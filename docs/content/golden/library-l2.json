@@ -1,0 +1,646 @@
+{
+  "level_id": "chunk-tuning",
+  "corpus": [
+    "qcdt-2024",
+    "qcdt-2019"
+  ],
+  "grading": {
+    "status": "Tạm chốt cho v0.1 (build brief §4.2); chủ Phần 4 xác nhận khi viết evaluator.",
+    "normalize": "NFC, chữ thường, đổi dấu phẩy thập phân giữa hai chữ số thành dấu chấm, bỏ dấu câu khác (giữ '%' và dấu chấm giữa hai chữ số), gộp khoảng trắng. Áp như nhau cho câu trả lời, answer_points, forbidden, equivalents và refusal_markers.",
+    "answer": "Mỗi mục answer_points đạt khi câu trả lời chứa chính nó hoặc một cách viết trong equivalents[mục]. Ca answer đạt khi: đủ mọi answer_points, có ít nhất một cited_id thuộc tập đoạn chứa một quote của gold, không có llm.cite_unknown, không chứa mục nào của forbidden.",
+    "abstain": "Ca abstain (gold rỗng) đạt khi: câu trả lời chứa ít nhất một mục của refusal_markers, không chứa mục nào của forbidden, không có llm.cite_unknown. Được trích đoạn có thật trong thùng (ví dụ để chỉ ra Điều 41 chỉ có 4 khoản); chỉ trích bịa mới trượt.",
+    "refusal_markers": [
+      "không có thông tin",
+      "không tìm thấy",
+      "không có điều",
+      "không có khoản",
+      "không tồn tại",
+      "không quy định"
+    ],
+    "bites": "bites dùng mã cấu hình ngây thơ ở mục 6 kịch bản của chính level này.",
+    "level_rule": "Riêng L2: ca role trap và mọi ca vai van-ban-cu/da-bai-bo còn trượt nếu pack.included có đoạn meta.hieu_luc = false (kịch bản L2 mục 9)."
+  },
+  "equivalents": {
+    "hai tuần": [
+      "2 tuần",
+      "14 ngày",
+      "mười bốn ngày"
+    ],
+    "15 ngày": [
+      "mười lăm ngày"
+    ],
+    "ốm đau": [
+      "ốm",
+      "bệnh",
+      "tai nạn",
+      "điều trị",
+      "nhập ngũ",
+      "nghĩa vụ quân sự"
+    ],
+    "2,00": [
+      "2.0",
+      "2,0"
+    ],
+    "chuẩn đầu ra ngoại ngữ": [
+      "ngoại ngữ"
+    ],
+    "30 ngày": [
+      "ba mươi ngày"
+    ],
+    "công nghệ thông tin cơ bản": [
+      "cntt cơ bản",
+      "tin học cơ bản"
+    ],
+    "hằng tháng": [
+      "hàng tháng",
+      "mỗi tháng"
+    ],
+    "25 tín chỉ": [
+      "hai mươi lăm tín chỉ"
+    ],
+    "30 tín chỉ": [
+      "ba mươi tín chỉ"
+    ],
+    "điểm 0": [
+      "0 điểm",
+      "không điểm"
+    ],
+    "06 ngày": [
+      "6 ngày",
+      "sáu ngày"
+    ],
+    "thi bổ sung": [
+      "đợt bổ sung"
+    ],
+    "hai học kỳ": [
+      "2 học kỳ",
+      "hai kỳ",
+      "2 kỳ"
+    ],
+    "2,30": [
+      "2.3"
+    ],
+    "trưởng khoa": [
+      "khoa tiếp nhận",
+      "khoa chuyển đến",
+      "khoa đồng ý"
+    ],
+    "80%": [
+      "80 %",
+      "tám mươi phần trăm"
+    ],
+    "hội đồng chuyên môn": [
+      "hội đồng của khoa",
+      "hội đồng khoa"
+    ],
+    "hai lần": [
+      "2 lần"
+    ],
+    "điểm cao nhất": [
+      "cao nhất"
+    ],
+    "25 sinh viên": [
+      "hai mươi lăm sinh viên"
+    ],
+    "02 năm": [
+      "2 năm",
+      "hai năm"
+    ],
+    "1,00": [
+      "1.0",
+      "1,0",
+      "dưới 1 "
+    ],
+    "không được hoàn": [
+      "không hoàn",
+      "không được trả lại",
+      "không trả lại"
+    ],
+    "lớp học phần bị hủy": [
+      "lớp bị hủy",
+      "hủy lớp",
+      "bị hủy lớp"
+    ],
+    "tuần thứ ba": [
+      "tuần 3",
+      "tuần thứ 3"
+    ],
+    "2,50": [
+      "2.5"
+    ],
+    "tháng 11": [
+      "tháng mười một"
+    ],
+    "20%": [
+      "20 %",
+      "20 phần trăm",
+      "hai mươi phần trăm"
+    ]
+  },
+  "cases": [
+    {
+      "id": "lib-l2-v01",
+      "role": "visible",
+      "vai": "ngoai-le-khoan-sau",
+      "question": "Hạn chót nộp đơn bảo lưu là lúc nào vậy ạ? Nếu em lỡ nộp trễ hạn thì còn được xét không?",
+      "expect": "answer",
+      "answer_points": [
+        "hai tuần",
+        "15 ngày",
+        "ốm đau"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 12,
+          "khoan": 2,
+          "quote": "Sinh viên nộp đơn bảo lưu cho phòng đào tạo chậm nhất hai tuần trước ngày bắt đầu học kỳ, kèm ý kiến của cố vấn học tập."
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 12,
+          "khoan": 3,
+          "quote": "được nộp đơn bảo lưu muộn, chậm nhất 15 ngày kể từ ngày bắt đầu học kỳ, kèm giấy xác nhận của cơ sở y tế hoặc lệnh gọi nhập ngũ"
+        }
+      ],
+      "forbidden": [
+        "một tuần",
+        "1 tuần",
+        "08 ngày",
+        "8 ngày",
+        "email"
+      ],
+      "trap": "boundary_split",
+      "bites": [
+        "N1",
+        "N5"
+      ],
+      "notes": "Neo brief §3 (câu của Hà). Câu không nhắc 'ốm' hay 'viện' (yêu cầu B4); vế 'nộp trễ' cần dữ kiện riêng của khoản 3 ('15 ngày', lý do ốm đau/tai nạn/nhập ngũ). Từ câu neo tới '15 ngày' ≈ 158 token o200k, nên ở 128/0 khoản 2 và khoản 3 luôn nằm ở hai đoạn khác nhau. forbidden có giá trị của bản 2019 ('một tuần', '08 ngày'). ƯỚC TÍNH: nếu cổng phát hành đo thấy đoạn khoản 3 vào top-3 ở 128/0, bỏ vế thứ hai của câu hỏi (kịch bản L2, Câu hỏi mở 7)."
+    },
+    {
+      "id": "lib-l2-v02",
+      "role": "visible",
+      "vai": "cau-dai",
+      "question": "Điều kiện để được xét tốt nghiệp gồm những gì ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "2,00",
+        "chuẩn đầu ra ngoại ngữ",
+        "30 ngày"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 68,
+          "khoan": 1,
+          "quote": "Sinh viên được xét công nhận tốt nghiệp khi tích lũy đủ số tín chỉ và hoàn thành các học phần bắt buộc của chương trình đào tạo, có điểm trung bình tích lũy toàn khóa từ 2,00 trở lên, không còn học phần nào mang ký hiệu I hoặc X trong bảng điểm, đạt chuẩn đầu ra ngoại ngữ theo Điều 66 và chuẩn đầu ra tin học theo Điều 67, có chứng chỉ giáo dục quốc phòng và an ninh và hoàn thành học phần giáo dục thể chất, đã hoàn thành nghĩa vụ học phí và trả đủ sách, thiết bị mượn của Trường, không đang bị truy cứu trách nhiệm hình sự hoặc đang trong thời hạn bị kỷ luật đình chỉ học tập, và đã nộp đơn đề nghị xét tốt nghiệp trên cổng thông tin đào tạo trước ngày họp hội đồng xét tốt nghiệp ít nhất 30 ngày."
+        }
+      ],
+      "forbidden": [],
+      "trap": "boundary_split",
+      "bites": [
+        "N1"
+      ],
+      "notes": "Khoản 1 Điều 68 là một câu dài; từ '2,00' tới '30 ngày' ≈ 140 token o200k, nên ở 128/0 câu luôn bị cắt ngang giữa hai mục bắt buộc. Bản 2019 không có điều tốt nghiệp nên ca này không dính văn bản cũ."
+    },
+    {
+      "id": "lib-l2-v03",
+      "role": "visible",
+      "vai": "don-gian",
+      "question": "Chuẩn đầu ra tin học là gì, thi ở đâu ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "công nghệ thông tin cơ bản",
+        "hằng tháng"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 67,
+          "khoan": null,
+          "quote": "Sinh viên phải đạt chuẩn kỹ năng sử dụng công nghệ thông tin cơ bản trước khi được xét tốt nghiệp."
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 67,
+          "khoan": null,
+          "quote": "Chuẩn này được chứng nhận qua bài kiểm tra do Trường tổ chức hằng tháng"
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [
+        "N4"
+      ],
+      "notes": "Ca đối chứng: điều ngắn (≈ 68 token o200k), không có bản 2019. Đạt ở hầu hết cấu hình; trượt ở N4 vì ngưỡng điểm lọc sạch thùng."
+    },
+    {
+      "id": "lib-l2-h01",
+      "role": "hidden",
+      "vai": "ngoai-le-khoan-sau",
+      "question": "1 kỳ chính đc đăng ký tối đa bn tín chỉ vậy ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "25 tín chỉ",
+        "30 tín chỉ"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 10,
+          "khoan": 2,
+          "quote": "Khối lượng học tập tối đa sinh viên được đăng ký trong mỗi học kỳ chính là 25 tín chỉ."
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 10,
+          "khoan": 3,
+          "quote": "Sinh viên có điểm trung bình tích lũy từ 3,20 trở lên và không có học phần nào bị điểm F được đăng ký tối đa 30 tín chỉ trong học kỳ chính."
+        }
+      ],
+      "forbidden": [
+        "22 tín chỉ",
+        "26 tín chỉ"
+      ],
+      "trap": "boundary_split",
+      "bites": [
+        "N1",
+        "N5"
+      ],
+      "notes": "Quy định chung ở khoản 2, ngoại lệ ở khoản 3 (yêu cầu A7). Từ '25 tín chỉ' tới '30 tín chỉ' ≈ 159 token o200k. Bản 2019 (Điều 5) có 22 và 26 tín chỉ nên đây cũng là ca dính văn bản cũ khi tắt lọc [M]. Câu viết tắt kiểu nhắn tin."
+    },
+    {
+      "id": "lib-l2-h02",
+      "role": "hidden",
+      "vai": "ngoai-le-khoan-sau",
+      "question": "Hôm thi cuối kỳ mà em vắng thì bị tính điểm sao ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "điểm 0",
+        "06 ngày",
+        "thi bổ sung"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 36,
+          "khoan": 2,
+          "quote": "Sinh viên vắng thi kết thúc học phần không có lý do chính đáng nhận điểm 0 cho lần thi đó."
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 36,
+          "khoan": 3,
+          "quote": "nếu nộp đơn kèm minh chứng tại phòng khảo thí trong thời hạn 06 ngày làm việc kể từ ngày thi, được nhận điểm I và được dự thi ở đợt thi bổ sung theo Điều 37"
+        }
+      ],
+      "forbidden": [],
+      "trap": "boundary_split",
+      "bites": [
+        "N1",
+        "N5"
+      ],
+      "notes": "Quy định chung (điểm 0) ở khoản 2, ngoại lệ (lý do chính đáng, 06 ngày làm việc, thi bổ sung) ở khoản 3. Khoảng cách ≈ 161 token o200k."
+    },
+    {
+      "id": "lib-l2-h03",
+      "role": "hidden",
+      "vai": "cau-dai",
+      "question": "Muốn chuyển sang ngành khác trong trường thì phải đủ những điều kiện gì ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "hai học kỳ",
+        "2,30",
+        "trưởng khoa"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 21,
+          "khoan": 2,
+          "quote": "Sinh viên được xét chuyển ngành khi đã học ít nhất hai học kỳ chính và chưa quá bốn học kỳ chính tại ngành đang học, có điểm trung bình tích lũy từ 2,30 trở lên và không có học phần bắt buộc nào bị điểm F chưa được học lại, có điểm trúng tuyển đầu vào không thấp hơn điểm trúng tuyển của ngành muốn chuyển đến trong cùng năm tuyển sinh và cùng tổ hợp xét tuyển, ngành muốn chuyển đến còn chỉ tiêu tiếp nhận do Trường công bố trong học kỳ đó, sinh viên đã hoàn thành nghĩa vụ học phí của các học kỳ đã học, không đang trong thời hạn bị kỷ luật từ mức cảnh cáo trở lên và không thuộc diện bị xem xét buộc thôi học, và được trưởng khoa quản lý ngành muốn chuyển đến đồng ý tiếp nhận bằng văn bản."
+        }
+      ],
+      "forbidden": [],
+      "trap": "boundary_split",
+      "bites": [
+        "N1"
+      ],
+      "notes": "Khoản 2 Điều 21 là một câu dài; từ 'hai học kỳ' tới 'trưởng khoa' ≈ 146 token o200k."
+    },
+    {
+      "id": "lib-l2-h04",
+      "role": "hidden",
+      "vai": "cau-dai",
+      "question": "Môn em học ở trường cũ muốn được công nhận thì cần những điều kiện gì?",
+      "expect": "answer",
+      "answer_points": [
+        "80%",
+        "hội đồng chuyên môn"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 25,
+          "khoan": 2,
+          "quote": "Một học phần đã học được công nhận khi học phần đó có nội dung trùng với học phần trong chương trình đào tạo của Trường từ 80% trở lên, có khối lượng không ít hơn khối lượng của học phần được công nhận, có hình thức đánh giá tương đương và điểm thi kết thúc học phần chiếm không dưới 50% điểm học phần, đạt điểm từ C trở lên theo thang điểm của Trường hoặc mức quy đổi tương đương theo khoản 6 Điều 39, được học trong vòng 05 năm tính đến ngày nộp đơn đề nghị công nhận và chưa được dùng để công nhận cho một chương trình đào tạo khác của sinh viên, được cơ sở đào tạo nơi sinh viên đã học xác nhận bằng bảng điểm có đóng dấu, và được hội đồng chuyên môn của khoa quản lý học phần thẩm định bằng biên bản."
+        }
+      ],
+      "forbidden": [],
+      "trap": "boundary_split",
+      "bites": [
+        "N1"
+      ],
+      "notes": "Khoản 2 Điều 25 là một câu dài; từ '80%' tới 'hội đồng chuyên môn' ≈ 137 token o200k."
+    },
+    {
+      "id": "lib-l2-h05",
+      "role": "hidden",
+      "vai": "nhieu-khoan",
+      "question": "Môn em bị D thì có được học lại để nâng điểm không, được học mấy lần và điểm lần nào được tính ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "hai lần",
+        "điểm cao nhất"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 15,
+          "khoan": 2,
+          "quote": "Sinh viên được đăng ký học lại để cải thiện điểm đối với học phần đã đạt điểm D hoặc D+. Mỗi học phần chỉ được học cải thiện điểm tối đa hai lần."
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 15,
+          "khoan": 3,
+          "quote": "Điểm cao nhất trong các lần học được dùng để tính điểm trung bình tích lũy và ghi vào bảng điểm"
+        }
+      ],
+      "forbidden": [
+        "lần học sau cùng",
+        "lần sau cùng"
+      ],
+      "trap": null,
+      "bites": [
+        "N4",
+        "N5"
+      ],
+      "notes": "Đáp án gộp khoản 2 và khoản 3. Bản 2019 (Điều 9) lấy điểm lần học sau cùng nên giá trị đó nằm trong forbidden [M khi tắt lọc]. Hai khoản ngắn và liền nhau nên ở 128/0 có thể vẫn chung đoạn: không ghi N1."
+    },
+    {
+      "id": "lib-l2-h06",
+      "role": "hidden",
+      "vai": "don-gian",
+      "question": "Lớp học phần lý thuyết cần tối thiểu bao nhiêu sinh viên mới được mở ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "25 sinh viên"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 8,
+          "khoan": 1,
+          "quote": "25 sinh viên đối với học phần lý thuyết"
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [
+        "N4"
+      ],
+      "notes": "Ca đối chứng."
+    },
+    {
+      "id": "lib-l2-h07",
+      "role": "hidden",
+      "vai": "don-gian",
+      "question": "bai thi cuoi ky duoc luu tru bao lau vay a",
+      "expect": "answer",
+      "answer_points": [
+        "02 năm"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 46,
+          "khoan": 1,
+          "quote": "Bài thi viết, bài tiểu luận và biên bản chấm thi được lưu trữ tại phòng khảo thí ít nhất 02 năm kể từ ngày thi."
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [
+        "N4"
+      ],
+      "notes": "Ca đối chứng, gõ không dấu."
+    },
+    {
+      "id": "lib-l2-t01",
+      "role": "trap",
+      "vai": "van-ban-cu",
+      "question": "Kỳ sau em tính bảo lưu, vậy phải nộp đơn trước ngày bắt đầu học kỳ ít nhất mấy hôm ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "hai tuần"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 12,
+          "khoan": 2,
+          "quote": "Sinh viên nộp đơn bảo lưu cho phòng đào tạo chậm nhất hai tuần trước ngày bắt đầu học kỳ, kèm ý kiến của cố vấn học tập."
+        }
+      ],
+      "forbidden": [
+        "một tuần",
+        "1 tuần",
+        "7 ngày",
+        "bảy ngày"
+      ],
+      "trap": "stale_doc",
+      "bites": [
+        "N1",
+        "N2",
+        "N3"
+      ],
+      "notes": "Neo brief §3. Bản 2019 (Điều 10 khoản 2) gần như trùng lời văn nhưng ghi 'một tuần'. Không lọc hiệu lực thì đoạn 2019 dự kiến đứng hạng 1–2 (ƯỚC TÍNH, cổng phát hành đo). Đạt còn cần pack.included không có đoạn hieu_luc = false."
+    },
+    {
+      "id": "lib-l2-t02",
+      "role": "trap",
+      "vai": "da-bai-bo",
+      "question": "nghe noi dat giai olympic sinh vien thi duoc cong diem vao mon lien quan, cong bao nhieu vay a?",
+      "expect": "abstain",
+      "answer_points": [],
+      "gold": [],
+      "forbidden": [
+        "1,0 điểm",
+        "1 điểm"
+      ],
+      "trap": "stale_doc",
+      "bites": [
+        "N1",
+        "N2",
+        "N3"
+      ],
+      "notes": "Quy định chỉ có ở bản 2019 (Điều 12, cộng 1,0 điểm); bản 2024 không có điều nào về cộng điểm hay giải thưởng. Đáp án đúng là 'quy chế hiện hành không có'. Gõ không dấu."
+    },
+    {
+      "id": "lib-l2-t03",
+      "role": "trap",
+      "vai": "van-ban-cu",
+      "question": "Điểm trung bình học kỳ dưới bao nhiêu thì bị cảnh báo học tập ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "1,00"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 52,
+          "khoan": 1,
+          "quote": "Điểm trung bình học kỳ dưới 1,00"
+        }
+      ],
+      "forbidden": [
+        "0,80",
+        "0,8"
+      ],
+      "trap": "stale_doc",
+      "bites": [
+        "N1",
+        "N2",
+        "N3"
+      ],
+      "notes": "Bẫy văn bản cũ thứ ba (brief yêu cầu ≥ 3 ca bẫy; kịch bản chỉ đặt 2). Bản 2019 (Điều 13) ghi 0,80. Tính vào điều kiện sao 3 'không ca nào có ret.stale_doc'."
+    },
+    {
+      "id": "lib-l2-r01",
+      "role": "review",
+      "vai": "ngoai-le-khoan-sau",
+      "question": "Qua tuần thứ tư em mới bỏ học môn đó thì có được trả lại học phí không ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "không được hoàn",
+        "lớp học phần bị hủy"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 78,
+          "khoan": 2,
+          "quote": "Sau tuần thứ ba của học kỳ chính, học phí đã nộp không được hoàn trả, kể cả khi sinh viên không tham gia học hoặc không dự thi."
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 78,
+          "khoan": 3,
+          "quote": "lớp học phần bị hủy theo khoản 2 Điều 8"
+        }
+      ],
+      "forbidden": [],
+      "trap": "boundary_split",
+      "bites": [
+        "N1"
+      ],
+      "notes": "Ngoại lệ ở khoản sau, điều khác Điều 12 (kịch bản L2 mục 14). Từ 'không được hoàn trả' tới 'lớp học phần bị hủy' ≈ 150 token o200k."
+    },
+    {
+      "id": "lib-l2-r02",
+      "role": "review",
+      "vai": "van-ban-cu",
+      "question": "Hạn cuối để rút bớt học phần đã đăng ký là khi nào ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "tuần thứ ba"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 11,
+          "khoan": 1,
+          "quote": "Sinh viên được rút bớt học phần đã đăng ký trước khi kết thúc tuần thứ ba của học kỳ chính"
+        }
+      ],
+      "forbidden": [
+        "kết thúc tuần thứ hai",
+        "hết tuần thứ hai"
+      ],
+      "trap": "stale_doc",
+      "bites": [
+        "N1",
+        "N2",
+        "N3"
+      ],
+      "notes": "Một con số khác nhau giữa 2019 (Điều 6: tuần thứ hai) và 2024, không về bảo lưu. forbidden viết đủ cụm vì 'tuần thứ hai' xuất hiện hợp lệ ở Điều 78 khoản 1."
+    },
+    {
+      "id": "lib-l2-r03",
+      "role": "review",
+      "vai": "cau-dai",
+      "question": "Muốn học thêm một ngành thứ hai song song thì cần điều kiện gì ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "hai học kỳ",
+        "2,50",
+        "tháng 11"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 13,
+          "khoan": 2,
+          "quote": "Đã hoàn thành ít nhất hai học kỳ chính của chương trình thứ nhất"
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 13,
+          "khoan": 2,
+          "quote": "Có điểm trung bình tích lũy của chương trình thứ nhất từ 2,50 trở lên"
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 13,
+          "khoan": 2,
+          "quote": "Nộp đơn tại phòng đào tạo trong đợt xét tuyển chương trình thứ hai do Trường tổ chức vào tháng 5 và tháng 11 hằng năm"
+        }
+      ],
+      "forbidden": [],
+      "trap": "boundary_split",
+      "bites": [
+        "N1"
+      ],
+      "notes": "Khoản 2 Điều 13 có 8 điểm; từ điểm a tới 'tháng 11' ở điểm h ≈ 230 token o200k: luôn bị cắt ở 128/0, và bị cắt ở 256/0 với xác suất cao nhưng không chắc chắn (ƯỚC TÍNH). Overlap 10–20% không bảo đảm giữ trọn một đoạn dài hơn phần chồng lấp; theo_dieu/512 thì giữ trọn."
+    },
+    {
+      "id": "lib-l2-r04",
+      "role": "review",
+      "vai": "van-ban-cu",
+      "question": "Vắng quá bao nhiêu phần trăm số tiết thì không được thi vậy ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "20%"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 18,
+          "khoan": 1,
+          "quote": "Sinh viên vắng mặt quá 20% tổng số tiết của một học phần, kể cả vắng có phép, không được dự thi kết thúc học phần đó và nhận điểm F."
+        }
+      ],
+      "forbidden": [
+        "25%"
+      ],
+      "trap": "stale_doc",
+      "bites": [
+        "N1",
+        "N2",
+        "N3"
+      ],
+      "notes": "Ca ôn thứ tư (brief yêu cầu ≥ 4). Bản 2019 (Điều 8) ghi 25%."
+    }
+  ]
+}

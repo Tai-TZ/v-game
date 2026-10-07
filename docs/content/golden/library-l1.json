@@ -1,0 +1,415 @@
+{
+  "level_id": "grounded-citation",
+  "corpus": [
+    "qcdt-2024"
+  ],
+  "grading": {
+    "status": "Tạm chốt cho v0.1 (build brief §4.2); chủ Phần 4 xác nhận khi viết evaluator.",
+    "normalize": "NFC, chữ thường, đổi dấu phẩy thập phân giữa hai chữ số thành dấu chấm, bỏ dấu câu khác (giữ '%' và dấu chấm giữa hai chữ số), gộp khoảng trắng. Áp như nhau cho câu trả lời, answer_points, forbidden, equivalents và refusal_markers.",
+    "answer": "Mỗi mục answer_points đạt khi câu trả lời chứa chính nó hoặc một cách viết trong equivalents[mục]. Ca answer đạt khi: đủ mọi answer_points, có ít nhất một cited_id thuộc tập đoạn chứa một quote của gold, không có llm.cite_unknown, không chứa mục nào của forbidden.",
+    "abstain": "Ca abstain (gold rỗng) đạt khi: câu trả lời chứa ít nhất một mục của refusal_markers, không chứa mục nào của forbidden, không có llm.cite_unknown. Được trích đoạn có thật trong thùng (ví dụ để chỉ ra Điều 41 chỉ có 4 khoản); chỉ trích bịa mới trượt.",
+    "refusal_markers": [
+      "không có thông tin",
+      "không tìm thấy",
+      "không có điều",
+      "không có khoản",
+      "không tồn tại",
+      "không quy định"
+    ],
+    "bites": "bites dùng mã cấu hình ngây thơ ở mục 6 kịch bản của chính level này."
+  },
+  "equivalents": {
+    "hai tuần": [
+      "2 tuần",
+      "14 ngày",
+      "mười bốn ngày"
+    ],
+    "cố vấn học tập": [
+      "cố vấn"
+    ],
+    "phòng đào tạo": [
+      "phòng đt"
+    ],
+    "20%": [
+      "20 %",
+      "20 phần trăm",
+      "hai mươi phần trăm"
+    ],
+    "bậc 3": [
+      "bậc ba",
+      "bậc 3/6"
+    ],
+    "2,5": [
+      "2.5"
+    ],
+    "09 tín chỉ": [
+      "9 tín chỉ",
+      "chín tín chỉ"
+    ],
+    "02 ngày làm việc": [
+      "2 ngày làm việc",
+      "hai ngày làm việc"
+    ],
+    "cảnh báo học tập": [
+      "bị cảnh báo"
+    ],
+    "hai học kỳ": [
+      "2 học kỳ",
+      "hai kỳ",
+      "2 kỳ"
+    ],
+    "bốn học kỳ": [
+      "4 học kỳ",
+      "bốn kỳ",
+      "4 kỳ"
+    ],
+    "100%": [
+      "100 %",
+      "toàn bộ học phí",
+      "hoàn đủ"
+    ],
+    "15 tuần": [
+      "mười lăm tuần"
+    ],
+    "03 tuần": [
+      "3 tuần",
+      "ba tuần"
+    ]
+  },
+  "cases": [
+    {
+      "id": "lib-l1-v01",
+      "role": "visible",
+      "vai": "su-kien",
+      "question": "Em muốn bảo lưu kết quả học tập một học kỳ thì cần làm gì?",
+      "expect": "answer",
+      "answer_points": [
+        "hai tuần",
+        "cố vấn học tập",
+        "phòng đào tạo"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 12,
+          "khoan": 2,
+          "quote": "Sinh viên nộp đơn bảo lưu cho phòng đào tạo chậm nhất hai tuần trước ngày bắt đầu học kỳ, kèm ý kiến của cố vấn học tập."
+        }
+      ],
+      "forbidden": [
+        "email",
+        "Điều 47"
+      ],
+      "trap": null,
+      "bites": [
+        "N1",
+        "N2"
+      ],
+      "notes": "Neo brief §3: nguyên văn câu demo trang chủ (ShiftDemo.tsx). Câu bịa 'Điều 47 ma' bảo gửi email; quy chế không có quy định nào như vậy, nên 'email' và 'Điều 47' nằm trong forbidden. Camera bám ca này. Ở biến thể theo_dieu/512/10 cả Điều 12 nằm trong một đoạn."
+    },
+    {
+      "id": "lib-l1-v02",
+      "role": "visible",
+      "vai": "su-kien",
+      "question": "Vắng bao nhiêu phần trăm số tiết thì bị cấm thi cuối kỳ vậy ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "20%"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 18,
+          "khoan": 1,
+          "quote": "Sinh viên vắng mặt quá 20% tổng số tiết của một học phần, kể cả vắng có phép, không được dự thi kết thúc học phần đó và nhận điểm F."
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [
+        "N1",
+        "N2"
+      ],
+      "notes": "Dữ kiện nằm gọn trong một khoản, ở điều khác Điều 12 (yêu cầu B4)."
+    },
+    {
+      "id": "lib-l1-v03",
+      "role": "visible",
+      "vai": "dien-dat-lai",
+      "question": "Cuối khóa muốn ra trường thì tiếng Anh phải tới cỡ nào ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "bậc 3"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 66,
+          "khoan": 1,
+          "quote": "Sinh viên phải đạt trình độ ngoại ngữ tương đương bậc 3 theo khung năng lực ngoại ngữ sáu bậc trước khi được xét tốt nghiệp"
+        }
+      ],
+      "forbidden": [],
+      "trap": "paraphrase",
+      "bites": [
+        "N1",
+        "N2",
+        "N5"
+      ],
+      "notes": "Lời thường ('ra trường', 'tiếng Anh') thay cho 'xét tốt nghiệp', 'ngoại ngữ'. Dự kiến đoạn Điều 68 (nhắc chuẩn ngoại ngữ nhưng không có mức) đứng trên Điều 66, nên N5 (top_k 1) trượt. ƯỚC TÍNH: cổng phát hành phải xác nhận hạng của đoạn Điều 66 ≥ 2 ở biến thể theo_dieu/512/10; nếu không, đổi câu hỏi."
+    },
+    {
+      "id": "lib-l1-h01",
+      "role": "hidden",
+      "vai": "su-kien",
+      "question": "diem C+ doi ra thang 4 la bao nhieu vay?",
+      "expect": "answer",
+      "answer_points": [
+        "2,5"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 39,
+          "khoan": 2,
+          "quote": "điểm C+, từ 6,3 đến 6,9, tương ứng 2,5"
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [
+        "N1",
+        "N2"
+      ],
+      "notes": "Câu gõ không dấu (khoảng 20% số ca)."
+    },
+    {
+      "id": "lib-l1-h02",
+      "role": "hidden",
+      "vai": "su-kien",
+      "question": "Học kỳ hè được đăng ký tối đa bao nhiêu tín chỉ ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "09 tín chỉ"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 19,
+          "khoan": 1,
+          "quote": "Sinh viên được đăng ký tối đa 09 tín chỉ trong học kỳ phụ."
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [
+        "N1",
+        "N2"
+      ],
+      "notes": "'Học kỳ hè' trong câu hỏi, 'học kỳ phụ' trong văn bản."
+    },
+    {
+      "id": "lib-l1-h03",
+      "role": "hidden",
+      "vai": "su-kien",
+      "question": "Xin giấy xác nhận sinh viên thì mấy ngày mới lấy được ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "02 ngày làm việc"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 30,
+          "khoan": 1,
+          "quote": "Giấy xác nhận sinh viên được trả trong 02 ngày làm việc kể từ ngày nhận đơn tại bộ phận một cửa."
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [
+        "N1",
+        "N2"
+      ],
+      "notes": "Dữ kiện thủ tục ngắn, một khoản."
+    },
+    {
+      "id": "lib-l1-h04",
+      "role": "hidden",
+      "vai": "dien-dat-lai",
+      "question": "Rớt môn hoài thì tới mức nào là bị đuổi học vậy ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "cảnh báo học tập",
+        "hai học kỳ"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 53,
+          "khoan": 1,
+          "quote": "Bị cảnh báo học tập hai học kỳ chính liên tiếp;"
+        }
+      ],
+      "forbidden": [],
+      "trap": "paraphrase",
+      "bites": [
+        "N1",
+        "N2",
+        "N5"
+      ],
+      "notes": "'Đuổi học' là lời thường của 'buộc thôi học'. Đáp án ở điểm a khoản 1 Điều 53."
+    },
+    {
+      "id": "lib-l1-h05",
+      "role": "hidden",
+      "vai": "dien-dat-lai",
+      "question": "Mới học tuần đầu thấy không hợp, rút môn thì có lấy lại được tiền học không ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "100%"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 78,
+          "khoan": 1,
+          "quote": "Sinh viên rút học phần theo Điều 11 trước khi kết thúc tuần thứ nhất của học kỳ chính được hoàn trả 100% học phí của học phần đó"
+        }
+      ],
+      "forbidden": [],
+      "trap": "paraphrase",
+      "bites": [
+        "N1",
+        "N2",
+        "N5"
+      ],
+      "notes": "'Tiền học' thay cho 'học phí', 'rút môn' thay cho 'rút học phần'."
+    },
+    {
+      "id": "lib-l1-t01",
+      "role": "trap",
+      "vai": "dieu-khong-ton-tai",
+      "question": "Điều 99 của quy chế đào tạo quy định gì về học vượt vậy ạ?",
+      "expect": "abstain",
+      "answer_points": [],
+      "gold": [],
+      "forbidden": [
+        "Điều 99 quy định",
+        "theo Điều 99"
+      ],
+      "trap": "nonexistent_article",
+      "bites": [
+        "N3"
+      ],
+      "notes": "Neo brief §3. Kho dừng ở Điều 84, không có Điều 99 ở bất kỳ đâu (self-check kiểm). Ở N1 (có G5) model có thể từ chối hoặc bịa; đó là điểm dạy, không ghi vào bites. Bẫy phụ thuộc model [M], phải qua cổng hiệu chỉnh."
+    },
+    {
+      "id": "lib-l1-t02",
+      "role": "trap",
+      "vai": "ngoai-pham-vi",
+      "question": "Sinh viên ngành công nghệ thông tin sau khi tốt nghiệp thường có mức lương khởi điểm bao nhiêu ạ?",
+      "expect": "abstain",
+      "answer_points": [],
+      "gold": [],
+      "forbidden": [
+        "triệu"
+      ],
+      "trap": "out_of_scope",
+      "bites": [
+        "N3"
+      ],
+      "notes": "Neo brief §3: câu ngoài phạm vi quy chế. Mọi con số lương ('… triệu') đều là bịa. [M]."
+    },
+    {
+      "id": "lib-l1-r01",
+      "role": "review",
+      "vai": "su-kien",
+      "question": "Một lần bảo lưu được tối đa bao lâu, tổng cộng được mấy kỳ ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "hai học kỳ",
+        "bốn học kỳ"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 12,
+          "khoan": 1,
+          "quote": "được bảo lưu kết quả học tập để gián đoạn việc học tối đa hai học kỳ chính liên tiếp, tổng cộng không quá bốn học kỳ chính trong toàn khóa"
+        }
+      ],
+      "forbidden": [
+        "email"
+      ],
+      "trap": null,
+      "bites": [
+        "N2"
+      ],
+      "notes": "Biến thể của v01 cho ca trực (grounding.citation): sự cố dựng sẵn là tắt Máy đóng tem."
+    },
+    {
+      "id": "lib-l1-r02",
+      "role": "review",
+      "vai": "khoan-khong-ton-tai",
+      "question": "Điều 12 khoản 9 nói gì vậy ạ?",
+      "expect": "abstain",
+      "answer_points": [],
+      "gold": [],
+      "forbidden": [
+        "khoản 9 quy định",
+        "theo khoản 9"
+      ],
+      "trap": "nonexistent_article",
+      "bites": [
+        "N3"
+      ],
+      "notes": "Biến thể của t01: điều có thật (Điều 12 chỉ có 3 khoản), khoản không tồn tại. Danh sách dấu hiệu từ chối nên có thêm 'không có khoản' (xem README, Câu hỏi mở). [M]."
+    },
+    {
+      "id": "lib-l1-r03",
+      "role": "review",
+      "vai": "ngoai-pham-vi",
+      "question": "Bãi giữ xe máy cạnh thư viện có bán vé tháng không ạ?",
+      "expect": "abstain",
+      "answer_points": [],
+      "gold": [],
+      "forbidden": [
+        "nghìn đồng",
+        "000 đồng"
+      ],
+      "trap": "out_of_scope",
+      "bites": [
+        "N1",
+        "N3"
+      ],
+      "notes": "Biến thể của t02: chuyện đời sống trong khuôn viên nhưng quy chế đào tạo không nói. Sự cố dựng sẵn: tháo Vòm Sao, chỉ còn LLM chay. [M]."
+    },
+    {
+      "id": "lib-l1-r04",
+      "role": "review",
+      "vai": "su-kien",
+      "question": "1 hk chính học mấy tuần, thi mấy tuần vậy ad?",
+      "expect": "answer",
+      "answer_points": [
+        "15 tuần",
+        "03 tuần"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 5,
+          "khoan": 1,
+          "quote": "Mỗi học kỳ chính có 15 tuần thực học và 03 tuần thi kết thúc học phần."
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [
+        "N1",
+        "N2"
+      ],
+      "notes": "Ca ôn thứ tư (brief yêu cầu ≥ 4 ca ôn; kịch bản chỉ đặt vai cho r01–r03). Câu viết tắt kiểu nhắn tin."
+    }
+  ]
+}

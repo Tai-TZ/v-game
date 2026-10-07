@@ -1,0 +1,609 @@
+{
+  "id": "library-assessment",
+  "use": "Chỉ dùng cho pilot (đo trước/sau và kiểm tra nhanh). Engine không đọc file này.",
+  "misconceptions": {
+    "m-l1-tu-noi-khong-biet": {
+      "level": "grounded-citation",
+      "text": "Không có tài liệu thì model sẽ tự nói là không biết."
+    },
+    "m-l2-topk-cang-lon": {
+      "level": "chunk-tuning",
+      "text": "top-k càng lớn càng chắc."
+    },
+    "m-l2-cat-cang-nho": {
+      "level": "chunk-tuning",
+      "text": "Cắt chunk càng nhỏ thì tìm càng chuẩn."
+    },
+    "m-l2-van-ban-nao-cung-dung": {
+      "level": "chunk-tuning",
+      "text": "Văn bản nào trong kho cũng dùng được."
+    },
+    "m-l3-nghia-hieu-so-hieu": {
+      "level": "article-number-lookup",
+      "text": "Tìm theo nghĩa hiểu được cả số hiệu, mã số."
+    },
+    "m-l3-rerank-luon-dang": {
+      "level": "article-number-lookup",
+      "text": "Thêm rerank lúc nào cũng đáng."
+    }
+  },
+  "pre_post": {
+    "how_to_use": "Hai dạng song song A/B cùng độ khó; trước khi chơi làm một dạng, sau 2–4 tuần làm dạng kia (đổi chiều ở một nửa lớp). Mỗi dạng có 2 câu cho mỗi hiểu lầm: một câu dự đoán và một câu chuyển giao dùng log hoặc cấu hình thật. Bản rút gọn 5 câu = các câu core: true (một câu cho mỗi khái niệm grounding_abstention, chunk_size_overlap, top_k_tradeoff, metadata_filter, hybrid_rerank). Đáp án máy kiểm theo key.",
+    "forms": {
+      "A": [
+        {
+          "id": "pp-a01",
+          "form": "A",
+          "misconception": "m-l1-tu-noi-khong-biet",
+          "concept": "grounding_abstention",
+          "core": true,
+          "transfer": false,
+          "stem": "Một chatbot nội bộ gọi thẳng LLM, không kèm tài liệu nào. Nhân viên hỏi: \"Nhân viên thử việc được nghỉ phép mấy ngày?\" Đây là quy định riêng của công ty, chưa từng công bố ra ngoài. Kết quả nào hay gặp nhất?",
+          "options": {
+            "A": "Model nói \"tôi không biết\" vì không có dữ liệu.",
+            "B": "Model trả lời trôi chảy, có số ngày cụ thể và có thể kèm cả tên điều khoản, dù không có nguồn nào.",
+            "C": "Model từ chối mọi câu hỏi liên quan đến công ty.",
+            "D": "Model trả lời đúng vì quy định nghỉ phép ở công ty nào cũng giống nhau."
+          },
+          "key": "B",
+          "rationale": "Ngày 8, slide 5/46 (Ảo giác của LLM): model ưu tiên câu trả lời trôi chảy hơn câu trả lời chính xác và không biết mình không biết. Muốn từ chối đúng chỗ thì phải có tài liệu và lệnh từ chối rõ ràng (Ngày 8, slide 27/46, Grounding & Abstention).",
+          "parallel": "pp-b01"
+        },
+        {
+          "id": "pp-a02",
+          "form": "A",
+          "misconception": "m-l1-tu-noi-khong-biet",
+          "concept": "grounding_abstention",
+          "core": false,
+          "transfer": true,
+          "stem": "Đọc log sau.\nsystem: \"Bạn là trợ lý nhân sự. Luôn đưa ra câu trả lời hữu ích nhất.\"\nretrieved: [] (0 đoạn)\nhỏi: \"Nhân viên thử việc được nghỉ phép mấy ngày?\"\ntrả lời: \"Theo Mục 9 Sổ tay nhân sự, nhân viên thử việc được 6 ngày phép.\"\nCách sửa nào chạm đúng gốc lỗi?",
+          "options": {
+            "A": "Đổi sang model lớn hơn.",
+            "B": "Thêm câu \"hãy trả lời thật chính xác\" vào system prompt.",
+            "C": "Thêm bước truy xuất trả về đoạn kèm mã nguồn, và dặn: không có trong tài liệu thì nói là không có.",
+            "D": "Rút ngắn câu hỏi để model dễ hiểu hơn."
+          },
+          "key": "C",
+          "rationale": "Ngày 7, slide 36/60 (LLM chay so với RAG): dữ liệu riêng thì model không thể biết, phải đưa vào bằng truy xuất. Ngày 8, slide 27/46: buộc trích nguồn và cho phép từ chối. Lệnh \"luôn hữu ích\" còn đẩy model đoán thêm.",
+          "parallel": "pp-b02"
+        },
+        {
+          "id": "pp-a03",
+          "form": "A",
+          "misconception": "m-l2-topk-cang-lon",
+          "concept": "top_k_tradeoff",
+          "core": true,
+          "transfer": false,
+          "stem": "Một pipeline RAG cho phép tối đa 3.000 token tài liệu trong prompt; mỗi chunk khoảng 500 token. Nhóm đổi top_k từ 3 lên 12 \"cho chắc\". Điều gì nhiều khả năng xảy ra?",
+          "options": {
+            "A": "Phần lớn chunk bị cắt khi đóng gói prompt; chunk đúng nếu đứng hạng thấp vẫn có thể bị loại; token và nhiễu đều tăng.",
+            "B": "Độ chính xác chắc chắn tăng vì có nhiều ngữ cảnh hơn.",
+            "C": "Không có gì thay đổi vì model tự bỏ qua chunk thừa.",
+            "D": "Độ trễ giảm vì một lần tìm lấy được nhiều đoạn hơn."
+          },
+          "key": "A",
+          "rationale": "Ngày 7, slide 27/60 (top-k: lấy quá nhiều thì nhiễu) và slide 49/60 (anti-pattern top-k = 10 \"cho chắc\"); Ngày 8, slide 23/46 (ngân sách token cho phần context).",
+          "parallel": "pp-b03"
+        },
+        {
+          "id": "pp-a04",
+          "form": "A",
+          "misconception": "m-l2-topk-cang-lon",
+          "concept": "top_k_tradeoff",
+          "core": false,
+          "transfer": true,
+          "stem": "Log một câu hỏi:\nchunk_size=1024, top_k=10\npacker: 10.240 token, cắt còn 3.000 (giữ hạng 1–3)\nđoạn đúng: hạng 6\ntrả lời: thiếu ý chính\nNguyên nhân chính là gì?",
+          "options": {
+            "A": "Embedding kém nên không tìm thấy đoạn đúng.",
+            "B": "Câu hỏi quá mơ hồ.",
+            "C": "Model đã đọc đủ thông tin nhưng vẫn trả lời sai.",
+            "D": "Lấy quá nhiều đoạn to nên bước đóng gói phải cắt, và đoạn đúng ở hạng 6 bị loại."
+          },
+          "key": "D",
+          "rationale": "Đoạn đúng đã được tìm thấy (hạng 6) nhưng không vào prompt vì vượt ngân sách. Ngày 7, slide 38/60 (Common failure patterns: top-k quá cao, inject quá nhiều context) và slide 27/60.",
+          "parallel": "pp-b04"
+        },
+        {
+          "id": "pp-a05",
+          "form": "A",
+          "misconception": "m-l2-cat-cang-nho",
+          "concept": "chunk_size_overlap",
+          "core": true,
+          "transfer": false,
+          "stem": "Tài liệu có câu: \"Hạn nộp hồ sơ là ngày 15; riêng hồ sơ xin miễn giảm được nộp đến hết ngày 30.\" Nhóm cắt chunk cố định 32 token, overlap 0, \"để tìm cho chuẩn\". Rủi ro chính là gì?",
+          "options": {
+            "A": "Chunk nhỏ thì tìm chính xác hơn, không có rủi ro đáng kể.",
+            "B": "Câu bị cắt ngang ở ranh giới: chunk lấy về có \"ngày 15\" nhưng mất vế ngoại lệ nằm ở chunk sau.",
+            "C": "Mỗi lần trả lời tốn nhiều token hơn hẳn.",
+            "D": "Embedding không chạy được với chunk ngắn."
+          },
+          "key": "B",
+          "rationale": "Ngày 7, slide 31/60 (chunk quá nhỏ mất ngữ cảnh, quá to thì nhiễu) và slide 33/60 (overlap 10–20% để giữ nghĩa ở ranh giới).",
+          "parallel": "pp-b05"
+        },
+        {
+          "id": "pp-a06",
+          "form": "A",
+          "misconception": "m-l2-cat-cang-nho",
+          "concept": "chunk_size_overlap",
+          "core": false,
+          "transfer": true,
+          "stem": "Hai lần đo trên cùng bộ câu hỏi, đáp án thường dài 2–3 câu:\nv1: chunk_size=512, overlap=10% → recall@3 = 0,81\nv2: chunk_size=128, overlap=0 → recall@3 = 0,58\nGiải thích nào hợp lý nhất?",
+          "options": {
+            "A": "v2 đo sai, vì chunk nhỏ hơn luôn cho kết quả tốt hơn.",
+            "B": "recall không phụ thuộc chunk_size; chênh lệch là ngẫu nhiên.",
+            "C": "Đáp án dài bị chia qua nhiều chunk nhỏ; mỗi chunk chỉ chứa một phần nên khó khớp và khó đủ ý trong top-3.",
+            "D": "Bước sinh câu trả lời bị lỗi ở v2."
+          },
+          "key": "C",
+          "rationale": "Ngày 7, slide 31/60 (chunking quá nhỏ làm vỡ ý) và slide 33/60 (overlap). recall@k đo ở bước truy xuất, chưa liên quan tới bước sinh câu trả lời.",
+          "parallel": "pp-b06"
+        },
+        {
+          "id": "pp-a07",
+          "form": "A",
+          "misconception": "m-l2-van-ban-nao-cung-dung",
+          "concept": "metadata_filter",
+          "core": true,
+          "transfer": false,
+          "stem": "Kho có \"Chính sách đổi trả 2022\" (đã bị thay) và \"Chính sách đổi trả 2025\" (đang áp dụng), lời văn gần như giống hệt, chỉ khác số ngày. Cách chắc chắn nhất để chatbot không trả lời theo bản 2022 là gì?",
+          "options": {
+            "A": "Tăng top_k để lấy cả hai bản, model sẽ tự chọn bản mới.",
+            "B": "Giảm chunk_size.",
+            "C": "Dặn model \"ưu tiên bản mới\" trong prompt là đủ.",
+            "D": "Gắn metadata hiệu lực cho từng chunk và lọc chỉ lấy bản đang áp dụng trước khi tìm."
+          },
+          "key": "D",
+          "rationale": "Ngày 7, slide 26/60 (metadata quan trọng không kém similarity, kể cả thời điểm và độ mới); Ngày 8, slide 31/46 (pre-filtering: chỉ lấy tài liệu còn hiệu lực). Lọc là cơ chế tất định; dặn bằng prompt thì tuỳ model.",
+          "parallel": "pp-b07"
+        },
+        {
+          "id": "pp-a08",
+          "form": "A",
+          "misconception": "m-l2-van-ban-nao-cung-dung",
+          "concept": "metadata_filter",
+          "core": false,
+          "transfer": true,
+          "stem": "Log:\nretrieved: [{doc: \"bang-phi-2021\", in_force: false, score: 0.86}, {doc: \"bang-phi-2025\", in_force: true, score: 0.85}]\ntrả lời: dùng mức phí của bảng 2021\nSửa thế nào?",
+          "options": {
+            "A": "Bật bộ lọc in_force = true ở bước truy xuất.",
+            "B": "Đổi sang embedding model khác.",
+            "C": "Tăng top_k lên 10.",
+            "D": "Thêm rerank sau bước truy xuất."
+          },
+          "key": "A",
+          "rationale": "Hai văn bản gần như trùng nghĩa nên điểm tương đồng sát nhau; đổi embedding hay thêm rerank không phân biệt được hiệu lực. Ngày 8, slide 31/46 (pre-filtering theo metadata).",
+          "parallel": "pp-b08"
+        },
+        {
+          "id": "pp-a09",
+          "form": "A",
+          "misconception": "m-l3-nghia-hieu-so-hieu",
+          "concept": "hybrid_rerank",
+          "core": true,
+          "transfer": false,
+          "stem": "Người dùng hỏi: \"Mã lỗi E-4012 nghĩa là gì?\" Hệ thống chỉ dùng dense search, trả về các đoạn nói chung chung về lỗi kết nối, không đoạn nào chứa \"E-4012\". Vì sao?",
+          "options": {
+            "A": "Vector database bị lỗi.",
+            "B": "Câu hỏi quá ngắn, cần viết lại dài hơn.",
+            "C": "Embedding nắm nghĩa chung, còn chuỗi mã hay con số gần như không mang nghĩa, nên đoạn chứa đúng mã không nổi lên; cần thêm tìm từ khóa (BM25) hoặc hybrid.",
+            "D": "Cần tăng chunk_size."
+          },
+          "key": "C",
+          "rationale": "Ngày 8, slide 13/46 (semantic search bỏ lỡ mã lỗi, tên riêng, con số), slide 14/46 (BM25 khớp chính xác) và slide 15/46 (hybrid bù điểm mù cho nhau).",
+          "parallel": "pp-b09"
+        },
+        {
+          "id": "pp-a10",
+          "form": "A",
+          "misconception": "m-l3-nghia-hieu-so-hieu",
+          "concept": "hybrid_rerank",
+          "core": false,
+          "transfer": true,
+          "stem": "Tra cứu hợp đồng, câu hỏi: \"Mục 7.3 quy định phạt chậm thanh toán bao nhiêu?\"\ndense top-5: 7.2 (0,81) · 9.3 (0,80) · 7.1 (0,79) · 3.7 (0,78) · 8.3 (0,77)\nBM25 top-1: 7.3\nNên chọn cấu hình nào cho kho này?",
+          "options": {
+            "A": "Chỉ dùng BM25 cho mọi câu hỏi.",
+            "B": "Hybrid: dense + BM25, gộp bằng RRF, để bắt được số hiệu mà vẫn hiểu câu hỏi lời thường.",
+            "C": "Tăng top_k của dense lên 50.",
+            "D": "Đổi sang embedding model lớn hơn."
+          },
+          "key": "B",
+          "rationale": "Ngày 8, slide 15/46 (hybrid search), slide 16/46 (RRF, k = 60, không cần tinh chỉnh) và slide 42/46 (case study: thêm BM25 làm recall tăng mạnh). Chỉ dùng BM25 thì lại trượt câu hỏi diễn đạt lại (slide 14/46).",
+          "parallel": "pp-b10"
+        },
+        {
+          "id": "pp-a11",
+          "form": "A",
+          "misconception": "m-l3-rerank-luon-dang",
+          "concept": "hybrid_rerank",
+          "core": false,
+          "transfer": false,
+          "stem": "Nhóm thêm cross-encoder rerank vào chatbot FAQ. Trước khi thêm, đáp án đúng đã đứng hạng 1 ở 97% câu hỏi. Sau khi thêm, độ đúng gần như không đổi, độ trễ tăng từ 0,6 s lên 2,1 s. Nên làm gì?",
+          "options": {
+            "A": "Giữ rerank vì rerank luôn làm chất lượng tốt hơn.",
+            "B": "Tăng top_n của rerank.",
+            "C": "Thay rerank bằng cách tăng top_k.",
+            "D": "Bỏ rerank, hoặc chỉ bật cho nhóm câu hỏi hay bị sai thứ tự, vì lợi ích gần như bằng 0 còn độ trễ tăng hơn gấp ba."
+          },
+          "key": "D",
+          "rationale": "Ngày 8, slide 17/46 (rerank sửa thứ tự sai trong top-k) và slide 43/46 (ROI của RAG: rerank làm độ trễ tăng từ khoảng 1 s lên 4 s, chỉ đáng khi chất lượng tăng thật).",
+          "parallel": "pp-b11"
+        },
+        {
+          "id": "pp-a12",
+          "form": "A",
+          "misconception": "m-l3-rerank-luon-dang",
+          "concept": "hybrid_rerank",
+          "core": false,
+          "transfer": true,
+          "stem": "Số đo trên 200 câu hỏi:\nkhông rerank: đoạn đúng nằm trong top-3 ở 41% câu (hạng trung vị 7 trên 20 ứng viên)\nrerank 20 → top_n 3: đoạn đúng nằm trong top-3 ở 88% câu; độ trễ tăng 300 ms\nbước sau chỉ nhận 3 đoạn\nNhận xét nào đúng?",
+          "options": {
+            "A": "Rerank đáng giữ ở đây: đoạn đúng thường có trong 20 ứng viên nhưng đứng sai thứ tự, và 300 ms đổi được mức tăng lớn.",
+            "B": "Nên bỏ rerank vì rerank lúc nào cũng làm chậm.",
+            "C": "Nên tăng top_n lên 20 cho chắc.",
+            "D": "Kết quả này cho thấy embedding hỏng, cần thay embedding."
+          },
+          "key": "A",
+          "rationale": "Ngày 8, slide 17/46 (retrieve-and-rerank: lấy rộng rồi xếp lại hẹp) và slide 43/46 (đo ROI chất lượng so với độ trễ trước khi quyết định). Hiểu lầm cần sửa là \"lúc nào cũng đáng\", không phải \"không bao giờ đáng\".",
+          "parallel": "pp-b12"
+        }
+      ],
+      "B": [
+        {
+          "id": "pp-b01",
+          "form": "B",
+          "misconception": "m-l1-tu-noi-khong-biet",
+          "concept": "grounding_abstention",
+          "core": true,
+          "transfer": false,
+          "stem": "Trợ lý tra cứu nội quy của một thư viện tỉnh gọi thẳng LLM, không kèm tài liệu. Người dùng hỏi: \"Trả sách trễ thì bị phạt bao nhiêu một ngày?\" Nội quy này chưa từng được đăng lên mạng. Kết quả nào hay gặp nhất?",
+          "options": {
+            "A": "Model nêu một mức phạt cụ thể, nghe hợp lý, có thể kèm số điều, dù không có nguồn.",
+            "B": "Model nói không biết vì không có dữ liệu.",
+            "C": "Model trả lời đúng vì mức phạt ở thư viện nào cũng như nhau.",
+            "D": "Model từ chối mọi câu hỏi về thư viện."
+          },
+          "key": "A",
+          "rationale": "Ngày 8, slide 5/46 (Ảo giác của LLM) và slide 27/46 (Grounding & Abstention): không có tài liệu thì model lấp chỗ trống bằng câu nghe hợp lý.",
+          "parallel": "pp-a01"
+        },
+        {
+          "id": "pp-b02",
+          "form": "B",
+          "misconception": "m-l1-tu-noi-khong-biet",
+          "concept": "grounding_abstention",
+          "core": false,
+          "transfer": true,
+          "stem": "Log:\nretrieved: [] (0 đoạn)\nhỏi: \"Phòng gym của khu chung cư mở cửa mấy giờ?\"\ntrả lời: \"Theo mục 4.2 nội quy, phòng gym mở từ 5 giờ đến 22 giờ.\"\nDấu hiệu nào trong log cho thấy câu trả lời là bịa?",
+          "options": {
+            "A": "Câu trả lời có con số cụ thể.",
+            "B": "Câu trả lời ngắn.",
+            "C": "Không có đoạn nào được truy xuất mà câu trả lời vẫn trích \"mục 4.2\".",
+            "D": "Câu hỏi về giờ giấc."
+          },
+          "key": "C",
+          "rationale": "Trích một nguồn không có trong context là dấu hiệu bịa có thể kiểm bằng máy (Ngày 8, slide 22/46 Grounding & Verification và slide 27/46).",
+          "parallel": "pp-a02"
+        },
+        {
+          "id": "pp-b03",
+          "form": "B",
+          "misconception": "m-l2-topk-cang-lon",
+          "concept": "top_k_tradeoff",
+          "core": true,
+          "transfer": false,
+          "stem": "Kho tài liệu có chunk khoảng 800 token, ngân sách cho phần tài liệu là 4.000 token. Một bạn đề xuất tăng top_k từ 4 lên 15 để \"không bỏ sót\". Dự đoán nào hợp lý nhất?",
+          "options": {
+            "A": "Không bỏ sót gì nữa nên độ đúng chắc chắn tăng.",
+            "B": "Model tự bỏ qua phần thừa nên không ảnh hưởng gì.",
+            "C": "Độ trễ giảm.",
+            "D": "Phần lớn đoạn bị cắt khi đóng gói; đoạn đúng đứng hạng thấp vẫn có thể bị loại; chi phí và nhiễu tăng."
+          },
+          "key": "D",
+          "rationale": "Ngày 7, slide 27/60 và slide 49/60 (anti-pattern top-k lớn \"cho chắc\"); Ngày 8, slide 23/46 (ngân sách token).",
+          "parallel": "pp-a03"
+        },
+        {
+          "id": "pp-b04",
+          "form": "B",
+          "misconception": "m-l2-topk-cang-lon",
+          "concept": "top_k_tradeoff",
+          "core": false,
+          "transfer": true,
+          "stem": "Hai cấu hình trên cùng 100 câu hỏi:\ntop_k=3: 82% đúng, 1.900 token/câu\ntop_k=10: 78% đúng, 4.100 token/câu\nKết luận nào đúng?",
+          "options": {
+            "A": "top_k=10 tốt hơn vì có nhiều ngữ cảnh hơn.",
+            "B": "top_k lớn làm tăng nhiễu và chi phí mà không tăng độ đúng; chọn top_k theo số đo, ở đây là 3.",
+            "C": "Số liệu sai, phải chạy lại cho tới khi top_k=10 thắng.",
+            "D": "top_k không ảnh hưởng đến số token."
+          },
+          "key": "B",
+          "rationale": "Ngày 7, slide 38/60 (top-k quá cao: inject quá nhiều context; cách sửa là giảm k) và slide 27/60.",
+          "parallel": "pp-a04"
+        },
+        {
+          "id": "pp-b05",
+          "form": "B",
+          "misconception": "m-l2-cat-cang-nho",
+          "concept": "chunk_size_overlap",
+          "core": true,
+          "transfer": false,
+          "stem": "Bộ phận IT cắt tài liệu hướng dẫn thành chunk 40 token, overlap 0, \"để tìm cho chuẩn\". Một bước cấu hình gồm bốn dòng liên tiếp, dòng cuối là \"sau đó khởi động lại dịch vụ\". Rủi ro chính là gì?",
+          "options": {
+            "A": "Các dòng của cùng một bước rơi vào các chunk khác nhau; trợ lý có thể trả lời thiếu bước cuối.",
+            "B": "Chunk nhỏ nên không có rủi ro.",
+            "C": "Embedding không xử lý được chunk ngắn.",
+            "D": "Mỗi câu trả lời tốn gấp mười lần token."
+          },
+          "key": "A",
+          "rationale": "Ngày 7, slide 31/60 (chunk quá nhỏ làm mất ngữ cảnh), slide 32/60 (cắt theo cấu trúc mục/heading) và slide 33/60 (overlap).",
+          "parallel": "pp-a05"
+        },
+        {
+          "id": "pp-b06",
+          "form": "B",
+          "misconception": "m-l2-cat-cang-nho",
+          "concept": "chunk_size_overlap",
+          "core": false,
+          "transfer": true,
+          "stem": "Log:\nchunk_size=64, overlap=0, top_k=3\ntrả lời: \"Đặt MAX_CONN=50.\"\nthiếu: \"…và khởi động lại dịch vụ\" (nằm ở chunk kế tiếp, hạng 14)\nSửa thế nào là hợp lý nhất?",
+          "options": {
+            "A": "Tăng top_k lên 20.",
+            "B": "Đổi model sinh câu trả lời.",
+            "C": "Thêm câu \"trả lời đầy đủ\" vào prompt.",
+            "D": "Cắt theo cấu trúc (mỗi bước hoặc mỗi mục một chunk), hoặc tăng chunk_size kèm overlap 10–20%, rồi đo lại."
+          },
+          "key": "D",
+          "rationale": "Ngày 7, slide 32/60 (cắt theo section/heading) và slide 33/60 (overlap 10–20%). Tăng top_k lên 20 chỉ kéo thêm nhiễu (slide 49/60).",
+          "parallel": "pp-a06"
+        },
+        {
+          "id": "pp-b07",
+          "form": "B",
+          "misconception": "m-l2-van-ban-nao-cung-dung",
+          "concept": "metadata_filter",
+          "core": true,
+          "transfer": false,
+          "stem": "Kho FAQ tuyển sinh có \"Đề án tuyển sinh 2023\" và \"Đề án tuyển sinh 2025\", nhiều đoạn gần như trùng nhau, chỉ khác chỉ tiêu và mốc thời gian. Thí sinh hỏi về năm nay. Cách đáng tin nhất là gì?",
+          "options": {
+            "A": "Để model tự đọc cả hai bản và chọn.",
+            "B": "Tăng top_k để chắc chắn có bản 2025.",
+            "C": "Lọc theo metadata năm áp dụng (hoặc hiệu lực) trước khi tìm, chỉ giữ bản 2025.",
+            "D": "Tăng chunk_size để mỗi đoạn có nhiều ngữ cảnh hơn."
+          },
+          "key": "C",
+          "rationale": "Ngày 7, slide 26/60 (metadata thời điểm/độ mới) và Ngày 8, slide 31/46 (pre-filtering). Xung đột giữa hai bản trong context là rủi ro riêng (Ngày 8, slide 30/46).",
+          "parallel": "pp-a07"
+        },
+        {
+          "id": "pp-b08",
+          "form": "B",
+          "misconception": "m-l2-van-ban-nao-cung-dung",
+          "concept": "metadata_filter",
+          "core": false,
+          "transfer": true,
+          "stem": "Cấu hình đang chạy:\n{\"top_k\": 5, \"filter\": null}\nlog: đoạn của \"Quy định làm thêm giờ 2020\" (hết hiệu lực) đứng hạng 1, đoạn của bản 2024 đứng hạng 2; câu trả lời dùng số giờ của bản 2020.\nThay đổi nào sửa đúng gốc lỗi?",
+          "options": {
+            "A": "\"filter\": {\"in_force\": true}",
+            "B": "\"top_k\": 1",
+            "C": "\"top_k\": 10",
+            "D": "Thêm rerank."
+          },
+          "key": "A",
+          "rationale": "Ngày 8, slide 31/46 (pre-filtering theo metadata). top_k = 1 lại giữ đúng đoạn 2020 đang đứng hạng 1.",
+          "parallel": "pp-a08"
+        },
+        {
+          "id": "pp-b09",
+          "form": "B",
+          "misconception": "m-l3-nghia-hieu-so-hieu",
+          "concept": "hybrid_rerank",
+          "core": true,
+          "transfer": false,
+          "stem": "Khách hỏi chatbot bán hàng: \"Sản phẩm mã SP-20931 bảo hành mấy tháng?\" Hệ thống chỉ dùng dense search, trả về đoạn về chính sách bảo hành chung của nhiều sản phẩm khác, không đoạn nào chứa SP-20931. Vì sao?",
+          "options": {
+            "A": "Chatbot cần model lớn hơn.",
+            "B": "Mã sản phẩm gần như không mang nghĩa nên embedding không đưa đúng đoạn lên; cần tìm từ khóa (BM25) hoặc hybrid.",
+            "C": "Chunk quá to.",
+            "D": "Phải viết câu hỏi dài hơn."
+          },
+          "key": "B",
+          "rationale": "Ngày 8, slide 13/46 (semantic search bỏ lỡ mã, số), slide 14/46 (BM25) và slide 15/46 (hybrid).",
+          "parallel": "pp-a09"
+        },
+        {
+          "id": "pp-b10",
+          "form": "B",
+          "misconception": "m-l3-nghia-hieu-so-hieu",
+          "concept": "hybrid_rerank",
+          "core": false,
+          "transfer": true,
+          "stem": "Log câu hỏi \"Phụ lục 12 mục 3 nói gì về hạn nộp?\"\ndense: đoạn đúng hạng 23\nBM25: đoạn đúng hạng 1\nRRF (k=60) gộp hai danh sách: đoạn đúng hạng 2\nCấu hình nào nên dùng cho kho này?",
+          "options": {
+            "A": "Chỉ dense, tăng top_k lên 25.",
+            "B": "Chỉ BM25 cho mọi câu.",
+            "C": "Đổi embedding.",
+            "D": "Hybrid dense + BM25 gộp bằng RRF, vì kho có cả câu hỏi theo số hiệu lẫn câu hỏi lời thường."
+          },
+          "key": "D",
+          "rationale": "Ngày 8, slide 15/46 và slide 16/46 (RRF vs alpha; mới bắt đầu thì dùng RRF).",
+          "parallel": "pp-a10"
+        },
+        {
+          "id": "pp-b11",
+          "form": "B",
+          "misconception": "m-l3-rerank-luon-dang",
+          "concept": "hybrid_rerank",
+          "core": false,
+          "transfer": false,
+          "stem": "Thêm rerank vào chatbot nội bộ. Đo: recall@3 trước 0,94, sau 0,95; độ trễ p95 tăng từ 0,9 s lên 3,2 s. Người dùng phàn nàn chatbot chậm. Quyết định nào hợp lý?",
+          "options": {
+            "A": "Giữ rerank vì recall có tăng.",
+            "B": "Tăng top_n.",
+            "C": "Bỏ rerank hoặc chỉ bật cho nhóm câu hỏi khó, vì mức tăng 0,01 không đáng với độ trễ tăng hơn ba lần.",
+            "D": "Thêm một rerank thứ hai."
+          },
+          "key": "C",
+          "rationale": "Ngày 8, slide 43/46 (ROI của RAG: chi phí so với chất lượng, rerank làm tăng độ trễ).",
+          "parallel": "pp-a11"
+        },
+        {
+          "id": "pp-b12",
+          "form": "B",
+          "misconception": "m-l3-rerank-luon-dang",
+          "concept": "hybrid_rerank",
+          "core": false,
+          "transfer": true,
+          "stem": "Số đo trên 150 câu hỏi:\nkhông rerank: đoạn đúng trong top-3 ở 45% câu; thường nằm ở hạng 4–12 trong 20 ứng viên\nrerank 20 → top_n 3: đoạn đúng trong top-3 ở 86% câu; độ trễ tăng 350 ms\nNhận xét nào đúng?",
+          "options": {
+            "A": "Bỏ rerank vì rerank lúc nào cũng chậm.",
+            "B": "Rerank đáng giữ: đoạn đúng có trong ứng viên nhưng đứng sai thứ tự, và 350 ms đổi được mức tăng lớn.",
+            "C": "Nên tăng top_n lên 20.",
+            "D": "Embedding hỏng, phải thay."
+          },
+          "key": "B",
+          "rationale": "Ngày 8, slide 17/46 (vì sao top-k chưa đủ: thứ tự sai) và slide 43/46 (đo ROI rồi mới quyết).",
+          "parallel": "pp-a12"
+        }
+      ]
+    }
+  },
+  "check60_pool": {
+    "how_to_use": "Bộ luân phiên cho bài 60 giây sau level (teach-back.md mục 5): 2 mục mỗi level, nội dung mới, cùng menu lựa chọn. Dùng xen kẽ với bộ cố định để giảm lộ đáp án giữa các bạn cùng lớp.",
+    "items": [
+      {
+        "id": "c60-l1-a",
+        "level_id": "grounded-citation",
+        "context": "Đoạn đã lấy: [p1] \"Phòng tự học mở cửa từ 7 giờ đến 22 giờ.\" · [p2] \"Không mang đồ ăn vào phòng tự học.\"",
+        "options": [
+          "Có nguồn, đúng",
+          "Bịa nguồn",
+          "Từ chối đúng",
+          "Từ chối sai"
+        ],
+        "question": "Phòng tự học có cho đặt chỗ trước không?",
+        "answer_shown": "Nội quy hiện có không có thông tin về việc đặt chỗ trước.",
+        "key": "Từ chối đúng",
+        "explanation": "Không đoạn nào nói về đặt chỗ, nên nói là không có là đúng."
+      },
+      {
+        "id": "c60-l1-b",
+        "level_id": "grounded-citation",
+        "context": "Đoạn đã lấy: [p1] \"Phòng tự học mở cửa từ 7 giờ đến 22 giờ.\" · [p2] \"Không mang đồ ăn vào phòng tự học.\"",
+        "options": [
+          "Có nguồn, đúng",
+          "Bịa nguồn",
+          "Từ chối đúng",
+          "Từ chối sai"
+        ],
+        "question": "Mấy giờ phòng tự học đóng cửa?",
+        "answer_shown": "Theo mục 6 nội quy, phòng đóng cửa lúc 21 giờ.",
+        "key": "Bịa nguồn",
+        "explanation": "Đoạn p1 ghi 22 giờ; 'mục 6' không có trong các đoạn đã lấy."
+      },
+      {
+        "id": "c60-l2-a",
+        "level_id": "chunk-tuning",
+        "options": [
+          "Đoạn quá nhỏ cắt rời ý",
+          "Văn bản hết hiệu lực lọt vào",
+          "Lấy quá nhiều đoạn to nên thùng tràn",
+          "Không phải lỗi truy xuất"
+        ],
+        "trace": "Cỡ đoạn 1024, top_k 8. Thùng nhận 8.100 token, cắt còn 3.000; đoạn đúng ở hạng 5 bị cắt. Trả lời thiếu mức phí.",
+        "key": "Lấy quá nhiều đoạn to nên thùng tràn",
+        "explanation": "Đoạn đúng đã được tìm thấy nhưng bị cắt ở bước đóng thùng vì vượt ngân sách."
+      },
+      {
+        "id": "c60-l2-b",
+        "level_id": "chunk-tuning",
+        "options": [
+          "Đoạn quá nhỏ cắt rời ý",
+          "Văn bản hết hiệu lực lọt vào",
+          "Lấy quá nhiều đoạn to nên thùng tràn",
+          "Không phải lỗi truy xuất"
+        ],
+        "trace": "Trả lời: 'giảm 50% phí gửi xe', thiếu vế 'chỉ áp dụng cho xe đạp'. Vế này nằm ở đoạn kế tiếp, hạng 11; cỡ đoạn 64, không overlap; top_k 3.",
+        "key": "Đoạn quá nhỏ cắt rời ý",
+        "explanation": "Điều kiện áp dụng bị tách sang đoạn sau ở ranh giới cắt."
+      },
+      {
+        "id": "c60-l3-a",
+        "level_id": "article-number-lookup",
+        "options": [
+          "Tìm từ khoá",
+          "Tìm theo nghĩa",
+          "Cần cả hai"
+        ],
+        "question": "Mẫu đơn HC-09 tải ở đâu?",
+        "key": "Tìm từ khoá",
+        "explanation": "Mã mẫu đơn là chuỗi chính xác, gần như không mang nghĩa (Ngày 8, slide 13/46)."
+      },
+      {
+        "id": "c60-l3-b",
+        "level_id": "article-number-lookup",
+        "options": [
+          "Tìm từ khoá",
+          "Tìm theo nghĩa",
+          "Cần cả hai"
+        ],
+        "question": "Em làm mất thẻ sinh viên ngay trước buổi thi thì có được vào phòng thi không?",
+        "key": "Tìm theo nghĩa",
+        "explanation": "Lời thường; văn bản có thể viết 'giấy tờ tùy thân có ảnh' nên khó trùng chữ (Ngày 8, slide 14/46)."
+      }
+    ]
+  },
+  "transfer_task": {
+    "id": "transfer-01",
+    "title": "Chẩn đoán log của trợ lý chính sách nhân sự",
+    "minutes": 10,
+    "note": "Bài ngoài game: không dùng ẩn dụ Thư viện. Dùng ở bài kiểm tra muộn 2–4 tuần hoặc buổi học trên lớp.",
+    "setup": "Một công ty phần mềm (hư cấu) có trợ lý hỏi đáp chính sách nhân sự. Kho gồm so-tay-nhan-su-2021 (in_force: false) và so-tay-nhan-su-2025 (in_force: true). Cấu hình: chunk cố định 128 token, overlap 0; chỉ dense search, top_k 12, không lọc metadata; packer giữ tối đa 3.000 token; system prompt: \"Luôn trả lời đầy đủ và hữu ích nhất có thể.\"",
+    "log": [
+      "T1 · hỏi: \"Nhân viên được nghỉ phép năm bao nhiêu ngày?\" · retrieved: [2021 §3.1 (0,88, in_force false), 2025 §3.1 (0,87)] · trả lời: \"12 ngày\" (bản 2025 ghi 14 ngày).",
+      "T2 · hỏi: \"Làm thêm giờ ngày lễ được trả bao nhiêu?\" · retrieved: 12 đoạn, 6.100 token, packer cắt còn 3.000 · đoạn đúng (2025 §5.4) hạng 9, bị cắt · trả lời: \"theo quy định của pháp luật\".",
+      "T3 · hỏi: \"Con ốm thì có được làm việc từ xa không?\" · hạng 1: 2025 §6.2 \"Nhân viên được làm việc từ xa tối đa 2 ngày mỗi tuần\" · vế \"hoặc 5 ngày liên tiếp khi con dưới 6 tuổi bị ốm, kèm giấy của cơ sở y tế\" nằm ở chunk kế tiếp, hạng 15 · trả lời: \"tối đa 2 ngày mỗi tuần\".",
+      "T4 · hỏi: \"Công ty có hỗ trợ học phí thạc sĩ không?\" · retrieved: 12 đoạn, điểm cao nhất 0,41, không đoạn nào nói về học phí · trả lời: \"Có, theo mục 8.3 công ty hỗ trợ 50% học phí.\"",
+      "T5 · hỏi: \"Mục 7.3 quy định gì về phụ cấp đi lại?\" · dense top-12 không có §7.3; các đoạn §7.2, §3.7, §9.3 đứng đầu · trả lời nội dung của §7.2."
+    ],
+    "task": "Với mỗi dòng T1–T5: (1) gọi tên nguyên nhân; (2) chỉ ra dữ kiện trong log làm bằng chứng; (3) đề xuất một thay đổi cấu hình; (4) nói sẽ kiểm lại bằng loại ca test nào.",
+    "expected": [
+      {
+        "trace": "T1",
+        "cause": "Văn bản hết hiệu lực lọt vào context.",
+        "fix": "Lọc in_force = true (pre-filter) trước khi tìm.",
+        "verify": "Ca hỏi số liệu khác nhau giữa 2021 và 2025; kiểm không có đoạn in_force false trong context.",
+        "lesson": "Ngày 8, slide 31/46"
+      },
+      {
+        "trace": "T2",
+        "cause": "top_k quá lớn so với ngân sách nên đoạn đúng bị cắt khi đóng gói.",
+        "fix": "Giảm top_k (3–5), có thể thêm rerank để đưa đoạn đúng lên đầu.",
+        "verify": "Đo recall@k và token mỗi câu trước/sau.",
+        "lesson": "Ngày 7, slide 38/60 và 49/60"
+      },
+      {
+        "trace": "T3",
+        "cause": "Chunk cố định 128 không overlap cắt rời vế ngoại lệ.",
+        "fix": "Cắt theo cấu trúc mục, hoặc chunk 512 kèm overlap 10–20%.",
+        "verify": "Ca có đáp án gồm quy định chung và ngoại lệ ngay sau.",
+        "lesson": "Ngày 7, slide 31/60–33/60"
+      },
+      {
+        "trace": "T4",
+        "cause": "Không có tài liệu liên quan mà prompt ép 'luôn trả lời', nên model bịa nguồn.",
+        "fix": "Ngưỡng điểm (score threshold), prompt chỉ dùng tài liệu kèm và cho phép nói 'không có', bắt trích mã đoạn.",
+        "verify": "Ca ngoài phạm vi; kiểm câu trả lời không trích mã không có trong context.",
+        "lesson": "Ngày 8, slide 27/46"
+      },
+      {
+        "trace": "T5",
+        "cause": "Dense search không bắt được số hiệu '7.3'.",
+        "fix": "Thêm BM25 và gộp bằng RRF (hybrid).",
+        "verify": "Ca hỏi bằng số hiệu mục cùng ca diễn đạt lại để chắc hybrid không làm vỡ ca cũ.",
+        "lesson": "Ngày 8, slide 13/46–16/46"
+      }
+    ],
+    "rubric": "Mỗi dòng T tối đa 2 điểm: 1 điểm cho nguyên nhân đúng có trích dữ kiện log; 1 điểm cho cách sửa đúng kèm cách kiểm lại. Tổng 10, đạt từ 7. Cách sửa không chạm gốc lỗi (đổi model lớn hơn, thêm câu 'hãy chính xác') không được điểm."
+  }
+}

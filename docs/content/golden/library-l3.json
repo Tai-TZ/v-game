@@ -1,0 +1,582 @@
+{
+  "level_id": "article-number-lookup",
+  "corpus": [
+    "qcdt-2024"
+  ],
+  "grading": {
+    "status": "Tạm chốt cho v0.1 (build brief §4.2); chủ Phần 4 xác nhận khi viết evaluator.",
+    "normalize": "NFC, chữ thường, đổi dấu phẩy thập phân giữa hai chữ số thành dấu chấm, bỏ dấu câu khác (giữ '%' và dấu chấm giữa hai chữ số), gộp khoảng trắng. Áp như nhau cho câu trả lời, answer_points, forbidden, equivalents và refusal_markers.",
+    "answer": "Mỗi mục answer_points đạt khi câu trả lời chứa chính nó hoặc một cách viết trong equivalents[mục]. Ca answer đạt khi: đủ mọi answer_points, có ít nhất một cited_id thuộc tập đoạn chứa một quote của gold, không có llm.cite_unknown, không chứa mục nào của forbidden.",
+    "abstain": "Ca abstain (gold rỗng) đạt khi: câu trả lời chứa ít nhất một mục của refusal_markers, không chứa mục nào của forbidden, không có llm.cite_unknown. Được trích đoạn có thật trong thùng (ví dụ để chỉ ra Điều 41 chỉ có 4 khoản); chỉ trích bịa mới trượt.",
+    "refusal_markers": [
+      "không có thông tin",
+      "không tìm thấy",
+      "không có điều",
+      "không có khoản",
+      "không tồn tại",
+      "không quy định"
+    ],
+    "bites": "bites dùng mã cấu hình ngây thơ ở mục 6 kịch bản của chính level này.",
+    "level_rule": "Riêng ca vai tra-so trong họ Điều 41/47/74: forbidden chứa con số tương ứng của hai điều còn lại (kịch bản L3 mục 9)."
+  },
+  "equivalents": {
+    "05 ngày": [
+      "5 ngày",
+      "năm ngày"
+    ],
+    "07 ngày": [
+      "7 ngày",
+      "bảy ngày"
+    ],
+    "10 ngày": [
+      "mười ngày"
+    ],
+    "03 ngày": [
+      "3 ngày",
+      "ba ngày"
+    ],
+    "20 ngày": [
+      "hai mươi ngày"
+    ],
+    "trưởng bộ môn": [
+      "bộ môn"
+    ],
+    "phòng khảo thí": [
+      "khảo thí"
+    ],
+    "khoa quản lý ngành": [
+      "khoa quản lý",
+      "nộp cho khoa",
+      "gửi khoa"
+    ],
+    "giảng viên khác": [
+      "một giảng viên khác",
+      "thêm một giảng viên"
+    ],
+    "0,5 điểm": [
+      "0.5",
+      "nửa điểm"
+    ],
+    "25 tín chỉ": [
+      "hai mươi lăm tín chỉ"
+    ],
+    "đình chỉ thi": [
+      "bị đình chỉ"
+    ],
+    "điểm 0": [
+      "0 điểm",
+      "không điểm"
+    ],
+    "chứng nhận tốt nghiệp tạm thời": [
+      "giấy chứng nhận tạm thời",
+      "chứng nhận tạm thời"
+    ],
+    "bộ phận một cửa": [
+      "một cửa"
+    ],
+    "hai học kỳ": [
+      "2 học kỳ",
+      "hai kỳ",
+      "2 kỳ"
+    ],
+    "hai tuần": [
+      "2 tuần",
+      "14 ngày",
+      "mười bốn ngày"
+    ],
+    "15 ngày": [
+      "mười lăm ngày"
+    ],
+    "ốm đau": [
+      "ốm",
+      "bệnh",
+      "tai nạn",
+      "điều trị",
+      "nhập ngũ",
+      "nghĩa vụ quân sự"
+    ],
+    "phòng đào tạo": [
+      "phòng đt"
+    ],
+    "03 thành viên": [
+      "3 thành viên",
+      "ba thành viên",
+      "3 người",
+      "ba người"
+    ],
+    "04 tuần": [
+      "4 tuần",
+      "bốn tuần"
+    ],
+    "một lần": [
+      "1 lần"
+    ]
+  },
+  "cases": [
+    {
+      "id": "lib-l3-v01",
+      "role": "visible",
+      "vai": "tra-so",
+      "question": "Điều 47 khoản 2 quy định gì?",
+      "expect": "answer",
+      "answer_points": [
+        "05 ngày",
+        "trưởng bộ môn"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 47,
+          "khoan": 2,
+          "quote": "Sinh viên nộp đơn đề nghị xem xét lại cho trưởng bộ môn phụ trách học phần trong thời hạn 05 ngày làm việc kể từ ngày giảng viên công bố điểm đánh giá quá trình"
+        }
+      ],
+      "forbidden": [
+        "7 ngày",
+        "10 ngày",
+        "phòng khảo thí"
+      ],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2",
+        "N6"
+      ],
+      "notes": "Neo brief §3 (câu của Khang). Họ Điều 41/47/74 cùng khung: khoản 2 mỗi điều là 'Sinh viên nộp đơn … trong thời hạn N ngày làm việc kể từ ngày công bố …' với N = 07 / 05 / 10. Chuỗi '47' chỉ có trong Điều 47 (self-check kiểm), nên BM25 bắt được còn dense thì không. ƯỚC TÍNH: hạng dense > giới hạn top_k của L3 trên mọi biến thể, cổng phát hành đo."
+    },
+    {
+      "id": "lib-l3-v02",
+      "role": "visible",
+      "vai": "tra-so",
+      "question": "Khoản 2 Điều 41 quy định gì ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "07 ngày",
+        "phòng khảo thí"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 41,
+          "khoan": 2,
+          "quote": "Sinh viên nộp đơn đề nghị phúc khảo cho phòng khảo thí trong thời hạn 07 ngày làm việc kể từ ngày công bố điểm thi trên cổng thông tin đào tạo"
+        }
+      ],
+      "forbidden": [
+        "5 ngày",
+        "10 ngày",
+        "trưởng bộ môn"
+      ],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2",
+        "N6"
+      ],
+      "notes": "Ca thấy được vai tra-so thứ hai, cùng họ."
+    },
+    {
+      "id": "lib-l3-v03",
+      "role": "visible",
+      "vai": "don-gian",
+      "question": "Thi online thì có phải bật camera suốt buổi không ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "camera",
+        "micro"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 43,
+          "khoan": 2,
+          "quote": "Sinh viên dự thi trực tuyến phải bật camera và micro trong suốt buổi thi và không được rời khỏi khung hình."
+        }
+      ],
+      "forbidden": [],
+      "trap": null,
+      "bites": [],
+      "notes": "Ca đối chứng hỏi bằng lời thường; đạt ở mọi cấu hình có truy xuất."
+    },
+    {
+      "id": "lib-l3-h01",
+      "role": "hidden",
+      "vai": "tra-so",
+      "question": "Cho em hỏi khoản 3 của Điều 47 nói về chuyện gì ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "03 ngày",
+        "giảng viên khác"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 47,
+          "khoan": 3,
+          "quote": "Trưởng bộ môn phân công một giảng viên khác cùng giảng viên phụ trách học phần xem xét lại. Kết quả xem xét lại được thông báo cho sinh viên trong thời hạn 03 ngày làm việc kể từ ngày nhận đơn."
+        }
+      ],
+      "forbidden": [
+        "12 ngày",
+        "20 ngày"
+      ],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2",
+        "N6"
+      ],
+      "notes": "Khoản 3 của họ: 12 / 03 / 20 ngày làm việc (Điều 41 / 47 / 74)."
+    },
+    {
+      "id": "lib-l3-h02",
+      "role": "hidden",
+      "vai": "tra-so",
+      "question": "Khoản 3 Điều 74 quy định thời hạn gì vậy?",
+      "expect": "answer",
+      "answer_points": [
+        "20 ngày"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 74,
+          "khoan": 3,
+          "quote": "Kết quả phúc tra được thông báo cho sinh viên trong thời hạn 20 ngày làm việc kể từ ngày khoa nhận đơn."
+        }
+      ],
+      "forbidden": [
+        "12 ngày",
+        "3 ngày làm việc"
+      ],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2",
+        "N6"
+      ],
+      "notes": "'3 ngày làm việc' bắt cả '03 ngày làm việc' của Điều 47."
+    },
+    {
+      "id": "lib-l3-h03",
+      "role": "hidden",
+      "vai": "tra-so",
+      "question": "khoan 2 dieu 10 ghi gi a",
+      "expect": "answer",
+      "answer_points": [
+        "25 tín chỉ"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 10,
+          "khoan": 2,
+          "quote": "Khối lượng học tập tối đa sinh viên được đăng ký trong mỗi học kỳ chính là 25 tín chỉ."
+        }
+      ],
+      "forbidden": [],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2"
+      ],
+      "notes": "Tra số ngoài họ 41/47/74 (yêu cầu B4), gõ không dấu. Chữ số '10' và '2' vẫn khớp BM25 dù 'dieu' không dấu; nếu tokenizer BM25 không bỏ dấu thì 'dieu'/'khoan' không khớp 'điều'/'khoản' (xem README, Câu hỏi mở)."
+    },
+    {
+      "id": "lib-l3-h04",
+      "role": "hidden",
+      "vai": "tra-so-kho",
+      "question": "Theo Điều 47, không đồng ý điểm chuyên cần thì em làm đơn gửi ai, trong mấy ngày?",
+      "expect": "answer",
+      "answer_points": [
+        "trưởng bộ môn",
+        "05 ngày"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 47,
+          "khoan": 2,
+          "quote": "Sinh viên nộp đơn đề nghị xem xét lại cho trưởng bộ môn phụ trách học phần trong thời hạn 05 ngày làm việc kể từ ngày giảng viên công bố điểm đánh giá quá trình"
+        }
+      ],
+      "forbidden": [
+        "7 ngày",
+        "10 ngày",
+        "phòng khảo thí"
+      ],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2",
+        "N8"
+      ],
+      "notes": "Vừa số hiệu vừa lời thường. Dự kiến hạng 4–8 sau RRF, ≤ 3 sau rerank (ƯỚC TÍNH, phụ thuộc cross-encoder tiếng Việt)."
+    },
+    {
+      "id": "lib-l3-h05",
+      "role": "hidden",
+      "vai": "tra-so-kho",
+      "question": "Khoản 4 Điều 41: phúc khảo xong điểm chênh bao nhiêu thì mới được đổi điểm ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "0,5 điểm"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 41,
+          "khoan": 4,
+          "quote": "Trường hợp điểm phúc khảo chênh lệch với điểm chấm lần đầu từ 0,5 điểm trở lên, điểm phúc khảo được dùng làm điểm chính thức"
+        }
+      ],
+      "forbidden": [],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2",
+        "N8"
+      ],
+      "notes": "Vừa số hiệu vừa lời thường; khoản 4 của Điều 47 và 74 không có con số tương ứng."
+    },
+    {
+      "id": "lib-l3-h06",
+      "role": "hidden",
+      "vai": "dien-dat-lai",
+      "question": "Lỡ mang tài liệu vô phòng thi rồi lén mở ra coi, bị bắt thì bị xử sao ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "đình chỉ thi",
+        "điểm 0"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 42,
+          "khoan": 1,
+          "quote": "Đình chỉ thi và nhận điểm 0 cho bài thi: áp dụng đối với sinh viên đã bị cảnh cáo một lần mà tiếp tục vi phạm trong cùng buổi thi, mang vào phòng thi hoặc sử dụng tài liệu, thiết bị không được phép"
+        }
+      ],
+      "forbidden": [],
+      "trap": "paraphrase",
+      "bites": [
+        "N3"
+      ],
+      "notes": "Lời thường ('lén mở ra coi') cho 'sử dụng tài liệu không được phép' (điểm c khoản 1 Điều 42)."
+    },
+    {
+      "id": "lib-l3-h07",
+      "role": "hidden",
+      "vai": "dien-dat-lai",
+      "question": "Học xong rồi mà chưa có bằng, em cần giấy gì đó để nộp hồ sơ xin việc trước thì xin ở đâu ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "chứng nhận tốt nghiệp tạm thời",
+        "bộ phận một cửa"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 71,
+          "khoan": 2,
+          "quote": "được cấp giấy chứng nhận tốt nghiệp tạm thời trong thời hạn 02 ngày làm việc kể từ ngày nộp đơn tại bộ phận một cửa"
+        }
+      ],
+      "forbidden": [],
+      "trap": "paraphrase",
+      "bites": [
+        "N3"
+      ],
+      "notes": "Lời thường, gần như không trùng chữ với khoản 2 Điều 71."
+    },
+    {
+      "id": "lib-l3-t01",
+      "role": "trap",
+      "vai": "dien-dat-lai",
+      "question": "Em tính nghỉ ở nhà một thời gian để đi làm kiếm tiền, sau này quay lại thì có được không ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "bảo lưu",
+        "hai học kỳ"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 12,
+          "khoan": 1,
+          "quote": "được bảo lưu kết quả học tập để gián đoạn việc học tối đa hai học kỳ chính liên tiếp"
+        }
+      ],
+      "forbidden": [],
+      "trap": "paraphrase",
+      "bites": [
+        "N3"
+      ],
+      "notes": "Neo brief §3. Điều 12 không chứa âm tiết nội dung nào của câu hỏi (tính, nghỉ, nhà, thời, gian, đi, làm, kiếm, tiền, quay, lại; self-check kiểm), nên BM25 trượt; dense dự kiến bắt được nhờ nghĩa 'gián đoạn việc học … tiếp tục chương trình' (ƯỚC TÍNH)."
+    },
+    {
+      "id": "lib-l3-t02",
+      "role": "trap",
+      "vai": "hoi-quy",
+      "question": "Hạn chót nộp đơn bảo lưu là lúc nào vậy ạ? Nếu em lỡ nộp trễ hạn thì còn được xét không?",
+      "expect": "answer",
+      "answer_points": [
+        "hai tuần",
+        "15 ngày",
+        "ốm đau"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 12,
+          "khoan": 2,
+          "quote": "Sinh viên nộp đơn bảo lưu cho phòng đào tạo chậm nhất hai tuần trước ngày bắt đầu học kỳ, kèm ý kiến của cố vấn học tập."
+        },
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 12,
+          "khoan": 3,
+          "quote": "được nộp đơn bảo lưu muộn, chậm nhất 15 ngày kể từ ngày bắt đầu học kỳ, kèm giấy xác nhận của cơ sở y tế hoặc lệnh gọi nhập ngũ"
+        }
+      ],
+      "forbidden": [
+        "một tuần",
+        "1 tuần",
+        "08 ngày",
+        "8 ngày",
+        "email"
+      ],
+      "trap": "regression",
+      "bites": [
+        "N7"
+      ],
+      "notes": "Neo brief §3: hồi quy, chép nguyên câu và tiêu chí của lib-l2-v01 (kịch bản L3, Câu hỏi mở 6). Kho L3 không có bản 2019 (D7), nên các giá trị 2019 trong forbidden chỉ còn để giữ tiêu chí giống hệt ca gốc."
+    },
+    {
+      "id": "lib-l3-t03",
+      "role": "trap",
+      "vai": "khoan-khong-ton-tai",
+      "question": "Điều 41 khoản 6 quy định gì vậy ạ?",
+      "expect": "abstain",
+      "answer_points": [],
+      "gold": [],
+      "forbidden": [
+        "khoản 6 quy định",
+        "theo khoản 6"
+      ],
+      "trap": "nonexistent_article",
+      "bites": [],
+      "notes": "Bẫy thứ ba (brief yêu cầu ≥ 3). Điều 41 có thật nhưng chỉ có 4 khoản; BM25 kéo Điều 41 lên rất mạnh nên model dễ đọc khoản 2 hoặc 4 thay vào. Không có cấu hình ngây thơ nào của L3 nhắm riêng ca này; nó kiểm G3 (thẻ từ chối) còn giữ khi lắp hybrid. [M]: đề xuất tính info cho tới khi qua cổng hiệu chỉnh. Danh sách dấu hiệu từ chối cần thêm 'không có khoản'."
+    },
+    {
+      "id": "lib-l3-r01",
+      "role": "review",
+      "vai": "tra-so",
+      "question": "khoản 2 Điều 74 quy định gì ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "10 ngày",
+        "khoa quản lý ngành"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 74,
+          "khoan": 2,
+          "quote": "Sinh viên nộp đơn khiếu nại cho khoa quản lý ngành trong thời hạn 10 ngày làm việc kể từ ngày công bố kết quả bảo vệ khóa luận"
+        }
+      ],
+      "forbidden": [
+        "5 ngày",
+        "7 ngày",
+        "trưởng bộ môn",
+        "phòng khảo thí"
+      ],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2",
+        "N6"
+      ],
+      "notes": "Kịch bản L3 mục 14: sự cố dựng sẵn là tháo Tủ ngăn kéo."
+    },
+    {
+      "id": "lib-l3-r02",
+      "role": "review",
+      "vai": "dien-dat-lai",
+      "question": "Nhà em xa quá, em không theo nổi nữa, muốn rút hồ sơ nghỉ hẳn luôn thì làm giấy tờ gì ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "phòng đào tạo",
+        "học phí"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 28,
+          "khoan": 1,
+          "quote": "Sinh viên có nguyện vọng thôi học nộp đơn tại phòng đào tạo, kèm ý kiến của gia đình đối với sinh viên chưa đủ 18 tuổi và giấy xác nhận đã hoàn thành nghĩa vụ học phí"
+        }
+      ],
+      "forbidden": [],
+      "trap": "paraphrase",
+      "bites": [
+        "N3"
+      ],
+      "notes": "Diễn đạt lại cho một điều khác Điều 12: 'nghỉ hẳn' cho 'thôi học theo nguyện vọng'. Sự cố dựng sẵn: chỉ còn Tủ ngăn kéo."
+    },
+    {
+      "id": "lib-l3-r03",
+      "role": "review",
+      "vai": "tra-so-kho",
+      "question": "Điều 74 nói hội đồng phúc tra gồm mấy người, có được là người đã chấm lần đầu không ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "03 thành viên",
+        "lần đầu"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 74,
+          "khoan": 4,
+          "quote": "Hội đồng phúc tra gồm 03 thành viên không tham gia hội đồng chấm khóa luận lần đầu."
+        }
+      ],
+      "forbidden": [],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2",
+        "N8"
+      ],
+      "notes": "Sự cố dựng sẵn: tháo Kính lúp, miệng phễu thu về 3."
+    },
+    {
+      "id": "lib-l3-r04",
+      "role": "review",
+      "vai": "tra-so",
+      "question": "Khoản 2 Điều 62 nói gì vậy ạ?",
+      "expect": "answer",
+      "answer_points": [
+        "04 tuần",
+        "một lần"
+      ],
+      "gold": [
+        {
+          "doc_id": "qcdt-2024",
+          "dieu": 62,
+          "khoan": 2,
+          "quote": "Sinh viên được gia hạn nộp khóa luận một lần, tối đa 04 tuần"
+        }
+      ],
+      "forbidden": [],
+      "trap": "article_number",
+      "bites": [
+        "N1",
+        "N2"
+      ],
+      "notes": "Ca ôn thứ tư (brief yêu cầu ≥ 4): tra số ngoài họ."
+    }
+  ]
+}
