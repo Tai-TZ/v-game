@@ -58,6 +58,7 @@ export function palette(campus: CampusTheme) {
     roof: c(campus.landmark.roof),
     accent: c(campus.landmark.accent),
   };
+  const mk = building(campus.buildings.market);
   return {
     ground,
     path: c(campus.path),
@@ -70,7 +71,7 @@ export function palette(campus: CampusTheme) {
     lm,
     lib: building(campus.buildings.library),
     wt: building(campus.buildings.watchtower),
-    mk: building(campus.buildings.market),
+    mk,
     soil: mul(ground, 0.45),
     skirt: mul(ground, 0.7),
     contact: mul(ground, 0.8),
@@ -82,5 +83,9 @@ export function palette(campus: CampusTheme) {
     pants: mul(player, 0.45),
     xray: lerpW(player, 0.45),
     cypress: mul(foliage, 0.82),
+    /** Dark inlaid paving bands (campus-scene v0.2 §4.2). */
+    band: mul(lm.trim, 0.5),
+    hedge: mul(foliage, 0.7),
+    bloom: mul(lerpW(mk.roof, 0.35), 0.85),
   };
 }
