@@ -8,15 +8,16 @@ import {
   OBSTACLES,
   parseArrival,
   SITES,
+  SPAWN,
   SPAWN_HEADING,
   TREES,
   WORLD_BOUNDS,
 } from "./layout";
-import { isBlocked } from "./movement";
+import { isBlocked, step } from "./movement";
 
-describe("trees (art §6.4)", () => {
-  it("keeps 39 trees, all inside the world bounds", () => {
-    expect(TREES).toHaveLength(39);
+describe("trees (campus-scene v0.2 §2.2)", () => {
+  it("keeps 41 trees, all inside the world bounds", () => {
+    expect(TREES).toHaveLength(41);
     for (const tree of TREES) {
       expect(Math.abs(tree.x)).toBeLessThanOrEqual(WORLD_BOUNDS.halfX);
       expect(Math.abs(tree.z)).toBeLessThanOrEqual(WORLD_BOUNDS.halfZ);
@@ -46,9 +47,9 @@ describe("arrival from a zone page", () => {
 
   it("stands 0.8 in front of each door (art §4.6) on walkable ground", () => {
     const expected = {
-      library: { x: -4.8, z: 2 },
-      watchtower: { x: 5.6, z: 2 },
-      market: { x: 0, z: 4.5 },
+      library: { x: -7.4, z: -2.8 },
+      watchtower: { x: 7.4, z: -2.8 },
+      market: { x: 5.6, z: 3.9 },
     };
     for (const site of SITES) {
       const { position } = arrivalPose(site);
@@ -68,6 +69,31 @@ describe("librarian", () => {
   });
 
   it("faces the spawn towards the librarian", () => {
-    expect(SPAWN_HEADING).toBeCloseTo(-1.497, 3);
+    expect(SPAWN_HEADING).toBeCloseTo(-1.751, 3);
+  });
+});
+
+describe("click-to-move (campus-scene v0.2 §1.6)", () => {
+  it("walks straight between every pair of interaction points without path finding", () => {
+    const points = [
+      SPAWN,
+      NPC_TALK_SPOT,
+      ...SITES.flatMap((site) => [site.door, arrivalPose(site).position]),
+    ];
+    for (const from of points) {
+      for (const to of points) {
+        if (from === to) continue;
+        let position = from;
+        let done = false;
+        for (let i = 0; i < 4000 && !done; i += 1) {
+          const result = step(position, { keys: [], target: to }, 1 / 60, OBSTACLES, WORLD_BOUNDS);
+          position = result.position;
+          done = result.targetDone;
+        }
+        const label = `(${from.x}, ${from.z}) -> (${to.x}, ${to.z})`;
+        expect(done, label).toBe(true);
+        expect(Math.hypot(position.x - to.x, position.z - to.z), label).toBeLessThanOrEqual(0.08);
+      }
+    }
   });
 });

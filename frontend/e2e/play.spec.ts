@@ -75,23 +75,33 @@ test.describe("campus hub", () => {
     await page.goto("/play?debug=frames");
     await waitForIdleScene(page);
 
-    // From the spawn the librarian is due west: screen up + left held together. Both key
-    // presses are dispatched in one task; two separate CDP presses leave frames in between where
-    // only one key is held, and on a slow software renderer that drifts the player past her.
-    const hold = (type: "keydown" | "keyup") =>
-      page.evaluate((eventType) => {
-        for (const code of ["ArrowLeft", "ArrowUp"]) {
-          document.body.dispatchEvent(
-            new KeyboardEvent(eventType, { code, key: code, bubbles: true, cancelable: true }),
-          );
-        }
-      }, type);
-    await hold("keydown");
+    // From the spawn the librarian is west and a little ahead: screen up + left held together
+    // walks due west past her. Both key presses are dispatched in one task; two separate CDP
+    // presses leave frames in between where only one key is held, and on a slow software
+    // renderer that drifts the player off the line. The keys are released in the page the moment
+    // her hint appears, so the player stops beside her instead of walking on to the library.
+    await page.evaluate(
+      ({ hintId, codes }) => {
+        const send = (type: "keydown" | "keyup") => {
+          for (const code of codes) {
+            document.body.dispatchEvent(
+              new KeyboardEvent(type, { code, key: code, bubbles: true, cancelable: true }),
+            );
+          }
+        };
+        const observer = new MutationObserver(() => {
+          if (!document.getElementById(hintId)) return;
+          observer.disconnect();
+          send("keyup");
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        send("keydown");
+      },
+      { hintId: "hub-interact-hint", codes: ["ArrowLeft", "ArrowUp"] },
+    );
     const hint = page.getByRole("button", { name: LAN_HINT, exact: true });
     await expect(hint).toBeVisible({ timeout: 45_000 });
-    // Still walking into her (blocked), so the target cannot change before E.
     await page.keyboard.press("e");
-    await hold("keyup");
 
     const dialog = page.getByRole("dialog", { name: "Cô Lan" });
     await expect(dialog).toBeVisible();
