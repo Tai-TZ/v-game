@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Third-party agent skill docs contain fake example tokens"
+paths = ['''(^|/)\.(claude|agents)/skills/''']

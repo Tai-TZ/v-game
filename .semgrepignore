@@ -1,0 +1,28 @@
+# Paths Semgrep skips. This file replaces Semgrep's built-in default list, so the defaults
+# we still want are repeated here (tests stay in scope on purpose).
+.git/
+
+# Dependencies and virtualenvs
+node_modules/
+.venv/
+
+# Build output, reports and tool caches
+build/
+dist/
+frontend/.react-router/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Third-party agent skills (vendored docs, not our code)
+.claude/skills/
+.agents/
+
+# Binary font files shipped with theme packs
+frontend/public/themes/*/fonts/
+
+# Minified bundles
+*.min.js

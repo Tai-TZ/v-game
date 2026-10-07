@@ -1,0 +1,33 @@
+# Git hooks (https://lefthook.dev). Enable once per clone with `lefthook install`.
+# Needs gitleaks, npm (with frontend/node_modules installed) and uv on PATH.
+#
+# Path handling: `glob` is matched against repo-relative paths, and `root` both limits the
+# job to files under that directory and rewrites {staged_files} relative to it, so
+# frontend/app/root.tsx is passed as ./app/root.tsx while the command runs inside frontend/.
+# Keep `run` lines free of quotes: lefthook on Windows re-splits them before calling sh.
+pre-commit:
+  parallel: true
+  commands:
+    gitleaks:
+      run: gitleaks git --pre-commit --staged --redact --no-banner
+
+    frontend-format:
+      root: frontend/
+      glob: "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,css,md,html,yml,yaml}"
+      run: npx --no -- prettier --check --ignore-unknown {staged_files}
+
+    frontend-lint:
+      root: frontend/
+      glob: "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"
+      run: npx --no -- eslint --max-warnings=0 --no-warn-ignored {staged_files}
+
+    # --frozen: never rewrite uv.lock from inside a hook.
+    backend-lint:
+      root: backend/
+      glob: "*.py"
+      run: uv run --frozen ruff check {staged_files}
+
+    backend-format:
+      root: backend/
+      glob: "*.py"
+      run: uv run --frozen ruff format --check {staged_files}
