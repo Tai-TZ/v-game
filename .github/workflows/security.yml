@@ -1,0 +1,90 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 3 * * 1" # Mondays 03:23 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks
+        working-directory: ${{ runner.temp }}
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          checksums="gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          curl -fsSLO "${base}/${tarball}"
+          curl -fsSLO "${base}/${checksums}"
+          awk -v f="${tarball}" '$2 == f' "${checksums}" | sha256sum --check --strict
+          mkdir -p bin
+          tar -xzf "${tarball}" -C bin gitleaks
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+      # Scans every commit; .gitleaks.toml at the repo root is picked up automatically.
+      - run: gitleaks git --redact --no-banner
+
+  semgrep:
+    name: SAST (semgrep)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SEMGREP_IMAGE: semgrep/semgrep:1.179.0@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Path exclusions live in .semgrepignore. The backend requires Python 3.12, so the
+      # Python 3.7 back-compat rule (flags `importlib.resources`) does not apply.
+      - run: >-
+          docker run --rm -v "${GITHUB_WORKSPACE}:/src" -w /src "${SEMGREP_IMAGE}"
+          semgrep scan --config p/default --error --metrics=off
+          --exclude-rule python.lang.compatibility.python37.python37-compatibility-importlib2
+
+  osv-scanner:
+    name: Dependency vulnerabilities (osv-scanner)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      OSV_SCANNER_VERSION: 2.6.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install osv-scanner
+        working-directory: ${{ runner.temp }}
+        run: |
+          base="https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}"
+          binary="osv-scanner_linux_amd64"
+          curl -fsSLO "${base}/${binary}"
+          curl -fsSLO "${base}/osv-scanner_SHA256SUMS"
+          awk -v f="${binary}" '$2 == f' osv-scanner_SHA256SUMS | sha256sum --check --strict
+          install -D -m 0755 "${binary}" bin/osv-scanner
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+      # Exit codes: 0 clean, 1 vulnerabilities found, 127 error (e.g. a lockfile path does not
+      # exist), 128 no packages found.
+      - name: Scan lockfiles
+        run: |
+          status=0
+          osv-scanner scan source --lockfile frontend/package-lock.json --lockfile backend/uv.lock || status=$?
+          if [ "$status" -eq 128 ]; then
+            echo "::error::osv-scanner found no packages in the lockfiles."
+          fi
+          exit "$status"
