@@ -1,0 +1,62 @@
+[project]
+name = "v-game-backend"
+version = "0.1.0"
+description = "V-Game backend API: campus zones, levels and (later) agent compilation."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.142.2",
+    "uvicorn[standard]==0.54.0",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff==0.16.10",
+    "mypy==2.4.0",
+    "pytest==9.1.1",
+    "httpx==0.28.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.19,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "vgame"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "N", "ASYNC", "PT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = [
+    "error",
+    # httpx is pinned at 0.28.1; Starlette 1.7's TestClient prefers httpx2.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:UserWarning",
+]

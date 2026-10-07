@@ -1,0 +1,106 @@
+{
+  "zones": [
+    {
+      "id": "library",
+      "name": "Thư viện",
+      "summary": "Dạy agent tra cứu trước khi trả lời: truy xuất tài liệu, chia chunk, tìm kiếm lai và xếp hạng lại kết quả.",
+      "concepts": ["Truy xuất tài liệu (RAG)", "Chia chunk", "Tìm kiếm lai", "Xếp hạng lại"],
+      "location": "library",
+      "status": "open",
+      "levels": [
+        {
+          "id": "grounded-citation",
+          "order": 1,
+          "title": "Thôi bịa điều luật",
+          "brief": "Agent đang bịa ra điều luật không tồn tại. Gắn bước truy xuất để agent trích đúng điều luật từ văn bản gốc.",
+          "concepts": ["Truy xuất tài liệu", "Trích dẫn nguồn", "Chống bịa thông tin"],
+          "kind": "standard"
+        },
+        {
+          "id": "chunk-tuning",
+          "order": 2,
+          "title": "Lược dao chunk",
+          "brief": "Câu trả lời bị cụt hoặc lạc đề. Chỉnh kích thước chunk, độ chồng lấp và top-k cho đến khi agent lấy đủ ngữ cảnh.",
+          "concepts": ["Kích thước chunk", "Độ chồng lấp", "Top-k"],
+          "kind": "standard"
+        },
+        {
+          "id": "article-number-lookup",
+          "order": 3,
+          "title": "Hỏi bằng số điều",
+          "brief": "Sự cố: người dùng hỏi theo số hiệu điều luật và tìm theo nghĩa trả về sai điều. Kết hợp tìm theo từ khoá với tìm theo nghĩa, rồi xếp hạng lại kết quả.",
+          "concepts": ["Tìm kiếm lai", "Tìm theo từ khoá", "Xếp hạng lại"],
+          "kind": "incident"
+        }
+      ]
+    },
+    {
+      "id": "watchtower",
+      "name": "Tháp canh",
+      "summary": "Dựng hàng rào bảo vệ cho agent: chặn prompt injection, lọc dữ liệu cá nhân và tự tấn công thử để tìm lỗ hổng.",
+      "concepts": ["Hàng rào bảo vệ", "Prompt injection", "Lọc dữ liệu cá nhân", "Tấn công thử"],
+      "location": "watchtower",
+      "status": "coming_soon",
+      "levels": [
+        {
+          "id": "direct-injection",
+          "order": 1,
+          "title": "Cổng thành",
+          "brief": "Người dùng chèn lệnh để agent bỏ qua chỉ dẫn hệ thống. Dựng cổng kiểm tra đầu vào để chặn prompt injection trực tiếp.",
+          "concepts": ["Injection trực tiếp", "Kiểm tra đầu vào", "Chỉ dẫn hệ thống"],
+          "kind": "standard"
+        },
+        {
+          "id": "poisoned-documents",
+          "order": 2,
+          "title": "Tài liệu độc",
+          "brief": "Tài liệu truy xuất về chứa lệnh ẩn, còn câu trả lời làm lộ thông tin cá nhân. Chặn injection gián tiếp và lọc PII ở đầu ra.",
+          "concepts": ["Injection gián tiếp", "Lọc PII đầu ra", "Nguồn không tin cậy"],
+          "kind": "standard"
+        },
+        {
+          "id": "turncoat-agent",
+          "order": 3,
+          "title": "Đổi phe",
+          "brief": "Sự cố: agent của một NPC có thể bị dụ làm trái nhiệm vụ. Đóng vai kẻ tấn công để tìm lỗ hổng, rồi vá hàng rào.",
+          "concepts": ["Red-team", "Kịch bản tấn công", "Vá lỗ hổng"],
+          "kind": "incident"
+        }
+      ]
+    },
+    {
+      "id": "market",
+      "name": "Chợ model",
+      "summary": "Cân đo token, ngữ cảnh và chọn model hợp lý để agent vừa nhanh, vừa rẻ, vừa đủ giỏi.",
+      "concepts": ["Ngân sách token", "Cửa sổ ngữ cảnh", "Chọn model", "Nén hội thoại"],
+      "location": "market",
+      "status": "coming_soon",
+      "levels": [
+        {
+          "id": "context-packing",
+          "order": 1,
+          "title": "Đóng thùng context",
+          "brief": "Ngữ cảnh vượt ngân sách token. Chọn và xếp những gì thật cần cho vừa thùng mà không bỏ sót thông tin quan trọng.",
+          "concepts": ["Ngân sách token", "Cửa sổ ngữ cảnh", "Ưu tiên thông tin"],
+          "kind": "standard"
+        },
+        {
+          "id": "model-routing",
+          "order": 2,
+          "title": "Ghi ray",
+          "brief": "Mỗi loại đơn cần một model khác nhau. Bẻ ghi để đơn đơn giản đi model nhỏ, đơn khó đi model mạnh.",
+          "concepts": ["Định tuyến model", "Chi phí và độ trễ", "Phân loại yêu cầu"],
+          "kind": "standard"
+        },
+        {
+          "id": "history-compaction",
+          "order": 3,
+          "title": "Lịch sử phình to",
+          "brief": "Sự cố: hội thoại dài khiến agent chậm, tốn kém và quên đoạn đầu. Nén lịch sử hội thoại mà vẫn giữ các chi tiết then chốt.",
+          "concepts": ["Nén lịch sử", "Tóm tắt hội thoại", "Bộ nhớ ngắn hạn"],
+          "kind": "incident"
+        }
+      ]
+    }
+  ]
+}
