@@ -1,0 +1,7 @@
+build/
+.react-router/
+coverage/
+playwright-report/
+test-results/
+public/themes/*/fonts/
+package-lock.json
