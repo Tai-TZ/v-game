@@ -1,0 +1,46 @@
+{
+  "id": "town",
+  "name": "Thị trấn",
+  "brand": {
+    "programName": null,
+    "orgName": null,
+    "disclaimer": null
+  },
+  "fonts": {
+    "preload": [
+      "fonts/be-vietnam-pro-latin-400-normal.woff2",
+      "fonts/be-vietnam-pro-vietnamese-400-normal.woff2"
+    ]
+  },
+  "hero": {
+    "sources": [{ "src": "images/hero.svg", "width": 1600 }],
+    "width": 1600,
+    "height": 900,
+    "alt": "",
+    "credit": null
+  },
+  "campus": {
+    "ground": "#c8dcb0",
+    "path": "#ebe6da",
+    "plaza": "#efece4",
+    "water": "#9ccfd8",
+    "foliage": "#5c9a52",
+    "trunk": "#80603f",
+    "player": "#1d6b62",
+    "npc": "#b85f12",
+    "landmark": {
+      "archetype": "clock-tower",
+      "name": "Toà thị chính",
+      "wall": "#e9e2d3",
+      "trim": "#cfc5b0",
+      "roof": "#1d6b62",
+      "accent": "#b85f12",
+      "colonnades": false
+    },
+    "buildings": {
+      "library": { "wall": "#efe7d8", "trim": "#d6cbb6", "roof": "#1d6b62" },
+      "watchtower": { "wall": "#e4e8e6", "trim": "#c9d1ce", "roof": "#12343b" },
+      "market": { "wall": "#f3e6d6", "trim": "#dccbb5", "roof": "#b85f12" }
+    }
+  }
+}

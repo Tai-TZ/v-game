@@ -1,0 +1,50 @@
+{
+  "id": "vinuni",
+  "name": "Khuôn viên VinUni",
+  "brand": {
+    "programName": "AI 20K",
+    "orgName": "VinUniversity",
+    "disclaimer": "Dự án học tập độc lập, lấy cảm hứng từ khuôn viên VinUniversity. Không phải sản phẩm chính thức của VinUniversity."
+  },
+  "fonts": {
+    "preload": [
+      "fonts/montserrat-latin-wght-normal.woff2",
+      "fonts/montserrat-vietnamese-wght-normal.woff2"
+    ]
+  },
+  "hero": {
+    "sources": [
+      { "src": "images/campus-768.webp", "width": 768 },
+      { "src": "images/campus-1280.webp", "width": 1280 },
+      { "src": "images/campus-1920.webp", "width": 1920 }
+    ],
+    "width": 1920,
+    "height": 1172,
+    "alt": "Toà nhà trung tâm màu trắng có tháp nhọn, nhìn từ bãi cỏ trước khuôn viên VinUniversity",
+    "credit": "Ảnh: VinUniversity"
+  },
+  "campus": {
+    "ground": "#b9d7a0",
+    "path": "#ece8df",
+    "plaza": "#f2efe8",
+    "water": "#8ec3e6",
+    "foliage": "#4f8f45",
+    "trunk": "#7b5a3c",
+    "player": "#134d8b",
+    "npc": "#d08a1e",
+    "landmark": {
+      "archetype": "spire-hall",
+      "name": "Toà nhà trung tâm",
+      "wall": "#f7f6f2",
+      "trim": "#e1ddd2",
+      "roof": "#d8d2c2",
+      "accent": "#c9a13b",
+      "colonnades": true
+    },
+    "buildings": {
+      "library": { "wall": "#f4f2ec", "trim": "#d9d4c7", "roof": "#134d8b" },
+      "watchtower": { "wall": "#eef1f5", "trim": "#d5dbe3", "roof": "#0b2a4d" },
+      "market": { "wall": "#f6f3ee", "trim": "#ddd6ca", "roof": "#c72127" }
+    }
+  }
+}

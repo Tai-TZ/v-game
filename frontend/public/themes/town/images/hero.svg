@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="presentation">
+  <rect width="1600" height="900" fill="#12343b"/>
+  <circle cx="1240" cy="250" r="90" fill="#1b4750"/>
+  <path d="M0 640 L180 600 L360 625 L560 585 L760 615 L980 575 L1200 610 L1400 580 L1600 605 V900 H0 Z" fill="#163f47"/>
+  <g fill="#1d5560">
+    <rect x="140" y="520" width="150" height="230"/>
+    <polygon points="130,520 215,460 300,520"/>
+    <rect x="330" y="560" width="120" height="190"/>
+    <rect x="1120" y="540" width="170" height="210"/>
+    <polygon points="1110,540 1205,480 1300,540"/>
+    <rect x="1320" y="575" width="130" height="175"/>
+  </g>
+  <g fill="#23676f">
+    <rect x="720" y="380" width="160" height="370"/>
+    <polygon points="705,380 800,290 895,380"/>
+    <rect x="560" y="520" width="150" height="230"/>
+    <rect x="890" y="510" width="170" height="240"/>
+    <polygon points="880,510 975,450 1070,510"/>
+  </g>
+  <circle cx="800" cy="450" r="34" fill="#12343b"/>
+  <circle cx="800" cy="450" r="26" fill="#e3efec"/>
+  <path d="M800 450 V430 M800 450 H815" stroke="#12343b" stroke-width="5" stroke-linecap="round"/>
+  <g fill="#e8c27a">
+    <rect x="590" y="560" width="22" height="30"/><rect x="640" y="560" width="22" height="30"/>
+    <rect x="590" y="620" width="22" height="30"/><rect x="930" y="555" width="22" height="30"/>
+    <rect x="990" y="555" width="22" height="30"/><rect x="990" y="615" width="22" height="30"/>
+    <rect x="175" y="570" width="20" height="28"/><rect x="235" y="570" width="20" height="28"/>
+    <rect x="1160" y="590" width="20" height="28"/><rect x="1230" y="590" width="20" height="28"/>
+  </g>
+  <rect x="0" y="750" width="1600" height="150" fill="#0f2c32"/>
+</svg>
