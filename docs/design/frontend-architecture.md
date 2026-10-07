@@ -55,8 +55,8 @@ app/
 | Ngân sách | Thực tế | Ép bằng |
 |---|---|---|
 | Trang chủ không có three | 0 chunk | `scripts/check-bundle.mjs` (manifest + dò chuỗi `THREE.WebGLRenderer`) và `e2e/landing.spec.ts` (danh sách chunk từ `build/bundle-report.json`) |
-| `/play` ≤ 300 kB gzip ¹ | 259,7 kB | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
-| ≤ 40 draw call, ≤ 60k tam giác | 13; 8 778 (campus) / 7 226 (town), khớp art §6.1 | `scene.test.ts` (fail nếu > 16 hoặc > 12 000) |
+| `/play` ≤ 300 kB gzip ¹ | 262,2 kB | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
+| ≤ 40 draw call, ≤ 60k tam giác | 13; 16 238 (campus) / 13 768 (town), khớp campus-scene v0.2 §7 | `scene.test.ts` (fail nếu > 16 hoặc > 20 000) |
 | `frameloop="demand"` | không frame khi đứng yên | `e2e/play.spec.ts` với `?debug=frames` |
 | Không shadow map / postprocessing | — | `scene.test.ts` grep `app/features/campus` |
 | DPR | `dpr={[1, 2]}`, `[1, 1.5]` khi `(pointer: coarse)` hoặc < 768 px | xem dưới |

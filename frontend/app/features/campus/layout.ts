@@ -24,92 +24,120 @@ export interface Site {
 }
 
 export const WORLD_BOUNDS = { halfX: 14, halfZ: 10 } as const;
-export const SPAWN: Vec2 = { x: 0, z: 3 };
-export const PLAZA: Vec2 = { x: 0, z: -1 };
-export const FOUNTAIN_RADIUS = 1.4;
+/** Middle of the central lawn, on the main axis (campus-scene v0.2 §2.2). */
+export const SPAWN: Vec2 = { x: 0, z: -0.8 };
+/** Centre of the fountain and the curved colonnades. */
+export const PLAZA: Vec2 = { x: 0, z: 5.6 };
+/** Half side of the fountain's blocking box: the hedge ring around the basin. */
+export const FOUNTAIN_RADIUS = 1.88;
 export const INTERACT_RADIUS = 1.7;
 
+const span = (x0: number, x1: number, z0: number, z1: number): Box => ({
+  x: (x0 + x1) / 2,
+  z: (z0 + z1) / 2,
+  halfX: (x1 - x0) / 2,
+  halfZ: (z1 - z0) / 2,
+});
+
+/** Point on a circle around the plaza; angle 0 points to the main building (-z). */
+export function arcPoint(angle: number, radius: number): Vec2 {
+  return { x: PLAZA.x + Math.sin(angle) * radius, z: PLAZA.z - Math.cos(angle) * radius };
+}
+
 export const LANDMARK = {
-  centre: { x: 0, z: -7.2 },
-  footprint: { x: 0, z: -7.2, halfX: 3.4, halfZ: 2 },
+  centre: { x: 0, z: -7.6 },
+  /** Wings + pavilions; the tower base that steps forward; porch + steps. */
+  footprints: [
+    span(-9.75, 9.75, -9.9, -6.0),
+    span(-3.15, 3.15, -6.0, -5.15),
+    span(-1.7, 1.7, -5.15, -3.55),
+  ],
 } as const;
 
 export const SITES: readonly Site[] = [
   {
     id: "library",
-    centre: { x: -8.5, z: 2 },
-    footprint: { x: -8.5, z: 2, halfX: 2.3, halfZ: 1.7 },
-    door: { x: -5.6, z: 2 },
+    centre: { x: -10.6, z: -3.3 },
+    footprint: span(-12.4, -8.8, -6.0, -0.6),
+    door: { x: -8.2, z: -2.8 },
     facing: Math.PI / 2,
   },
   {
     id: "watchtower",
-    centre: { x: 8.5, z: 2 },
-    footprint: { x: 8.5, z: 2, halfX: 1.5, halfZ: 1.5 },
-    door: { x: 6.4, z: 2 },
+    centre: { x: 10.4, z: -3.5 },
+    footprint: span(8.8, 12.0, -6.0, -1.0),
+    door: { x: 8.2, z: -2.8 },
     facing: -Math.PI / 2,
   },
   {
     id: "market",
-    centre: { x: 0, z: 7.6 },
-    footprint: { x: 0, z: 7.6, halfX: 2.7, halfZ: 1.6 },
-    door: { x: 0, z: 5.3 },
-    facing: Math.PI,
+    centre: { x: 9.0, z: 3.9 },
+    footprint: span(7.0, 11.0, 2.6, 5.2),
+    door: { x: 6.4, z: 3.9 },
+    facing: -Math.PI / 2,
   },
 ];
 
-/** Colonnade columns flanking the plaza (only built when the theme asks for them). */
-export const COLONNADE_COLUMNS: readonly Vec2[] = (() => {
-  const columns: Vec2[] = [];
-  const radius = 4.2;
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 6; i += 1) {
-      const angle = side * (Math.PI * 0.38 + (i / 5) * Math.PI * 0.3);
-      columns.push({
-        x: PLAZA.x + Math.sin(angle) * radius,
-        z: PLAZA.z - Math.cos(angle) * radius,
-      });
-    }
-  }
-  return columns;
-})();
+export const COLONNADE = { inner: 3.05, outer: 3.75, mid: 3.4 } as const;
 
-/** Trees around the edge of the map and in a few clusters; positions are fixed so the scene is stable. */
-export const TREES: readonly Vec2[] = (() => {
-  const trees: Vec2[] = [];
-  for (let x = -13; x <= 13; x += 2.6) {
-    trees.push({ x, z: -9.3 }, { x: x + 1.3, z: 9.3 });
-  }
-  for (let z = -6.5; z <= 6.5; z += 2.6) {
-    trees.push({ x: -13.3, z }, { x: 13.3, z: z + 1.3 });
-  }
-  trees.push(
-    { x: -5, z: -4.6 },
-    { x: 5, z: -4.6 },
-    { x: -4.4, z: 6.8 },
-    { x: 4.4, z: 6.8 },
-    { x: -10.5, z: -3.5 },
-    { x: 10.5, z: -3.5 },
-    { x: -10.8, z: 6.5 },
-    { x: 10.8, z: 6.5 },
-  );
-  // Drop trees that would overhang the base edge or push into the market roof (art §6.4).
-  return trees.filter(
-    (t) => Math.abs(t.x) <= WORLD_BOUNDS.halfX && !(t.z > 9 && Math.abs(t.x) < 2),
-  );
-})();
+/** 24 columns: two rows (inner, outer) on six angles per side of the plaza. */
+export const COLONNADE_COLUMNS: readonly Vec2[] = [-1, 1].flatMap((s) =>
+  [0, 1, 2, 3, 4, 5].flatMap((i) => {
+    const angle = s * (0.37 + 0.05 * i) * Math.PI;
+    return [arcPoint(angle, COLONNADE.inner), arcPoint(angle, COLONNADE.outer)];
+  }),
+);
 
-export const NPC_SPOT: Vec2 = { x: -5.4, z: 3.4 };
+/** Square piers closing the front end of each colonnade. */
+export const COLONNADE_PIERS: readonly Vec2[] = [-1, 1].map((s) =>
+  arcPoint(s * 0.68 * Math.PI, COLONNADE.mid),
+);
+
+const v = (x: number, z: number): Vec2 => ({ x, z });
+
+/** Broad-crowned trees; their trunks block the player. */
+export const ROUND_TREES: readonly Vec2[] = [
+  ...[v(-11.4, -9.0), v(-13.3, -7.4), v(11.4, -9.0), v(13.3, -7.4)], // back corners
+  ...[v(-13.4, -4.4), v(-13.4, -1.8), v(-13.3, 1.2)], // west edge
+  ...[v(13.3, -4.4), v(13.3, -1.6), v(12.8, 1.3), v(13.4, 3.7)], // east edge
+  ...[v(-5.4, 2.4), v(5.6, 1.8), v(-4.9, 0.6), v(5.0, 0.6)], // lawns beside the axis
+  ...[v(-4.9, 6.4), v(4.9, 6.4), v(-4.3, 8.9), v(4.3, 8.9)], // behind the colonnades
+  ...[v(-13.4, 4.3), v(-13.4, 7.3), v(-12.8, 9.6), v(-5.6, 9.6)], // around the rose garden
+];
+
+/** Slender cypresses: decoration only, the player walks past them. */
+export const CYPRESS_TREES: readonly Vec2[] = [
+  // Two rows along the axis; none in front of the wings, whose facades must stay readable.
+  ...[-3.75, 3.75].flatMap((x) => [0, 1, 2, 3, 4, 5, 6, 7, 8].map((k) => v(x, -5.6 + 0.8 * k))),
+];
+
+export const TREES: readonly Vec2[] = [...ROUND_TREES, ...CYPRESS_TREES];
+
+/** Four boxes inside the lake (front-right corner); the shore stays walkable. */
+export const LAKE_BLOCKS: readonly Box[] = [
+  span(8.6, 14.8, 8.3, 10.8),
+  span(11.4, 14.8, 6.4, 8.3),
+  span(7.2, 8.6, 9.0, 10.8),
+  span(13.0, 14.8, 5.9, 6.4),
+];
+
+/** Next to the library entrance, off the camera's line of sight from the door. */
+export const NPC_SPOT: Vec2 = { x: -6.6, z: -2.0 };
 /** Where the player is placed (or walks to) to talk to the librarian: inside INTERACT_RADIUS. */
-export const NPC_TALK_SPOT: Vec2 = { x: -4.7, z: 3.0 };
+export const NPC_TALK_SPOT: Vec2 = { x: -6.6, z: -2.8 };
 const NPC_BOX: Box = { ...NPC_SPOT, halfX: 0.3, halfZ: 0.3 };
 
-/** Everything the player cannot walk through. */
+/**
+ * Everything the player cannot walk through: buildings, the fountain, round-tree trunks, the
+ * lake and the librarian. Low or slender things (columns, lamps, statues, cypresses, hedges,
+ * balustrades) do not block, so click-to-move walks straight without path finding.
+ */
 export const OBSTACLES: readonly Box[] = [
-  LANDMARK.footprint,
+  ...LANDMARK.footprints,
   ...SITES.map((site) => site.footprint),
   { x: PLAZA.x, z: PLAZA.z, halfX: FOUNTAIN_RADIUS, halfZ: FOUNTAIN_RADIUS },
-  ...TREES.map((tree) => ({ x: tree.x, z: tree.z, halfX: 0.35, halfZ: 0.35 })),
+  ...ROUND_TREES.map((tree) => ({ x: tree.x, z: tree.z, halfX: 0.35, halfZ: 0.35 })),
+  ...LAKE_BLOCKS,
   NPC_BOX,
 ];
 
