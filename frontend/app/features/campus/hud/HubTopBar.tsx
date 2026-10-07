@@ -6,6 +6,7 @@ import { ChevronLeftIcon } from "~/components/ui/icons";
 import { ThemeToggle } from "~/features/theme/ThemeToggle";
 import type { ZoneListResult } from "~/features/zones/api";
 import { ZoneCard, ZonesErrorNotice } from "~/features/zones/ZoneCard";
+import { AUTHOR } from "~/lib/site";
 import { useDelayedFlag } from "~/lib/useSettled";
 
 import { hubStore } from "../store";
@@ -127,6 +128,7 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
               </li>
             ))}
         </ul>
+        <p className="border-t border-line px-4 py-3 text-xs text-fg-muted">V-Game · {AUTHOR}</p>
       </div>
     </>
   );

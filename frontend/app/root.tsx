@@ -14,6 +14,7 @@ import { themeBootstrapScript } from "./features/theme/bootstrap";
 import { loadThemeCatalog } from "./features/theme/catalog.server";
 import { ThemeProvider } from "./features/theme/context";
 import { THEME_STYLESHEET_ID, themeAssetUrl, themeStylesheetUrl } from "./features/theme/paths";
+import { AUTHOR } from "./lib/site";
 
 // Runs at build time only (pre-render and SPA shell); the result is embedded in the HTML.
 export async function loader() {
@@ -41,6 +42,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="author" content={AUTHOR} />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         {themeId && (
           <>

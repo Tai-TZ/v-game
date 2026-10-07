@@ -7,6 +7,7 @@ test("landing page loads without any three.js or scene chunk", async ({ page, co
 
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("contentinfo")).toContainText("© 2026 Tai Thanh Nguyen");
   await page.waitForLoadState("networkidle");
 
   expect(bundleReport.threeChunks.length).toBeGreaterThan(0);
