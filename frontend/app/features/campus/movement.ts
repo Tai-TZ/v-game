@@ -44,12 +44,15 @@ export function overlapsBox(point: Vec2, box: Box, radius: number): boolean {
   );
 }
 
-export function isBlocked(
-  point: Vec2,
-  obstacles: readonly Box[],
-  bounds: { halfX: number; halfZ: number },
-): boolean {
-  if (Math.abs(point.x) > bounds.halfX || Math.abs(point.z) > bounds.halfZ) return true;
+export interface Bounds {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+export function isBlocked(point: Vec2, obstacles: readonly Box[], b: Bounds): boolean {
+  if (point.x < b.minX || point.x > b.maxX || point.z < b.minZ || point.z > b.maxZ) return true;
   return obstacles.some((box) => overlapsBox(point, box, PLAYER_RADIUS));
 }
 
@@ -58,7 +61,11 @@ export interface StepResult {
   /** Yaw in radians for the walking direction; unchanged when standing still. */
   heading: number | null;
   moving: boolean;
-  /** True when a click/tap target has been reached or cannot be reached any further. */
+  /**
+   * True when a click/tap target has been reached or cannot be reached any further. A target
+   * inside an obstacle or off the walkable ground is given up at the first wall either axis
+   * meets, so the player does not crawl along it (QA r4).
+   */
   targetDone: boolean;
 }
 
@@ -71,30 +78,35 @@ export function step(
   input: { keys: Iterable<string>; target: Vec2 | null },
   dt: number,
   obstacles: readonly Box[],
-  bounds: { halfX: number; halfZ: number },
+  bounds: Bounds,
 ): StepResult {
   let direction = keyboardDirection(input.keys);
   let maxDistance = WALK_SPEED * dt;
-  const targetDone = false;
+  let blockedTarget = false;
 
   if (!direction && input.target) {
     const dx = input.target.x - position.x;
     const dz = input.target.z - position.z;
     const distance = Math.hypot(dx, dz);
     if (distance <= ARRIVE_DISTANCE) {
-      return { position, heading: null, moving: false, targetDone: true };
+      // Snap onto a free target, so the next route leg starts on the line routeTo checked.
+      const end = isBlocked(input.target, obstacles, bounds) ? position : { ...input.target };
+      return { position: end, heading: null, moving: false, targetDone: true };
     }
     direction = { x: dx / distance, z: dz / distance };
     maxDistance = Math.min(maxDistance, distance);
+    blockedTarget = isBlocked(input.target, obstacles, bounds);
   }
 
-  if (!direction) return { position, heading: null, moving: false, targetDone };
+  if (!direction) return { position, heading: null, moving: false, targetDone: false };
 
   const next = { ...position };
   const tryX = { x: position.x + direction.x * maxDistance, z: position.z };
-  if (!isBlocked(tryX, obstacles, bounds)) next.x = tryX.x;
+  const xFree = !isBlocked(tryX, obstacles, bounds);
+  if (xFree) next.x = tryX.x;
   const tryZ = { x: next.x, z: position.z + direction.z * maxDistance };
-  if (!isBlocked(tryZ, obstacles, bounds)) next.z = tryZ.z;
+  const zFree = !isBlocked(tryZ, obstacles, bounds);
+  if (zFree) next.z = tryZ.z;
 
   const moved = Math.hypot(next.x - position.x, next.z - position.z);
   if (moved < 1e-6) {
@@ -105,7 +117,7 @@ export function step(
     position: next,
     heading: Math.atan2(direction.x, direction.z),
     moving: true,
-    targetDone,
+    targetDone: blockedTarget && !(xFree && zFree),
   };
 }
 
