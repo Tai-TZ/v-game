@@ -26,7 +26,8 @@ npx playwright install chromium
 npm run test:e2e     # Playwright on the production build, API mocked per test
 ```
 
-Run the backend for `npm run dev`: `cd ../backend && uv run uvicorn vgame.main:app --port 8000`.
+Run the backend for `npm run dev`:
+`cd ../backend && uv run uvicorn --factory vgame.main:create_app --reload --port 8000`.
 
 ## Rules worth knowing
 
