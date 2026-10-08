@@ -10,6 +10,9 @@ Environment = Literal["development", "test", "production"]
 
 # src/vgame/config.py -> parents[2] is backend/, parents[3] is the repo root.
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
+# Built by vgame-build-index and committed with the code: the server never loads an ML model
+# (engine-v0.2.md §14, 2026-10-08 "bản miễn phí").
+SHIPPED_INDEX_DIR = Path(__file__).resolve().parent / "engine" / "data" / "index"
 
 
 class Settings(BaseSettings):
@@ -42,12 +45,14 @@ class Settings(BaseSettings):
     # Read-only docs/content (corpus + golden). ponytail: repo checkout only; the Docker image
     # does not ship docs/, so mount it and set CONTENT_DIR until content is packaged.
     content_dir: Path = _BACKEND_DIR.parent / "docs" / "content"
-    # Gitignored, derived artifacts: model files, index variants, replay cache.
+    # Index variants, question vectors and rerank scores (vgame-build-index writes here).
+    index_dir: Path = SHIPPED_INDEX_DIR
+    # Gitignored: model files (vgame-build-index and slow tests only) and the replay cache.
     engine_cache_dir: Path = _BACKEND_DIR / ".cache" / "engine"
     embed_model: str = "intfloat/multilingual-e5-large"
     rerank_model: str = "jinaai/jina-reranker-v2-base-multilingual"
-    # ponytail: 1 run x 3 cases = at most 3 parallel provider calls and CPU reranks for the pilot;
-    # raise via MAX_CONCURRENT_RUNS once the key's RPM tier and the server's CPU/RAM allow it.
+    # ponytail: 1 run x 3 cases = at most 3 parallel provider calls (Render free: 0.1 CPU); raise
+    # via MAX_CONCURRENT_RUNS once the key's RPM tier and the server's CPU allow it.
     max_concurrent_runs: int = Field(default=1, ge=1, le=20)
     # Server-wide cap on real (non-replayed) LLM calls per UTC day; protects the owner's key.
     daily_llm_call_cap: int = Field(default=500, ge=0)

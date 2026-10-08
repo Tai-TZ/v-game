@@ -31,7 +31,7 @@ def test_concurrent_run_cap_frees_on_terminal_event() -> None:
     store.start("l", None)
     with pytest.raises(RunBusyError) as exc:
         store.start("l", None)
-    assert exc.value.message_vi.startswith("Đang có nhiều lượt chạy")
+    assert exc.value.message_vi.startswith("Máy chủ miễn phí chạy một lượt mỗi lúc")
     store.append(first, ev("run.finished"))
     store.start("l", None)
 

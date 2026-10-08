@@ -4,11 +4,19 @@
     uv run python scripts/spike_llm.py --cap 75 --json out.json \\
         chunk-tuning:ref wait:65 chunk-tuning:N2 wait:65 article-number-lookup:ref!
 
-Plan items: ``<level>:ref`` or ``<level>:<naive id>``; a trailing ``!`` bypasses the replay
-cache (a fresh sample). ``wait:<s>`` sleeps, so the 60 s RPM window drains and the primary model
-serves the next run. A run repeated without ``!`` must be served from the replay cache with the
-original usage (exit 2 otherwise). The script stops at the first run that fails or has an
-``llm_error`` case (the whole chain refused): it does not spend the cap on more runs.
+Plan items: ``<level>:ref``, ``<level>:starter`` or ``<level>:<naive id>``; a trailing ``!``
+bypasses the replay cache (a fresh sample). ``wait:<s>`` sleeps, so the 60 s RPM window drains and
+the primary model serves the next run. A run repeated without ``!`` must be served from the replay
+cache with the original usage (exit 2 otherwise). The script stops at the first run that fails or
+has an ``llm_error`` case (the whole chain refused): it does not spend the cap on more runs.
+
+``--seed PATH`` writes every answer the runs used (replayed or fresh) as the shipped replay seed
+(engine-v0.2.md §14, 2026-10-08), only if every run finished without an ``llm_error`` case::
+
+    uv run python scripts/spike_llm.py --cap 80 --seed src/vgame/engine/data/replay-seed.json \\
+        grounded-citation:ref grounded-citation:starter wait:65 \\
+        chunk-tuning:ref chunk-tuning:starter wait:65 \\
+        article-number-lookup:ref article-number-lookup:starter
 
 Needs GEMINI_API_KEY in backend/.env and a fresh index (``vgame-build-index``). Hard cap:
 ``--cap`` real network attempts for the whole script (DailyCap). The key is never read here:
@@ -35,8 +43,10 @@ from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import GraphPayload
 from vgame.engine.levels import LevelSpec, load_level
 from vgame.engine.llm import GeminiClient, ReplayingLLM
+from vgame.engine.prompt import FRAME_VERSION
+from vgame.engine.replay import replay_key, response_json
 from vgame.engine.runtime import run_level
-from vgame.engine.types import EngineEvent, LLMClient
+from vgame.engine.types import EngineEvent, LLMClient, LLMRequest, LLMResponse
 from vgame.engine.validator import validate
 
 DEFAULT_PLAN = ("grounded-citation:ref", "grounded-citation:N1", "grounded-citation:ref")
@@ -50,7 +60,32 @@ def _pct(values: Sequence[int], q: float) -> int:
 def _graph(level: LevelSpec, name: str) -> GraphPayload:
     if name == "ref":
         return level.reference_graph
+    if name == "starter":
+        return level.starter_graph
     return next(n.graph for n in level.naive_graphs if n.id == name)
+
+
+class _Recorder:
+    """Keeps every answer the engine received under its replay key: the seed entries."""
+
+    def __init__(self, inner: ReplayingLLM) -> None:
+        self.inner = inner
+        self.entries: dict[str, dict[str, object]] = {}
+
+    @property
+    def provider(self) -> str:
+        return self.inner.provider
+
+    @property
+    def model(self) -> str:
+        return self.inner.model
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        response = await self.inner.complete(request)
+        if response.stop_reason != "error":  # never cached either
+            key = replay_key(self.provider, response.model, request, FRAME_VERSION)
+            self.entries[key] = response_json(response)
+        return response
 
 
 async def _run(
@@ -157,12 +192,15 @@ def _per_model(calls: list[dict[str, Any]]) -> None:
         )
 
 
-async def _plan(engine: EngineServices, plan: Sequence[str]) -> tuple[int, dict[str, Any]]:
+async def _plan(
+    engine: EngineServices, plan: Sequence[str], recorder: _Recorder | None = None
+) -> tuple[int, dict[str, Any]]:
     """One event loop for every run: the shared Gemini client's pool is bound to it."""
     replaying = engine.llm
     if not isinstance(replaying, ReplayingLLM) or not isinstance(replaying.inner, GeminiClient):
         raise SystemExit("expected the engine's ReplayingLLM over GeminiClient")
     gemini = replaying.inner
+    cached: LLMClient = recorder or replaying
     limiter: list[dict[str, Any]] = []
     reserve = gemini._limiter.reserve
 
@@ -189,7 +227,7 @@ async def _plan(engine: EngineServices, plan: Sequence[str]) -> tuple[int, dict[
             run_id = f"{n:02d}-{level_id}-{name}{'-fresh' if fresh else ''}"
             sent, booked = gemini._daily_cap._count, len(limiter)
             events = await _run(
-                engine, gemini if fresh else replaying, level, _graph(level, name), run_id
+                engine, gemini if fresh else cached, level, _graph(level, name), run_id
             )
             run_calls = _calls(run_id, events)
             calls += run_calls
@@ -229,16 +267,36 @@ def main() -> int:
     parser.add_argument("plan", nargs="*", default=list(DEFAULT_PLAN))
     parser.add_argument("--cap", type=int, default=40, help="real network attempts (DailyCap)")
     parser.add_argument("--json", type=Path, help="write runs and per-call records here")
+    parser.add_argument("--seed", type=Path, help="write the answers used as a replay seed here")
     args = parser.parse_args()
     # The engine logs model, status and cooldown of each failed call (never bodies or the key).
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(message)s")
-    engine = build_engine(Settings(daily_llm_call_cap=args.cap))
+    settings = Settings(daily_llm_call_cap=args.cap)
+    engine = build_engine(settings)
     if engine.llm is None or engine.store is None:
         print("LLM or index not configured: set GEMINI_API_KEY and run vgame-build-index first.")
         return 1
-    code, record = asyncio.run(_plan(engine, args.plan))
+    recorder = None
+    if args.seed is not None:
+        if not isinstance(engine.llm, ReplayingLLM):
+            raise SystemExit("expected the engine's ReplayingLLM")
+        recorder = _Recorder(engine.llm)
+    code, record = asyncio.run(_plan(engine, args.plan, recorder))
     if args.json is not None:
         args.json.write_text(json.dumps(record, ensure_ascii=False, indent=1), encoding="utf-8")
+    if recorder is not None and args.seed is not None:
+        if code != 0 or not all(r["finished"] and not r["llm_error"] for r in record["runs"]):
+            print("seed NOT written: a run failed or had an llm_error case")
+            return code or 2
+        fallback = sorted(
+            {str(e["model"]) for e in recorder.entries.values()} - {settings.gemini_model}
+        )
+        if fallback:  # star 2 is calibrated on the primary model only
+            print(f"warning: fallback models served some seed answers: {fallback}")
+        seed = {"version": 1, "entries": dict(sorted(recorder.entries.items()))}
+        text = json.dumps(seed, ensure_ascii=False, indent=1) + "\n"
+        args.seed.write_text(text, encoding="utf-8", newline="\n")
+        print(f"seed: {len(recorder.entries)} answers written to {args.seed}")
     return code
 
 

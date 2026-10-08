@@ -494,5 +494,7 @@ class BudgetExceededError(EngineError):
         self.message_vi = (
             "Ca này đã dùng hết số lời gọi LLM cho phép."
             if scope == "case"
-            else "Máy chủ đã dùng hết lượt gọi LLM hôm nay, mời bạn quay lại ngày mai."
+            # DailyCap counts per UTC day: 00:00 UTC = 7:00 in Vietnam (UTC+7).
+            else "Máy chủ đã dùng hết lượt gọi AI miễn phí của hôm nay. "
+            "Lượt gọi mở lại lúc 7 giờ sáng (giờ Việt Nam)."
         )

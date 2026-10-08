@@ -31,6 +31,13 @@ def test_daily_cap_blocks_then_resets_on_a_new_utc_day() -> None:
     cap.reserve()
 
 
+def test_daily_cap_message_says_when_calls_reopen_in_vietnam_time() -> None:
+    # DailyCap counts per UTC day: 00:00 UTC is 7:00 in Vietnam (UTC+7, no daylight time).
+    message = BudgetExceededError("daily").message_vi
+    assert "miễn phí" in message
+    assert "7 giờ sáng (giờ Việt Nam)" in message
+
+
 def test_daily_cap_zero_blocks_everything() -> None:
     with pytest.raises(BudgetExceededError):
         DailyCap(0).reserve()

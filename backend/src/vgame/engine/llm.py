@@ -19,7 +19,7 @@ Model chain: GEMINI_MODEL, then GEMINI_FALLBACK_MODELS. A per-model requests-per
 per-day quota until the next Pacific midnight) and the same request goes to the next model,
 within the case deadline. A call is only sent if its model can finish before the case deadline
 (MIN_CALL_S), and its server timeout is what is left of the case. DailyCap still counts every
-network attempt.
+network attempt; a call it refuses books no limiter slot.
 """
 
 import asyncio
@@ -43,6 +43,7 @@ from vgame.engine.constants import CASE_DEADLINE_S, Profile
 from vgame.engine.prompt import FRAME_VERSION
 from vgame.engine.replay import ReplayStore, replay_key
 from vgame.engine.types import (
+    BudgetExceededError,
     LLMCallError,
     LLMClient,
     LLMNotConfiguredError,
@@ -254,6 +255,10 @@ class GeminiClient:
         retried = too_late = False
         last: LLMCallError | None = None
         while queue:
+            # Before any limiter booking: a refused call must not use up a per-minute slot (the
+            # chain would then answer 429 "busy" and players read the wrong reset time).
+            if self._daily_cap.exhausted:
+                raise BudgetExceededError("daily")
             model = queue.pop(0)
             now = self._clock()
             if self._cooldown.get(model, 0.0) > now:

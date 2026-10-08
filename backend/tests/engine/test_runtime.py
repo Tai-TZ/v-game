@@ -3,6 +3,7 @@ import json
 import time
 from collections import Counter
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -29,6 +30,7 @@ from vgame.engine.grading import LevelEvaluator
 from vgame.engine.graph import GraphPayload
 from vgame.engine.index import IndexStaleError
 from vgame.engine.levels import LevelSpec
+from vgame.engine.replay import ReplayStore
 from vgame.engine.types import (
     BudgetExceededError,
     EngineEvent,
@@ -261,10 +263,38 @@ def test_provider_outage_on_every_case_is_not_scored() -> None:
     assert not [e for e in events if e["type"] == "run.scored"]
     assert events[-1]["type"] == "run.failed"
     assert events[-1]["code"] == "llm_unavailable"
-    assert events[-1]["message_vi"] == runtime.LLM_UNAVAILABLE_VI
+    assert events[-1]["message_vi"] == runtime.llm_unavailable_vi(False, datetime.now(UTC))
 
 
-def test_one_answered_case_keeps_the_run_scored() -> None:
+def test_daily_cap_failure_says_calls_reopen_at_7_vietnam_time() -> None:
+    events = run(L1_STARTER, cs=cases(3), llm=DailyCapHit())
+    assert events[-1]["type"] == "run.failed"
+    assert events[-1]["code"] == "llm_unavailable"
+    message = events[-1]["message_vi"]
+    assert "7 giờ sáng (giờ Việt Nam)" in message
+    assert "kết quả lưu sẵn" in message  # the unchanged starter graph replays the seed
+
+
+@pytest.mark.parametrize(
+    ("now", "reopens"),
+    [
+        (datetime(2026, 10, 8, 12, tzinfo=UTC), "14:00"),  # Pacific daylight time: UTC-7
+        (datetime(2026, 12, 1, 12, tzinfo=UTC), "15:00"),  # Pacific standard time: UTC-8
+        (datetime(2026, 10, 8, 6, 59, tzinfo=UTC), "14:00"),  # 23:59 PDT: reset in a minute
+    ],
+)
+def test_provider_failure_names_the_quota_reset_in_vietnam_time(
+    now: datetime, reopens: str
+) -> None:
+    # Gemini per-day quotas reset at midnight Pacific time.
+    message = runtime.llm_unavailable_vi(False, now)
+    assert f"lúc {reopens} (giờ Việt Nam)" in message
+    assert "1 phút" in message
+
+
+def test_a_case_the_provider_failed_voids_the_run_even_if_others_answered() -> None:
+    # The score would count c2 as the player's miss (free tier 2026-10-08: replayed cases
+    # answer while the provider is out, so partial runs are common). A rerun replays c1.
     def flaky(request: LLMRequest) -> str:
         if any("Câu 2:" in m.text for m in request.messages):
             raise LLMCallError("upstream 503", status=503)
@@ -272,7 +302,42 @@ def test_one_answered_case_keeps_the_run_scored() -> None:
 
     events = run(L1_STARTER, cs=cases(2), llm=FakeLLM(flaky))
     assert graded(events) == {"c1": "ok", "c2": "llm_error"}
-    assert events[-1]["type"] == "run.finished"
+    assert not [e for e in events if e["type"] == "run.scored"]
+    assert events[-1]["type"] == "run.failed"
+    assert events[-1]["code"] == "llm_unavailable"
+    assert events[-1]["message_vi"] == runtime.llm_unavailable_vi(False, datetime.now(UTC))
+
+
+def test_daily_cap_after_replayed_cases_voids_the_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A graph that shares c1 with a seeded one: c1 replays, c2 and c3 hit DAILY_LLM_CALL_CAP.
+    # Scored, it would end with stars computed from 1 of 3 cases and no quota message.
+    sdk = install_fake_genai(monkeypatch)
+    sdk.outcomes.append(gemini_answer())
+    store = ReplayStore(":memory:")
+    seeding = llm.GeminiClient(api_key="test-key", models=["a"], daily_cap=DailyCap(10))
+    assert run(L1_STARTER, llm=llm.ReplayingLLM(seeding, store))[-1]["type"] == "run.finished"
+
+    capped = llm.GeminiClient(api_key="test-key", models=["a"], daily_cap=DailyCap(0))
+    events = run(L1_STARTER, cs=cases(3), llm=llm.ReplayingLLM(capped, store))
+    assert graded(events) == {"c1": "ok", "c2": "skipped_budget", "c3": "skipped_budget"}
+    assert len(sdk.calls) == 1  # only the seeding call reached the provider
+    assert events[-1]["type"] == "run.failed"
+    assert events[-1]["code"] == "llm_unavailable"
+    assert "7 giờ sáng (giờ Việt Nam)" in events[-1]["message_vi"]
+
+
+def test_daily_cap_message_holds_after_a_minute_of_refused_runs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # 3 refused calls a run; the chain has 5 + 5 slots a minute. Refusals used to book them,
+    # and from the 5th run on players read "thử lại sau khoảng 1 phút … 14:00".
+    sdk = install_fake_genai(monkeypatch)
+    client = llm.GeminiClient(api_key="test-key", models=["a", "b"], daily_cap=DailyCap(0))
+    for _ in range(6):
+        events = run(L1_STARTER, cs=cases(3), llm=client)
+        assert events[-1]["type"] == "run.failed"
+        assert "7 giờ sáng (giờ Việt Nam)" in events[-1]["message_vi"]
+    assert sdk.calls == []
 
 
 def test_provider_error_finish_is_an_llm_error_not_an_answer() -> None:
@@ -437,7 +502,7 @@ def test_every_gemini_model_rate_limited_is_the_vietnamese_llm_unavailable(
     assert set(graded(events).values()) == {"llm_error"}
     assert events[-1]["type"] == "run.failed"
     assert events[-1]["code"] == "llm_unavailable"
-    assert events[-1]["message_vi"] == runtime.LLM_UNAVAILABLE_VI
+    assert events[-1]["message_vi"] == runtime.llm_unavailable_vi(False, datetime.now(UTC))
 
 
 def test_fallback_model_is_recorded_on_the_step_and_the_run(
