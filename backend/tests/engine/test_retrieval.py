@@ -205,7 +205,9 @@ def test_rerank_scores_headings_so_a_mid_article_chunk_wins_a_number_lookup(
     assert out.origin == "rerank"
     assert [h.chunk.chunk_id for h in out.hits] == [mid.chunk_id, head.chunk_id]
     assert _ids(rerank(store, reranker, V01_L3, docs, top_n=1)) == [mid.chunk_id]
-    assert reranker.calls == 1  # second call served from the score cache
+    # No score cache in front of the reranker: the shipped RerankTable is the cache, and a
+    # process-wide dict served one double's scores to another with the same model_id.
+    assert reranker.calls == 2
 
 
 def test_fact_and_summaries_are_short_and_vietnamese() -> None:
