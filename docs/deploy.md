@@ -24,6 +24,33 @@ khoảng một phút. Trang chủ tự gọi `/api/health` để đánh thức A
 monitor HTTP 5 phút trên [UptimeRobot](https://uptimerobot.com) trỏ vào `/api/health` (một service
 chạy cả tháng vẫn nằm trong 750 giờ miễn phí).
 
+### Giữ Render ở mức 0 đồng
+
+Render không có giới hạn chi tiêu. Workspace Hobby miễn phí gồm 750 giờ chạy máy free, 500 phút build
+và 5 GB băng thông ra mỗi tháng; hết giờ chạy máy thì service tạm dừng tới tháng sau, còn phút build
+và băng thông vượt mức thì bị tính tiền ($5 mỗi 1.000 phút build, $0,15 mỗi GB). `render.yaml` đã
+chặn những gì cấu hình được:
+
+- `plan: free`, không có ổ đĩa, database, cron job hay service thứ hai.
+- Tắt môi trường xem trước cho pull request (`previews: generation: off`).
+- Chỉ deploy commit đã qua CI (`autoDeployTrigger: checksPass`) và chỉ khi `backend/`,
+  `docs/content/` hoặc `render.yaml` đổi (`buildFilter`), nên merge giao diện hay tài liệu không tốn
+  phút build.
+
+Phần làm trên dashboard (một lần):
+
+1. **Workspace → Billing**: plan là **Hobby**. Nếu chưa thêm thẻ thì không thêm. Nếu đã có thẻ, ở mục
+   giới hạn chi tiêu cho phút build (pipeline minutes) đặt mức vượt cho phép là **$0**, để vượt mức
+   thì build dừng chứ không tính tiền.
+2. **Service → Settings → Instance Type**: phải là **Free**. Đừng bấm Upgrade trên các thông báo
+   "suspended".
+3. **Workspace → Notifications**: bật email cảnh báo, và xem mục **Free usage** trong Billing mỗi
+   tháng (giờ chạy máy, phút build, băng thông).
+4. Không tạo thêm service, Postgres hay disk trong workspace này.
+
+Mức dùng thực tế rất nhỏ: API trả JSON vài KB, một monitor ping 5 phút một lần chỉ khoảng 2 MB một
+tháng, mỗi lần build khoảng 3–5 phút.
+
 ## 2. Frontend trên Vercel
 
 1. Đăng nhập [vercel.com](https://vercel.com) bằng GitHub → **Add New → Project** → import `v-game`.
@@ -45,7 +72,7 @@ phía máy chủ.
 
 ## Cập nhật
 
-Merge vào `main` là cả hai tự deploy lại. Thử bản Vercel trên máy:
+Merge vào `main` thì Vercel tự deploy lại; Render chỉ deploy khi CI xanh và phần API đổi (xem mục "Giữ Render ở mức 0 đồng"). Thử bản Vercel trên máy:
 
 ```bash
 cd frontend && VG_API_ORIGIN=https://example.onrender.com npm run build:vercel

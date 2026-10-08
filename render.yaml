@@ -1,6 +1,16 @@
 # Render Blueprint for the V-Game API on the free plan (512 MB, sleeps after 15 idle minutes).
 # Create it once from the dashboard: New > Blueprint > this repository. Then set GEMINI_API_KEY
-# in the service's Environment tab (it is never stored in git). Pushes to main redeploy.
+# in the service's Environment tab (it is never stored in git).
+#
+# Staying at $0 (Render has no spend cap; the Hobby workspace includes 750 free instance hours,
+# 500 build minutes and 5 GB outbound bandwidth a month, and bills build/bandwidth overage):
+# - plan: free only; no disks, databases, cron jobs or extra services in this file.
+# - previews off: pull requests never spin up extra services.
+# - deploys only for commits whose GitHub checks passed, and only when the API's inputs change
+#   (backend/, the content it reads, this file), so frontend or docs merges cost no build minutes.
+previews:
+  generation: off
+
 services:
   - type: web
     name: v-game-api
@@ -12,7 +22,12 @@ services:
     buildCommand: pip install uv==0.11.19 && uv sync --frozen --no-dev
     startCommand: uv run --no-sync uvicorn --factory vgame.main:create_app --host 0.0.0.0 --port $PORT --no-server-header
     healthCheckPath: /api/health
-    autoDeploy: true
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - backend/**
+        - docs/content/**
+        - render.yaml
     envVars:
       - key: ENV
         value: production
