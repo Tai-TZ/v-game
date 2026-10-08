@@ -1,3 +1,10 @@
+import {
+  cameraCentre,
+  desiredCentre,
+  HUD_CORNER,
+  toScreen,
+  viewFor,
+} from "../app/features/campus/camera";
 import { expect, mockApi, test, themeIds, waitForIdleScene, zoneList } from "./fixtures";
 
 const LINE_1 =
@@ -109,6 +116,94 @@ test.describe("campus hub", () => {
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(hint).toBeFocused();
+  });
+
+  test("walks to the back of campus and back again from the zone list", async ({
+    page,
+    consoleErrors,
+  }) => {
+    // Two walks of about 26 units each; software WebGL can drop to a few frames per second.
+    test.slow();
+    await mockApi(page);
+    await page.goto("/play?debug=frames");
+    await waitForIdleScene(page);
+    const zonesButton = page.getByRole("button", { name: "Các khu" });
+    const list = page.locator("#hub-zone-list");
+
+    await zonesButton.click();
+    await list.getByRole("button", { name: "Đi tới khuôn viên phía sau", exact: true }).click();
+    await expect(list).toBeHidden();
+    await expect(zonesButton).toBeFocused();
+    await waitForIdleScene(page, 45_000);
+
+    await zonesButton.click();
+    await list.getByRole("button", { name: "Về mặt trước", exact: true }).click();
+    await expect(list).toBeHidden();
+    await waitForIdleScene(page, 45_000);
+
+    await zonesButton.click();
+    await expect(
+      list.getByRole("button", { name: "Đi tới khuôn viên phía sau", exact: true }),
+    ).toBeVisible();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("walks to what the market's awning, a zone label and the librarian's badge name", async ({
+    page,
+    consoleErrors,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      "The awning's pixel is for the 1280×800 overview.",
+    );
+    // Three walks; software WebGL can drop to a few frames per second.
+    test.slow();
+    await mockApi(page);
+    await page.goto("/play?debug=frames");
+    await waitForIdleScene(page);
+    const hint = (text: string) =>
+      page.locator('[aria-live="polite"]').getByText(text, { exact: true });
+
+    // The south awning hangs outside the market's footprint (QA r4).
+    const view = viewFor(1280, 800);
+    const centre = cameraCentre(desiredCentre({ sx: 0, sy: 0 }, { sx: 0, sy: 0 }, view), view);
+    const awning = toScreen(9.0, 1.5, 5.55);
+    await page.mouse.click(
+      view.width / 2 + (awning.sx - centre.sx) * view.zoom,
+      view.height / 2 - (awning.sy - centre.sy) * view.zoom,
+    );
+    await expect(hint("Chợ model · Sắp mở")).toBeVisible();
+
+    // World labels are decoration for assistive tech, but a click on one walks to its door.
+    await page.locator("button", { hasText: "Tháp canh" }).click();
+    await expect(hint("Tháp canh · Sắp mở")).toBeVisible();
+
+    await page.getByText("!", { exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Cô Lan" })).toBeVisible();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("keeps the top HUD inside the corners the overview leaves clear", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "The corner rule is for the desktop overview.");
+    await mockApi(page);
+    await page.goto("/play");
+    const width = page.viewportSize()?.width ?? 0;
+    const controls = [
+      page.getByRole("link", { name: "Về trang chủ" }),
+      page.getByRole("button", { name: "Các khu" }),
+      page.getByRole("button", { name: /Đổi giao diện/ }),
+    ];
+    for (const control of controls) {
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) continue;
+      expect(box.y + box.height).toBeLessThanOrEqual(HUD_CORNER.height);
+      const left = box.x + box.width <= HUD_CORNER.width;
+      const right = box.x >= width - HUD_CORNER.width;
+      expect(left || right, `${JSON.stringify(box)} outside HUD_CORNER`).toBe(true);
+    }
   });
 
   test("shows the watchtower and the market as coming soon, without a way in", async ({ page }) => {

@@ -109,7 +109,7 @@ export const test = base.extend<{ consoleErrors: string[] }>({
 export { expect };
 
 /** Waits until the scene has drawn its first frame and stopped drawing. */
-export async function waitForIdleScene(page: Page) {
+export async function waitForIdleScene(page: Page, timeout = 15_000) {
   await expect(page.locator("canvas")).toBeVisible();
   await expect(page.locator("html[data-frames]")).toBeAttached();
   const frames = () => page.evaluate(() => Number(document.documentElement.dataset.frames));
@@ -122,7 +122,7 @@ export async function waitForIdleScene(page: Page) {
         previous = now;
         return settled;
       },
-      { intervals: [500], timeout: 15_000 },
+      { intervals: [500], timeout },
     )
     .toBe(true);
   return frames;
