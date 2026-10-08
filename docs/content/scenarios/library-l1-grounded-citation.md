@@ -80,7 +80,7 @@ Lời thoại của cô Lan dùng nguyên văn. Mỗi lượt thoại tối đa 
 | Lược dao (treo tường, có ổ khoá) | `chunker` | `strategy` = `theo_dieu`, `chunk_size` = 512, `overlap_pct` = 10 | khoá, nhìn thấy, nhãn "Mở khoá ở Lược dao chunk" |
 | Vòm Sao + Đèn pin | `vector_search` | gắn hoặc tháo khỏi khe Truy xuất. Đèn pin chỉ chiếu câu có sẵn (embedding tính sẵn), không nhận chữ gõ tự do | mở |
 | Móc kéo K | `vector_search.top_k` | 1–10, mặc định 5 | mở |
-| Thùng Context | `context_packer` | `token_budget` = 3000, `on_overflow` = `cat_duoi`, `order` = mặc định engine | khoá (thùng cỡ cố định; Chợ model mới cho đổi cỡ) |
+| Thùng Context | `context_packer` | `token_budget` = 3000 (chỉ tính tài liệu + câu hỏi; dặn dò của Lăng kính và khung nền đi riêng, ngoài thùng, engine-v0.2 E8), `on_overflow` = `cat_duoi`, `order` = mặc định engine | khoá (thùng cỡ cố định; Chợ model mới cho đổi cỡ) |
 | Máy đóng tem | `context_packer.cite_ids` | `false` / `true` | mở |
 | Bộ Óc | `llm.profile` | `can_bang` (effort medium) | khoá, nhãn "Bộ Óc · cân bằng" |
 | Lăng kính (3 khe thẻ) | `llm.system_prompt` | ghép theo thứ tự từ ≤ 3 thẻ G1–G6 bên dưới; luôn ≤ 2000 ký tự | mở |
@@ -136,8 +136,8 @@ Ký hiệu: **[T]** là cơ chế tất định (nguyên tắc 3 Phần 3). **[M
 | N1 | Khởi đầu nguyên trạng (LLM chay, G4+G5) | [T] Thùng không có đoạn nào nên các dữ kiện bắt buộc (`answer_points`, ví dụ "hai tuần", "cố vấn học tập") không thể xuất hiện, trừ khi trùng may rủi; không có `cited_ids` hợp lệ. [M] Model bịa "Điều N" (áp phích) hay trả lời chung chung là tuỳ model | cả 3 ca thấy được (`lib-l1-v01` và hai ca còn lại) cùng 5 ca ẩn thường (8/8). Ca bẫy `t01`, `t02` có thể **đạt** nhờ model từ chối: đây là điểm dạy, không phải lỗi | `ret.gold_missing` (sau run), `llm.cite_unknown` [M], `llm.cite_missing` |
 | N2 | Gắn Vòm Sao, tem tắt, giữ G4+G5 | [T] Packet không có mã đoạn, nên không thể có `cited_ids` thuộc đoạn đáp án (mã đoạn là chuỗi mờ, không suy ra được từ số điều; xem Yêu cầu A10). Tiêu chí "có nguồn" trượt | 8/8 ca thường trượt tiêu chí nguồn dù đủ ý; `t01` có thể trượt nếu G5 khiến model suy đoán [M] | `llm.cite_missing`; `llm.cite_unknown` nếu model tự chế mã [M] |
 | N3 | Gắn Vòm Sao, bật tem, Lăng kính chỉ G2 (không G1, không G3) | [M] Không có lệnh từ chối nên câu Điều 99 và câu ngoài phạm vi dễ bị trả lời bằng đoạn gần nhất | `lib-l1-t01`, `lib-l1-t02` (sao 3) | `llm.cite_unknown`, trượt tiêu chí từ chối |
-| N4 | Như lời giải mẫu nhưng `top_k` = 10 và thêm G6 | [T] Thùng gần đầy (≈ 3000 token mỗi ca) nên tổng token vượt ngân sách sao 2 (mục 10). Số token đầu vào là tất định; G6 chỉ làm tăng thêm [M] | không ca nào trượt nội dung; trượt **sao 2** | `pack.tokens`, `budget.exceeded` |
-| N5 | Gắn Vòm Sao với `top_k` = 1, tem bật, G1–G3 | [T] Với câu diễn đạt lại, đoạn đáp án có thể đứng hạng 2–3 nên không vào thùng | ca thấy được vai `dien-dat-lai` và ca ẩn cùng vai. Cổng phát hành xác nhận hạng đoạn đáp án của ca thấy được vai này ≥ 2 ở biến thể L1 | `ret.gold_missing`, `ret.gold_rank` |
+| N4 | Như lời giải mẫu nhưng `top_k` = 10 và thêm G6 | [T] Thùng gần đầy (≈ 2.000 token tài liệu mỗi ca) nên tổng token vượt ngân sách sao 2 (mục 10) ngay cả khi chỉ đếm token đầu vào: engine đo 21.523/15.000 (regex-v1), Gemini thật 29.091/15.000 (2026-10-08, engine-spike-report §3.2). G6 làm tăng thêm | không ca nào trượt nội dung; trượt **sao 2** | `pack.tokens`, `budget.exceeded` |
+| N5 | Gắn Vòm Sao với `top_k` = 1, tem bật, G1–G3 | [T, đo 2026-10-08] Câu có điều na ná: "học kỳ hè" (`h02`) kéo Điều 10 (học kỳ chính) lên trên Điều 19 (học kỳ phụ), hạng ≥ 2 trên cả 24 biến thể, nên `top_k` 1 bỏ mất đoạn đúng. [M] Ca diễn đạt lại `v03`, `h04`, `h05`: e5 xếp đoạn đúng hạng 1 | `lib-l1-h02` (đo thêm: `h01` gõ không dấu hạng 3 ở `theo_dieu` ≥ 512). Đo 2026-10-08: ca thấy được vai `dien-dat-lai` (`v03`) đứng hạng 1 ở biến thể L1 (cosine 0,865, trên Điều 69 0,829), nên cổng phát hành cũ (hạng ≥ 2) không đạt; N5 không có ca thấy được nào trượt | `ret.gold_missing`, `ret.gold_rank` |
 
 Cổng phát hành phải chạy đủ N1–N5 trên model thật và ghi lại cờ sinh ra cho từng ca (theo sửa lỗi của phản biện: áp cổng cho từng ca, không chỉ cho 4 bẫy đã liệt kê).
 
@@ -197,7 +197,7 @@ Luật chuẩn hoá, `equivalents` và danh sách dấu hiệu từ chối nằm
 | Sao | Điều kiện | Ghi chú |
 |---|---|---|
 | 1 | Ít nhất 6/8 ca thường đạt (`v01`–`v03` + 5 ca ẩn), **bắt buộc có `lib-l1-v01`** | Mở L2. Chú Bảy gỡ áp phích |
-| 2 | Có sao 1 **và** tổng token của run ≤ **22.000** (tạm) | Ngân sách = làm tròn lên tới nghìn của 1,25 × p50 token lời giải mẫu qua 3 lần hiệu chỉnh. Ước tính hiện tại: lời giải mẫu ≈ 1.800 token/ca × 10 ca ≈ 18.000 |
+| 2 | Có sao 1 **và** tổng token của run ≤ **15.000** | Ngân sách = làm tròn lên tới nghìn của 1,25 × p50 token lời giải mẫu. Hiệu chỉnh 2026-10-08 với `gemini-3.5-flash-lite`, `can_bang`: hai lần chạy 10.262 và 11.260, p50 10.761, ra 14.000 (engine-spike-report §3.2). Nâng lên 15.000 cùng ngày vì phần ra (thinking) dao động: ở 14.000 lời giải mẫu đúng vẫn mất sao 2 trong 1,6–6,3 % số lần chạy, ở 15.000 còn 0,1–1,1 % (§3.3) |
 | 3 | Có sao 1 **và** `lib-l1-t01`, `lib-l1-t02` đều đạt **và** cả run không có ca nào bị `llm.cite_unknown` | Phải qua cổng hiệu chỉnh [M]. Nếu bẫy không cắn thì hạ thành `info` và sao 3 chỉ còn điều kiện "0 `cite_unknown`" |
 
 **Đạt được bằng đồ chơi đã mở?** Có.
@@ -296,7 +296,7 @@ Câu hỏi và tiêu chí chấm của từng ca nằm ở file golden; bảng n
 | Áp phích Bảng Tin | Ca thấy được: "Áp phích: «{câu trả lời}». Câu này trích {cite}, không có trong tài liệu đã lấy." Ca ẩn hoặc bẫy: "Áp phích từ một ca ẩn: trích {cite}, không có trong tài liệu đã lấy" (không in câu trả lời, vì nó lộ câu hỏi). Danh sách áp phích là một `<ul>` đọc được |
 | Vòm Sao, sao sáng | Bảng "Hạng · Điều/khoản · Cosine · Trích đoạn 120 ký tự", kèm chú thích "Vị trí sao là hình chiếu, không có nghĩa" |
 | Móc kéo K | `<input type="range" min="1" max="10">` có nhãn "Số đoạn lấy về (top_k)" và giá trị đọc to |
-| Thùng Context | "Thùng: {used}/3.000 token ({pct}%). Gồm: dặn dò {a}, tài liệu {b}, câu hỏi {c}." |
+| Thùng Context | "Thùng: {used}/3.000 token ({pct}%). Gồm: tài liệu {b}, câu hỏi {c}. Dặn dò {a} token đi riêng, không tính vào thùng." |
 | Máy đóng tem | Công tắc "Đóng mã lên từng đoạn (cite_ids)" |
 | Lăng kính | 3 `<select>` thẻ, có đọc nguyên văn thẻ |
 | Gạch / bong bóng | Câu trả lời hiện theo từng câu, mỗi câu kèm "nguồn: [mã]" hoặc "không có nguồn" |

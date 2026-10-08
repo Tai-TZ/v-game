@@ -3,12 +3,13 @@ import asyncio
 import pytest
 
 from vgame.engine.run_store import IdempotencyConflictError, RunBusyError, RunStore
-from vgame.engine.types import EngineEvent
+from vgame.engine.types import EngineEvent, RunReport
 
 
 def ev(kind: str = "run.scored") -> EngineEvent:
     if kind == "run.finished":
-        return {"type": "run.finished", "run": "r", "report": {"gold": {}, "diagnosis": []}}
+        report: RunReport = {"gold": {}, "diagnosis": []}
+        return {"type": "run.finished", "run": "r", "report": report, "models": {}}
     return {"type": "step.started", "run": "r", "case": "c1", "node": "q", "block": "input"}
 
 

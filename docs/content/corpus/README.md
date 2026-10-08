@@ -14,7 +14,7 @@ Tài liệu này mô tả hai văn bản trong kho, cách engine nên nạp chú
 
 - **L1:** chỉ `qcdt-2024`. Người chơi học truy xuất và trích nguồn trước, chưa có nhiễu văn bản cũ.
 - **L2:** `qcdt-2024` + `qcdt-2019`. Bản 2019 "vừa được phòng lưu trữ số hoá" là bẫy văn bản hết hiệu lực.
-- **L3:** chỉ `qcdt-2024` (D7). Lý do: chỉ `vector_search` có `only_in_force`; nếu kho có bản 2019 thì nhánh BM25 kéo bản cũ về mà người chơi không lọc được (phản biện Phần 3).
+- **L3:** chỉ `qcdt-2024` (D7). Lý do gốc: khi `only_in_force` còn nằm ở `vector_search`, nhánh BM25 kéo bản cũ về mà người chơi không lọc được (phản biện Phần 3). Engine v0.2 đã chuyển `only_in_force` sang `chunker` (tầng Index, E6) nên mọi retriever đều được lọc; kho L3 vẫn giữ một văn bản.
 
 ## 2. Cách nạp (giả định cho engine)
 
@@ -33,7 +33,7 @@ Tài liệu này mô tả hai văn bản trong kho, cách engine nên nạp chú
 | `doc_id` | string | `qcdt-2024` hoặc `qcdt-2019` |
 | `dieu` | int | số điều chứa đoạn |
 | `khoan` | int[] | các khoản mà đoạn chạm tới, theo thứ tự; `[]` nếu điều không chia khoản |
-| `hieu_luc` | bool | lấy từ `in_force` của văn bản; `vector_search.only_in_force` lọc trên trường này |
+| `hieu_luc` | bool | lấy từ `in_force` của văn bản; `chunker.only_in_force` lọc trên trường này ở tầng Index (engine-v0.2 E6) |
 
 **Hai giả định engine phải chốt (yêu cầu A10):**
 1. `chunk_id` là chuỗi mờ, ví dụ băm của (biến thể, vị trí). Không suy ra được số điều từ `chunk_id`. Vì vậy không bật `cite_ids` thì model không thể trích đúng đoạn (cơ chế của L1-N2).
@@ -54,13 +54,13 @@ Tài liệu này mô tả hai văn bản trong kho, cách engine nên nạp chú
 | Câu bịa "Điều 47 ma" | Điều 47 có thật nhưng nói về xem xét lại điểm đánh giá quá trình; cả hai văn bản không có chữ "email" | `lib-l1-v01` (`forbidden`: "email", "Điều 47") | L1-N1 | [T] Kiểm chuỗi. Self-check xác nhận cả hai văn bản không có cụm của câu bịa trong brief §3 và không có chữ "email" |
 | Điều hoặc khoản không tồn tại | Không có Điều 99 (kho dừng ở Điều 84, không dẫn chiếu Điều 99); Điều 12 chỉ có 3 khoản; Điều 41 chỉ có 4 khoản | `lib-l1-t01`, `lib-l1-r02`, `lib-l3-t03` | L1-N3 | [M] Kho không có đoạn trả lời; đạt hay trượt tuỳ model có nghe thẻ G3 không. Phần [T] là kho thật sự không có nội dung đó |
 | Ngoài phạm vi | Không điều nào nói về lương sau tốt nghiệp hay vé gửi xe | `lib-l1-t02`, `lib-l1-r03` | L1-N3 (r03 còn L1-N1) | [M] như trên |
-| Ngoại lệ nằm ở khoản sau | `qcdt-2024` Điều 12 k2→k3; Điều 10 k2→k3; Điều 36 k2→k3; Điều 78 k2→k3 | `lib-l2-v01`, `lib-l2-h01`, `lib-l2-h02`, `lib-l2-r01`, `lib-l3-t02` | L2-N1, L2-N5, L3-N7 | [T] Khoảng cách từ dữ kiện bắt buộc của khoản chung tới dữ kiện bắt buộc của khoản ngoại lệ là 152–161 token (mục 4), lớn hơn 128, nên ở `co_dinh` 128/0 không đoạn nào chứa đủ cả hai. Việc đoạn sau có được kéo về hay không là **ước tính hạng**, cổng phát hành đo |
+| Ngoại lệ nằm ở khoản sau | `qcdt-2024` Điều 12 k2→k3; Điều 10 k2→k3; Điều 36 k2→k3; Điều 78 k2→k3 | `lib-l2-v01`, `lib-l2-h01`, `lib-l2-h02`, `lib-l2-r01`, `lib-l3-t02` | L2-N1, L2-N5, L3-N7 | [T] Khoảng cách từ dữ kiện bắt buộc của khoản chung tới dữ kiện bắt buộc của khoản ngoại lệ là 152–161 token (mục 4), lớn hơn 128, nên ở `co_dinh` 128/0 không đoạn nào chứa đủ cả hai. Việc đoạn sau có được kéo về hay không là hạng, phụ thuộc model: đo 2026-10-08, L2-N1 (top 3) kéo đủ cả hai đoạn của `lib-l2-v01` nên là [M]; L2-N5 (top 1) và L3-N7 (`rerank.top_n` 1) cắn tất định |
 | Câu đáp án dài | `qcdt-2024` Điều 68 k1, Điều 21 k2, Điều 25 k2 (mỗi khoản là một câu); Điều 13 k2 (8 điểm a–h) | `lib-l2-v02`, `lib-l2-h03`, `lib-l2-h04`, `lib-l2-r03` | L2-N1 | [T] Mục bắt buộc đầu và cuối cách nhau 137–236 token, nên ở 128/0 luôn bị cắt ngang. Ở 256/0 chỉ có xác suất (mục 4) |
 | Văn bản cũ gần trùng | `qcdt-2019`: Điều 10 (bảo lưu: "một tuần", "08 ngày"), Điều 5 (22 và 26 tín chỉ), Điều 6 (rút học phần trước hết tuần thứ hai), Điều 8 (chuyên cần 25%), Điều 9 (lấy điểm lần học sau cùng), Điều 13 (cảnh báo dưới 0,80) | `lib-l2-t01`, `lib-l2-t03`, `lib-l2-r02`, `lib-l2-r04`; phụ: `lib-l2-v01`, `lib-l2-h01`, `lib-l2-h05` | L2-N1, L2-N2, L2-N3 | [T] Tiêu chí "không có đoạn `hieu_luc = false` trong `pack.included`" kiểm bằng metadata. Việc câu trả lời dùng con số cũ là [M]. Hạng 1–2 của đoạn 2019 khi không lọc là **ước tính**, cổng phát hành đo |
 | Quy định đã bãi bỏ | `qcdt-2019` Điều 12 (cộng 1,0 điểm cho giải Olympic). Bản 2024 không có điều nào về cộng điểm hay giải thưởng thi đấu | `lib-l2-t02` (`expect: abstain`) | L2-N1, L2-N2, L2-N3 | [T] như dòng trên cho phần thùng; phần từ chối là [M] |
-| Thùng tràn | Mọi đoạn ở biến thể 1024 | không gắn ca; cắn sao 2 | L1-N4, L2-N2, L3-N4, L3-N5 | [T] Số token đầu vào tính được từ biến thể và `top_k` |
+| Thùng tràn | Mọi đoạn ở biến thể 1024 | không gắn ca; cắn sao 2 | L1-N4, L2-N2, L3-N4, L3-N5 | [T] Số token đầu vào tính được từ biến thể và `top_k`. Chỉ L3-N4 vượt ngân sách bằng token đầu vào; L1-N4, L2-N2, L3-N5 vượt hay không tuỳ token ra của model: [M] (engine-v0.2 §15) |
 | Số điều trong họ na ná | `qcdt-2024` Điều 41 (phúc khảo bài thi), Điều 47 (xem xét lại điểm quá trình), Điều 74 (khiếu nại kết quả khóa luận): cùng khung 4 khoản; khoản 2 lần lượt 07 / 05 / 10 ngày làm việc; khoản 3 lần lượt 12 / 03 / 20 ngày làm việc | `lib-l3-v01`, `v02`, `h01`, `h02`, `h04`, `h05`, `r01`, `r03` | L3-N1, L3-N2, L3-N6; L3-N8 cho vai `tra-so-kho` | [T] Chuỗi "47", "41", "74" chỉ xuất hiện trong chính điều đó (self-check), nên BM25 giữ chữ số bắt chắc. `forbidden` chứa con số tương ứng của hai điều kia, nên trả lời nhầm điều trượt bằng kiểm chuỗi. Dense trượt hay không là **ước tính**, cổng phát hành đo trên cả 24 biến thể |
-| Diễn đạt lại không trùng chữ | `qcdt-2024` Điều 12 so với câu `lib-l3-t01` | `lib-l3-t01` | L3-N3 | [T] về chữ: Điều 12 không chứa âm tiết nội dung nào của câu hỏi (tính, nghỉ, nhà, thời, gian, đi, làm, kiếm, tiền, quay, lại), self-check kiểm. Chỉ còn hư từ (một, để, được, không…) trùng. Hạng BM25 thật do cổng phát hành đo |
+| Diễn đạt lại không trùng chữ | `qcdt-2024` Điều 12 so với câu `lib-l3-t01` | `lib-l3-t01` | L3-N3 | [T] về chữ: câu hỏi không chung từ đặc thù nào với Điều 12 (nghỉ, nhà, thời gian, đi làm, kiếm tiền, quay lại, giữ, điểm), chỉ chung cụm "kết quả học tập" (có ở 9 điều của `qcdt-2024`), "số" và hư từ. Điều kiện kiểm là BM25 top 10 trượt trên mọi biến thể `theo_dieu` và `co_dinh` ≤ 256 (`test_retrieval`); đo 2026-10-08: hạng BM25 ≥ 15 trên các biến thể đó |
 
 ## 4. Vị trí cắt dự kiến (ƯỚC TÍNH)
 
@@ -138,7 +138,7 @@ Script tự kiểm nằm trong thư mục scratchpad của phiên làm việc, k
 - ca `abstain` có `gold` rỗng;
 - hai văn bản không có cụm của câu bịa trong brief §3, không có chữ "email", không có Điều 99;
 - `qcdt-2024` có số điều liên tiếp từ 1, lớn nhất ≤ 90; "47", "41", "74" chỉ xuất hiện trong chính điều đó;
-- Điều 12 khoản 2 chứa nguyên văn câu neo; Điều 12 không chứa âm tiết nội dung nào của câu `lib-l3-t01`;
+- Điều 12 khoản 2 chứa nguyên văn câu neo; Điều 12 không chứa từ đặc thù nào của câu `lib-l3-t01` (cụm chung "kết quả học tập" được phép; BM25 top 10 trượt trên mọi biến thể `theo_dieu` và `co_dinh` ≤ 256, `test_retrieval` kiểm);
 - `lib-l1-v01` đúng nguyên văn câu trên trang chủ; `lib-l3-v01` đúng câu neo; `lib-l3-t02` có câu và tiêu chí giống hệt `lib-l2-v01`;
 - `grading.refusal_markers` có đủ 6 dấu hiệu tối thiểu (gồm "không có khoản"), luật `abstain` không còn điều kiện `cited_ids`, và không mục `forbidden` nào của ca `abstain` nằm trong một dấu hiệu từ chối;
 - khoản được hỏi ở `lib-l1-r02` (Điều 12 khoản 9) và `lib-l3-t03` (Điều 41 khoản 6) thật sự không có trong `qcdt-2024`.
@@ -153,10 +153,10 @@ Script tự kiểm nằm trong thư mục scratchpad của phiên làm việc, k
 3. **Ca từ chối mà có trích dẫn: đã chốt** (brief §4.2, tạm chốt như mục 2). Ca `abstain` đạt khi có một dấu hiệu từ chối, không chứa `forbidden`, không có `llm.cite_unknown`. Đã bỏ điều kiện "không có `cited_ids`": trích đoạn có thật trong thùng (ví dụ chỉ ra Điều 41 chỉ có 4 khoản ở `lib-l3-t03`) vẫn đạt, chỉ trích bịa mới trượt.
 4. **Câu hub và kho: đã xong.** Brief §4 đã sửa câu 1 của cô Lan thành "gán cho Điều 47 một quy định không hề có", khớp kho (Điều 47 có thật, nói chuyện khác).
 5. **Tokenizer của `chunk_size`.** Chưa chốt dùng tokenizer nào (count_tokens hay tokenizer của model embedding). Mọi số ở mục 4 phải đo lại.
-6. **Tiêu đề trong embedding** (mục 2) và **tokenizer BM25 có bỏ dấu không.** Ca `lib-l3-h03` gõ không dấu; nếu BM25 không bỏ dấu thì chỉ còn chữ số "10" và "2" khớp.
+6. **Đã đóng (2026-10-08).** Tiêu đề trong embedding và tokenizer BM25 giữ dấu đã chốt ở engine-v0.2 E4, E9. Ca `lib-l3-h03` đổi từ bản không dấu sang "khoản 2 điều 10 ghi gì ạ" (cùng nghĩa): BM25 hạng 4 thay vì 8, rerank hạng 1 ở biến thể của lời giải mẫu L3.
 7. **Câu `lib-l2-v01` có vế "nộp trễ".** Vế này có thể kéo đoạn khoản 3 lên top-3 ở 128/0. Nếu cổng phát hành đo thấy vậy, bỏ vế này và giữ `answer_points` (kịch bản L2, Câu hỏi mở 7).
 8. **Số điều của bản 2019 lệch bản 2024.** Ví dụ Điều 12 bản 2019 là điểm thưởng Olympic, không phải bảo lưu. Không ca L2 nào hỏi bằng số điều, nên điều này chỉ làm nhiễu thêm khi tắt lọc.
 9. **Phần 3 §3.7 vẫn gọi kho là "Bộ luật Thị trấn"**, lệch D6. Kịch bản đã báo; nội dung không sửa Phần 3.
-10. **Khớp chuỗi con của dấu hiệu từ chối và `forbidden`.** Hai chỗ có thể chấm sai, chủ Phần 4 chọn cách xử lý:
+10. **Khớp chuỗi con của dấu hiệu từ chối và `forbidden`.** Hai chỗ có thể chấm sai (chỗ thứ hai đã sửa):
     - "không có điều" cũng khớp "không có điều kiện", nên một câu trả lời bịa có cụm này có thể lọt qua luật `abstain`. Hàng rào còn lại là `forbidden` và `llm.cite_unknown`.
-    - `forbidden` dạng "Điều 99 quy định" (`lib-l1-t01`) và "khoản 9 quy định" (`lib-l1-r02`) cũng khớp một câu từ chối đúng như "không tìm thấy Điều 99 quy định về học vượt". Cách sửa có thể: chỉ xét `forbidden` ngoài câu chứa dấu hiệu từ chối, hoặc bỏ hai mục đó và dựa vào `llm.cite_unknown`.
+    - **Đã sửa (2026-10-08):** `forbidden` dạng "Điều 99 quy định" (`lib-l1-t01`), "khoản 9 quy định" (`lib-l1-r02`) và "khoản 6 quy định" (`lib-l3-t03`) khớp cả một câu từ chối đúng như "không tìm thấy Điều 99 quy định về học vượt", nên đã bỏ khỏi `forbidden`. Trích bịa vẫn trượt: "theo Điều 99" / "theo khoản N" còn trong `forbidden`, câu khẳng định "Điều 99 quy định …" bị `llm.cite_unknown`, và ca `abstain` thiếu dấu hiệu từ chối thì trượt tiêu chí `refusal` (`test_grading`).

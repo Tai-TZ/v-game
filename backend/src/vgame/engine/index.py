@@ -31,6 +31,17 @@ _VARIANTS_BY_KEY = {v.key: v for v in ALL_VARIANTS}
 
 class IndexNotBuiltError(EngineError):
     message_vi = "Chưa dựng index. Chủ máy chủ cần chạy vgame-build-index."
+    step_status = "index_error"
+
+
+class IndexStaleError(EngineError):
+    """The index was built from another corpus or golden question set (checked at startup)."""
+
+    message_vi = (
+        "Index đã cũ so với kho quy chế hoặc bộ câu hỏi. "
+        "Chủ máy chủ cần chạy lại vgame-build-index."
+    )
+    step_status = "index_error"
 
 
 def question_key(question: str) -> str:
@@ -110,7 +121,11 @@ class IndexStore:
         embedder: Embedder,
         questions: Sequence[str],
         variants: Sequence[IndexVariant] = ALL_VARIANTS,
+        *,
+        reuse: "IndexStore | None" = None,
     ) -> "IndexStore":
+        """``reuse``: an earlier index whose vectors are kept for texts it already embedded with
+        the same model (a question edit then embeds one question, not ~950 passages)."""
         chunks = {
             v.key: tuple(
                 c for doc_id in sorted(documents) for c in chunk_document(documents[doc_id], v)
@@ -123,12 +138,19 @@ class IndexStore:
             for key, variant_chunks in chunks.items()
         }
         unique = list(dict.fromkeys(t for variant_texts in texts.values() for t in variant_texts))
-        passage = normalise_rows(embedder.embed_passages(unique))
+        known, known_q = reuse.embedded(embedder.model_id) if reuse else ({}, {})
+        if missing := [t for t in unique if t not in known]:
+            fresh = normalise_rows(embedder.embed_passages(missing))
+            known.update(zip(missing, fresh, strict=True))
+        passage = np.stack([known[t] for t in unique])
         row_of = {t: i for i, t in enumerate(unique)}
         vectors = {key: passage[[row_of[t] for t in ts]] for key, ts in texts.items()}
         ordered = list(dict.fromkeys(unicodedata.normalize("NFC", q) for q in questions))
         query_rows = {question_key(q): i for i, q in enumerate(ordered)}
-        query_vectors = normalise_rows(embedder.embed_queries(ordered))
+        if missing_q := [q for q in ordered if question_key(q) not in known_q]:
+            fresh_q = normalise_rows(embedder.embed_queries(missing_q))
+            known_q.update(zip(map(question_key, missing_q), fresh_q, strict=True))
+        query_vectors = np.stack([known_q[question_key(q)] for q in ordered])
         manifest: dict[str, object] = {
             "embed_model": embedder.model_id,
             "fastembed_version": _fastembed_version(),
@@ -182,6 +204,32 @@ class IndexStore:
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise IndexNotBuiltError(f"index at {index_dir} missing or invalid: {exc}") from exc
         return cls(documents, chunks, vectors, query_rows, query_vectors, manifest)
+
+    def embedded(self, model_id: str) -> tuple[dict[str, Vectors], dict[str, Vectors]]:
+        """(dense text -> passage row, question key -> query row) if this index was built with
+        ``model_id`` and the installed fastembed; empty otherwise (rebuilds then embed all)."""
+        manifest = self.manifest
+        if (manifest.get("embed_model"), manifest.get("fastembed_version")) != (
+            model_id,
+            _fastembed_version(),
+        ):
+            return {}, {}
+        passages = {
+            embed_text(self._documents[c.doc_id], c): self._vectors[key][i]
+            for key, chunks in self._chunks.items()
+            for i, c in enumerate(chunks)
+        }
+        queries = {k: self._query_vectors[row] for k, row in self._query_rows.items()}
+        return passages, queries
+
+    def check_fresh(self, documents: Mapping[str, Document], questions: Sequence[str]) -> None:
+        """Raises IndexStaleError when the corpus or a golden question changed since the build:
+        chunk offsets (gold mapping) and precomputed question vectors would no longer match."""
+        if self.manifest.get("corpus_sha256") != _corpus_sha256(documents):
+            raise IndexStaleError("corpus changed since the index build")
+        missing = sum(question_key(q) not in self._query_rows for q in questions)
+        if missing:
+            raise IndexStaleError(f"{missing} golden questions not in the index")
 
     def document(self, doc_id: str) -> Document:
         return self._documents[doc_id]
@@ -278,7 +326,11 @@ def main(
         FastReranker(settings.rerank_model, models_dir, local_files_only=False)  # download only
 
     variants = [_VARIANTS_BY_KEY[k] for k in args.variant] if args.variant else list(ALL_VARIANTS)
-    store = IndexStore.build(documents, embedder, questions, variants)
+    try:  # vectors already on disk are reused: only new texts and questions are embedded
+        reuse: IndexStore | None = IndexStore.load(index_dir)
+    except IndexNotBuiltError:
+        reuse = None
+    store = IndexStore.build(documents, embedder, questions, variants, reuse=reuse)
     store.save(index_dir)
     for variant in variants:
         chunks = store._chunks[variant.key]

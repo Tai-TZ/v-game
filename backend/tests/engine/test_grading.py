@@ -33,6 +33,7 @@ from vgame.engine.types import (
     IndexHandle,
     LevelRules,
     PackFact,
+    PublicCase,
     Retriever,
     StepRecord,
     Usage,
@@ -119,7 +120,12 @@ def trace(
     status: CaseStatus = "ok",
     tokens: int = 100,
 ) -> CaseTrace:
-    case = next(c for c in public_cases(spec) if c.id == case_id)
+    # Review cases (daily shift) never run in a level; grade them like a trap.
+    case = next(
+        PublicCase(c.id, "trap" if c.role == "review" else c.role, c.vai, c.question)
+        for c in spec.cases
+        if c.id == case_id
+    )
     steps = [
         StepRecord(
             node,
@@ -267,13 +273,24 @@ def test_unfinished_case_fails_with_status_label(store: IndexStore, status: Case
             {"cite_unknown", "cite_missing"},
         ),
         ("Học vượt được tối đa 3 môn.", {"refusal"}, {"cite_missing"}),
-        # A refusal sentence never counts as cite_unknown. The golden forbidden list still
-        # contains "Điều 99 quy định", so applied literally this correct refusal fails
-        # (open issue for the content owner, engine-v0.2.md §14.9).
+        # A correct refusal that names the missing article passes (engine-v0.2.md §14.9) ...
+        ("Quy chế không có Điều 99 quy định về học vượt.", set(), {"abstained", "cite_missing"}),
+        # ... while the same claim stated as fact is still a fabrication (cite_unknown).
         (
-            "Quy chế không có Điều 99 quy định về học vượt.",
-            {"no_forbidden"},
-            {"abstained", "cite_missing"},
+            "Điều 99 quy định sinh viên được học vượt tối đa 3 môn.",
+            {"refusal", "no_fabrication"},
+            {"cite_unknown", "cite_missing"},
+        ),
+        # A refusal marker in one clause does not excuse a claim in the next one.
+        (
+            "Quy chế không quy định học vượt; Điều 99 quy định sinh viên được học vượt 3 môn.",
+            {"no_fabrication"},
+            {"abstained", "cite_unknown", "cite_missing"},
+        ),
+        (
+            "Quy chế không có thông tin này, nhưng Điều 99 quy định được học vượt 3 môn.",
+            {"no_fabrication"},
+            {"abstained", "cite_unknown", "cite_missing"},
         ),
     ],
 )
@@ -284,6 +301,31 @@ def test_grade_abstain_case(
     assert set(grade.criteria) == {"refusal", "no_fabrication", "no_forbidden"}
     assert {k for k, ok in grade.criteria.items() if not ok} == failed
     assert set(grade.labels) == labels
+
+
+@pytest.mark.parametrize(
+    ("spec", "case_id", "refusal", "fabrication"),
+    [
+        (
+            L1,
+            "lib-l1-r02",
+            "Điều 12 không có khoản 9 quy định nội dung này.",
+            "Theo khoản 9, sinh viên được bảo lưu ba học kỳ.",
+        ),
+        (
+            L3,
+            "lib-l3-t03",
+            "Điều 41 không có khoản 6 quy định nội dung này.",
+            "Theo khoản 6, sinh viên được phúc khảo hai lần.",
+        ),
+    ],
+)
+def test_refusal_naming_the_missing_clause_passes_and_a_fabrication_fails(
+    store: IndexStore, spec: GradingSpec, case_id: str, refusal: str, fabrication: str
+) -> None:
+    ev = LevelEvaluator(spec, rules(), store)
+    assert ev.grade_case(trace(spec, case_id, refusal)).passed
+    assert not ev.grade_case(trace(spec, case_id, fabrication)).passed
 
 
 def test_abstain_may_cite_a_real_packed_chunk(store: IndexStore) -> None:
@@ -539,6 +581,29 @@ def test_budget_exceeded_is_a_run_level_diagnosis(store: IndexStore) -> None:
         "in_pack": False,
         "flags": [],
     }
+
+
+def test_budget_line_without_rerank_does_not_talk_about_the_rerank_block(
+    store: IndexStore,
+) -> None:
+    diag = {
+        **DIAG,
+        "budget.exceeded": "Kính lúp tốn {ms} ms nhưng không tốn token nào.",
+        "budget.exceeded:no_rerank": "Mỗi câu mang {avg_docs} đoạn vào thùng.",
+    }
+    ev = LevelEvaluator(L3, rules(token_budget=100, diagnosis=diag), store)
+    gold = gold_chunk(store, L3, "lib-l3-v01")
+    plain = trace(L3, "lib-l3-v01", "x", included=[gold], tokens=500)
+    rr: list[Node] = [("rr", "rerank", [gold])]
+    reranked = trace(L3, "lib-l3-v01", "x", included=[gold], nodes=rr, tokens=500)
+
+    def budget_line(t: CaseTrace) -> str:
+        report = ev.report([t], [ev.grade_case(t)], {})
+        (line,) = [d for d in report["diagnosis"] if d["flag"] == "budget.exceeded"]
+        return line["message_vi"]
+
+    assert budget_line(plain) == "Mỗi câu mang 1,0 đoạn vào thùng."
+    assert budget_line(reranked) == "Kính lúp tốn 7 ms nhưng không tốn token nào."
 
 
 def test_template_values_are_never_formatted(store: IndexStore) -> None:

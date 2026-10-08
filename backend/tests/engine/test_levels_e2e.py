@@ -48,6 +48,7 @@ DIAGNOSIS_KEYS = {
     "trap.failed",
     "regression",
     "budget.exceeded",
+    "budget.exceeded:no_rerank",  # L3: the line for a graph without rerank
 }
 
 

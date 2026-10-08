@@ -14,12 +14,14 @@ def _utc_today() -> date:
 
 class RunBudget:
     """One per run. ``reserve`` before every LLM call; a reserved call counts even if it fails
-    (it may already have reached the provider). ``commit`` adds the provider usage."""
+    (it may already have reached the provider). ``commit`` adds the provider usage, also of
+    calls whose step then fails (a Gemini ``OTHER`` finish is billed): the case trace reads it
+    from here, not from the step records."""
 
     def __init__(self, max_calls_per_case: int = MAX_LLM_CALLS_PER_CASE) -> None:
         self._max = max_calls_per_case
         self._calls: Counter[str] = Counter()
-        self._usage = Usage()
+        self._usage: dict[str, Usage] = {}
         self.committed = 0  # reserved - committed = calls cancelled or failed mid-flight
 
     def reserve(self, case_id: str) -> None:
@@ -28,8 +30,11 @@ class RunBudget:
         self._calls[case_id] += 1
 
     def commit(self, case_id: str, usage: Usage) -> None:
-        self._usage = self._usage + usage
+        self._usage[case_id] = self.case_usage(case_id) + usage
         self.committed += 1
+
+    def case_usage(self, case_id: str) -> Usage:
+        return self._usage.get(case_id, Usage())
 
     @property
     def reserved(self) -> int:
@@ -37,7 +42,7 @@ class RunBudget:
 
     @property
     def usage(self) -> Usage:
-        return self._usage
+        return sum(self._usage.values(), Usage())
 
 
 class DailyCap:

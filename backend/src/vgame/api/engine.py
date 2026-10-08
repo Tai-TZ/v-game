@@ -10,8 +10,9 @@ from fastapi import Request
 
 from vgame.config import Settings
 from vgame.engine.budget import DailyCap
+from vgame.engine.corpus import load_documents
 from vgame.engine.grading import GradingSpec, load_grading_spec
-from vgame.engine.index import IndexNotBuiltError, IndexStore
+from vgame.engine.index import IndexNotBuiltError, IndexStaleError, IndexStore, golden_questions
 from vgame.engine.llm import build_llm_client
 from vgame.engine.replay import ReplayStore
 from vgame.engine.retrieval import FastReranker, RerankerUnavailableError
@@ -32,6 +33,7 @@ class EngineServices:
     reranker: Reranker | None
     runs: RunStore
     replay: ReplayStore | None = None
+    index_stale: bool = False  # store is None because the index no longer matches docs/content
     tasks: dict[str, asyncio.Task[None]] = field(default_factory=dict)
 
     def spec(self, level_id: str) -> GradingSpec:
@@ -55,10 +57,17 @@ def build_engine(settings: Settings) -> EngineServices:
     """Never raises for missing setup (no index, no models, no key): logs and degrades."""
     cache_dir = settings.engine_cache_dir
     store: IndexStore | None = None
+    index_stale = False
     try:
-        store = IndexStore.load(cache_dir / "index")
+        loaded = IndexStore.load(cache_dir / "index")
+        content = settings.content_dir
+        loaded.check_fresh(load_documents(content), golden_questions(content))
+        store = loaded
     except IndexNotBuiltError:
         logger.warning("engine index not built; run `uv run vgame-build-index`")
+    except IndexStaleError as exc:  # gold offsets and question vectors would be wrong
+        index_stale = True
+        logger.warning("engine index is stale (%s); rerun `uv run vgame-build-index`", exc)
 
     reranker: Reranker | None = None
     if store is not None:  # vgame-build-index downloads the reranker with the index
@@ -88,6 +97,7 @@ def build_engine(settings: Settings) -> EngineServices:
         reranker=reranker,
         runs=RunStore(max_concurrent_runs=settings.max_concurrent_runs),
         replay=replay,
+        index_stale=index_stale,
     )
 
 

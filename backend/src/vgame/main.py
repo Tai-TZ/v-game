@@ -5,12 +5,15 @@ No module-level app: importing this module (tests do) must never read ``backend/
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 from typing import cast
 
 from fastapi import FastAPI, Request, status
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from vgame.api import api_router
 from vgame.api.engine import EngineServices, build_engine
@@ -24,6 +27,11 @@ OPENAPI_URL = "/openapi.json"
 
 INTERNAL_ERROR = "Lỗi máy chủ, vui lòng thử lại sau."
 INVALID_REQUEST = "Yêu cầu không hợp lệ."
+# The framework's own errors (no route, wrong method) carry English reason phrases.
+FRAMEWORK_DETAIL_VI = {
+    404: "Không tìm thấy đường dẫn.",
+    405: "Phương thức này không được hỗ trợ.",
+}
 
 
 async def _invalid_request(_request: Request, exc: Exception) -> JSONResponse:
@@ -34,6 +42,16 @@ async def _invalid_request(_request: Request, exc: Exception) -> JSONResponse:
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={"detail": INVALID_REQUEST, "fields": fields},
     )
+
+
+async def _http_error(request: Request, exc: Exception) -> Response:
+    # Route details are already Vietnamese; only the default reason phrase is replaced.
+    error = cast(StarletteHTTPException, exc)  # registered for this type only
+    if error.detail == HTTPStatus(error.status_code).phrase:
+        fallback = INTERNAL_ERROR if error.status_code >= 500 else INVALID_REQUEST
+        detail = FRAMEWORK_DETAIL_VI.get(error.status_code, fallback)
+        error = StarletteHTTPException(error.status_code, detail, error.headers)
+    return await http_exception_handler(request, error)
 
 
 async def _internal_error(_request: Request, _exc: Exception) -> JSONResponse:
@@ -71,6 +89,7 @@ def create_app(settings: Settings | None = None, engine: EngineServices | None =
     )
     app.add_exception_handler(Exception, _internal_error)
     app.add_exception_handler(RequestValidationError, _invalid_request)
+    app.add_exception_handler(StarletteHTTPException, _http_error)
 
     # Middleware added last runs outermost: security headers wrap CORS responses too.
     app.add_middleware(

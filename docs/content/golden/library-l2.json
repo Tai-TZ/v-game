@@ -172,10 +172,9 @@
       ],
       "trap": "boundary_split",
       "bites": [
-        "N1",
         "N5"
       ],
-      "notes": "Neo brief §3 (câu của Hà). Câu không nhắc 'ốm' hay 'viện' (yêu cầu B4); vế 'nộp trễ' cần dữ kiện riêng của khoản 3 ('15 ngày', lý do ốm đau/tai nạn/nhập ngũ). Từ câu neo tới '15 ngày' ≈ 158 token o200k, nên ở 128/0 khoản 2 và khoản 3 luôn nằm ở hai đoạn khác nhau. forbidden có giá trị của bản 2019 ('một tuần', '08 ngày'). ƯỚC TÍNH: nếu cổng phát hành đo thấy đoạn khoản 3 vào top-3 ở 128/0, bỏ vế thứ hai của câu hỏi (kịch bản L2, Câu hỏi mở 7)."
+      "notes": "Neo brief §3 (câu của Hà). Câu không nhắc 'ốm' hay 'viện' (yêu cầu B4); vế 'nộp trễ' cần dữ kiện riêng của khoản 3 ('15 ngày', lý do ốm đau/tai nạn/nhập ngũ). Từ câu neo tới '15 ngày' ≈ 158 token o200k, nên ở 128/0 khoản 2 và khoản 3 luôn nằm ở hai đoạn khác nhau. forbidden có giá trị của bản 2019 ('một tuần', '08 ngày'). Đo 2026-10-08 (e5, co_dinh-128-0): đoạn khoản 2 và đoạn khoản 3 cùng vào top 3 (hạng phủ đủ 3, đoạn 2019 hạng 1), nên N1 trượt ca này hay không tuỳ model đọc nhầm số liệu 2019: [M]. Vẫn giữ vế thứ hai vì N5 (top_k 1) và L3-N7 cần khoản 3 để cắn tất định (kịch bản L2, Câu hỏi mở 7)."
     },
     {
       "id": "lib-l2-v02",

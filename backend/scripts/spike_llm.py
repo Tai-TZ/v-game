@@ -1,16 +1,29 @@
-"""Spike (real Gemini): L1 reference and naive N1 once each, then the reference again.
+"""Spike (real Gemini) through the engine: model chain, RPM limiter, DailyCap, replay cache.
 
-    uv run python scripts/spike_llm.py
+    uv run python scripts/spike_llm.py           # L1 reference, naive N1, reference again
+    uv run python scripts/spike_llm.py --cap 75 --json out.json \\
+        chunk-tuning:ref wait:65 chunk-tuning:N2 wait:65 article-number-lookup:ref!
 
-Needs GEMINI_API_KEY in backend/.env and the built index (``vgame-build-index``). The third run
-must be served from the replay cache with the ORIGINAL usage. Hard cap: 40 real LLM calls for
-the whole script (DailyCap); L1 has 10 non-review cases, so the expected spend is 20.
-The key is never read here: only ``Settings`` sees it.
+Plan items: ``<level>:ref`` or ``<level>:<naive id>``; a trailing ``!`` bypasses the replay
+cache (a fresh sample). ``wait:<s>`` sleeps, so the 60 s RPM window drains and the primary model
+serves the next run. A run repeated without ``!`` must be served from the replay cache with the
+original usage (exit 2 otherwise). The script stops at the first run that fails or has an
+``llm_error`` case (the whole chain refused): it does not spend the cap on more runs.
+
+Needs GEMINI_API_KEY in backend/.env and a fresh index (``vgame-build-index``). Hard cap:
+``--cap`` real network attempts for the whole script (DailyCap). The key is never read here:
+only ``Settings`` sees it.
 """
 
+import argparse
 import asyncio
 import io
+import json
+import logging
+import statistics
 import sys
+from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from vgame.api.engine import EngineServices, build_engine
@@ -21,25 +34,33 @@ from vgame.engine.compiler import compile_graph
 from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import GraphPayload
 from vgame.engine.levels import LevelSpec, load_level
+from vgame.engine.llm import GeminiClient, ReplayingLLM
 from vgame.engine.runtime import run_level
-from vgame.engine.types import EngineEvent
+from vgame.engine.types import EngineEvent, LLMClient
 from vgame.engine.validator import validate
 
-CALL_CAP = 40
+DEFAULT_PLAN = ("grounded-citation:ref", "grounded-citation:N1", "grounded-citation:ref")
 
 
-def _pct(values: list[int], q: float) -> int:
+def _pct(values: Sequence[int], q: float) -> int:
     ordered = sorted(values)
     return ordered[min(len(ordered) - 1, round(q * (len(ordered) - 1)))] if ordered else 0
 
 
-async def _run(engine: EngineServices, level: LevelSpec, graph: GraphPayload, run_id: str) -> Any:
+def _graph(level: LevelSpec, name: str) -> GraphPayload:
+    if name == "ref":
+        return level.reference_graph
+    return next(n.graph for n in level.naive_graphs if n.id == name)
+
+
+async def _run(
+    engine: EngineServices, llm: LLMClient, level: LevelSpec, graph: GraphPayload, run_id: str
+) -> list[EngineEvent]:
     validated, issues = validate(graph.model_dump_json(by_alias=True).encode(), level)
-    if validated is None:
+    if validated is None or engine.store is None:
         raise SystemExit(f"{run_id}: graph invalid: {issues}")
-    deps = EngineDeps(engine.store, engine.llm, engine.reranker, RunBudget())
+    deps = EngineDeps(engine.store, llm, engine.reranker, RunBudget())
     spec = engine.spec(level.id)
-    assert engine.store is not None  # noqa: S101 - checked in main
     evaluator = LevelEvaluator(spec, level.rules, engine.store)
     events: list[EngineEvent] = []
     compiled = compile_graph(validated, level, deps)
@@ -47,89 +68,178 @@ async def _run(engine: EngineServices, level: LevelSpec, graph: GraphPayload, ru
     return events
 
 
-def _summarise(run_id: str, events: list[Any]) -> dict[str, tuple[int, int]]:
-    last = events[-1]
-    print(f"\n## {run_id}: {last['type']}")
-    if last["type"] != "run.finished":
-        print(last)
-        return {}
-    score = next(e for e in events if e["type"] == "run.scored")["score"]
-    print(
-        {
-            k: score[k]
-            for k in (
-                "stars",
-                "s1",
-                "s2",
-                "s3",
-                "normal_passed",
-                "normal_total",
-                "traps_passed",
-                "traps_total",
-                "tokens",
-                "budget",
-            )
-        }
-    )
+def _calls(run_id: str, events: list[Any]) -> list[dict[str, Any]]:
+    """One record per llm step: provider tokens next to the engine's regex-v1 prompt count."""
+    pack: dict[str, int] = {}
+    out: list[dict[str, Any]] = []
     case_ms: dict[str, int] = {}
-    llm_ms: list[int] = []
-    usage: dict[str, tuple[int, int]] = {}
-    replayed: list[bool] = []
     for e in events:
         if e["type"] != "step.finished":
             continue
         case_ms[e["case"]] = case_ms.get(e["case"], 0) + e["ms"]
+        for f in e["facts"]:
+            if f["kind"] == "pack":
+                pack[e["case"]] = f["tokens"]["total"]
         if e["block"] == "llm":
-            llm_ms.append(e["ms"])
-            usage[e["case"]] = (e["tokens"]["in"], e["tokens"]["out"])
-            replayed += [f["replayed"] for f in e["facts"] if f["kind"] == "llm"]
-            print(
-                f"  {e['case']}: {e['status']} {e['ms']} ms tokens {e['tokens']} | {e['summary']}"
+            fact = next((f for f in e["facts"] if f["kind"] == "llm"), {})
+            out.append(
+                {
+                    "run": run_id,
+                    "case": e["case"],
+                    "status": e["status"],
+                    "model": fact.get("model"),
+                    "replayed": fact.get("replayed"),
+                    "in": e["tokens"]["in"],
+                    "out": e["tokens"]["out"],
+                    "llm_ms": e["ms"],
+                    "regex_prompt": pack.get(e["case"], 0) + fact.get("system_tokens", 0),
+                }
             )
-    ms = list(case_ms.values())
+    for c in out:
+        c["case_ms"] = case_ms[c["case"]]
+    return out
+
+
+def _summarise(run_id: str, events: list[Any], calls: list[dict[str, Any]]) -> dict[str, Any]:
+    last = events[-1]
+    print(f"\n## {run_id}: {last['type']}")
+    if last["type"] != "run.finished":
+        print(last)
+        return {"run": run_id, "finished": False}
+    score = next(e for e in events if e["type"] == "run.scored")["score"]
+    keys = ("stars", "s1", "s2", "s3", "normal_passed", "normal_total", "traps_passed")
+    print({k: score[k] for k in (*keys, "traps_total", "tokens", "budget")})
+    for c in calls:
+        print(
+            f"  {c['case']}: {c['status']} {c['model']} replayed={c['replayed']} "
+            f"in {c['in']} out {c['out']} (regex-v1 prompt {c['regex_prompt']}) "
+            f"llm {c['llm_ms']} ms case {c['case_ms']} ms"
+        )
+    case_ms = [c["case_ms"] for c in calls]
     print(
-        f"case ms p50 {_pct(ms, 0.5)} p95 {_pct(ms, 0.95)} max {max(ms, default=0)}; "
-        f"llm ms p50 {_pct(llm_ms, 0.5)} p95 {_pct(llm_ms, 0.95)}; "
-        f"replayed {sum(replayed)}/{len(replayed)}"
+        f"case ms p50 {_pct(case_ms, 0.5)} p95 {_pct(case_ms, 0.95)}; "
+        f"models {last.get('models')}; replayed {sum(bool(c['replayed']) for c in calls)}"
+        f"/{len(calls)}; budget exceeded {score['tokens'] > score['budget']}"
     )
-    report = last["report"]
+    labels: dict[str, list[str]] = {}
     for e in events:
         if e["type"] == "case.graded":
-            flags = report["gold"].get(e["case"], {}).get("flags", [])
+            labels[e["case"]] = e["labels"]
+            flags = last["report"]["gold"].get(e["case"], {}).get("flags", [])
             print(f"  {e['case']}: passed={e['passed']} labels={e['labels']} flags={flags}")
-    for d in report["diagnosis"]:
+    for d in last["report"]["diagnosis"]:
         print("  diagnosis:", d)
-    return usage
+    return {
+        "run": run_id,
+        "finished": True,
+        "score": score,
+        "models": last.get("models"),
+        "llm_error": sorted(c for c, ls in labels.items() if "llm_error" in ls),
+        "case_ms_p50": _pct(case_ms, 0.5),
+        "case_ms_p95": _pct(case_ms, 0.95),
+        "usage": {c["case"]: (c["in"], c["out"]) for c in calls},
+    }
+
+
+def _per_model(calls: list[dict[str, Any]]) -> None:
+    print("\n## per model (answered, non-replayed calls)")
+    by_model: dict[str, list[dict[str, Any]]] = {}
+    for c in calls:
+        if c["status"] == "ok" and not c["replayed"]:
+            by_model.setdefault(str(c["model"]), []).append(c)
+    for model, rows in sorted(by_model.items()):
+        ins, outs = [r["in"] for r in rows], [r["out"] for r in rows]
+        ratio = statistics.median(r["in"] / r["regex_prompt"] for r in rows if r["regex_prompt"])
+        print(
+            f"  {model}: {len(rows)} calls; in median {statistics.median(ins)} "
+            f"(max {max(ins)}); out median {statistics.median(outs)} p95 {_pct(outs, 0.95)} "
+            f"(max {max(outs)}); provider in / regex-v1 prompt median {ratio:.2f}"
+        )
+
+
+async def _plan(engine: EngineServices, plan: Sequence[str]) -> tuple[int, dict[str, Any]]:
+    """One event loop for every run: the shared Gemini client's pool is bound to it."""
+    replaying = engine.llm
+    if not isinstance(replaying, ReplayingLLM) or not isinstance(replaying.inner, GeminiClient):
+        raise SystemExit("expected the engine's ReplayingLLM over GeminiClient")
+    gemini = replaying.inner
+    limiter: list[dict[str, Any]] = []
+    reserve = gemini._limiter.reserve
+
+    def traced(model: str, now: float, latest: float) -> float | None:
+        start = reserve(model, now, latest)
+        limiter.append({"model": model, "wait_s": None if start is None else start - now})
+        return start
+
+    gemini._limiter.reserve = traced  # type: ignore[method-assign]
+    print(f"chain {gemini.models}; rpm {dict(gemini.rpm)}")
+    levels: dict[str, LevelSpec] = {}
+    first: dict[str, dict[str, Any]] = {}
+    results: list[dict[str, Any]] = []
+    calls: list[dict[str, Any]] = []
+    code = 0
+    try:
+        for n, item in enumerate(plan, 1):
+            if item.startswith("wait:"):
+                await asyncio.sleep(float(item.removeprefix("wait:")))
+                continue
+            fresh = item.endswith("!")
+            level_id, _, name = item.removesuffix("!").partition(":")
+            level = levels.setdefault(level_id, load_level(level_id))
+            run_id = f"{n:02d}-{level_id}-{name}{'-fresh' if fresh else ''}"
+            sent, booked = gemini._daily_cap._count, len(limiter)
+            events = await _run(
+                engine, gemini if fresh else replaying, level, _graph(level, name), run_id
+            )
+            run_calls = _calls(run_id, events)
+            calls += run_calls
+            result = _summarise(run_id, events, run_calls)
+            slots = limiter[booked:]
+            result["network_attempts"] = gemini._daily_cap._count - sent
+            result["limiter"] = {
+                "booked": sum(s["wait_s"] is not None for s in slots),
+                "waited": sum((s["wait_s"] or 0) > 0 for s in slots),
+                "max_wait_s": round(max((s["wait_s"] or 0) for s in slots) if slots else 0, 1),
+                "skipped": [s["model"] for s in slots if s["wait_s"] is None],
+            }
+            print(f"network attempts {result['network_attempts']}; limiter {result['limiter']}")
+            results.append(result)
+            if not result["finished"] or result["llm_error"]:
+                print("\nstopping: a run failed or the whole chain refused a call")
+                code = 2
+                break
+            key = item
+            if not fresh and key in first:
+                again = result["usage"] == first[key]["usage"]
+                full = all(c["replayed"] for c in run_calls)
+                print(f"replay returned the original usage for every case: {again and full}")
+                code = code or (0 if again and full else 2)
+            first.setdefault(key, result)
+    finally:
+        await engine.aclose()
+    _per_model(calls)
+    print(f"\nnetwork attempts in total: {gemini._daily_cap._count}")
+    return code, {"runs": results, "calls": calls, "network_attempts": gemini._daily_cap._count}
 
 
 def main() -> int:
     if isinstance(sys.stdout, io.TextIOWrapper):  # Windows cp1252 console vs Vietnamese text
         sys.stdout.reconfigure(encoding="utf-8")
-    settings = Settings(daily_llm_call_cap=CALL_CAP)
-    engine = build_engine(settings)
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
+    parser.add_argument("plan", nargs="*", default=list(DEFAULT_PLAN))
+    parser.add_argument("--cap", type=int, default=40, help="real network attempts (DailyCap)")
+    parser.add_argument("--json", type=Path, help="write runs and per-call records here")
+    args = parser.parse_args()
+    # The engine logs model, status and cooldown of each failed call (never bodies or the key).
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(message)s")
+    engine = build_engine(Settings(daily_llm_call_cap=args.cap))
     if engine.llm is None or engine.store is None:
         print("LLM or index not configured: set GEMINI_API_KEY and run vgame-build-index first.")
         return 1
-    return asyncio.run(_runs(engine))
-
-
-async def _runs(engine: EngineServices) -> int:
-    """One event loop for every run: the shared Gemini client's pool is bound to it."""
-    level = load_level("grounded-citation")
-    naive = next(n.graph for n in level.naive_graphs if n.id == "N1")
-    try:
-        first = _summarise("ref-1", await _run(engine, level, level.reference_graph, "ref-1"))
-        if not first:  # provider down or over quota: do not spend the cap on two more runs
-            return 2
-        _summarise("naive-N1", await _run(engine, level, naive, "naive-N1"))
-        again = _summarise(
-            "ref-2-replay", await _run(engine, level, level.reference_graph, "ref-2")
-        )
-    finally:
-        await engine.aclose()
-    same = first == again and bool(first)
-    print(f"\nreplay returned the original usage for every case: {same}")
-    return 0 if same else 2
+    code, record = asyncio.run(_plan(engine, args.plan))
+    if args.json is not None:
+        args.json.write_text(json.dumps(record, ensure_ascii=False, indent=1), encoding="utf-8")
+    return code
 
 
 if __name__ == "__main__":

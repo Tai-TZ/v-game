@@ -75,7 +75,7 @@
 | Lược dao, Nam châm, Băng keo | `chunker` | như L2: {128, 256, 512, 1024} × {`co_dinh`, `theo_dieu`} × {0, 10, 20} | mở |
 | Vòm Sao, Móc kéo K | `vector_search.top_k` | **1–5** | mở, giới hạn mới |
 | Màn lọc mờ | `vector_search.score_threshold` | 0–0,9, bước 0,05 | mở |
-| Kính lọc hiệu lực | `vector_search.only_in_force` | `false` / `true`; không có tác dụng vì kho L3 không có văn bản hết hiệu lực. Hiện mờ với nhãn "Kho tối nay không có văn bản hết hiệu lực" | mở |
+| Kính lọc hiệu lực | `chunker.only_in_force` (tầng Index, engine-v0.2 E6) | `false` / `true`; không có tác dụng vì kho L3 không có văn bản hết hiệu lực. Hiện mờ với nhãn "Kho tối nay không có văn bản hết hiệu lực" | mở |
 | **Tủ ngăn kéo** + Móc kéo ngăn | `bm25_search.top_k` | 1–10 (tokenizer giữ chữ số: "điều", "47") | **mở** |
 | **Phễu RRF** (bi rơi nặng 1/(k+hạng)) | `fusion` `method: "rrf"`, `k`, `top_k` | `k` 1–100 (mặc định 60); `top_k` 1–10 | **mở** |
 | **Bập bênh α** | `fusion` `method: "alpha"`, `alpha`, `top_k` | `alpha` 0–1 bước 0,1 (trọng số của vector; mặc định 0,5); `top_k` 1–10 | **mở** (Phễu và Bập bênh là hai mặt của cùng khe Gộp) |
@@ -139,11 +139,11 @@ Luật chéo (Phần 3 §3.5): `rerank.top_n` ≤ số ứng viên phía trướ
 |---|---|---|---|---|
 | N1 | **Chạy lại lời giải L2** (chỉ dense, `top_k` ≤ 5) | [T] Với câu chỉ có số hiệu, embedding gần như không mang nghĩa của "47". Điều 74 và 41 cùng họ, lời văn na ná, nên đứng trên Điều 47. Hạng dense của đoạn đáp án > giới hạn `top_k` trên mọi biến thể (cổng phát hành kiểm) | `lib-l3-v01`, ca thấy được vai `tra-so` thứ hai và mọi ca ẩn vai `tra-so` → **sao 1** | `ret.gold_missing`, `ret.gold_rank` (dense) |
 | N2 | Kéo Móc kéo lên tối đa | [T] G06 chặn mọi giá trị > 5. Ở 5 vẫn như N1 | như N1 | như N1 |
-| N3 | **Chỉ BM25** (tháo Vòm Sao) | [T] Câu `lib-l3-t01` không có từ nội dung nào chung với Điều 12 (yêu cầu nội dung A8), nên BM25 xếp đoạn đáp án ngoài `bm25_search.top_k` tối đa (10) | `lib-l3-t01` và ca ẩn vai `dien-dat-lai` → **sao 3**, có thể cả sao 1 | `ret.gold_missing`, `ret.gold_rank` (bm25) |
+| N3 | **Chỉ BM25** (tháo Vòm Sao) | [T] Câu `lib-l3-t01` không có từ đặc thù nào chung với Điều 12 (chỉ chung cụm "kết quả học tập" có ở 9 điều), nên BM25 xếp đoạn đáp án hạng ≥ 15 trên mọi biến thể `theo_dieu` và `co_dinh` ≤ 256 (đo 2026-10-08), ngoài `bm25_search.top_k` tối đa (10) | `lib-l3-t01` và ca ẩn vai `dien-dat-lai` → **sao 3**, có thể cả sao 1 | `ret.gold_missing`, `ret.gold_rank` (bm25) |
 | N4 | Hybrid, khe Gộp **trống** (hai danh sách đổ thẳng vào thùng) | [T] Tối đa 5 + 10 đoạn ≫ thùng 3.000 token, nên `cat_duoi` cắt theo thứ tự đến. Đoạn đúng đứng cuối danh sách BM25 bị cắt, và mỗi ca ≈ 3.000 token | ca có đoạn đúng chỉ nằm ở danh sách sau; **sao 2** | `pack.dropped`, `ctx.gold_dropped`, `budget.exceeded` |
-| N5 | Hybrid RRF, `fusion.top_k` 10, **không** Kính lúp | [T] 10 đoạn × ~350 token cộng dặn dò ≈ 3.000 token/ca, nên tổng ≈ 40.000 > ngân sách sao 2. Ca vai `tra-so-kho` có thể bị cắt ở thùng nếu đoạn đúng đứng hạng ≥ 8 sau gộp | **sao 2**; có thể có ca `tra-so-kho` | `pack.tokens`, `budget.exceeded`, `ctx.gold_dropped` |
+| N5 | Hybrid RRF, `fusion.top_k` 10, **không** Kính lúp | [T] 10 đoạn × ~350 token làm thùng gần đầy ở mọi ca (dặn dò đi riêng, ngoài thùng, engine-v0.2 E8), nên riêng token đầu vào đã vượt ngân sách sao 2: engine đo 26.850/22.000 (regex-v1), Gemini thật 35.803/22.000 (2026-10-08, engine-spike-report §3.2). Ca vai `tra-so-kho` có thể bị cắt ở thùng nếu đoạn đúng đứng hạng ≥ 8 sau gộp | **sao 2**; có thể có ca `tra-so-kho` | `pack.tokens`, `budget.exceeded`, `ctx.gold_dropped` |
 | N6 | Bập bênh α ≥ 0,7 (mức "chatbot FAQ" trên slide) | [T] Điểm đã chuẩn hoá nghiêng về dense, nên Điều 74 và 41 vẫn đứng trên 47 sau khi gộp. Cổng phát hành kiểm cho α ∈ {0,7; 0,8; 0,9; 1,0} với `fusion.top_k` ≤ 3 | `lib-l3-v01` và ca `tra-so` (khi `fusion.top_k` nhỏ) | `ret.gold_rank` (fusion) |
-| N7 | Hybrid + Kính lúp nhưng đổi Lược về `co_dinh` 128/0 | [T] Khoản 2 và khoản 3 Điều 12 lại tách đoạn (như L2-N1); `top_n` 3 không giữ đủ | `lib-l3-t02` (hồi quy) → **sao 3** | `ret.boundary_split`, `ret.gold_missing` |
+| N7 | Hybrid + Kính lúp giữ 1 đoạn (`top_n` 1), đổi Lược về `co_dinh` 128/0 | [T] Ở 128/0 không đoạn nào chạm cả khoản 2 lẫn khoản 3 Điều 12, Kính lúp giữ 1 đoạn nên luôn thiếu một khoản. Cùng `top_n` 1 với `theo_dieu` 512/10 (cả Điều 12 một đoạn) vẫn đạt `t02`, nên lỗi nằm ở cách cắt (đo 2026-10-08) | `lib-l3-t02` (hồi quy) → **sao 3** | `ret.gold_missing` |
 | N8 | Hybrid, `fusion.top_k` 3, không Kính lúp | [M] với ca `tra-so-kho`: đoạn đúng đứng hạng 4–8 sau gộp nên rơi khỏi top 3; Kính lúp đưa nó lên ≤ 3. Phụ thuộc chất lượng cross-encoder với tiếng Việt (spike Phần 3 §3.9) | các ca ẩn vai `tra-so-kho` | `ret.gold_rank` (fusion), sau Kính lúp |
 
 **`lib-l3-t03` không có cấu hình ngây thơ riêng** (golden `bites: []`). Ca này canh để thẻ G3 vẫn còn trong Lăng kính khi người chơi lắp lại đồ thị. Nó trượt khi trợ lý **không từ chối**: Lăng kính thiếu G3 hoặc có G5, BM25 kéo Điều 41 lên rất cao, và model đọc khoản 2 hoặc khoản 4 thay cho khoản 6 [M]. Theo ghi chú golden, ca này tính `info` cho tới khi qua cổng hiệu chỉnh.
@@ -195,12 +195,12 @@ Nhờ vậy, trả lời bằng nội dung Điều 74 thay cho Điều 47 trư�
 | Sao | Điều kiện | Ghi chú |
 |---|---|---|
 | 1 | Ít nhất 8/10 ca thường đạt (`v01`–`v03` + 7 ca ẩn), **bắt buộc có `lib-l3-v01`** | Xong khu Thư viện; hàng người giải tán |
-| 2 | Có sao 1 **và** tổng token ≤ **30.000** (tạm) | 1,25 × p50 của lời giải mẫu, làm tròn lên tới nghìn. Ước tính: thùng có 3 đoạn ≈ 1.800 token/ca × 13 ≈ 23.400. Rerank không tốn token LLM; chi phí của nó là ms, hiện trong truy vết |
+| 2 | Có sao 1 **và** tổng token ≤ **22.000** | 1,25 × p50 của lời giải mẫu, làm tròn lên tới nghìn. Hiệu chỉnh 2026-10-08 với `gemini-3.5-flash-lite`, `can_bang`: lời giải mẫu 17.348 token (engine-spike-report §3.2). Rerank không tốn token LLM; chi phí của nó là ms, hiện trong truy vết |
 | 3 | Có sao 1 **và** mọi ca bẫy (`lib-l3-t01`, `t02`, `t03`) đều đạt | `t01` bảo vệ phần dense; `t02` là hồi quy; `t03` giữ thẻ từ chối khi lắp hybrid. `t03` là [M], tính `info` cho tới khi qua cổng hiệu chỉnh (mục 6) |
 
 **Cơ chế trượt của từng ca bẫy:**
-- `t01`: chỉ còn BM25, câu lời thường không trùng chữ nào với Điều 12 (N3, [T]).
-- `t02`: đổi cách cắt làm khoản 3 Điều 12 tách khỏi khoản 2 (N7, [T]).
+- `t01`: chỉ còn BM25, câu lời thường không trùng từ đặc thù nào với Điều 12 (N3, [T]).
+- `t02`: đổi cách cắt làm khoản 3 Điều 12 tách khỏi khoản 2, với Kính lúp giữ 1 đoạn (N7, [T]).
 - `t03`: không từ chối, vì Lăng kính thiếu G3 hoặc có G5 và model đọc khoản khác của Điều 41 thay vào ([M]).
 
 **Đạt được bằng đồ chơi đã mở?** Có.
@@ -219,7 +219,7 @@ Nếu cổng phát hành thấy Kính lúp không đưa được các ca `tra-so
 | `lib-l3-v01` trượt với lời giải cũ | A. Tìm theo nghĩa xếp các điều na ná (74, 41) cao hơn 47 · B. Đoạn quá nhỏ · C. top_k quá thấp · D. Model bịa | `ret.gold_rank` (dense) > K và thùng có điều cùng họ → A |
 | Ca diễn đạt lại trượt | A. **Câu hỏi không dùng chữ nào có trong điều luật, nên tìm từ khoá trượt** · B. Gộp sai · C. Kính lúp loại mất · D. Model bịa | `ret.gold_rank` (bm25) vô cực và dense không có trong đồ thị → A; đoạn có mặt trước Kính lúp mà mất sau → C |
 | Vượt ngân sách | **Gộp ra nhiều đoạn quá, thùng gần đầy ở mọi câu** · Kính lúp tốn token · Câu hỏi dài · Model trả lời dài | `budget.exceeded` + `pack.tokens` |
-| `lib-l3-t02` trượt | **Đổi cách cắt làm khoản ngoại lệ tách khỏi đoạn chính** · BM25 không bắt được · Kính lúp loại mất · Model quên | `ret.boundary_split` → 1; đoạn mất sau Kính lúp → 3 |
+| `lib-l3-t02` trượt | **Đổi cách cắt làm khoản ngoại lệ tách khỏi đoạn chính** · BM25 không bắt được · Kính lúp loại mất · Model quên | `ret.boundary_split` hoặc `ret.gold_missing` → 1 (cách cắt đã đổi); đoạn mất sau Kính lúp mà cách cắt vẫn như lời giải L2 → 3 |
 | `lib-l3-t03` trượt (ca bẫy hỏi một khoản không có) | **Lăng kính không dặn "không thấy thì nói không có", nên model đọc một khoản khác thay vào** · BM25 kéo nhầm điều · Thùng bị cắt · top_k quá thấp | thiếu dấu hiệu từ chối hoặc có `llm.cite_unknown` → 1 |
 
 **Lời chẩn đoán gắn với bằng chứng:**
@@ -233,6 +233,7 @@ Nếu cổng phát hành thấy Kính lúp không đưa được các ca `tra-so
 | hồi quy | "Ca của Hà trượt: {flag}. Lần đổi này làm vỡ thứ đã chạy được." |
 | bẫy từ chối trượt | "Có ca bẫy hỏi về một khoản không hề có, mà trợ lý vẫn đọc ra nội dung. Thùng của ca đó có {dieu_list}." (không hiện câu hỏi của ca bẫy) |
 | `budget.exceeded` | "Mỗi câu mang {avg_docs} đoạn vào thùng. Kính lúp tốn {ms} ms nhưng không tốn token nào." |
+| `budget.exceeded`, graph không có Kính lúp (`budget.exceeded:no_rerank`, 2026-10-08, chờ người viết nội dung duyệt) | "Mỗi câu mang {avg_docs} đoạn vào thùng. Kính lúp tốn mili giây, nhưng nó giúp bạn chỉ cần mang ba đoạn." |
 
 **Ba gợi ý tăng dần.** Gợi ý 1 của level sự cố luôn là chạy lại lời giải cũ (Phần 3 §3.3).
 

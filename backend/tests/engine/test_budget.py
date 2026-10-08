@@ -34,3 +34,13 @@ def test_daily_cap_blocks_then_resets_on_a_new_utc_day() -> None:
 def test_daily_cap_zero_blocks_everything() -> None:
     with pytest.raises(BudgetExceededError):
         DailyCap(0).reserve()
+
+
+def test_run_budget_keeps_usage_per_case() -> None:
+    budget = RunBudget()
+    budget.commit("c1", Usage(10, 2))
+    budget.commit("c2", Usage(5, 1))
+    budget.commit("c1", Usage(1, 1))
+    assert budget.case_usage("c1") == Usage(11, 3)
+    assert budget.case_usage("c3") == Usage()
+    assert budget.usage == Usage(16, 4)

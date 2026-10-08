@@ -188,6 +188,15 @@ def summarize_docs(docs: DocList, *, n_in: int = 0, method: str = "rrf") -> str:
 # fastembed defaults to 256 per batch; through e5-large with 512-token chunks that held ~16 GB.
 # ponytail: fixed small batch, a few GB peak; raise only with a measured RAM budget.
 MODEL_BATCH_SIZE = 8
+# The reranker runs in the API process, up to MAX_CONCURRENT_CASES at once per run, and ONNX's
+# CPU arena keeps the peak of those concurrent runs for good: batch 8 at jina's 1024 tokens left a
+# legal L3 graph at ~15 GB committed. Attention memory and time grow with batch x length^2, so
+# batches are small and pairs stop at 512 tokens, e5's limit (dense search never sees more of a
+# chunk either). Measured 2026-10-08, 3 concurrent: ~3.2 GB committed even for the heaviest legal
+# L3 graph; rerank p50 ~2.3 s (L3 reference) / ~5.5 s (heaviest graph), engine-spike-report §3.3.
+# The arena stays on: with the peak bounded, turning it off only cost ~20 % more time.
+RERANK_BATCH_SIZE = 2
+RERANK_MAX_TOKENS = 512
 
 
 class FastEmbedder:
@@ -225,6 +234,10 @@ class FastReranker:
             self._model = TextCrossEncoder(
                 model_id, cache_dir=str(cache_dir), local_files_only=local_files_only
             )
+            # Pairs (question, passage): longest_first trims the passage. ponytail: reaches into
+            # fastembed's loaded tokenizer (pinned); the slow tests load the real model.
+            tokenizer = self._model.model.tokenizer  # type: ignore[attr-defined]
+            tokenizer.enable_truncation(max_length=RERANK_MAX_TOKENS)
         except Exception as exc:  # fastembed raises several types for a missing/corrupt model
             raise RerankerUnavailableError(
                 f"reranker {model_id} unavailable: {type(exc).__name__}"
@@ -235,5 +248,5 @@ class FastReranker:
         return self._model_id
 
     def score(self, query: str, texts: Sequence[str]) -> list[float]:
-        scores = self._model.rerank(query, list(texts), batch_size=MODEL_BATCH_SIZE)
+        scores = self._model.rerank(query, list(texts), batch_size=RERANK_BATCH_SIZE)
         return [float(s) for s in scores]
