@@ -1,6 +1,6 @@
 # Báo cáo spike engine v0.2: khu Thư viện
 
-> **Trạng thái:** cập nhật 2026-10-08 sau đợt hiệu chỉnh 3: ngân sách sao 2 của L1–L3 đo bằng Gemini thật và đã đặt lại (mục 3.2). Trước đó, đợt sửa 2: đủ 24 biến thể index với e5 thật, reranker jina-v2 thật, Gemini `gemini-3.5-flash-lite` trả lời được (mục 0.1, 2.4, 3.0b). Các mục 0–2.3 và 3.0 giữ lại làm lịch sử. **Phạm vi:** đo hành vi thật của engine v0.2 ([hợp đồng](engine-v0.2.md)) trên kho quy chế thật và bộ câu hỏi vàng L1–L3.
+> **Trạng thái:** cập nhật 2026-10-08, bản miễn phí (mục 3.4): API không nạp model, index và bảng rerank đi kèm code, seed phát lại. Trước đó, đợt hiệu chỉnh 3: ngân sách sao 2 của L1–L3 đo bằng Gemini thật và đã đặt lại (mục 3.2). Trước đó, đợt sửa 2: đủ 24 biến thể index với e5 thật, reranker jina-v2 thật, Gemini `gemini-3.5-flash-lite` trả lời được (mục 0.1, 2.4, 3.0b). Các mục 0–2.3 và 3.0 giữ lại làm lịch sử. **Phạm vi:** đo hành vi thật của engine v0.2 ([hợp đồng](engine-v0.2.md)) trên kho quy chế thật và bộ câu hỏi vàng L1–L3.
 > **Script:** [`backend/scripts/spike_retrieval.py`](../../backend/scripts/spike_retrieval.py) (truy xuất, không gọi LLM, không tải gì) và [`backend/scripts/spike_llm.py`](../../backend/scripts/spike_llm.py) (Gemini thật, tối đa 40 lần gọi).
 
 ## 0. Tóm tắt
@@ -35,6 +35,7 @@ Tải file phải được chủ dự án đồng ý, nên spike không tải g�
   Cả 4 đã quyết ngày 2026-10-08 (engine-v0.2 §14, khối "nội dung"): viết lại `lib-l3-t01` và thêm dấu cho `lib-l3-h03` (L3 3 sao); L1-N5 và L2-N1 v01 chuyển [M] (L1-N5 giữ [T] trên h02); L3-N7 thêm `rerank.top_n` 1.
 - **Gemini:** `gemini-3.5-flash-lite` (GA, có `thinking_level` low/medium/high) trả lời đủ; lời giải mẫu L1 được 3 sao với 10.262 token (ngân sách 22.000), replay trả đúng usage gốc. Xem 3.0b.
 - **Đợt hiệu chỉnh 3 (mục 3.2):** index dựng lại sau khi đổi `lib-l3-t01`, `h03`; `uv run pytest -m slow` **13/13 đạt**. Ngân sách sao 2 đặt theo 1,25 × p50 lời giải mẫu với Gemini thật: L1 22.000 → **14.000**, L2 30.000 → **20.000**, L3 30.000 → **22.000**. `budget.exceeded` của L1-N4, L2-N2, L3-N5 vượt cả khi chỉ đếm token đầu vào, nên trở lại [T].
+- **Bản miễn phí (mục 3.4, 2026-10-08):** API không nạp model nào: index, vector câu hỏi và bảng điểm jina tính sẵn đi kèm code (6,78 MB, không mất gì so với model sống), cùng seed 71 câu trả lời Gemini thật cho lời giải mẫu và đồ thị khởi đầu. Đo qua HTTP: đỉnh 131 MB, lượt đã lưu 0,05–0,23 s CPU (0,5–2,3 s ở 0,1 CPU), 29 lời gọi Gemini để sinh seed.
 - **Sửa lỗi vòng 1 (mục 3.3):** RAM của tiến trình API khi rerank giảm từ tối đa 14,8 GB xuống 3,2 GB committed (lô 2 cặp, cặp cắt ở 512 token); rerank lời giải mẫu L3 p50 2,3 s khi 3 ca song song, đồ thị L3 nặng nhất 5,5 s. Ngân sách sao 2 của L1 nâng lên **15.000**. Bỏ `gemini-3.7-flash` khỏi chuỗi model.
 
 ## 1. Index
@@ -440,6 +441,78 @@ Phản biện QA chi phí/hiệu năng sau mục 3.2. Đo trong đường code c
 - L2 (20.000) và L3 (22.000) không đổi: lời giải mẫu vượt ≤ 0,3 % và ≤ 1 %.
 - Chấm sao 2 chỉ bằng token vào (tất định) để chủ dự án quyết.
 - Sao 2 chỉ hiệu chỉnh trên model chính. `gemini-3.1-flash-lite` ra trung vị 478 so với 411 token mỗi lời gọi, tức khoảng +0,9k cho 13 lời gọi L3. `gemini-3.5-flash` chưa có mẫu. `run.finished.models` cho biết khi model dự phòng phục vụ.
+
+### 3.4 Bản miễn phí: không model lúc chạy, seed phát lại (2026-10-08)
+
+Mục tiêu: Render free (512 MB, 0,1 CPU, đĩa tạm, ngủ sau 15 phút) chạy được run thật của cả ba level. Quyết định và hợp đồng: [engine-v0.2 §14, khối "bản miễn phí"](engine-v0.2.md). Máy dev như mục 3.3 (i7-12700H, Windows). Script đo nằm ở scratchpad của phiên, không vào repo; lệnh tái tạo ở cuối mục.
+
+**Artifact đóng gói** (`backend/src/vgame/engine/data`):
+
+| File | Thô | Nén (deflate) |
+|---|---|---|
+| `passages.npy` (952 × 1024 float32, mỗi chữ dense một hàng) | 3,90 MB | 3,62 MB |
+| 24 file chunk JSON | 2,36 MB | 0,47 MB |
+| `queries.npy` (47 × 1024 float32) | 0,19 MB | 0,18 MB |
+| `documents.json`, `passages.json`, `rerank.json`, `queries.json`, `manifest.json` | 0,23 MB | 0,09 MB |
+| `rerank.npy` (13 × 873 float32) | 0,05 MB | 0,04 MB |
+| `replay-seed.json` (71 câu trả lời) | 0,05 MB | 0,01 MB |
+| **Tổng** | **6,78 MB** | **4,41 MB** |
+
+Trước đó index nằm trong `.cache` (11,7 MB: 24 ma trận float32 riêng, 9,2 MB) cùng 3,2 GB model.
+
+**Độ chính xác.**
+- 2.203 hàng của 24 biến thể chỉ có 952 chữ dense khác nhau; chữ lặp có vector bằng bit. Index mới (format 2) bằng bit với index cũ ở mọi biến thể và mọi vector câu hỏi; 4.608 bảng xếp hạng dense đầy đủ (47 câu × 24 biến thể × 4 handle: kho L1/L2 × `only_in_force`) giống hệt cả điểm lẫn thứ tự.
+- float16 cho vector bị loại (đo của architect): 2.337/4.608 bảng xếp hạng đổi, 795 trong top 30, có đảo ở hạng 1, 44 lần vượt `score_threshold`, sai số điểm tối đa 3,9e-5.
+- Điểm jina: thuộc [-3,71; 1,20], khoảng cách nhỏ nhất giữa hai điểm khác nhau 1,2e-7 (float16 có bước ~1e-3 ở vùng này). Điểm giống hệt nhau ở lô 1, 2, 8 và mọi thứ tự lô (đo của architect), và mọi logit vừa khít float32, nên bảng trả đúng số mà `FastReranker.score` trả.
+- Test `slow` (`HF_HUB_OFFLINE=1`, 183 s cả bộ, 3/3 đạt): `test_shipped_vectors_equal_the_live_model` (e5 sống, 24 s), `test_shipped_rerank_scores_equal_the_live_model` (jina sống trên 651 cặp ứng viên của 13 câu L3 ở 4 biến thể, so cả điểm lẫn thứ tự, 97 s), `test_real_models_rank_the_anchor_questions`.
+- Test e2e "model thật" (3 sao ở cả ba level với Oracle, mọi cờ `needs_real_models`) giờ là test nhanh trên artifact đóng gói: đạt.
+
+**Dựng bảng rerank** (`HF_HUB_OFFLINE=1 uv run vgame-build-index`, vector dùng lại nên pha embedding 0 s): 11.349 cặp, 3.710 s. Mỗi câu (873 cặp, lô 2, chữ ngắn trước) mất 102–195 s khi máy rảnh (khoảng 120 ms mỗi cặp), 424–689 s cho 4 câu đầu khi máy đang bận việc khác; working set khoảng 3 GB (e5 + jina cùng nạp). Một câu hỏi mới vì vậy tốn khoảng 2 phút chấm (cộng thời gian nạp model); dựng lại từ đầu khoảng 33 phút embedding (mục 3.2) cộng 25–60 phút rerank.
+
+**Cài đặt runtime** (`uv sync --frozen --no-dev`): 73 → 57 gói (Windows; 59 trên Linux), tải wheel Linux 79,5 → 41,0 MB (onnxruntime 22,5, pillow 6,6, hf-xet 4,0, tokenizers 3,2 MB không còn). Venv Windows có `--compile-bytecode`: 234 → 138 MB; cài lại khi cache uv ấm: 7,2 → 4,0 s.
+
+**Đo qua HTTP.** Venv `uv sync --frozen --no-dev --compile-bytecode`; `python -m uvicorn --factory vgame.main:create_app` như `startCommand`; `ENV=production`, key giả, `DAILY_LLM_CALL_CAP=0` (lượt không có trong seed không thể gọi ra mạng), `MAX_CONCURRENT_RUNS=1`, `OPENBLAS_NUM_THREADS=1`, `ENGINE_CACHE_DIR` trống. POST rồi đọc hết SSE, tuần tự; RAM và CPU của tiến trình server lấy bằng `GetProcessMemoryInfo`/`GetProcessTimes`.
+
+| Thời điểm / lượt | CPU server | Wall | SSE | Working set (đỉnh) |
+|---|---|---|---|---|
+| Khởi động tới `/api/health` 200 | 1,84 s | 2,2 s | | 118 MB |
+| L1 lời giải mẫu (lần 1 / 2), 3 sao, 10/10 phát lại | 0,19 / 0,06 s | 0,19 / 0,12 s | 36 KB | 124 / 127 MB |
+| L1 khởi đầu, 0 sao, 10/10 phát lại | 0,05 / 0,11 s | 0,04 / 0,10 s | 31 KB | 124 / 127 MB |
+| L2 lời giải mẫu, 3 sao, 13/13 phát lại | 0,13 / 0,16 s | 0,12 / 0,16 s | 47 KB | 125 / 127 MB |
+| L2 khởi đầu, 0 sao, 13/13 phát lại | 0,11 / 0,13 s | 0,14 / 0,16 s | 49 KB | 125 / 127 MB |
+| L3 lời giải mẫu, 3 sao, 13/13 phát lại | 0,23 / 0,22 s | 0,24 / 0,23 s | 97 KB | 127 / 128 MB |
+| L3 khởi đầu, 0 sao, 13/13 phát lại | 0,13 / 0,13 s | 0,14 / 0,13 s | 46 KB | 127 / 128 MB |
+| L3 nặng nhất (`co_dinh` 128/20, `bm` 10, `fu` 10, `rr` 5), không có trong seed: `run.failed{llm_unavailable}` với câu "7 giờ sáng" | 0,11 s | 0,13 s | 28 KB | 131 MB |
+
+- **Đỉnh RAM 131 MB working set, 148 MB private** (mục tiêu < 300 MB, giới hạn 512 MB). fastembed/onnxruntime không được nạp (test `test_engine_uses_the_rerank_table_and_never_imports_model_libraries` chạy trong tiến trình mới). Linux đếm RSS khác Windows một chút; `OPENBLAS_NUM_THREADS=1` bỏ bộ đệm của các luồng BLAS rỗi (Windows committed 755 → 143 MB, đo của architect).
+- **Sửa lỗi vòng 1 (2026-10-09): tiến trình sống lâu.** QA đo thêm: mỗi `IndexHandle` (24 biến thể × 2 kho × `only_in_force` = 96) giữ bản chép vector và một model BM25 mãi mãi, nên một server chạy nhiều giờ lên khoảng 250 MB working set, 290–300 MB private. Sau sửa (view giữ chỉ số hàng, BM25 giữ 4 handle gần nhất), cùng cách đo trên, venv chỉ có phụ thuộc runtime:
+
+  | Thời điểm | CPU server | Working set | Private |
+  |---|---|---|---|
+  | Khởi động | 1,86 s | 118 MB | 104 MB |
+  | Lời giải mẫu L1 / L2 / L3 (3 sao, phát lại) | 0,22 / 0,08 / 0,09 s | 124–126 MB | 142–143 MB |
+  | Đồ thị khởi đầu L1 / L2 / L3 (0 sao, phát lại) | 0,05 / 0,08 / 0,06 s | 126 MB | 143 MB |
+  | L3 nặng nhất (`run.failed{llm_unavailable}`) | 0,09 s | 128 MB | 146 MB |
+  | 96 lượt, mỗi lượt một handle khác (L2, L3 × 24 biến thể × `only_in_force`), 4,7 s | | 141 MB | 159 MB |
+  | Thêm 200 lượt đã lưu (`RunStore` đầy), 15,1 s | | **158 MB** | **175 MB** |
+
+  Trong tiến trình, chạm cả 96 handle: +96 → +5 MB working set, tracemalloc +92 → +2,6 MB. Dựng lại một BM25 khi rơi khỏi LRU mất khoảng 6 ms (khoảng 60 ms ở 0,1 CPU). Linux RSS chưa đo (Render tab Metrics sau deploy).
+- **Ước tính 0,1 CPU = CPU × 10:** lượt đã lưu 0,5–2,3 s; khởi động khoảng 18 s sau khi Render thức (cộng khoảng một phút Render tự mất). Đồ thị L3 hợp lệ nặng nhất trong tiến trình, đủ 13 ca với Oracle: 0,42 s CPU lần đầu (dựng BM25 cho biến thể mới), 0,17 s lần sau, tức 2–4 s ở 0,1 CPU (trước: rerank sống 32,9 s, 3,2 GB). Lượt có đồ thị mới bị chặn bởi Gemini: mỗi ca p50 1,3–1,4 s ở lần sinh seed dưới đây, 3 ca song song.
+- Không cần gzip: một lượt 28–97 KB, 5 GB băng thông đủ cho khoảng 50 nghìn lượt.
+
+**Sinh seed** (`scripts/spike_llm.py --cap 80 --seed …`, lệnh trong docstring, chờ 65 s giữa các level): 6 run (lời giải mẫu và khởi đầu của 3 level), 72 lời gọi LLM, 43 lấy từ cache phát lại cũ, **29 lời gọi Gemini thật**, đều do `gemini-3.5-flash-lite` trả lời (`stop=end`), không 429, không model dự phòng. Seed có 71 mục (72 request, hai request giống hệt nhau). Chạy lại với `--cap 0` từ một cache trống (chỉ có seed): 72/72 phát lại, 0 lời gọi mạng, sao và token như lần đầu.
+
+**Bỏ qua có chủ ý:** bỏ trường `text` khỏi chunk JSON (tiết kiệm ~1,9 MB, tổng đã dưới 10 MB), chia nhỏ cặp rerank theo top-k mà đồ thị hợp lệ chạm tới (ít cặp hơn khoảng 3 lần nhưng gắn chặt vào `param_limits` và phải dựng BM25 của 24 biến thể lúc khởi động để kiểm), gzip, `MALLOC_ARENA_MAX`, chế độ chỉ phát lại khi không có key, seed thêm N2–N8 (khoảng 210 lời gọi).
+
+```bash
+cd backend
+HF_HUB_OFFLINE=1 uv run vgame-build-index          # index + bảng rerank (model trong ENGINE_CACHE_DIR/models)
+HF_HUB_OFFLINE=1 uv run pytest -m slow             # so với e5/jina sống
+uv run python scripts/spike_llm.py --cap 80 --seed src/vgame/engine/data/replay-seed.json \
+  grounded-citation:ref grounded-citation:starter wait:65 \
+  chunk-tuning:ref chunk-tuning:starter wait:65 \
+  article-number-lookup:ref article-number-lookup:starter
+```
 
 ## 4. Đề xuất
 
