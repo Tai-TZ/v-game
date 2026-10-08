@@ -70,6 +70,38 @@ tháng, mỗi lần build khoảng 3–5 phút.
 Không cần đổi CORS ở backend: trình duyệt chỉ gọi `vgame.ai20k.cloud/api/*`, Vercel chuyển tiếp
 phía máy chủ.
 
+## CI/CD: push là tự deploy
+
+```mermaid
+flowchart LR
+  PR[Push nhánh + mở PR] --> CI1[CI + Security]
+  PR --> PV[Vercel preview]
+  CI1 --> M[Merge vào main]
+  M --> CI2[CI + Security trên main]
+  M --> VP[Vercel production]
+  CI2 -->|xanh, có đổi backend/ hoặc docs/content/| RD[Render deploy API]
+  VP --> SM[Deploy smoke test]
+```
+
+- **Mỗi PR:** GitHub Actions chạy CI (format, lint, type, unit, build, e2e, kiểm tên thương hiệu) và
+  Security (gitleaks, semgrep, osv-scanner). Vercel dựng một bản preview riêng cho PR.
+- **Merge vào `main`:** Vercel deploy production ngay. Render chỉ deploy API khi CI trên commit đó
+  xanh và phần API có đổi (`render.yaml`).
+- **Sau mỗi lần Vercel deploy production:** workflow `Deploy smoke test`
+  (`.github/workflows/deploy-smoke.yml`) gọi trang thật: trang chủ, `/play`, header bảo mật, chỉ
+  theme công khai được phục vụ, `/api/health` (chờ tối đa 4 phút cho API thức dậy) và `/api/zones`.
+  Nó cũng chạy mỗi sáng 07:00 và chạy tay được (tab Actions → Deploy smoke test → Run workflow).
+  Lỗi thì GitHub gửi email cho chủ repo.
+- **Chặn production khi CI đỏ (làm một lần trên Vercel):** Project → **Settings → Deployment
+  Checks** → thêm các check của GitHub Actions `Frontend checks`, `End-to-end tests` và
+  `Brand isolation`. Vercel giữ bản production lại, chỉ gắn vào tên miền khi các check đó xanh.
+  Nếu gói Hobby không có mục này thì luồng vẫn chạy, chỉ là Vercel deploy song song với CI.
+- **Khi có tên miền riêng:** đặt biến repo `PRODUCTION_URL` (GitHub → Settings → Secrets and
+  variables → Actions → Variables) thành `https://vgame.ai20k.cloud`; mặc định smoke test dùng
+  `https://v-game-theta.vercel.app`.
+- **Quay lại bản trước:** Vercel → Deployments → **Instant Rollback**; Render → service →
+  Events → chọn bản deploy cũ → **Rollback**.
+
 ## Cập nhật
 
 Merge vào `main` thì Vercel tự deploy lại; Render chỉ deploy khi CI xanh và phần API đổi (xem mục "Giữ Render ở mức 0 đồng"). Thử bản Vercel trên máy:
