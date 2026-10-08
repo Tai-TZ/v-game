@@ -11,17 +11,21 @@ dependencies = [
     "pydantic-settings==2.15.0",
     "langgraph==1.2.14",
     "google-genai==2.28.0",
-    "fastembed==0.8.1",
     "rank-bm25==0.2.2",
     "numpy==2.5.3",
 ]
 
 [project.scripts]
-# Precompute the 24 index variants, query embeddings and model files into ENGINE_CACHE_DIR.
+# Precompute the 24 index variants, question vectors and rerank scores into INDEX_DIR (default:
+# the shipped src/vgame/engine/data/index). Needs the "models" group (in dev, so `uv sync`).
 vgame-build-index = "vgame.engine.index:main"
 
 [dependency-groups]
+# Offline only (vgame-build-index, slow tests): e5 + jina through onnxruntime. The server
+# installs with `uv sync --no-dev` and never loads a model (engine-v0.2.md §14, 2026-10-08).
+models = ["fastembed==0.8.1"]
 dev = [
+    { include-group = "models" },
     "ruff==0.16.10",
     "mypy==2.4.0",
     "pytest==9.1.1",
