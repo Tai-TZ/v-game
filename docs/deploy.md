@@ -25,12 +25,13 @@ monitor HTTP 5 phút trên [UptimeRobot](https://uptimerobot.com) trỏ vào `/a
 chạy cả tháng vẫn nằm trong 750 giờ miễn phí).
 
 Thời tiết trên bản đồ (`/api/weather`) lấy từ [Open-Meteo](https://open-meteo.com/): miễn phí, không
-cần key, chỉ dùng phi thương mại, dữ liệu theo giấy phép CC BY 4.0 nên HUD luôn ghi nguồn kèm link
-ngay cạnh chỗ hiện thời tiết. API gọi Open-Meteo phía máy chủ (cache 15 phút, nên chỉ vài lần một giờ)
+cần key, chỉ dùng phi thương mại, dữ liệu theo giấy phép CC BY 4.0 nên HUD ghi nguồn kèm link trong
+popover thời tiết. API gọi Open-Meteo phía máy chủ (cache 15 phút, nên chỉ vài lần một giờ)
 cho toạ độ khuôn viên, mặc định Hà Nội; `WEATHER_LATITUDE`/`WEATHER_LONGITUDE` chỉ dùng khi đổi thành
-phố và phải đổi cùng `place` của theme. `render.yaml` không cần thêm gì. Khi API đang ngủ hoặc
-Open-Meteo lỗi, `/api/weather` trả 503 và bản đồ chỉ mất phần thời tiết: bình minh, ban ngày, hoàng hôn,
-ban đêm vẫn đúng vì trình duyệt tự tính theo đồng hồ của mình.
+phố và phải đổi cùng `place` của theme. `render.yaml` không cần thêm gì. Open-Meteo lỗi thì API trả
+giá trị gần nhất (tối đa 3 giờ), không có thì 503; client im lặng giữ cảnh theo giờ, nên khi API ngủ
+hay lỗi thì bình minh, ban ngày, hoàng hôn, ban đêm vẫn đúng vì trình duyệt tự tính theo đồng hồ của
+mình.
 
 ### Giữ Render ở mức 0 đồng
 
