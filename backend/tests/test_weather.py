@@ -181,6 +181,10 @@ def _timeout(request: httpx.Request) -> httpx.Response:
     raise httpx.ConnectTimeout("slow", request=request)
 
 
+def _boom(_: httpx.Request) -> httpx.Response:
+    raise RuntimeError("secret detail")
+
+
 @pytest.mark.parametrize(
     "reply",
     [
@@ -210,6 +214,44 @@ def test_failed_refresh_serves_last_good_as_stale_and_backs_off(
     assert first.headers["cache-control"] == "public, max-age=60"
     assert len(upstream.requests) == 2
     assert "<html>" not in caplog.text  # the warning never quotes the upstream body
+
+
+def test_unexpected_refresh_error_still_serves_last_good(
+    client: TestClient, upstream: Upstream, clock: Clock, caplog: pytest.LogCaptureFixture
+) -> None:
+    client.get("/api/weather")
+    upstream.reply = _boom
+    clock.t += timedelta(minutes=16)
+
+    response = client.get("/api/weather")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "public, max-age=60"
+    assert "secret detail" not in caplog.text  # type name only
+
+
+def test_upstream_time_with_an_offset_is_converted_to_utc(
+    client: TestClient, upstream: Upstream
+) -> None:
+    upstream.reply = reply_with(time="2026-10-08T14:00+07:00")
+    assert client.get("/api/weather").json()["updated_at"] == "2026-10-08T07:00:00Z"
+
+
+@pytest.mark.parametrize("time", ["2020-01-01T00:00", "2026-10-08T10:01"])
+def test_implausible_observation_time_is_a_failed_fetch(
+    client: TestClient, upstream: Upstream, time: str
+) -> None:
+    upstream.reply = reply_with(time=time)  # clock is 07:00Z; 3 h either side is plausible
+    assert client.get("/api/weather").status_code == 503
+
+
+def test_clock_stepping_back_does_not_freeze_the_cache(
+    client: TestClient, upstream: Upstream, clock: Clock
+) -> None:
+    client.get("/api/weather")
+    clock.t -= timedelta(hours=1)
+    client.get("/api/weather")
+    assert len(upstream.requests) == 2
 
 
 def test_no_value_yet_answers_503_without_details(client: TestClient, upstream: Upstream) -> None:

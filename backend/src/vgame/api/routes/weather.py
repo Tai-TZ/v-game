@@ -16,7 +16,7 @@ from typing import Annotated, Final, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,12 @@ class _Current(BaseModel):
     temperature_2m: float = Field(ge=-90, le=60)
     weather_code: int
 
+    @field_validator("time")
+    @classmethod
+    def _to_utc(cls, value: datetime) -> datetime:
+        # Convert, never relabel: an offset (someone adds `timezone=`) must not shift the time.
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
 
 class _Forecast(BaseModel):
     current: _Current
@@ -90,22 +96,25 @@ class WeatherService:
             async with self._lock:
                 if self._due():
                     await self._refresh()
-        now = self._now()
-        if self._good is None or now - self._good[0] > MAX_STALE:
+        if self._good is None or self._age(self._good[0]) > MAX_STALE:
             return None
         fetched_at, cur = self._good
         body = WeatherResponse(
             condition=WMO_GROUP.get(cur.weather_code, "cloudy"),
             temperature_c=round(cur.temperature_2m, 1),
-            updated_at=cur.time.replace(tzinfo=UTC),
+            updated_at=cur.time,
         )
-        return body, now - fetched_at > FRESH_FOR
+        return body, self._age(fetched_at) > FRESH_FOR
+
+    def _age(self, then: datetime | None) -> timedelta:
+        """Time since `then`. Never, or in the future (the clock stepped back): infinitely old."""
+        age = timedelta.max if then is None else self._now() - then
+        return age if age >= timedelta(0) else timedelta.max
 
     def _due(self) -> bool:
-        now = self._now()
-        fresh = self._good is not None and now - self._good[0] <= FRESH_FOR
-        resting = self._attempted_at is not None and now - self._attempted_at < MIN_GAP
-        return not fresh and not resting
+        return self._age(self._good[0] if self._good else None) > FRESH_FOR and (
+            self._age(self._attempted_at) >= MIN_GAP
+        )
 
     async def _refresh(self) -> None:
         # Set before the call: even an unexpected error cannot turn traffic into a retry storm.
@@ -118,12 +127,15 @@ class WeatherService:
                 response = await client.get(OPEN_METEO_URL, params=self._params)
                 response.raise_for_status()
             cur = _Forecast.model_validate_json(response.content).current
-        except (httpx.HTTPError, TimeoutError, ValidationError) as exc:
+        except Exception as exc:  # any failure keeps the last good value (stale-on-error)
             # Type and status only: str(ValidationError) quotes the upstream body.
             status_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else ""
             logger.warning(
                 "weather: Open-Meteo fetch failed: %s %s", type(exc).__name__, status_code
             )
+            return
+        if abs(attempted_at - cur.time) > MAX_STALE:  # served as "now", so it must be near now
+            logger.warning("weather: Open-Meteo fetch failed: implausible time")
             return
         if cur.weather_code not in WMO_GROUP:
             logger.warning("weather: unknown WMO code %d, shown as cloudy", cur.weather_code)
