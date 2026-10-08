@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { buttonClass } from "~/components/ui/button";
 import { ChevronLeftIcon } from "~/components/ui/icons";
 import { ThemeToggle } from "~/features/theme/ThemeToggle";
+import { AUTHOR } from "~/lib/site";
 
 import type { ZonePageData } from "./api";
 import type { Zone } from "./schema";
@@ -27,6 +28,9 @@ function Frame({ back, children }: { back: string; children: ReactNode }) {
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{children}</main>
+      <footer className="mx-auto max-w-3xl px-4 pb-10 sm:px-6">
+        <p className="border-t border-line pt-5 text-xs text-fg-muted">V-Game · {AUTHOR}</p>
+      </footer>
     </>
   );
 }

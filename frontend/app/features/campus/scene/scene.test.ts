@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseThemeIndex, parseThemeManifest, type ThemeManifest } from "~/features/theme/schema";
 
+import { CONTENT, toScreen } from "../camera";
 import { desaturate, palette, shade } from "./palette";
 import { triangleCount } from "./primitives";
 import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
@@ -65,8 +66,8 @@ describe("baked lighting (art §2.3)", () => {
         expect(Math.abs(((a >> shift) & 255) - ((e >> shift) & 255))).toBeLessThanOrEqual(1);
       }
     };
-    near(pal.soil, "#81966f");
-    near(pal.lit, "#d5b985");
+    near(pal.soil, "#74895b");
+    near(pal.lit, "#ddba8b");
     near(pal.xray, "#b3baca");
     near(desaturate(pal.wt.roof), "#222936");
   });
@@ -75,11 +76,25 @@ describe("baked lighting (art §2.3)", () => {
 describe.each(manifests.map((m) => [m.id, m] as const))(
   "scene budget, theme %s",
   (_id, manifest) => {
-    it("stays well inside 40 draw calls and 60k triangles (target 13 / 9k)", () => {
+    it("stays well inside 40 draw calls and 60k triangles (target 13 / ≈14.8k)", () => {
       const { result, unmount } = build(manifest);
       const budget = sceneBudget(result.current);
       expect(budget.drawCalls).toBeLessThanOrEqual(16);
-      expect(budget.triangles).toBeLessThanOrEqual(12_000);
+      expect(budget.triangles).toBeLessThanOrEqual(20_000);
+      unmount();
+    });
+
+    it("keeps the landmark and terrain under the top of the camera framing", () => {
+      const { result, unmount } = build(manifest);
+      for (const geometry of [result.current.landmark, result.current.terrain]) {
+        const position = geometry.getAttribute("position");
+        let top = -Infinity;
+        for (let i = 0; i < position.count; i += 1) {
+          const { x, y, z } = { x: position.getX(i), y: position.getY(i), z: position.getZ(i) };
+          top = Math.max(top, toScreen(x, y, z).sy);
+        }
+        expect(top).toBeLessThanOrEqual(CONTENT.maxY);
+      }
       unmount();
     });
 

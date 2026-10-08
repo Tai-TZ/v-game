@@ -10,7 +10,7 @@
     "build": "react-router build && node scripts/check-bundle.mjs && node scripts/postbuild-csp.mjs",
     "preview": "node scripts/serve-build.mjs",
     "typecheck": "react-router typegen && tsc",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "react-router typegen && eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

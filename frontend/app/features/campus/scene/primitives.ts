@@ -55,8 +55,18 @@ export function circle(r: number, seg: number, x: number, y: number, z: number) 
   return flat(new CircleGeometry(r, seg), x, y, z);
 }
 
-export function ring(rIn: number, rOut: number, seg: number, x: number, y: number, z: number) {
-  return flat(new RingGeometry(rIn, rOut, seg), x, y, z);
+/** Flat ring; after laying it down, θ points to (cos θ, −sin θ), so 7π/6 + 2π/3 is the +z arc. */
+export function ring(
+  rIn: number,
+  rOut: number,
+  seg: number,
+  x: number,
+  y: number,
+  z: number,
+  thetaStart = 0,
+  thetaLength = Math.PI * 2,
+) {
+  return flat(new RingGeometry(rIn, rOut, seg, 1, thetaStart, thetaLength), x, y, z);
 }
 
 export function rect(x0: number, x1: number, z0: number, z1: number, y: number) {
@@ -81,28 +91,6 @@ export function arch(face: Face, plane: number, u: number, v: number, r: number)
 
 export function disc(face: Face, plane: number, u: number, v: number, r: number, seg: number) {
   return onFace(new CircleGeometry(r, seg), face, plane, u, v);
-}
-
-/** Triangular prism with its ridge along x (gable roof): 8 triangles, wound outwards. */
-export function prismX(
-  x0: number,
-  x1: number,
-  z0: number,
-  z1: number,
-  yBase: number,
-  yRidge: number,
-) {
-  const zm = (z0 + z1) / 2;
-  const a = [x0, yBase, z0];
-  const b = [x0, yBase, z1];
-  const c = [x0, yRidge, zm];
-  const d = [x1, yBase, z0];
-  const e = [x1, yBase, z1];
-  const f = [x1, yRidge, zm];
-  const triangles = [a, b, c, d, f, e, b, e, f, b, f, c, a, c, f, a, f, d, a, d, e, a, e, b];
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(triangles.flat(), 3));
-  return geometry;
 }
 
 /** Annular sector following the colonnade curve around the plaza, extruded from y0 to y1. */

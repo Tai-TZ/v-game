@@ -74,5 +74,5 @@
 
   /* Absolute: a url() inside a custom property resolves against the stylesheet that uses it. */
   --vg-footer-image: url("/themes/vinuni/images/skyline.webp");
-  --vg-scene-sky: #dfeaf5;
+  --vg-scene-sky: #d7e7f3;
 }

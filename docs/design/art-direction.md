@@ -4,6 +4,7 @@
 - **Ràng buộc:** [build-brief-v0.1.md](build-brief-v0.1.md) (D5, D8, D9, §4 lời thoại, §5 ngân sách), `CLAUDE.md`, ADR 0002.
 - **Phạm vi:** cảnh 3D của `/play`, lớp HUD/DOM đè lên cảnh, trang `/play/:zoneId`. Không có engine, bàn thợ, đồ chơi.
 - **Đã kiểm chứng bằng blockout:** mọi số trong mục 3–6 đã được dựng thử bằng three 0.186 (bản dựng nháp ở scratchpad, không nằm trong repo) và chụp ở 1280×800, 375×812, cả hai theme. Số draw call và tam giác ở mục 6 là số đo được, không phải ước lượng.
+- **Cập nhật v0.2:** cảnh hub dựng theo [campus-scene-v0.2.md](campus-scene-v0.2.md); file đó thay thế §5.1–§5.7, §6.1, §6.4 của tài liệu này.
 - **Quy ước tên:** "theme campus" là theme pack mặc định lấy cảm hứng từ trường thật (`public/themes/<campus>/`), "theme town" là `public/themes/town/`. Tài liệu này không ghi tên thương hiệu.
 
 ---

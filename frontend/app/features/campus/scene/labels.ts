@@ -1,10 +1,10 @@
 import { NPC_SPOT } from "../layout";
 
-/** World anchors of the DOM labels (art §5.10). */
+/** World anchors of the DOM labels (art §5.10, campus-scene v0.2 §2.3). */
 export const LABEL_ANCHORS = {
-  library: [-8.5, 4.1, 2.0],
-  watchtower: [8.8, 6.95, 1.7],
-  market: [0, 3.6, 7.6],
+  library: [-10.8, 2.9, -3.3],
+  watchtower: [10.6, 6.6, -4.8],
+  market: [9.0, 2.9, 3.9],
   lan: [NPC_SPOT.x, 1.85, NPC_SPOT.z],
 } as const satisfies Record<string, readonly [number, number, number]>;
 
