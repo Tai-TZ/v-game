@@ -4,7 +4,7 @@ import { OBSTACLES, SITES, SPAWN, WORLD_BOUNDS, type Box } from "./layout";
 import { isBlocked, keyboardDirection, nearestWithin, step, WALK_SPEED } from "./movement";
 
 const OPEN_FIELD: readonly Box[] = [];
-const BOUNDS = { halfX: 10, halfZ: 10 };
+const BOUNDS = { minX: -10, maxX: 10, minZ: -10, maxZ: 10 };
 
 describe("keyboardDirection", () => {
   it("returns null when no movement key is held", () => {
@@ -26,8 +26,16 @@ describe("step", () => {
     expect(first.moving).toBe(true);
     expect(first.position.x).toBeCloseTo(WALK_SPEED * 0.1);
 
-    const arrived = step({ x: 0.999, z: 0 }, { keys: [], target }, 0.1, OPEN_FIELD, BOUNDS);
-    expect(arrived.position).toEqual({ x: 0.999, z: 0 });
+    const arrived = step({ x: 0.95, z: 0 }, { keys: [], target }, 0.1, OPEN_FIELD, BOUNDS);
+    expect(arrived.position).toEqual(target); // snapped, so a next route leg starts on target
+    expect(arrived.targetDone).toBe(true);
+  });
+
+  it("does not snap onto a target inside an obstacle", () => {
+    const wall: Box = { x: 1.5, z: 0, halfX: 0.5, halfZ: 5 };
+    const target = { x: 0.7, z: 0 }; // 0.3 from the wall: blocked for the player's radius
+    const arrived = step({ x: 0.64, z: 0 }, { keys: [], target }, 0.1, [wall], BOUNDS);
+    expect(arrived.position).toEqual({ x: 0.64, z: 0 });
     expect(arrived.targetDone).toBe(true);
   });
 
@@ -61,6 +69,23 @@ describe("step", () => {
     expect(result.position.z).toBeGreaterThan(0);
   });
 
+  it("gives up a target inside a wall at the first wall either axis meets (QA r4)", () => {
+    const wall: Box = { x: 1, z: 0, halfX: 0.5, halfZ: 5 };
+    // x runs into the wall, z is free: a free target slides on, a blocked one ends here.
+    const blocked = step(
+      { x: 0.1, z: 0 },
+      { keys: [], target: { x: 1, z: 3 } },
+      0.1,
+      [wall],
+      BOUNDS,
+    );
+    expect(blocked.moving).toBe(true);
+    expect(blocked.targetDone).toBe(true);
+    const free = step({ x: 0.1, z: 0 }, { keys: [], target: { x: 3, z: 3 } }, 0.1, [wall], BOUNDS);
+    expect(free.moving).toBe(true);
+    expect(free.targetDone).toBe(false);
+  });
+
   it("abandons a click target that is completely blocked", () => {
     const wall: Box = { x: 0, z: 0, halfX: 5, halfZ: 5 };
     const result = step(
@@ -82,7 +107,7 @@ describe("step", () => {
       OPEN_FIELD,
       BOUNDS,
     );
-    expect(Math.abs(result.position.x)).toBeLessThanOrEqual(BOUNDS.halfX);
+    expect(result.position.x).toBeLessThanOrEqual(BOUNDS.maxX);
   });
 });
 

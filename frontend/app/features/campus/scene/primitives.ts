@@ -93,11 +93,22 @@ export function disc(face: Face, plane: number, u: number, v: number, r: number,
   return onFace(new CircleGeometry(r, seg), face, plane, u, v);
 }
 
-/** Annular sector following the colonnade curve around the plaza, extruded from y0 to y1. */
-export function arcSlab(rIn: number, rOut: number, a0: number, a1: number, y0: number, y1: number) {
+/**
+ * Annular sector around `centre` (the plaza: the colonnade curve), extruded from y0 to y1.
+ * Angle 0 points to -z, π/2 to +x.
+ */
+export function arcSlab(
+  rIn: number,
+  rOut: number,
+  a0: number,
+  a1: number,
+  y0: number,
+  y1: number,
+  centre: { x: number; z: number } = PLAZA,
+) {
   const SEGMENTS = 16;
   const point = (angle: number, r: number) =>
-    new Vector2(PLAZA.x + Math.sin(angle) * r, -(PLAZA.z - Math.cos(angle) * r));
+    new Vector2(centre.x + Math.sin(angle) * r, -(centre.z - Math.cos(angle) * r));
   const outline: Vector2[] = [];
   for (let i = 0; i <= SEGMENTS; i += 1) outline.push(point(a0 + ((a1 - a0) * i) / SEGMENTS, rOut));
   for (let i = SEGMENTS; i >= 0; i -= 1) outline.push(point(a0 + ((a1 - a0) * i) / SEGMENTS, rIn));
@@ -146,6 +157,8 @@ export interface PartStyle {
   ao?: boolean;
   /** Lit from inside: skip baked shading (windows, lamps, clock face). */
   emissive?: boolean;
+  /** Distance haze: after shading, pull this far towards white (back of campus, v0.3 §5.2). */
+  haze?: number;
 }
 
 const normal = new Vector3();
@@ -180,9 +193,10 @@ export function part(source: BufferGeometry, style: PartStyle, mode: "baked" | "
       k = shade(normal);
       if (style.ao && Math.abs(normal.y) < 0.5 && position.getY(i) <= minY + 0.001) k *= 0.82;
     }
-    colors[i * 3] = base.r * k;
-    colors[i * 3 + 1] = base.g * k;
-    colors[i * 3 + 2] = base.b * k;
+    const haze = style.haze ?? 0;
+    colors[i * 3] = base.r * k + (1 - base.r * k) * haze;
+    colors[i * 3 + 1] = base.g * k + (1 - base.g * k) * haze;
+    colors[i * 3 + 2] = base.b * k + (1 - base.b * k) * haze;
   }
   geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
   if (mode === "baked") geometry.deleteAttribute("normal");

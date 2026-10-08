@@ -1,13 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { cameraCentre, desiredCentre, groundFromScreen, toScreen, viewFor } from "./camera";
+import {
+  cameraCentre,
+  CONTENT,
+  desiredCentre,
+  groundFromScreen,
+  toScreen,
+  viewFor,
+} from "./camera";
 
-describe("viewFor (art §4.3)", () => {
-  it("uses overview at 1280×800 with zoom 32.8", () => {
+describe("viewFor (art §4.3, campus-scene v0.3 §4.2)", () => {
+  it("uses overview at 1280×800 with zoom 26.9", () => {
     const view = viewFor(1280, 800);
     expect(view.mode).toBe("overview");
-    expect(Math.abs(view.zoom - 32.8)).toBeLessThanOrEqual(0.1);
+    expect(Math.abs(view.zoom - 26.9)).toBeLessThanOrEqual(0.1);
     expect(view.insetTop).toBe(0);
+  });
+
+  it("keeps common laptops in overview and drops 1024×768 to follow", () => {
+    const short = viewFor(1366, 657);
+    expect(short.mode).toBe("overview");
+    expect(Math.abs(short.zoom - 22.7)).toBeLessThanOrEqual(0.1);
+    expect(viewFor(1536, 730).mode).toBe("overview");
+    expect(viewFor(1280, 720).mode).toBe("overview");
+    expect(viewFor(1024, 768).mode).toBe("follow");
   });
 
   it("uses follow at 375×812 with zoom 29.8", () => {
@@ -45,8 +61,10 @@ describe("follow camera", () => {
     expect(desiredCentre({ sx: 0, sy: 0 }, { sx: 0.5, sy: 0.5 }, view).sx).toBe(0);
   });
 
-  it("only slides sideways on a portrait phone (the model fits vertically)", () => {
-    expect(desiredCentre({ sx: 0, sy: 0 }, { sx: 0, sy: 9 }, view).sy).toBeCloseTo(0.15);
+  it("slides up on a portrait phone, but not past the back of the model", () => {
+    const next = desiredCentre({ sx: 0, sy: 0 }, { sx: 0, sy: 9 }, view);
+    expect(next.sy).toBeCloseTo(CONTENT.maxY - (812 - 72) / (2 * view.zoom));
+    expect(next.sy).toBeCloseTo(2.42, 1);
   });
 
   it("is pushed by exactly the overshoot when the focus leaves the dead-zone", () => {
@@ -57,7 +75,7 @@ describe("follow camera", () => {
 
   it("never shows past the edge of the model", () => {
     const next = desiredCentre({ sx: 0, sy: 0 }, { sx: 100, sy: 0 }, view);
-    expect(next.sx + 375 / (2 * view.zoom)).toBeCloseTo(18.46);
+    expect(next.sx + 375 / (2 * view.zoom)).toBeCloseTo(CONTENT.maxX);
   });
 
   it("shifts the camera so the visible centre sits below the top HUD", () => {

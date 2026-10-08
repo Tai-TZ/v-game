@@ -3,6 +3,7 @@
 - **Ngày:** 2026-10-07 · **Chủ sở hữu file:** art. Coder đọc và dựng theo, không cần hỏi lại số.
 - **Nguồn:** [../research/vinuni-campus-reference.md](../research/vinuni-campus-reference.md) (mặt bằng OSM, tỷ lệ tháp §2.2, hàng cột §2.4, màu §2.6), ảnh tham chiếu trong scratchpad của phiên (không đưa vào repo), [art-direction.md](art-direction.md), [build-brief-v0.1.md](build-brief-v0.1.md) §5.
 - **Thay thế:** art-direction §5.1–§5.7, §6.1 và §6.4, §2.1 cho các bề mặt mới. Các mục còn lại của art-direction vẫn giữ nguyên: §1 tinh thần, §2.2–§2.5 công thức màu, §3 ánh sáng, §4 camera, §5.8–§5.10 người và nhãn, §7 chuyển động, §8 HUD.
+- **Bị thay một phần bởi [campus-scene-v0.3.md](campus-scene-v0.3.md)** (cổng ba vòm, khuôn viên phía sau): §1 mục 2 và 7, §2.1, các khối `WORLD_BOUNDS`, `ROUND_TREES`, hồ, `LAKE_BLOCKS`, `OBSTACLES` trong §2.2, §2.4, §3, các dòng T1, T2, W1, W2 của §5.1, §5.9, gạch đầu dòng cuối của §6, §7 và câu hỏi về cổng ở §9.
 - **Đã kiểm bằng blockout:** script Python dựng lại mọi footprint, vật cản và khối chính trong file này. Script mô phỏng `step()` của `movement.ts` cho mọi cặp điểm tương tác, rồi vẽ isometric ở 1280×800 và 375×812 cho cả hai theme. Script và ảnh nằm ở scratchpad (`v02/blockout.py`), không nằm trong repo. Số tam giác ở §7 là số đếm theo công thức primitive của three.js. Coder đo lại bằng `sceneBudget()`.
 
 ---
@@ -40,7 +41,7 @@ z=+10 └───────────────────────�
      x=−14                         x=0                            x=+14
 ```
 
-Đối chiếu với thực tế (§2.1 của tài liệu nghiên cứu): Vườn Hồng nằm phía tây quảng trường đài phun (`−x`), hồ uốn quanh phía nam và đông nam (`+x, +z`). Hai đầu cánh nhô về phía trước tạo chữ U nông, đúng như ảnh chụp từ trên cao. Các phần bỏ qua có chủ đích: cổng ba vòm (vị trí chưa chắc), sân vận động, nhà thể thao, ký túc xá, mái vòm tòa B, các tháp chung cư bên ngoài. Tất cả đều nằm ngoài khung hình hoặc ngoài đế sa bàn.
+Đối chiếu với thực tế (§2.1 của tài liệu nghiên cứu): Vườn Hồng nằm phía tây quảng trường đài phun (`−x`), hồ uốn quanh phía nam và đông nam (`+x, +z`). Hai đầu cánh nhô về phía trước tạo chữ U nông, đúng như ảnh chụp từ trên cao. Các phần bỏ qua có chủ đích ở v0.2: cổng ba vòm, sân vận động, nhà thể thao, ký túc xá, mái vòm tòa B, các tháp chung cư bên ngoài. v0.3 dựng thêm cổng (vị trí đã xác nhận ở tài liệu nghiên cứu §2.7.1), sân vận động và hội trường B.
 
 ### 2.2 Hằng số (thay khối tương ứng trong `layout.ts`)
 
@@ -489,5 +490,5 @@ Giữ nguyên art §5.8–§5.10. Chỉ đổi vị trí và neo theo §2.
 
 ## 9. Câu hỏi mở
 
-- Cổng ba vòm: chưa dựng vì vị trí chưa chắc (tài liệu nghiên cứu §3). Nếu muốn dựng thì đặt ở mép trước, giữa hai đèn `(±3.25, 8.85)`, rộng khoảng 4 u, theo archetype `colonnades`. Ước thêm khoảng 300 tam giác. Cần người chủ dự án quyết.
+- Cổng ba vòm: đã giải quyết. Vị trí đã xác nhận (tài liệu nghiên cứu §2.7.1): cổng đứng trên trục, ngay trên hàng rào ranh giới, phía trước quảng trường đài phun, có đường vòng chạy giữa cổng và hàng cột. Không đặt giữa hai đèn `(±3.25, 8.85)` như ghi chú cũ. v0.3 §6.2 dựng cổng ở mép trước của đế đã kéo dài (`z 11.44–12.6`, rộng 5,6 u), cùng hàng rào hai bên, theo cờ `colonnades`.
 - Kim tháp hiện màu `lm.wall`, trắng như thật. Nếu muốn kim mang màu nhận diện của theme thì đổi sang `lm.roof`. Việc này không cần đổi code dựng hình khác.

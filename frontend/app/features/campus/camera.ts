@@ -25,8 +25,16 @@ export interface View {
 /** Distance from the look-at point along (1, 1, 1); 34.641 × √3 = 60. */
 export const CAMERA_OFFSET = 34.641;
 
-/** Screen-space bounds of the whole model (base, trees, landmark), measured on the blockout. */
-export const CONTENT = { minX: -18.46, maxX: 18.46, minY: -11.31, maxY: 11.61 } as const;
+/**
+ * Screen-space bounds of the whole model: the corners of the base and its plate, rounded
+ * outwards (campus-scene v0.3 §4.1).
+ */
+export const CONTENT = { minX: -19.73, maxX: 26.03, minY: -12.05, maxY: 14.82 } as const;
+/**
+ * Pixels kept free of scenery at both top corners in overview: HubTopBar lg:top-6 + h-11 + 8
+ * high; wide enough for "Các khu" plus the theme switch with the longest theme name (≈ 315 px).
+ */
+export const HUD_CORNER = { width: 320, height: 76 } as const;
 
 const PAD = 24;
 const FOLLOW_INSET_TOP = 72;
@@ -47,7 +55,7 @@ export function viewFor(width: number, height: number, insetBottom = 0): View {
   const spanX = CONTENT.maxX - CONTENT.minX;
   const spanY = CONTENT.maxY - CONTENT.minY;
   const fit = Math.min((width - 2 * PAD) / spanX, (height - 2 * PAD) / spanY);
-  if (fit >= 26) {
+  if (fit >= 22) {
     return {
       width,
       height,
