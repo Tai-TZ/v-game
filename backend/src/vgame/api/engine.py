@@ -12,10 +12,15 @@ from vgame.config import Settings
 from vgame.engine.budget import DailyCap
 from vgame.engine.corpus import load_documents
 from vgame.engine.grading import GradingSpec, load_grading_spec
-from vgame.engine.index import IndexNotBuiltError, IndexStaleError, IndexStore, golden_questions
+from vgame.engine.index import (
+    IndexNotBuiltError,
+    IndexStaleError,
+    IndexStore,
+    golden_questions,
+    rerank_questions,
+)
 from vgame.engine.llm import build_llm_client
-from vgame.engine.replay import ReplayStore
-from vgame.engine.retrieval import FastReranker, RerankerUnavailableError
+from vgame.engine.replay import SEED_PATH, ReplayStore
 from vgame.engine.run_store import RunStore
 from vgame.engine.types import LLMClient, LLMNotConfiguredError, Reranker
 
@@ -54,33 +59,34 @@ def _spec(content_dir: Path, level_id: str) -> GradingSpec:
 
 
 def build_engine(settings: Settings) -> EngineServices:
-    """Never raises for missing setup (no index, no models, no key): logs and degrades."""
+    """Never raises for missing setup (no index, no key): logs and degrades. Loads no ML model:
+    question vectors and rerank scores were computed by vgame-build-index (§14, 2026-10-08)."""
     cache_dir = settings.engine_cache_dir
     store: IndexStore | None = None
     index_stale = False
     try:
-        loaded = IndexStore.load(cache_dir / "index")
+        loaded = IndexStore.load(settings.index_dir)
         content = settings.content_dir
-        loaded.check_fresh(load_documents(content), golden_questions(content))
+        loaded.check_fresh(
+            load_documents(content), golden_questions(content), rerank_questions(content)
+        )
         store = loaded
     except IndexNotBuiltError:
         logger.warning("engine index not built; run `uv run vgame-build-index`")
-    except IndexStaleError as exc:  # gold offsets and question vectors would be wrong
+    except IndexStaleError as exc:  # gold offsets, question vectors or rerank scores are wrong
         index_stale = True
         logger.warning("engine index is stale (%s); rerun `uv run vgame-build-index`", exc)
-
-    reranker: Reranker | None = None
-    if store is not None:  # vgame-build-index downloads the reranker with the index
-        try:
-            reranker = FastReranker(settings.rerank_model, cache_dir / "models")
-        except RerankerUnavailableError:
-            logger.warning("reranker %s not available locally", settings.rerank_model)
+    reranker: Reranker | None = store.rerank if store is not None else None
 
     llm: LLMClient | None = None
     replay: ReplayStore | None = None
     if settings.gemini_api_key is not None:
         cache_dir.mkdir(parents=True, exist_ok=True)
         replay = ReplayStore(cache_dir / "replay.sqlite3")
+        # Real answers for every Library reference and starter graph: those runs cost no call.
+        # WARNING: uvicorn shows only WARNING+ of app loggers, and Render's log is the owner's
+        # only sign that the seed loaded.
+        logger.warning("replay seed: %d answers added", replay.import_seed(SEED_PATH))
         try:
             llm = build_llm_client(
                 settings, daily_cap=DailyCap(settings.daily_llm_call_cap), store=replay

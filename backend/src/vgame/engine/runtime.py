@@ -11,6 +11,7 @@ import time
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 from vgame.engine.blocks import EngineDeps
@@ -18,7 +19,7 @@ from vgame.engine.budget import RunBudget
 from vgame.engine.compiler import RECURSION_LIMIT, CaseContext, CaseState, CompiledLevelGraph
 from vgame.engine.constants import CASE_DEADLINE_S, MAX_CONCURRENT_CASES, RUN_DEADLINE_S
 from vgame.engine.index import IndexNotBuiltError, IndexStaleError
-from vgame.engine.llm import case_deadline
+from vgame.engine.llm import case_deadline, seconds_until_pacific_midnight
 from vgame.engine.retrieval import RerankerUnavailableError
 from vgame.engine.types import (
     BlockType,
@@ -42,9 +43,7 @@ logger = logging.getLogger(__name__)
 
 INTERNAL_ERROR_VI = "Máy chủ gặp lỗi khi chạy lượt này. Bạn thử chạy lại nhé."
 CANCELLED_VI = "Lượt chạy bị dừng giữa chừng. Bạn thử chạy lại nhé."
-LLM_UNAVAILABLE_VI = (
-    "Dịch vụ AI đang quá tải hoặc hết lượt hôm nay, lượt này không tính. Hãy thử lại sau."
-)
+VIETNAM_UTC_OFFSET = timedelta(hours=7)  # no daylight saving time
 _RETRIEVERS: frozenset[BlockType] = frozenset({"vector_search", "bm25_search"})
 
 
@@ -126,16 +125,34 @@ async def _run_case(run: _Run, case: PublicCase) -> CaseTrace:
     return CaseTrace(case, status, steps, answer, usage, ms)
 
 
+def llm_unavailable_vi(daily_cap_hit: bool, now: datetime) -> str:
+    """run.failed{llm_unavailable}: says when calls come back, in Vietnam time. Our DailyCap
+    resets at 00:00 UTC (7:00); Gemini's per-day quotas at midnight Pacific time."""
+    if daily_cap_hit:
+        return (
+            "Máy chủ đã dùng hết lượt gọi AI miễn phí của hôm nay nên lượt này không tính. "
+            "Lượt gọi mở lại lúc 7 giờ sáng (giờ Việt Nam). "
+            "Đồ thị khởi đầu, nếu chưa sửa, vẫn chạy được vì đã có kết quả lưu sẵn."
+        )
+    reset = now + timedelta(seconds=seconds_until_pacific_midnight(now)) + VIETNAM_UTC_OFFSET
+    return (
+        "Dịch vụ AI miễn phí đang quá tải hoặc đã hết hạn mức của hôm nay nên lượt này không "
+        "tính. Bạn thử lại sau khoảng 1 phút; nếu vẫn lỗi thì hạn mức mở lại lúc "
+        f"{reset:%H:%M} (giờ Việt Nam)."
+    )
+
+
 def _llm_unavailable(traces: Sequence[CaseTrace], daily_cap_hit: bool) -> bool:
-    """No LLM call answered in any case and at least one case failed on the provider side:
-    a provider outage, not a 0-star attempt. A timeout counts only if it hit the llm step (a
-    case that ran out of time in rerank never called the AI)."""
+    """The score would not be the player's: a case lost its answer to DailyCap or to the
+    provider (llm_error), even if other cases answered (replayed ones answer during an outage;
+    a rerun replays them for free). A timeout counts only when no case answered and it hit the
+    llm step: a slow graph is the player's, a case that ran out of time in rerank never called
+    the AI."""
+    if daily_cap_hit or any(t.status == "llm_error" for t in traces):
+        return True
     llm_steps = [s for t in traces for s in t.steps if s.block == "llm"]
     answered = any(s.status in ("ok", "refusal") for s in llm_steps)
-    failed = any(s.status == "timeout" for s in llm_steps) or any(
-        t.status == "llm_error" or (t.status == "skipped_budget" and daily_cap_hit) for t in traces
-    )
-    return not answered and failed
+    return not answered and any(s.status == "timeout" for s in llm_steps)
 
 
 async def run_level(
@@ -202,7 +219,8 @@ async def run_level(
             emit(_failed(run_id, "index_stale", IndexStaleError.message_vi))
             return
         if "llm" in compiled.blocks and _llm_unavailable(ordered, run.daily_cap_hit):
-            emit(_failed(run_id, "llm_unavailable", LLM_UNAVAILABLE_VI))
+            message = llm_unavailable_vi(run.daily_cap_hit, datetime.now(UTC))
+            emit(_failed(run_id, "llm_unavailable", message))
             return
         score = evaluator.score(ordered, ordered_grades)
         emit({"type": "run.scored", "run": run_id, "score": score})

@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 
 from vgame.engine.types import CaseGrade, LevelRules, StarResult
 
-_PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
+PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
 
 
 def compute_stars(
@@ -46,4 +46,4 @@ def compute_stars(
 def render(template: str, variables: Mapping[str, str]) -> str:
     """Replace ``{name}`` from ``variables``; unknown names stay as written. Never
     ``str.format``: templates and values are data, so ``{0}``/``{__class__}`` are harmless."""
-    return _PLACEHOLDER_RE.sub(lambda m: variables.get(m.group(1), m.group(0)), template)
+    return PLACEHOLDER_RE.sub(lambda m: variables.get(m.group(1), m.group(0)), template)

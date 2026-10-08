@@ -25,7 +25,7 @@
 | E2 | **Usage:** `input_tokens = usage_metadata.prompt_token_count` (đã gồm phần cache), `output_tokens = candidates_token_count + thoughts_token_count`. Metric sao 2 `tokens = input + output`. | Phản biện "đếm cache 2 lần"; thinking tính vào output (giá Gemini tính như output). |
 | E3 | **Tokenizer engine** `regex-v1`: `count_tokens = số khớp của \w+|[^\w\s]` (`constants.py`). Dùng cho `chunk_size`, ngân sách thùng, `pack.tokens`. Đo trên `qcdt-2024`: 13.792 token so với 13.649 của tokenizer XLM-R (multilingual-e5), lệch < 3 %. Token thật cho sao luôn lấy từ usage của nhà cung cấp. | "một tokenizer có tài liệu"; không cần mạng, test được. |
 | E4 | **Embedding:** fastembed `intfloat/multilingual-e5-large` (1024 chiều, giới hạn 512 token, MIT). Passage: `"passage: " + tiêu đề điều không kèm số + chữ đoạn đã bỏ dòng "Điều N. …"`; query: `"query: " + câu hỏi`. Manifest ghi `embed_model`, `fastembed_version`, `dim`, `tokenizer_id`, sha256 của kho. | Đề xuất của corpus README §2 (dense không thấy số hiệu, chỉ BM25 thấy). |
-| E5 | **Rerank:** fastembed `TextCrossEncoder` `jinaai/jina-reranker-v2-base-multilingual`, chỉ nạp từ cache cục bộ. **Dự phòng có tài liệu:** không có dự phòng ngầm. Thiếu model thì run có `rerank` báo `run.failed` (`rerank_unavailable`) bằng tiếng Việt; chất lượng kém với tiếng Việt thì đổi `RERANK_MODEL` sang model khác của fastembed. Rerank bằng LLM (Phần 3 §3.7) hoãn tới khi spike cho thấy cần. | Dự phòng ngầm (ví dụ dùng cosine) sẽ đảo bài học L3. |
+| E5 | **Rerank:** fastembed `TextCrossEncoder` `jinaai/jina-reranker-v2-base-multilingual`, **chạy offline** trong `vgame-build-index` (từ 2026-10-08, §14 khối "bản miễn phí"): mọi cặp (câu hỏi public của level cho phép `rerank`, `bm25_text` của mọi đoạn trong kho của level, cả 24 biến thể) được chấm sẵn vào bảng float32 `RerankTable` đi kèm code. Máy chủ không nạp model. **Dự phòng có tài liệu:** không có dự phòng ngầm. Bảng thiếu một cặp lúc khởi động thì cả index bị coi là cũ (`503 index_stale`); thiếu lúc chạy là `RerankScoreMissingError` (`index_error`, run kết thúc `run.failed{index_stale}`). Không có bảng thì run có `rerank` báo `run.failed` (`rerank_unavailable`) bằng tiếng Việt. Chất lượng kém với tiếng Việt thì đổi `RERANK_MODEL` sang model khác của fastembed rồi dựng lại. Rerank bằng LLM (Phần 3 §3.7) hoãn tới khi spike cho thấy cần. | Dự phòng ngầm (ví dụ dùng cosine) sẽ đảo bài học L3. |
 | E6 | **`only_in_force` nằm ở `chunker`** (tầng Index), không ở `vector_search`. Mọi retriever cắm vào index đó đều chỉ thấy văn bản còn hiệu lực. Đồ chơi "Kính lọc hiệu lực" của L2/L3 ánh xạ vào `chunker.only_in_force`. | Sửa lỗi phản biện (medium) "L3 không lọc được nhánh BM25". |
 | E7 | **Kho theo level ở tầng Index:** `IndexHandle.docs` = `corpus` của level. L1, L3 = `{qcdt-2024}`; L2 = `{qcdt-2024, qcdt-2019}`. Biến thể index được tính một lần cho cả hai văn bản; handle lọc hàng. | D7. |
 | E8 | **Ngân sách thùng** (`context_packer.token_budget`) tính **tài liệu + câu hỏi**. Khung nền và system prompt của người chơi không nằm trong ngân sách; bước `llm` báo `system_tokens`. | Packer không phải biết prompt của khối phía sau. |
@@ -34,7 +34,7 @@
 | E11 | **Không làm ấm prompt cache**, không ghi "cache hit 0 %". | Phản biện (low). |
 | E12 | **G07 đếm lời gọi theo cấu trúc** (số khối `llm` trên đường tới output × 1 lời gọi ≤ 12, số khối LLM ≤ 8). `RunBudget` lúc chạy là trần thật. Test: mọi `starter_graph`, `reference_graph`, `naive_graphs` đều qua G07. | Phản biện (high). |
 | E13 | **Không có guard** nên không có `halt`, không có conditional edge. DAG tĩnh, fan-in bằng `add_edge([a, b], c)` (barrier). `output` là node duy nhất nối tới `END`, chạy đúng một lần mỗi ca (đã thử: nhánh lệch độ dài vẫn chạy `out` một lần). | Phản biện (high) chỉ cắn khi có guard. |
-| E14 | **Câu hỏi của ca được embed sẵn** trong CLI (mọi ca của 3 file golden, kể cả ca ôn). Lúc chạy không embed gì. | Phần 3 §3.7; kịch bản "Đèn pin chỉ chiếu câu có sẵn". |
+| E14 | **Câu hỏi của ca được embed sẵn** trong CLI (mọi ca của 3 file golden, kể cả ca ôn), **điểm rerank cũng tính sẵn** (E5). Lúc chạy không embed, không chấm gì bằng model. | Phần 3 §3.7; kịch bản "Đèn pin chỉ chiếu câu có sẵn". |
 
 ## 3. Bản đồ module và quyền sở hữu
 
@@ -132,9 +132,18 @@ def chunk_id(variant: IndexVariant, doc_id: str, start: int, end: int) -> str: .
 ```python
 class IndexNotBuiltError(EngineError):   # message_vi: "Chưa dựng index. Chủ máy chủ cần chạy vgame-build-index."
     ...
+class RerankScoreMissingError(EngineError):  # step_status "index_error"; message_vi: "Bảng điểm xếp hạng lại chưa có câu hỏi hoặc đoạn này. …"
+    ...
+
+class RerankTable:                        # Reranker của máy chủ: điểm jina tính sẵn (float32, NaN = cặp không cần)
+    model_id: str
+    regime: dict[str, object]             # max_tokens, fastembed_version, onnxruntime_version của lần chấm
+    def get(self, question: str, text: str) -> float | None: ...
+    def score(self, query: str, texts: Sequence[str]) -> list[float]: ...   # thiếu cặp → RerankScoreMissingError
 
 class IndexStore:
-    manifest: dict[str, object]           # embed_model, fastembed_version, dim, tokenizer_id, corpus_sha256, built_at
+    manifest: dict[str, object]           # format 2, embed_model, fastembed_version, dim, tokenizer_id, corpus_sha256, built_at, variants
+    rerank: RerankTable | None
 
     @classmethod
     def build(cls, documents: Mapping[str, Document], embedder: Embedder,
@@ -144,15 +153,19 @@ class IndexStore:
     def save(self, index_dir: Path) -> None: ...
     def document(self, doc_id: str) -> Document: ...
     def chunks(self, handle: IndexHandle) -> tuple[Chunk, ...]: ...      # đã lọc docs + only_in_force
-    def vectors(self, handle: IndexHandle) -> Vectors: ...               # cùng thứ tự với chunks()
-    def bm25(self, handle: IndexHandle) -> BM25Okapi: ...                # lru theo handle
+    def vectors(self, handle: IndexHandle) -> Vectors: ...               # cùng thứ tự với chunks(); bản chép mới mỗi lần gọi
+    def bm25(self, handle: IndexHandle) -> BM25Okapi: ...                # LRU 4 handle (BM25_CACHE_SIZE)
     def query_vector(self, question: str) -> Vectors: ...                # 1-D; EngineError nếu chưa tính sẵn
 
+def check_fresh(self, documents, questions, rerank: RerankQuestions | None = None) -> None: ...  # IndexStaleError
+def rerank_questions(content_dir: Path) -> dict[str, frozenset[str]]: ...  # câu public của level cho phép rerank → kho của level
+def required_rerank_pairs(store: IndexStore, rerank: RerankQuestions) -> set[tuple[str, str]]: ...
+def build_rerank_table(store, reranker, rerank, *, reuse=None, log=print) -> RerankTable: ...
 def main(argv: Sequence[str] | None = None) -> int: ...   # script `vgame-build-index`
 ```
 
-- Artifact mỗi biến thể: `index/<variant.key>.json` (chunk + meta) và `.npy` (float32, đã chuẩn hoá). Câu hỏi: `index/queries.json` (sha256 của câu hỏi NFC → hàng) + `queries.npy`. `index/manifest.json`. Không dùng pickle.
-- CLI: đọc `Settings`, nạp kho từ `CONTENT_DIR`, câu hỏi từ ba file golden, tải model embedding và rerank về `ENGINE_CACHE_DIR/models`, dựng 24 biến thể, ghi artifact. In thống kê mỗi biến thể (số đoạn, token trung bình). Đoạn trùng chữ giữa các biến thể chỉ embed một lần.
+- Artifact (format 2, đi kèm code ở `backend/src/vgame/engine/data/index`, `INDEX_DIR`): `<variant.key>.json` (chunk + meta) của mỗi biến thể; `passages.json` (sha256 của từng chữ dense khác nhau, theo hàng) + `passages.npy` (float32, đã chuẩn hoá; chữ trùng giữa các biến thể chỉ một hàng: 2.203 đoạn, 952 hàng); câu hỏi: `queries.json` (sha256 của câu hỏi NFC → hàng) + `queries.npy`; rerank: `rerank.json` (model, `regime`, khoá câu hỏi, khoá `bm25_text`) + `rerank.npy` (float32 [câu, đoạn]); `manifest.json` ghi cuối. Không dùng pickle. float16 bị loại vì đảo hạng (engine-spike-report §3.4).
+- CLI (cần nhóm phụ thuộc `models`, có trong `uv sync`; thiếu thì in hướng dẫn tiếng Việt, mã 1): đọc `Settings`, nạp kho từ `CONTENT_DIR`, câu hỏi từ ba file golden, tải model embedding và rerank về `ENGINE_CACHE_DIR/models`, dựng 24 biến thể, chấm bảng rerank, ghi artifact vào `INDEX_DIR`. `--variant X` thêm X vào các biến thể đã có trong `INDEX_DIR` (không bao giờ thu index lại còn X, vì mặc định đó là index đi kèm code). Dùng lại vector đã có (cùng model, cùng `fastembed_version`) và điểm đã có (cùng model, cùng `regime`), chỉ tính phần mới. In thống kê mỗi biến thể, thời gian từng pha, cỡ file. Đoạn trùng chữ giữa các biến thể chỉ embed một lần.
 - `FastEmbedder(model_id, cache_dir)` và `FastReranker(model_id, cache_dir, local_files_only=True)` sống trong `retrieval.py` (dưới). Thêm tiền tố e5 (`query: ` / `passage: `) trong `FastEmbedder`, không trong `embed_text`.
 
 ### 5.4 A · `engine/retrieval.py`
@@ -176,7 +189,7 @@ class FastReranker: ...      # Reranker thật; RerankerUnavailableError(EngineE
 - BM25: `BM25Okapi` mặc định trên `bm25_tokens(bm25_text)`; bỏ hit có điểm ≤ 0.
 - RRF: `Σ 1/(k + rank)` trên mọi danh sách; hoà điểm thì `chunk_id` tăng dần.
 - Alpha: chuẩn hoá min-max từng danh sách về [0, 1] (danh sách một phần tử → 1.0), thiếu mặt → 0, điểm = α·vector + (1 − α)·bm25.
-- Rerank: `reranker.score(question, [bm25_text(doc, c) …])` (tiêu đề "Điều N. …" + nội dung: đoạn giữa điều không chứa số điều, chấm `c.text` trần thì rerank không bao giờ cứu được câu tra số điều — L3 N8), giữ `top_n` cao nhất; cache điểm trong RAM theo `(model_id, question, văn bản được chấm)` (`# ponytail:` dict không giới hạn, đủ cho ~50 câu × vài nghìn đoạn).
+- Rerank: `reranker.score(question, [bm25_text(doc, c) …])` (tiêu đề "Điều N. …" + nội dung: đoạn giữa điều không chứa số điều, chấm `c.text` trần thì rerank không bao giờ cứu được câu tra số điều — L3 N8), giữ `top_n` cao nhất. Không cache: trên máy chủ `reranker` là `RerankTable` (bảng chính là cache); `FastReranker` chỉ chạy trong CLI và test `slow`.
 - `tests/engine/fakes_retrieval.py`: `HashingEmbedder` (túi từ băm `\w+`, 256 chiều, chuẩn hoá, tất định, không mạng) và `OverlapReranker` (điểm = số token chung kể cả chữ số). Hai lớp này dùng chung cho test của B, D, E.
 
 ### 5.5 C · `engine/prompt.py`
@@ -425,7 +438,7 @@ class CaseState(TypedDict):
    - `ok`; `timeout` (hết hạn ca hoặc run); `cancelled` (bị huỷ vì lý do khác); `budget` (`BudgetExceededError`); `llm_error` (`LLMCallError`); `index_error` (lỗi index trong bước, ví dụ câu hỏi chưa embed: lỗi máy chủ, không phải provider); `refusal` (`stop_reason == "refusal"`, câu trả lời vẫn đi tiếp tới `output`).
    - Bước lỗi (trừ `refusal`) dừng ca: node sau không chạy nên không có `step.started` mồ côi.
 4. Ca xong → `CaseTrace` → `evaluator.grade_case` → `case.graded`. Trạng thái ca: `ok`, `refusal`, `timeout`, `cancelled`, `llm_error`, `index_error`, `skipped_budget` (bước `budget`, hoặc ca chưa bắt đầu khi `DailyCap` đã cạn: không phát step nào, chỉ `case.graded`).
-5. Hết hạn run: ca chưa chạy thành `timeout`, vẫn chấm. Chấm sao → `run.scored`; báo cáo → `run.finished`. `run.failed` chỉ dành cho lỗi trước khi chạy, lỗi nội bộ (message chung, không stack trace), huỷ, hoặc provider sập: sau khi mọi ca đã `case.graded`, có ca `index_error` thì phát `run.failed{index_stale}` (lỗi máy chủ, không chấm); nếu không ca nào có bước `llm` `ok`/`refusal` **và** có ít nhất một ca `llm_error`, `skipped_budget` do `DailyCap` cạn, hoặc một bước `llm` `timeout` (ca hết giờ ở rerank, chưa gọi AI, không tính), thì phát `run.failed{llm_unavailable}` thay cho `run.scored` + `run.finished` (lượt không tính sao). Cuối run log một dòng INFO `run <id> llm reserved=N committed=M` (chênh lệch = lời gọi bị huỷ giữa chừng có thể vẫn bị tính phí).
+5. Hết hạn run: ca chưa chạy thành `timeout`, vẫn chấm. Chấm sao → `run.scored`; báo cáo → `run.finished`. `run.failed` chỉ dành cho lỗi trước khi chạy, lỗi nội bộ (message chung, không stack trace), huỷ, hoặc provider sập: sau khi mọi ca đã `case.graded`, có ca `index_error` thì phát `run.failed{index_stale}` (lỗi máy chủ, không chấm); nếu có ca `llm_error` hoặc ca `skipped_budget` do `DailyCap` cạn (kể cả khi các ca khác đã trả lời, ví dụ từ cache phát lại: điểm khi đó không phải của người chơi; chạy lại thì các ca đã trả lời được phát lại, không tốn lời gọi), hoặc không ca nào có bước `llm` `ok`/`refusal` mà có một bước `llm` `timeout` (ca hết giờ ở rerank, chưa gọi AI, không tính; đồ thị chậm là của người chơi nên ca `timeout` lẻ vẫn được chấm), thì phát `run.failed{llm_unavailable}` thay cho `run.scored` + `run.finished` (lượt không tính sao). Sửa 2026-10-09: trước đó chỉ khi không ca nào trả lời. Cuối run log một dòng INFO `run <id> llm reserved=N committed=M` (chênh lệch = lời gọi bị huỷ giữa chừng có thể vẫn bị tính phí).
 
 ## 8. Hợp đồng sự kiện (SSE)
 
@@ -443,7 +456,7 @@ Kiểu ở `types.py`. Run store thêm `seq` tăng dần từ 1; SSE: `id: <seq>
 
 | `code` | `message_vi` |
 |---|---|
-| `llm_unavailable` | Dịch vụ AI đang quá tải hoặc hết lượt hôm nay, lượt này không tính. Hãy thử lại sau. |
+| `llm_unavailable` | `runtime.llm_unavailable_vi`: chạm `DAILY_LLM_CALL_CAP` thì "Máy chủ đã dùng hết lượt gọi AI miễn phí của hôm nay nên lượt này không tính. Lượt gọi mở lại lúc 7 giờ sáng (giờ Việt Nam). …"; còn lại "Dịch vụ AI miễn phí đang quá tải hoặc đã hết hạn mức của hôm nay nên lượt này không tính. Bạn thử lại sau khoảng 1 phút; nếu vẫn lỗi thì hạn mức mở lại lúc HH:MM (giờ Việt Nam)." (nửa đêm giờ Thái Bình Dương) |
 | `index_stale` | Index đã cũ so với kho quy chế hoặc bộ câu hỏi. Chủ máy chủ cần chạy lại vgame-build-index. |
 
 Facts: `retrieved{items[{chunk_id, rank, score, doc_id, dieu, khoan, hieu_luc}]}` (metadata, không phải kết luận); `pack{included, dropped, tokens{docs, query, total, budget}}`; `llm{stop_reason, cited_ids, replayed, model, system_tokens, answer?}`.
@@ -582,11 +595,11 @@ Giới hạn `vector_search.top_k ≤ 5` và mọi hạng là **tạm**; cổng 
 | Mục | Trần hiện tại | Khi nào nâng cấp |
 |---|---|---|
 | Run store, event log | RAM, 200 run, mất khi restart, một tiến trình | Postgres `run`/`run_event` + Redis pub/sub khi có >1 worker hoặc cần lưu tiến độ |
-| Replay cache | sqlite cục bộ | bảng Postgres `llm_replay` khi deploy nhiều instance |
-| `DailyCap` | đếm trong RAM theo ngày UTC | Redis `INCR`+TTL khi >1 tiến trình |
-| Index | file `.npy`/`.json` trong cache, nạp hết vào RAM (vài MB) | pgvector khi kho > ~100k đoạn |
+| Replay cache | sqlite cục bộ (Render free: đĩa tạm, mất khi ngủ; seed đi kèm code nạp lại mỗi lần khởi động) | bảng Postgres `llm_replay` khi deploy nhiều instance |
+| `DailyCap` | đếm trong RAM theo ngày UTC; Render free ngủ hoặc khởi động lại là mất đếm (hạn mức ngày của provider mới là trần cứng) | Redis `INCR`+TTL khi >1 tiến trình |
+| Index | file `.npy`/`.json` đi kèm code (`engine/data/index`, ~6,7 MB), nạp hết vào RAM (~12 MB, mỗi biến thể chép lại hàng dùng chung); view theo handle chỉ giữ chỉ số hàng, BM25 giữ 4 handle gần nhất (dựng lại ~6 ms) | pgvector khi kho > ~100k đoạn |
 | Nội dung | đọc `docs/content` từ repo (`CONTENT_DIR`) | đóng gói vào image khi deploy Docker |
-| Rerank cache | dict không giới hạn | LRU khi câu hỏi tự do của người chơi xuất hiện |
+| Bảng điểm rerank | chỉ câu golden × đoạn trong kho của level (11.349 cặp); câu hỏi tự do không có điểm | model rerank sống (hoặc rerank bằng LLM) khi người chơi được gõ câu hỏi tự do |
 | Cổng hiệu chỉnh 3/3 với model thật, `needs_real_models` | test `slow` thủ công | script `vgame-calibrate` trước khi mở level cho lớp |
 | Gợi ý, menu "Vì sao", phiếu đoán | chưa có | frontend v0.3 dùng `report` + `case.graded` |
 
@@ -613,7 +626,7 @@ Lệnh: `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src test
 7. **Ngưỡng 0,8 của L2-N4:** cosine của e5 dồn trong khoảng 0,7–0,9, nên ngưỡng 0,8 có thể không làm thùng rỗng. Cổng hiệu chỉnh đo, có thể đổi N4 sang 0,9.
 8. **BM25 không bỏ dấu** (E9): giữ bẫy `lib-l3-t01` nhưng `lib-l3-h03` (gõ không dấu "khoan 2 dieu 10") chỉ còn khớp chữ số. Đề nghị người viết nội dung đổi h03 sang có dấu, hoặc chấp nhận để đo.
 9. **`forbidden` trong câu từ chối** (corpus README câu hỏi mở 10): engine áp nguyên văn luật golden ("không chứa mục nào của `forbidden`"), nên câu "không có Điều 99 quy định…" sẽ trượt `lib-l1-t01`. Đề nghị bỏ "Điều 99 quy định", "khoản 9 quy định", "khoản 6 quy định" khỏi `forbidden` và dựa vào `cite_unknown`; cần người viết nội dung sửa golden.
-10. **Docker** chưa chạy được engine (thiếu `docs/content` và cache model trong image): chấp nhận cho v0.2 (chạy local)?
+10. **Docker** chưa chạy được engine (thiếu `docs/content` và cache model trong image): chấp nhận cho v0.2 (chạy local)? (2026-10-08: index, bảng rerank và seed đã nằm trong package; image chỉ còn thiếu `docs/content`.)
 
 **Trạng thái 2026-10-08 · nội dung** (golden, kịch bản, naive; mục 4, 5, 8, 9 ở trên và việc mở L1-N5, L2-N1, L3-N7, sao L3). Đo bằng e5 + jina-v2 thật từ `backend/.cache/engine` (index chưa dựng lại, câu hỏi mới embed trong RAM), LLM `Oracle`, 0 lời gọi Gemini; cùng khung với test `slow` e2e.
 
@@ -734,6 +747,37 @@ Lệnh: `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src test
   - **`thinking_level` LOW/HIGH trên model dự phòng.** Cả ba level khoá `llm.profile` = `can_bang` (`param_limits` `const`), nên engine chỉ gửi MEDIUM, mức đã gọi thật được trên 3.1-flash-lite và 3.5-flash. Thử LOW/HIGH trên chuỗi trước khi một level mở profile khác (ghi ở docstring `llm.py`).
   - **Số `threads` và làm nóng cache:** xem mục major về thời gian ở trên.
 
+**Trạng thái 2026-10-08 · bản miễn phí** (Render free: 512 MB RAM, 0,1 CPU, đĩa tạm, ngủ sau 15 phút; Vercel tĩnh). Mục tiêu của chủ dự án: khách xem chạy được agent thật với đủ tính năng, càng rẻ càng tốt. Trước đợt này API chạy không có index (mọi run trả 503), vì index nằm trong `backend/.cache` (gitignore) và reranker cần ~2–3 GB. Số đo đầy đủ: [engine-spike-report §3.4](engine-spike-report.md). Test nhanh 523 đạt, `uv run pytest -m slow` 3/3 đạt, `ruff`, `ruff format`, `mypy` sạch; mỗi thay đổi hành vi có test trượt trên code trước đợt (đã chạy lại các test mới trên mã nguồn `HEAD`), đạt sau. 29 lời gọi Gemini thật (giới hạn 200).
+
+- **Quyết định của chủ dự án: làm ấm sẵn cache phát lại cho bản trình diễn.** Hợp đồng cũ không làm ấm gì (E11 cho prompt cache của provider; khối "sửa lỗi vòng 1" bỏ làm ấm `_RERANK_CACHE`). Giờ code mang theo `backend/src/vgame/engine/data/replay-seed.json`: 71 câu trả lời thật của `gemini-3.5-flash-lite` cho lời giải mẫu và đồ thị khởi đầu (= N1) của cả ba level. Lúc khởi động, `ReplayStore.import_seed` gộp vào cache bằng `INSERT OR IGNORE` (hàng sẵn có thắng; seed hỏng thì khởi động lỗi, bản deploy trước vẫn chạy). Đánh đổi:
+  - Lượt phổ biến nhất (đồ thị khởi đầu chưa sửa, và lời giải mẫu) tốn 0 lời gọi Gemini, kể cả khi hạn mức ngày đã hết hoặc Render vừa thức (cache sqlite mất khi ngủ, seed thì không).
+  - Chạy lại các đồ thị đó luôn ra cùng một mẫu thật (fact `llm.replayed = true`), cùng sao và cùng token: đúng E10 (cache chi phí, không hứa chống quay số), nhưng khách không thấy độ dao động của model trên các đồ thị này. Lời giải mẫu: L1 3 sao 10.262 token, L2 3 sao 15.879, L3 3 sao 17.348; đồ thị khởi đầu 0 sao ở cả ba level (8.800 / 13.320 / 15.907 token).
+  - Seed cũ đi khi đổi lời giải mẫu hoặc đồ thị khởi đầu, khung prompt (`FRAME_VERSION`), packer, kho, câu golden hoặc index. Test nhanh `test_seed_answers_every_reference_and_starter_case` (mọi ca phải phát lại, không gọi provider; lời giải mẫu 3 sao) chặn trong CI. Sinh lại bằng `scripts/spike_llm.py --seed` (lệnh trong docstring; tối đa 72 lời gọi, câu đã có trong cache không tốn lời gọi).
+  - 71 câu trả lời của model thành nội dung công khai trong repo. Mỗi mục chỉ có 5 trường mà cache vẫn giữ (`text`, `stop_reason`, `input_tokens`, `output_tokens`, `model`), không có key, request hay metadata của provider (`test_seed_entries_hold_only_replay_fields`; gitleaks sạch).
+- **Không model ML lúc chạy (E5, E14 đã sửa).** `vgame-build-index` chấm sẵn bằng jina-v2 thật mọi cặp (câu hỏi public của level cho phép `rerank`, `bm25_text` của mọi đoạn trong kho của level, cả 24 biến thể): chỉ L3, 13 câu × 873 đoạn = 11.349 cặp. `RerankTable` thoả `Reranker` Protocol nên `retrieval.rerank`, khối `rerank`, precheck và `EngineServices` không đổi; `_RERANK_CACHE` bị xoá (bảng chính là cache; dict dùng chung còn trả điểm của double này cho double khác cùng `model_id`). Cặp thiếu: `RerankScoreMissingError` (`index_error`, run kết thúc `index_stale`), không bao giờ lùi về điểm khác. `check_fresh` lúc khởi động kiểm thêm bảng phủ đủ cặp (`required_rerank_pairs` là định nghĩa duy nhất, dùng chung cho build và kiểm).
+- **Artifact đi kèm code** (`backend/src/vgame/engine/data`, setting mới `INDEX_DIR`, mặc định thư mục này; `ENGINE_CACHE_DIR` chỉ còn model và cache phát lại): 6,78 MB, nén khoảng 4,4 MB. Vector dense float32, mỗi chữ dense một hàng (2.203 đoạn của 24 biến thể chỉ có 952 chữ khác nhau): không mất gì. float16 bị loại vì đo được 2.337/4.608 bảng xếp hạng đổi, có đảo ở hạng 1 và 44 lần vượt `score_threshold`. Bảng rerank float32 (45 KB): mọi logit của jina vừa khít float32, khoảng cách nhỏ nhất giữa hai điểm khác nhau là 1,2e-7 nên float16 sẽ đảo hạng.
+- **Chứng minh tương đương.** Index mới bằng bit với index cũ ở cả 24 biến thể và vector câu hỏi; 4.608 bảng xếp hạng dense đầy đủ (47 câu × 24 biến thể × 4 handle) giống hệt cả điểm lẫn thứ tự. Test `slow`: vector đóng gói bằng bit với e5 chạy sống (47 câu hỏi + đoạn đầu của mỗi biến thể); điểm và thứ tự rerank bằng bit với jina sống trên 651 cặp ứng viên (vector top 5 ∪ BM25 top 10 của 13 câu L3 ở 4 biến thể). Các test e2e "model thật" (3 sao ở cả ba level, mọi cờ `needs_real_models`) giờ chạy trong test nhanh trên artifact đóng gói, nên CI chứng minh luôn.
+- **Phụ thuộc:** `fastembed` (kéo theo onnxruntime, tokenizers, pillow…) chuyển sang nhóm `models`, nhóm `dev` gồm nhóm này. Render (`uv sync --frozen --no-dev`) không cài: 73 → 59 gói trên Linux, tải wheel 79,5 → 41,0 MB; venv Windows có bytecode 234 → 138 MB. Thiếu nhóm `models` thì `vgame-build-index` in hướng dẫn tiếng Việt và trả mã 1.
+- **Cấu hình gói free** (`render.yaml`): build thêm `--compile-bytecode`; `MAX_CONCURRENT_RUNS=1`, `DAILY_LLM_CALL_CAP=200` (tạm), `OPENBLAS_NUM_THREADS=1`. RPM theo model giữ ở `llm.DEFAULT_RPM` (15/15/5), không lặp trong `render.yaml`.
+- **Câu báo tiếng Việt** (mã sự kiện không đổi, frontend không phải sửa): chạm `DAILY_LLM_CALL_CAP` thì "…mở lại lúc 7 giờ sáng (giờ Việt Nam)…" (ngày UTC) và nhắc đồ thị khởi đầu chưa sửa vẫn chạy được; provider hết hạn mức hoặc quá tải thì "thử lại sau khoảng 1 phút; nếu vẫn lỗi thì hạn mức mở lại lúc 14:00" (15:00 khi Mỹ hết giờ mùa hè; nửa đêm giờ Thái Bình Dương). Hai lượt cùng lúc: "Máy chủ miễn phí chạy một lượt mỗi lúc và đang bận…".
+- **Số đo qua HTTP** (venv `--no-dev`, uvicorn như `startCommand`, key giả, `DAILY_LLM_CALL_CAP=0`, cache trống): khởi động 1,8 s CPU, 118 MB; đỉnh working set 131 MB (private 148 MB) sau 12 lượt đã lưu (lời giải mẫu và khởi đầu của 3 level, mỗi đồ thị 2 lần) và đồ thị L3 hợp lệ nặng nhất. Mỗi lượt đã lưu 0,05–0,23 s CPU, tức khoảng 0,5–2,3 s ở 0,1 CPU; đồ thị L3 nặng nhất 0,17–0,42 s CPU (trước: rerank sống, 32,9 s và 3,2 GB).
+- **Chủ dự án cần quyết:**
+  1. Đặt `DAILY_LLM_CALL_CAP` trên Render từ RPD trong AI Studio của ba model trong chuỗi (ai.google.dev không công bố hạn mức gói free; 2026-10-08 trang chỉ ghi "can be viewed in Google AI Studio"), khoảng 80 % tổng; 200 là số tạm.
+  2. Đồng ý 71 câu trả lời thật của model nằm công khai trong repo (mục đầu của khối này).
+  3. Giấy phép CC-BY-NC-4.0 của jina-v2 (mục 3 ở trên, vẫn mở) giờ cũng phủ bảng điểm đóng gói, vì bảng được tính từ model này.
+  4. Tuỳ chọn: monitor UptimeRobot 5 phút để Render không ngủ (giữ cả bộ đếm `DailyCap` và cache phát lại trong ngày). **Chỉ khi `v-game-api` là web service free duy nhất trong workspace Render:** 750 giờ free tính cho cả workspace, một service thức cả tháng đã dùng khoảng 744 giờ, service free khác (Edico, Talent Hub…) sẽ bị dừng giữa tháng. Có service khác thì để API ngủ; seed đã làm lượt đầu sau khi thức không tốn lời gọi.
+- **Sửa lỗi vòng 1 (2026-10-09, QA gói free).** Mỗi sửa có test trượt trên code trước, đạt sau; test nhanh 550 đạt, `slow` 3/3 đạt (`HF_HUB_OFFLINE=1`, 8,5 phút).
+  - **Hết `DAILY_LLM_CALL_CAP` mà câu báo đổi sai.** `GeminiClient` giữ một slot RPM trước khi `DailyCap` từ chối, nên sau 35 lời gọi bị từ chối trong một phút (15 + 15 + 5) chuỗi model báo 429 "bận": người chơi đọc "thử lại sau khoảng 1 phút… 14:00" thay vì "7 giờ sáng". Giờ `DailyCap.exhausted` được kiểm trước khi giữ slot (`test_calls_refused_by_the_daily_cap_book_no_limiter_slot`, `test_daily_cap_message_holds_after_a_minute_of_refused_runs`).
+  - **Hết lượt mà vẫn chấm sao.** Seed trả lời một phần ca của đồ thị sửa ít, nên khi hết `DAILY_LLM_CALL_CAP` (hoặc hạn mức Google) run cũ kết thúc `run.finished` với sao tính từ vài ca, không có câu báo. Giờ mọi ca `llm_error` hoặc bị `DailyCap` bỏ đều làm run thành `run.failed{llm_unavailable}` (§7.4 mục 5; `test_daily_cap_after_replayed_cases_voids_the_run`, `test_a_case_the_provider_failed_voids_the_run_even_if_others_answered`). Đánh đổi: một lỗi provider lẻ (500 hai lần, 504, finish `OTHER`) cũng huỷ lượt; chạy lại chỉ tốn lời gọi cho ca đó.
+  - **Chẩn đoán L3 hiện `{r_rr}`, `{ms}`** khi đồ thị không có khối rerank (N6, N8), và L2 N5 hiện `{k}`. Câu nào của mẫu còn chỗ trống không có giá trị thì bị bỏ, không còn câu nào thì dùng câu chung (`test_no_diagnosis_shows_an_unfilled_placeholder`, mọi đồ thị mẫu của 3 level, LLM luôn trượt).
+  - **Log seed** ghi mức WARNING (uvicorn chỉ hiện WARNING trở lên của logger ứng dụng): Render log có dòng `replay seed: 71 answers added`.
+  - **`vgame-build-index --variant X`** từng ghi đè index đi kèm code chỉ còn X. Giờ X được thêm vào các biến thể đã có (`test_cli_variant_build_adds_to_the_index_on_disk`).
+  - **Khoá dùng lại điểm rerank:** `rerank.json` ghi thêm `regime` (`max_tokens` 512, `fastembed_version` 0.8.1, `onnxruntime_version` 1.30.0, đúng môi trường đã chấm bảng); đổi một trong ba thì lần dựng sau chấm lại hết, không trộn hai cách chấm (`test_rerank_scores_of_other_scoring_settings_are_not_reused`). Bảng đóng gói chỉ thêm khoá này, điểm không đổi.
+  - **Test `slow` tương đương** rộng hơn: vector của mọi câu hỏi và 30/952 đoạn (mẫu ngẫu nhiên cố định + 5 đoạn dài nhất, chạm trần 512 token); điểm jina của mọi ứng viên (vector top 5 ∪ BM25 top 10) ở 8 biến thể (đủ 4 cỡ, 2 cách cắt, 3 mức chồng) cộng 15 đoạn ngẫu nhiên mỗi câu L3, đều bằng bit với model sống.
+  - **RAM.** Đo QA: tiến trình sống lâu lớn dần vì mỗi handle (24 biến thể × 2 kho × `only_in_force` = 96) giữ bản chép vector và một model BM25 mãi mãi (+96 MB working set, +131 MB private khi chạm cả 96). Giờ view chỉ giữ chỉ số hàng và BM25 giữ 4 handle gần nhất: chạm cả 96 handle còn +5 MB working set (`test_every_handle_a_server_can_reach_keeps_memory_bounded`, tracemalloc +92 → +2,6 MB). Qua HTTP (như khối trên, `DAILY_LLM_CALL_CAP=0`): khởi động 118 MB; sau lời giải mẫu và đồ thị khởi đầu của 3 level và đồ thị L3 nặng nhất 128 MB; sau 96 lượt chạm đủ 96 handle 141 MB; sau thêm 200 lượt đã lưu (`RunStore` đầy) **158 MB working set, 175 MB private** (QA ước trước sửa: khoảng 250 MB / 290–300 MB). Linux RSS chưa đo: xem một lần trên Render sau deploy (tab Metrics).
+  - **Chủ dự án cần quyết thêm: số ms của Kính lúp (L3).** Bước `rerank` giờ đo thời gian tra bảng (~10–20 ms, không tăng theo số ứng viên) thay vì cross-encoder sống (p50 ~2,3 s ở lời giải mẫu L3 trên máy dev, engine-spike-report §3.3; ở 0,1 CPU còn chậm gấp ~10). Mục tiêu 3 của kịch bản L3 ("chi phí… bằng con số của chính lần chạy: token, ms"), câu "chậm mà chắc" và mẫu chẩn đoán `budget.exceeded` ("Kính lúp tốn {ms} ms…") vì thế cho thấy rerank gần như miễn phí. Sao và cờ không dùng ms nên không đổi. Hai cách: (a) ghi thời gian chấm thật mỗi cặp lúc dựng (~120 ms mỗi cặp khi máy rảnh, §3.4) vào `rerank.json` và báo ms mô phỏng cho số cặp được chấm; (b) giữ ms thật của máy chủ và sửa lời L3 nói về chi phí thời gian của rerank (người viết nội dung). Chưa làm cách nào.
+- **Hệ quả cho người viết nội dung:** sửa kho, câu golden hoặc `allowed_blocks` của level thì phải chạy `uv run vgame-build-index` trên máy dev (~5 GB RAM; một câu hỏi mới khoảng 2 phút chấm rerank khi máy rảnh, dựng lại từ đầu 1–1,5 giờ) rồi commit `engine/data`; `test_shipped_index_is_fresh_and_complete` trượt trong CI tới khi làm. Đổi lời giải mẫu hoặc đồ thị khởi đầu thì sinh lại seed.
+
 ## 15. Integration notes (E, 2026-10-07)
 
 **API đã gắn** (`backend/src/vgame/api/`): `GET /api/blocks`, `GET /api/levels/{id}` (PublicLevel §9.2), `POST /api/runs?level=<id>` (thân = graph JSON, header tuỳ chọn `Idempotency-Key`), `GET /api/runs/{id}/events` (SSE, `Last-Event-ID`), `POST /api/runs/{id}/cancel`. Thứ tự kiểm ở POST: 415 (không phải `application/json`, chặn form chéo trang đốt key) → 404 level → 422 `{detail, issues[]}` (validator, gom lỗi) → 503 `llm_not_configured` → 503 `index_stale` (index lệch kho hoặc câu golden, kiểm lúc khởi động) → 503 `index_missing` (kể cả biến thể chưa dựng) → 503 `rerank_unavailable` → 409 (cùng `Idempotency-Key` cho đồ thị khác: "Idempotency-Key này đã dùng cho một đồ thị khác.") → 429 `RunBusyError` → 202 `{run_id, created, issues}` (issues info như `I01`, `W_RERANK_NOOP`); trùng `Idempotency-Key` (16-64 ký tự `[A-Za-z0-9_-]`) với cùng đồ thị (`graph_hash`) trả 200 cùng `run_id`. Lỗi 422 của framework (header/query/path sai) trả `{detail: "Yêu cầu không hợp lệ.", fields[]}`, không lặp input, không chữ tiếng Anh. Dịch vụ engine (`api/engine.py`) dựng một lần trong lifespan: index, reranker (chỉ khi index có), `ReplayStore` + `DailyCap` + client Gemini (chỉ khi có key); thiếu gì thì app vẫn chạy và POST trả 503 tiếng Việt. CORS mở `POST` và header `Content-Type`, `Idempotency-Key`, `Last-Event-ID` cho toàn app (CORSMiddleware không chia theo đường dẫn; chỉ `/api/runs` có POST).
@@ -757,5 +801,5 @@ Lệnh: `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src test
 **Còn mở:**
 - Trần `DailyCap` chỉ được runtime biết sau khi một ca chạm trần (D đã ghi).
 - ~~Lỗi index trong một bước hiện là `llm_error`~~, ~~usage của bước lỗi không cộng vào `CaseTrace.usage`~~, ~~không so `manifest.corpus_sha256` lúc khởi động~~, ~~SSE không có heartbeat~~: đã đóng 2026-10-08 (§14, khối "backend").
-- Retrieval L1/L2 chạy đồng bộ trên event loop (0–2 ms mỗi bước, chấp nhận). Rerank chạy trong thread. Tiến trình API nạp index + reranker khi index có: khoảng 2,1 GB committed lúc khởi động, khoảng 3,2 GB khi 3 ca L3 rerank song song, kể cả đồ thị L3 hợp lệ nặng nhất (§14, khối "sửa lỗi vòng 1"; trước đó tới 14,8 GB).
+- Retrieval L1/L2 chạy đồng bộ trên event loop (0–2 ms mỗi bước, chấp nhận). Rerank chạy trong thread. Từ 2026-10-08 tiến trình API không nạp model nào (điểm rerank từ bảng tính sẵn): 118 MB working set sau khởi động, 158 MB (private 175 MB) sau khi chạm đủ 96 handle và 200 run trong `RunStore` (§14, khối "bản miễn phí" và "sửa lỗi vòng 1"; trước đó 2,1 GB lúc khởi động, 3,2 GB khi 3 ca L3 rerank song song, có lúc tới 14,8 GB).
 - 9/24 biến thể trùng chữ (A đã ghi) và các mục §14 vẫn chờ chủ dự án.

@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -78,3 +80,11 @@ def test_framework_errors_answer_in_vietnamese(
     assert response.json() == {"detail": detail}
     if status == 405:
         assert response.headers["allow"] == "GET"  # the framework's headers are kept
+
+
+def test_app_info_lines_reach_the_server_log(client: TestClient) -> None:
+    # uvicorn configures only its own loggers, so without a handler on "vgame" the per-run
+    # Gemini accounting line (INFO, runtime.py) never shows in the Render log.
+    log = logging.getLogger("vgame")
+    assert logging.getLogger("vgame.engine.runtime").isEnabledFor(logging.INFO)
+    assert len([h for h in log.handlers if h.get_name() == "vgame"]) == 1

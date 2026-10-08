@@ -501,10 +501,8 @@ def test_fusion_that_drops_gold_is_blamed(store: IndexStore) -> None:
     }
     flags, diag, _ = run_report(LevelEvaluator(L3, rules(), store), [t], retrievers)
     assert "ret.gold_rank" in flags["lib-l3-v01"]
-    assert diag["lib-l3-v01"] == (
-        "ret.gold_rank:fusion",
-        "Sau phễu, hạng không có mặt. Kính lúp đưa nó lên {r_rr}, mất {ms} ms.",
-    )
+    # No rerank node: its sentence ("Kính lúp đưa nó lên {r_rr}, mất {ms} ms.") is dropped.
+    assert diag["lib-l3-v01"] == ("ret.gold_rank:fusion", "Sau phễu, hạng không có mặt.")
 
 
 def test_boundary_split_on_long_clause_at_128(store: IndexStore) -> None:
@@ -607,8 +605,10 @@ def test_budget_line_without_rerank_does_not_talk_about_the_rerank_block(
 
 
 def test_template_values_are_never_formatted(store: IndexStore) -> None:
-    ev = LevelEvaluator(L1, rules(diagnosis={"llm.cite_unknown": "{cite} {0} {__class__}"}), store)
+    template = "Trích {cite}. Lạ: {0} {__class__}."
+    ev = LevelEvaluator(L1, rules(diagnosis={"llm.cite_unknown": template}), store)
     t = trace(L1, "lib-l1-v01", "Xem [{n}].")
     _, diag, _ = run_report(ev, [t], {})
-    assert diag["lib-l1-v01"] == ("llm.cite_unknown", "[{n}] {0} {__class__}")
+    # The player's "{n}" is a value, never rendered again; unknown names drop their sentence.
+    assert diag["lib-l1-v01"] == ("llm.cite_unknown", "Trích [{n}].")
     assert render("{x}", {"x": "{n}"}) == "{n}"

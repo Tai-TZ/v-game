@@ -3,6 +3,7 @@
 No module-level app: importing this module (tests do) must never read ``backend/.env``.
 """
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from http import HTTPStatus
@@ -66,6 +67,18 @@ async def _internal_error(_request: Request, _exc: Exception) -> JSONResponse:
     )
 
 
+def _show_app_logs() -> None:
+    # uvicorn configures only its own loggers; INFO lines such as the per-run Gemini accounting
+    # (engine/runtime.py) would otherwise never reach the server log. Named, so it is added once.
+    log = logging.getLogger("vgame")
+    log.setLevel(logging.INFO)
+    if not any(handler.get_name() == "vgame" for handler in log.handlers):
+        handler = logging.StreamHandler()
+        handler.set_name("vgame")
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+        log.addHandler(handler)
+
+
 def create_app(
     settings: Settings | None = None,
     engine: EngineServices | None = None,
@@ -73,6 +86,7 @@ def create_app(
 ) -> FastAPI:
     """``engine`` and ``weather`` are for tests (fakes); by default they are built here."""
     settings = settings or Settings()
+    _show_app_logs()
     load_catalog()  # Fail fast: invalid content must stop startup, not a request.
 
     @asynccontextmanager
