@@ -15,17 +15,25 @@ from vgame.main import create_app
 
 HANOI = (21.0285, 105.8542)
 # Shape of the live reply to the exact request below (2026-10-08), changed to code 63 (rain).
+UPSTREAM_CURRENT: dict[str, object] = {
+    "time": "2026-10-08T07:00",
+    "interval": 900,
+    "temperature_2m": 27.36,
+    "weather_code": 63,
+}
 UPSTREAM = {
     "latitude": 21.05448,
     "longitude": 105.898476,
     "utc_offset_seconds": 0,
     "timezone": "GMT",
-    "current": {"time": "2026-10-08T07:00", "interval": 900, "temperature_2m": 27.36,
-                "weather_code": 63},
-}  # fmt: skip
-# Every code in Open-Meteo's "WMO Weather interpretation codes" table (checked 2026-10-08).
-DOCUMENTED_CODES = {0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77,
-                    80, 81, 82, 85, 86, 95, 96, 97, 99}  # fmt: skip
+    "current": UPSTREAM_CURRENT,
+}
+
+
+def reply_with(**current: object) -> Callable[[httpx.Request], httpx.Response]:
+    """Upstream reply with some `current` fields overridden."""
+    body = {**UPSTREAM, "current": {**UPSTREAM_CURRENT, **current}}
+    return lambda _: httpx.Response(200, json=body)
 
 
 class Clock:
@@ -67,11 +75,18 @@ def client(settings: Settings, clock: Clock, upstream: Upstream) -> Iterator[Tes
         yield test_client
 
 
-def test_every_documented_wmo_code_has_a_group() -> None:
-    assert set(WMO_GROUP) == DOCUMENTED_CODES
-    assert [WMO_GROUP[c] for c in (1, 2, 3, 48, 56, 66, 80, 97)] == [
-        "clear", "partly_cloudy", "cloudy", "fog", "drizzle", "rain", "rain", "thunderstorm",
-    ]  # fmt: skip
+def test_wmo_groups_match_the_contract_exactly() -> None:
+    # Every code in Open-Meteo's "WMO Weather interpretation codes" table (checked 2026-10-08).
+    expected = {
+        "clear": {0, 1},
+        "partly_cloudy": {2},
+        "cloudy": {3},
+        "fog": {45, 48},
+        "drizzle": {51, 53, 55, 56, 57},
+        "rain": {61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86},
+        "thunderstorm": {95, 96, 97, 99},
+    }
+    assert {c: g for g, codes in expected.items() for c in codes} == WMO_GROUP
 
 
 def test_weather_maps_upstream_and_only_sends_the_configured_place(
@@ -105,6 +120,60 @@ def test_value_is_cached_for_15_minutes(
 
     clock.t += timedelta(minutes=1)
     client.get("/api/weather")
+    assert len(upstream.requests) == 2
+
+
+def test_refresh_replaces_the_cached_value(
+    client: TestClient, upstream: Upstream, clock: Clock
+) -> None:
+    client.get("/api/weather")
+    clock.t += timedelta(minutes=15)
+    assert client.get("/api/weather").headers["cache-control"] == "public, max-age=300"
+
+    upstream.reply = reply_with(time="2026-10-08T07:15", temperature_2m=30.04, weather_code=0)
+    clock.t += timedelta(minutes=1)
+    response = client.get("/api/weather")
+
+    assert response.headers["cache-control"] == "public, max-age=300"
+    assert response.json() == {
+        "condition": "clear",
+        "temperature_c": 30.0,
+        "updated_at": "2026-10-08T07:15:00Z",
+    }
+
+
+def test_unknown_wmo_code_shows_as_cloudy_and_warns(
+    client: TestClient, upstream: Upstream, caplog: pytest.LogCaptureFixture
+) -> None:
+    upstream.reply = reply_with(weather_code=4)
+
+    response = client.get("/api/weather")
+
+    assert response.status_code == 200
+    assert response.json()["condition"] == "cloudy"
+    assert "unknown WMO code 4" in caplog.text
+
+
+def test_out_of_range_temperature_is_a_failed_fetch(client: TestClient, upstream: Upstream) -> None:
+    upstream.reply = reply_with(temperature_2m=999)
+    assert client.get("/api/weather").status_code == 503
+
+
+def test_after_a_failure_the_next_attempt_is_exactly_2_minutes_later(
+    client: TestClient, upstream: Upstream, clock: Clock
+) -> None:
+    upstream.reply = lambda _: httpx.Response(500)
+    assert client.get("/api/weather").status_code == 503
+
+    upstream.reply = reply_with()
+    clock.t += timedelta(seconds=119)
+    assert client.get("/api/weather").status_code == 503
+    assert len(upstream.requests) == 1
+
+    clock.t += timedelta(seconds=1)
+    response = client.get("/api/weather")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "public, max-age=300"
     assert len(upstream.requests) == 2
 
 
