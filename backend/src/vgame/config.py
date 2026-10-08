@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     max_concurrent_runs: int = Field(default=1, ge=1, le=20)
     # Server-wide cap on real (non-replayed) LLM calls per UTC day; protects the owner's key.
     daily_llm_call_cap: int = Field(default=500, ge=0)
+    # --- /api/weather. The campus's place, never the visitor's: must match the theme's `place`.
+    weather_latitude: float = Field(default=21.0285, ge=-90, le=90)
+    weather_longitude: float = Field(default=105.8542, ge=-180, le=180)
 
     @field_validator("cors_origins", "gemini_fallback_models", mode="before")
     @classmethod

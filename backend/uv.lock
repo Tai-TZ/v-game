@@ -1247,6 +1247,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "google-genai" },
+    { name = "httpx" },
     { name = "langgraph" },
     { name = "numpy" },
     { name = "pydantic" },
@@ -1258,7 +1259,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "fastembed" },
-    { name = "httpx" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -1271,6 +1271,7 @@ models = [
 requires-dist = [
     { name = "fastapi", specifier = "==0.142.2" },
     { name = "google-genai", specifier = "==2.28.0" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "langgraph", specifier = "==1.2.14" },
     { name = "numpy", specifier = "==2.5.3" },
     { name = "pydantic", specifier = "==2.13.5" },
@@ -1282,7 +1283,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "fastembed", specifier = "==0.8.1" },
-    { name = "httpx", specifier = "==0.28.1" },
     { name = "mypy", specifier = "==2.4.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "ruff", specifier = "==0.16.10" },
