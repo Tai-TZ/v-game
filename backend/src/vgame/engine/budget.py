@@ -60,10 +60,15 @@ class DailyCap:
         self._day = today()
         self._count = 0
 
-    def reserve(self) -> None:
+    @property
+    def exhausted(self) -> bool:
+        """True when ``reserve`` would refuse; counts nothing."""
         day = self._today()
         if day != self._day:
             self._day, self._count = day, 0
-        if self._count >= self._cap:
+        return self._count >= self._cap
+
+    def reserve(self) -> None:
+        if self.exhausted:
             raise BudgetExceededError("daily")
         self._count += 1

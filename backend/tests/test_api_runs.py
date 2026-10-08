@@ -1,7 +1,12 @@
 """HTTP API of the engine: blocks, levels, runs and SSE. Offline: Oracle LLM, fake models."""
 
 import json
+import logging
+import os
+import subprocess
+import sys
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,14 +22,20 @@ from tests.engine.fakes_oracle import (
     oracle_store,
     spec,
 )
-from tests.engine.fakes_retrieval import HashingEmbedder
+from tests.engine.fakes_retrieval import HashingEmbedder, OverlapReranker
 from vgame.api.engine import EngineServices
 from vgame.api.routes import runs
 from vgame.config import Settings
 from vgame.engine.constants import IndexVariant
 from vgame.engine.corpus import load_documents
-from vgame.engine.index import IndexStore
+from vgame.engine.index import (
+    IndexStore,
+    build_rerank_table,
+    golden_questions,
+    rerank_questions,
+)
 from vgame.engine.levels import load_level
+from vgame.engine.replay import SEED_PATH
 from vgame.engine.run_store import RunStore
 from vgame.engine.types import LLMClient
 from vgame.main import create_app
@@ -286,7 +297,10 @@ def test_concurrent_run_cap_answers_429(
     assert post_run(client, reference()).status_code == 202
     busy = post_run(client, reference())
     assert busy.status_code == 429
-    assert busy.json() == {"detail": "Đang có nhiều lượt chạy, bạn thử lại sau ít phút."}
+    assert busy.json() == {
+        "detail": "Máy chủ miễn phí chạy một lượt mỗi lúc và đang bận. "
+        "Bạn thử lại sau khoảng 1 phút nhé."
+    }
 
 
 def test_cancel_ends_the_run_with_run_failed(
@@ -375,3 +389,71 @@ def test_startup_refuses_an_index_built_from_other_content(settings: Settings) -
         response = post_run(client, reference())
     assert response.status_code == 503
     assert response.json()["code"] == "index_stale"
+
+
+# --- Free tier 2026-10-08: no ML model in the API process, shipped replay seed --------------
+
+
+def _index_with_table(settings: Settings, rerank: dict[str, frozenset[str]]) -> None:
+    """A fresh one-variant index of the real corpus with a rerank table for ``rerank``."""
+    content = settings.content_dir
+    store = IndexStore.build(
+        load_documents(content),
+        HashingEmbedder(),
+        golden_questions(content),
+        [IndexVariant("theo_dieu", 512, 10)],
+    )
+    store.rerank = build_rerank_table(store, OverlapReranker(), rerank, log=lambda _: None)
+    store.save(settings.index_dir)
+
+
+def test_engine_uses_the_rerank_table_and_never_imports_model_libraries(
+    settings: Settings, tmp_path: Path
+) -> None:
+    _index_with_table(settings, rerank_questions(settings.content_dir))
+    # A fresh interpreter: this test process already imported fastembed (slow test modules).
+    code = "\n".join(
+        [
+            "import sys",
+            "from vgame.api.engine import build_engine",
+            "from vgame.config import Settings",
+            "from vgame.engine.index import RerankTable",
+            "engine = build_engine(Settings(_env_file=None))",
+            "assert engine.store is not None",
+            "assert isinstance(engine.reranker, RerankTable), engine.reranker",
+            "loaded = [m for m in ('fastembed', 'onnxruntime') if m in sys.modules]",
+            "assert not loaded, loaded",
+        ]
+    )
+    env = {k: v for k, v in os.environ.items() if k != "GEMINI_API_KEY"}
+    env |= {"INDEX_DIR": str(settings.index_dir), "ENGINE_CACHE_DIR": str(tmp_path / "cache")}
+    result = subprocess.run(  # noqa: S603  # our own interpreter and code, no shell
+        [sys.executable, "-c", code], env=env, capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr[-3000:]
+
+
+def test_startup_flags_a_rerank_table_that_misses_a_pair(settings: Settings) -> None:
+    questions = rerank_questions(settings.content_dir)
+    dropped = sorted(questions)[0]
+    _index_with_table(settings, {q: d for q, d in questions.items() if q != dropped})
+    keyed = settings.model_copy(update={"gemini_api_key": SecretStr("test-not-a-real-key")})
+    with TestClient(create_app(keyed)) as client:
+        assert client.app.state.engine.store is None  # type: ignore[attr-defined]
+        response = post_run(client, reference("article-number-lookup"), "article-number-lookup")
+    assert response.status_code == 503
+    assert response.json()["code"] == "index_stale"
+
+
+def test_startup_imports_the_replay_seed(
+    settings: Settings, caplog: pytest.LogCaptureFixture
+) -> None:
+    entries = json.loads(SEED_PATH.read_text(encoding="utf-8"))["entries"]
+    keyed = settings.model_copy(update={"gemini_api_key": SecretStr("test-not-a-real-key")})
+    # uvicorn's default logging shows only WARNING and above of the app's loggers: this line is
+    # the owner's only sign in Render's log that the seed loaded.
+    with caplog.at_level(logging.WARNING), TestClient(create_app(keyed)) as client:
+        replay = client.app.state.engine.replay  # type: ignore[attr-defined]
+        assert replay is not None
+        assert all(replay.get(key) is not None for key in entries)
+    assert f"replay seed: {len(entries)} answers added" in caplog.text

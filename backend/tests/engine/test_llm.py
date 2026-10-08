@@ -473,6 +473,20 @@ def test_daily_cap_still_applies_across_the_chain(fake_sdk: FakeModels) -> None:
     assert fake_sdk.models == ["a"]
 
 
+def test_calls_refused_by_the_daily_cap_book_no_limiter_slot(fake_sdk: FakeModels) -> None:
+    # Refused calls used to book a per-minute slot: after 15 + 15 + 5 refusals in a minute the
+    # chain said "every model is busy" (429), so players read the provider message and the
+    # wrong reset time instead of "7 giờ sáng".
+    clock = FakeClock()
+    client = chain(clock, ("a", "b", "c"), rpm={"a": 15, "b": 15, "c": 5}, cap=0)
+    for _ in range(40):
+        with pytest.raises(BudgetExceededError) as exc:
+            asyncio.run(complete(client, clock))
+        assert exc.value.scope == "daily"
+    assert client._limiter._starts == {}
+    assert fake_sdk.calls == []
+
+
 # --- Replay -----------------------------------------------------------------------------------
 
 
