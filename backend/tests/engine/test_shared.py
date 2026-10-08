@@ -1,7 +1,7 @@
 """Checks for the shared engine primitives (constants, types, settings)."""
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from vgame.config import Settings
 from vgame.engine.constants import ALL_VARIANTS, FORBIDDEN_CHARS_RE, count_tokens
@@ -45,3 +45,35 @@ def test_gemini_key_is_optional_and_never_in_repr(monkeypatch: pytest.MonkeyPatc
     settings = Settings(_env_file=None)
     assert isinstance(settings.gemini_api_key, SecretStr)
     assert "test-not-a-real-key" not in repr(settings)
+
+
+def test_gemini_model_chain_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("GEMINI_MODEL", "GEMINI_FALLBACK_MODELS", "GEMINI_RPM"):
+        monkeypatch.delenv(name, raising=False)
+    settings = Settings(_env_file=None)
+    # gemini-3.8-flash only answered 429/503/504 in the spike; 3.5-flash-lite answered (3.0b).
+    assert settings.gemini_model == "gemini-3.5-flash-lite"
+    # not gemini-2.5-flash: 400 "Thinking level is not supported for this model"; not
+    # gemini-3.7-flash: never answered within 20 s (504, then ReadTimeout), §14 2026-10-08.
+    assert settings.gemini_fallback_models == ["gemini-3.1-flash-lite", "gemini-3.5-flash"]
+    assert settings.gemini_rpm == {}
+
+
+def test_gemini_chain_and_rpm_read_comma_separated_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-3.8-flash")
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", " gemini-3.5-flash-lite , gemini-2.5-flash,")
+    monkeypatch.setenv("GEMINI_RPM", "gemini-3.8-flash=2, gemini-2.5-flash = 4")
+    settings = Settings(_env_file=None)
+    assert settings.gemini_model == "gemini-3.8-flash"
+    assert settings.gemini_fallback_models == ["gemini-3.5-flash-lite", "gemini-2.5-flash"]
+    assert settings.gemini_rpm == {"gemini-3.8-flash": 2, "gemini-2.5-flash": 4}
+
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "")
+    assert Settings(_env_file=None).gemini_fallback_models == []
+
+
+@pytest.mark.parametrize("value", ["gemini-x=0", "gemini-x", "gemini-x=abc", "=5"])
+def test_gemini_rpm_rejects_bad_entries(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("GEMINI_RPM", value)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

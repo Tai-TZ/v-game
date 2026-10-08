@@ -7,7 +7,13 @@ test from the golden files.
 import asyncio
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
+
+import pytest
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as gt
 
 from vgame.engine.constants import count_tokens
 from vgame.engine.prompt import DOCS_PREFIX, QUESTION_PREFIX
@@ -110,3 +116,87 @@ class Oracle(FakeLLM):
         tags = "".join(" [" + cid + "]" for cid in cited)
         # nosemgrep (Flask XSS rule; this is a fake LLM's answer, not a web route)
         return "Theo quy chế: " + points + tags + "."
+
+
+# --- Fake google-genai SDK (Gemini adapter tests) -------------------------------------------
+
+
+@dataclass
+class FakeModels:
+    """Stands in for ``genai.Client(...).aio.models``: pops one outcome per call."""
+
+    outcomes: list[gt.GenerateContentResponse | Exception]
+    calls: list[dict[str, Any]] = field(default_factory=list)
+    created: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def models(self) -> list[str]:
+        return [call["model"] for call in self.calls]
+
+    async def generate_content(self, **kwargs: Any) -> gt.GenerateContentResponse:
+        self.calls.append(kwargs)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+def install_fake_genai(monkeypatch: pytest.MonkeyPatch) -> FakeModels:
+    models = FakeModels([])
+
+    class FakeClient:
+        def __init__(self, **kwargs: Any) -> None:
+            models.created.append(kwargs)
+            self.aio = type("Aio", (), {"models": models})()
+
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    return models
+
+
+def gemini_answer(text: str = "Đáp [ab12cd34]") -> gt.GenerateContentResponse:
+    return gt.GenerateContentResponse(
+        candidates=[
+            gt.Candidate(
+                content=gt.Content(role="model", parts=[gt.Part(text=text)]),
+                finish_reason=gt.FinishReason.STOP,
+            )
+        ],
+        usage_metadata=gt.GenerateContentResponseUsageMetadata(
+            prompt_token_count=100, candidates_token_count=10, thoughts_token_count=5
+        ),
+    )
+
+
+def quota_error(
+    status: int = 429, *, retry_s: str | None = None, per_day: bool = False, message: str = "m"
+) -> genai_errors.APIError:
+    """A Gemini 429/503 body as the API sends it (google.rpc QuotaFailure + RetryInfo)."""
+    details: list[dict[str, Any]] = []
+    if per_day:
+        quota_id = "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
+        details.append(
+            {
+                "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                "violations": [{"quotaId": quota_id, "quotaValue": "20"}],
+            }
+        )
+    if retry_s is not None:
+        details.append({"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": retry_s})
+    body = {"error": {"code": status, "message": message, "details": details}}
+    error = genai_errors.ClientError if status < 500 else genai_errors.ServerError
+    return error(status, body)
+
+
+class FakeClock:
+    """Monotonic clock + sleep for the Gemini model chain; sleeping advances the clock."""
+
+    def __init__(self, now: float = 1000.0) -> None:
+        self.now = now
+        self.slept: list[float] = []
+
+    def __call__(self) -> float:
+        return self.now
+
+    async def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.now += seconds

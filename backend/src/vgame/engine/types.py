@@ -31,8 +31,10 @@ BlockType = Literal[
 ]
 CaseRole = Literal["visible", "hidden", "trap"]  # "review" cases are not part of level runs
 StopReason = Literal["end", "max_tokens", "refusal", "error"]
-StepStatus = Literal["ok", "timeout", "cancelled", "budget", "llm_error", "refusal"]
-CaseStatus = Literal["ok", "timeout", "cancelled", "skipped_budget", "llm_error", "refusal"]
+StepStatus = Literal["ok", "timeout", "cancelled", "budget", "llm_error", "index_error", "refusal"]
+CaseStatus = Literal[
+    "ok", "timeout", "cancelled", "skipped_budget", "llm_error", "index_error", "refusal"
+]
 Retriever = Literal["vector_search", "bm25_search", "fusion", "rerank"]
 
 
@@ -279,7 +281,7 @@ class CaseTrace:
     status: CaseStatus
     steps: tuple[StepRecord, ...]
     answer: Answer | None
-    usage: Usage  # sum over steps (original usage on replay hits)
+    usage: Usage  # every committed LLM call, failed steps included (original usage on replays)
     ms: int
 
 
@@ -295,7 +297,7 @@ class CaseGrade:
     counted: bool  # False for cases demoted to info until calibration (e.g. lib-l3-t03)
     criteria: dict[str, bool]  # e.g. points, cited, no_fabrication, no_forbidden, refusal
     labels: tuple[str, ...]  # no-gold labels: cite_unknown, cite_missing, abstained, stale_doc,
-    # skipped_budget, timeout, llm_error, refusal
+    # skipped_budget, timeout, llm_error, index_error, refusal
 
 
 class StaleRule(TypedDict):
@@ -432,12 +434,15 @@ class RunFinishedEvent(TypedDict):
     type: Literal["run.finished"]
     run: str
     report: RunReport
+    models: dict[str, int]  # model id -> answered LLM calls (replays included)
 
 
 class RunFailedEvent(TypedDict):
     type: Literal["run.failed"]
     run: str
-    code: str  # llm_not_configured | run_timeout | internal
+    # index_missing | rerank_unavailable | llm_not_configured | cancelled | internal |
+    # llm_unavailable | index_stale
+    code: str
     message_vi: str
 
 
@@ -461,6 +466,8 @@ class EngineError(Exception):
     and must never contain secrets or provider response bodies."""
 
     message_vi: str = "Có lỗi khi chạy ca."
+    # Status of the step (and case) this error stops; the index layer overrides it.
+    step_status: Literal["llm_error", "index_error"] = "llm_error"
 
 
 class LLMNotConfiguredError(EngineError):
