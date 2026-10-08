@@ -3,6 +3,7 @@
 import json
 import unicodedata
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -13,7 +14,13 @@ from vgame.config import Settings
 from vgame.engine.chunking import embed_text
 from vgame.engine.constants import ALL_VARIANTS, TOKENIZER_ID, IndexVariant
 from vgame.engine.corpus import load_documents
-from vgame.engine.index import IndexNotBuiltError, IndexStore, golden_questions, main
+from vgame.engine.index import (
+    IndexNotBuiltError,
+    IndexStaleError,
+    IndexStore,
+    golden_questions,
+    main,
+)
 from vgame.engine.types import IndexHandle, Vectors
 
 CONTENT_DIR = Settings(_env_file=None).content_dir
@@ -151,3 +158,59 @@ def test_cli_builds_artifacts_with_an_injected_embedder(
 def test_cli_fails_cleanly_without_content(tmp_path: Path) -> None:
     settings = Settings(_env_file=None, engine_cache_dir=tmp_path, content_dir=tmp_path)
     assert main([], settings=settings, embedder=HashingEmbedder()) == 1
+
+
+def test_check_fresh_refuses_an_index_built_from_other_content(store: IndexStore) -> None:
+    documents = load_documents(CONTENT_DIR)
+    questions = golden_questions(CONTENT_DIR)
+    store.check_fresh(documents, questions)  # built from this checkout: fresh
+
+    edited = dict(documents)
+    old = edited["qcdt-2024"]
+    edited["qcdt-2024"] = replace(old, text=old.text.replace("Điều 12", "Điều 12 (sửa)", 1))
+    with pytest.raises(IndexStaleError) as corpus:
+        store.check_fresh(edited, questions)
+    assert "vgame-build-index" in corpus.value.message_vi
+
+    with pytest.raises(IndexStaleError):  # a golden question rewritten after the build
+        store.check_fresh(documents, [*questions, "Khoản 2 Điều 10 ghi gì vậy?"])
+
+
+class CountingQueries(CountingEmbedder):
+    def __init__(self, model_id: str = HashingEmbedder.model_id) -> None:
+        super().__init__()
+        self.model_id = model_id
+        self.queries: list[str] = []
+
+    def embed_queries(self, texts: Sequence[str]) -> Vectors:
+        self.queries += texts
+        return super().embed_queries(texts)
+
+
+def test_rebuild_embeds_only_texts_the_old_index_lacks(tmp_path: Path) -> None:
+    # Rewriting 2 golden questions cost 33 min of e5-large over 952 unchanged passages.
+    documents = load_documents(CONTENT_DIR)
+    questions = golden_questions(CONTENT_DIR)
+    variants = [_variant("theo_dieu-512-10")]
+    old = IndexStore.build(documents, HashingEmbedder(), questions, variants)
+
+    again = CountingQueries()
+    new = IndexStore.build(documents, again, [*questions, "Câu mới?"], variants, reuse=old)
+    assert (again.passages, again.queries) == (0, ["Câu mới?"])
+    handle = IndexHandle(variants[0], L1_DOCS, False)
+    assert np.array_equal(new.vectors(handle), old.vectors(handle))
+    assert np.array_equal(new.query_vector(QUESTION), old.query_vector(QUESTION))
+
+    other = CountingQueries("test/another-model")  # vectors of another model are not reused
+    IndexStore.build(documents, other, questions, variants, reuse=old)
+    assert other.passages > 0
+    assert len(other.queries) == len(set(questions))
+
+
+def test_cli_rebuild_reuses_the_index_on_disk(tmp_path: Path) -> None:
+    settings = Settings(_env_file=None, engine_cache_dir=tmp_path)
+    argv = ["--variant", "theo_dieu-512-10"]
+    assert main(argv, settings=settings, embedder=HashingEmbedder()) == 0
+    again = CountingQueries()
+    assert main(argv, settings=settings, embedder=again) == 0
+    assert (again.passages, again.queries) == (0, [])

@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from tests.engine.fakes_llm import FakeLLM
 from tests.engine.fakes_oracle import (
@@ -16,8 +17,13 @@ from tests.engine.fakes_oracle import (
     oracle_store,
     spec,
 )
+from tests.engine.fakes_retrieval import HashingEmbedder
 from vgame.api.engine import EngineServices
+from vgame.api.routes import runs
 from vgame.config import Settings
+from vgame.engine.constants import IndexVariant
+from vgame.engine.corpus import load_documents
+from vgame.engine.index import IndexStore
 from vgame.engine.levels import load_level
 from vgame.engine.run_store import RunStore
 from vgame.engine.types import LLMClient
@@ -73,8 +79,14 @@ def read_events(client: TestClient, run_id: str, last_event_id: int | None = Non
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")
         text = "".join(response.iter_text())
+    return parse_events(text)
+
+
+def parse_events(text: str) -> list[Event]:
     events: list[Event] = []
     for block in filter(None, text.split("\n\n")):
+        if block.startswith(":"):  # heartbeat comment
+            continue
         fields = dict(line.split(": ", 1) for line in block.split("\n"))
         events.append((int(fields["id"]), fields["event"], json.loads(fields["data"])))
     return events
@@ -319,3 +331,47 @@ def test_cors_preflight_allows_posting_a_run(api: TestClient, allowed_origin: st
     allowed = response.headers["access-control-allow-headers"].lower()
     assert "content-type" in allowed
     assert "idempotency-key" in allowed
+
+
+# --- Engine fixes 2026-10-08 -----------------------------------------------------------------
+
+
+def test_sse_sends_heartbeat_comments_while_a_step_is_running(
+    make_client: Callable[[EngineServices], TestClient], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runs, "HEARTBEAT_S", 0.05)
+    client = make_client(engine(FakeLLM("x", delay_s=0.3), max_runs=1))
+    run_id = post_run(client, reference()).json()["run_id"]
+    with client.stream("GET", f"/api/runs/{run_id}/events") as response:
+        text = "".join(response.iter_text())
+    assert "\n\n: ping\n\n" in text  # an SSE comment: browsers ignore it, proxies see traffic
+    assert [kind for _, kind, _ in parse_events(text)][-1] == "run.finished"
+
+
+def test_stale_index_answers_a_vietnamese_503(
+    make_client: Callable[[EngineServices], TestClient],
+) -> None:
+    services = engine(oracle_llm(), store=False)
+    services.index_stale = True
+    response = post_run(make_client(services), reference())
+    assert response.status_code == 503
+    assert response.json()["code"] == "index_stale"
+    assert "vgame-build-index" in response.json()["detail"]
+    assert "cũ" in response.json()["detail"]
+
+
+def test_startup_refuses_an_index_built_from_other_content(settings: Settings) -> None:
+    # Index of the real corpus, but without the golden questions: a question was rewritten.
+    stale = IndexStore.build(
+        load_documents(settings.content_dir),
+        HashingEmbedder(),
+        ["Câu hỏi cũ trước khi sửa golden?"],
+        [IndexVariant("theo_dieu", 512, 10)],
+    )
+    stale.save(settings.engine_cache_dir / "index")
+    keyed = settings.model_copy(update={"gemini_api_key": SecretStr("test-not-a-real-key")})
+    with TestClient(create_app(keyed)) as client:
+        assert client.app.state.engine.store is None  # type: ignore[attr-defined]
+        response = post_run(client, reference())
+    assert response.status_code == 503
+    assert response.json()["code"] == "index_stale"

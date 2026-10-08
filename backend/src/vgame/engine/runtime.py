@@ -8,14 +8,17 @@ questions never appear in any event.
 import asyncio
 import logging
 import time
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
 from vgame.engine.blocks import EngineDeps
+from vgame.engine.budget import RunBudget
 from vgame.engine.compiler import RECURSION_LIMIT, CaseContext, CaseState, CompiledLevelGraph
 from vgame.engine.constants import CASE_DEADLINE_S, MAX_CONCURRENT_CASES, RUN_DEADLINE_S
-from vgame.engine.index import IndexNotBuiltError
+from vgame.engine.index import IndexNotBuiltError, IndexStaleError
+from vgame.engine.llm import case_deadline
 from vgame.engine.retrieval import RerankerUnavailableError
 from vgame.engine.types import (
     BlockType,
@@ -81,6 +84,7 @@ class _Run:
     compiled: CompiledLevelGraph
     emit: EventSink
     deadline: float
+    budget: RunBudget
     daily_cap_hit: bool = False
 
 
@@ -93,6 +97,9 @@ async def _run_case(run: _Run, case: PublicCase) -> CaseTrace:
         return CaseTrace(case, "skipped_budget", (), None, Usage(), 0)
 
     ctx = CaseContext(run.run_id, run.emit, min(now + CASE_DEADLINE_S, run.deadline))
+    # Each case runs in its own task (own context): the LLM model chain reads this to skip a
+    # model whose next free slot is past the deadline. loop.time() == time.monotonic().
+    case_deadline.set(ctx.deadline)
     started = time.perf_counter()
     status: CaseStatus = "ok"
     answer = None
@@ -111,23 +118,22 @@ async def _run_case(run: _Run, case: PublicCase) -> CaseTrace:
     except BudgetExceededError as exc:
         status = "skipped_budget"
         run.daily_cap_hit = run.daily_cap_hit or exc.scope == "daily"
-    except EngineError:
-        status = "llm_error"
+    except EngineError as exc:
+        status = exc.step_status
     steps = tuple(ctx.steps)
-    usage = sum((s.usage for s in steps), Usage())
+    usage = run.budget.case_usage(case.id)  # every committed call, also of a failed step
     ms = round((time.perf_counter() - started) * 1000)
     return CaseTrace(case, status, steps, answer, usage, ms)
 
 
 def _llm_unavailable(traces: Sequence[CaseTrace], daily_cap_hit: bool) -> bool:
     """No LLM call answered in any case and at least one case failed on the provider side:
-    a provider outage, not a 0-star attempt."""
-    answered = any(
-        s.block == "llm" and s.status in ("ok", "refusal") for t in traces for s in t.steps
-    )
-    failed = any(
-        t.status in ("llm_error", "timeout") or (t.status == "skipped_budget" and daily_cap_hit)
-        for t in traces
+    a provider outage, not a 0-star attempt. A timeout counts only if it hit the llm step (a
+    case that ran out of time in rerank never called the AI)."""
+    llm_steps = [s for t in traces for s in t.steps if s.block == "llm"]
+    answered = any(s.status in ("ok", "refusal") for s in llm_steps)
+    failed = any(s.status == "timeout" for s in llm_steps) or any(
+        t.status == "llm_error" or (t.status == "skipped_budget" and daily_cap_hit) for t in traces
     )
     return not answered and failed
 
@@ -147,7 +153,7 @@ async def run_level(
         return
 
     loop = asyncio.get_running_loop()
-    run = _Run(run_id, compiled, emit, loop.time() + RUN_DEADLINE_S)
+    run = _Run(run_id, compiled, emit, loop.time() + RUN_DEADLINE_S, deps.budget)
     traces: dict[str, CaseTrace] = {}
     grades: dict[str, CaseGrade] = {}
     gate = asyncio.Semaphore(MAX_CONCURRENT_CASES)
@@ -191,13 +197,20 @@ async def run_level(
                 tg.create_task(one(c))
         ordered = [traces[c.id] for c in cases]
         ordered_grades = [grades[c.id] for c in cases]
+        # A server-side fault (question or variant missing from the index), not the player's.
+        if any(t.status == "index_error" for t in ordered):
+            emit(_failed(run_id, "index_stale", IndexStaleError.message_vi))
+            return
         if "llm" in compiled.blocks and _llm_unavailable(ordered, run.daily_cap_hit):
             emit(_failed(run_id, "llm_unavailable", LLM_UNAVAILABLE_VI))
             return
         score = evaluator.score(ordered, ordered_grades)
         emit({"type": "run.scored", "run": run_id, "score": score})
         report = evaluator.report(ordered, ordered_grades, compiled.retrievers)
-        emit({"type": "run.finished", "run": run_id, "report": report})
+        models = Counter(
+            f["model"] for t in ordered for s in t.steps for f in s.facts if f["kind"] == "llm"
+        )
+        emit({"type": "run.finished", "run": run_id, "report": report, "models": dict(models)})
     except asyncio.CancelledError:
         emit(_failed(run_id, "cancelled", CANCELLED_VI))
         raise

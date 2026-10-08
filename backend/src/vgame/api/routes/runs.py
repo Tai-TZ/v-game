@@ -20,7 +20,7 @@ from vgame.engine.compiler import compile_graph
 from vgame.engine.constants import MAX_PAYLOAD_BYTES
 from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import graph_hash
-from vgame.engine.index import IndexNotBuiltError
+from vgame.engine.index import IndexNotBuiltError, IndexStaleError
 from vgame.engine.levels import load_level
 from vgame.engine.run_store import IdempotencyConflictError, RunBusyError
 from vgame.engine.runtime import CANCELLED_VI, precheck, run_level
@@ -36,6 +36,9 @@ RUN_NOT_FOUND: Final = "Không tìm thấy lượt chạy."
 RUN_ALREADY_ENDED: Final = "Lượt chạy này đã kết thúc."
 GRAPH_INVALID: Final = "Đồ thị chưa chạy được. Sửa các lỗi bên dưới rồi thử lại."
 JSON_ONLY: Final = "Chỉ nhận đồ thị dạng JSON (Content-Type: application/json)."
+# Idle seconds before an SSE comment line: one LLM step can stay silent for up to 20 s, longer
+# than some proxies keep an idle stream open.
+HEARTBEAT_S: Final = 15.0
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -92,6 +95,10 @@ async def create_run(
             code="llm_not_configured",
         )
     if engine.store is None:
+        if engine.index_stale:
+            return _error(
+                status.HTTP_503_SERVICE_UNAVAILABLE, IndexStaleError.message_vi, code="index_stale"
+            )
         return _error(
             status.HTTP_503_SERVICE_UNAVAILABLE, IndexNotBuiltError.message_vi, code="index_missing"
         )
@@ -165,17 +172,32 @@ async def run_events(
     except KeyError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, RUN_NOT_FOUND) from None
 
-    async def stream() -> AsyncIterator[str]:
-        async for seq, event in events:
-            data = json.dumps(event, ensure_ascii=False)
-            yield f"id: {seq}\nevent: {event['type']}\ndata: {data}\n\n"
-
-    # ponytail: no heartbeat comments; add one if a proxy drops streams idle > 20 s (one LLM call).
     return StreamingResponse(
-        stream(),
+        _sse(events),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )
+
+
+async def _sse(events: AsyncIterator[tuple[int, EngineEvent]]) -> AsyncIterator[str]:
+    """SSE frames, plus a ``: ping`` comment (ignored by EventSource) after HEARTBEAT_S without
+    an event. The pending read survives a ping: cancelling it would close the event generator."""
+    pending = asyncio.ensure_future(anext(events))
+    try:
+        while True:
+            done, _ = await asyncio.wait({pending}, timeout=HEARTBEAT_S)
+            if not done:
+                yield ": ping\n\n"
+                continue
+            try:
+                seq, event = pending.result()
+            except StopAsyncIteration:
+                return
+            data = json.dumps(event, ensure_ascii=False)
+            yield f"id: {seq}\nevent: {event['type']}\ndata: {data}\n\n"
+            pending = asyncio.ensure_future(anext(events))
+    finally:
+        pending.cancel()
 
 
 @router.post(

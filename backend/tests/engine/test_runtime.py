@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from collections import Counter
 from collections.abc import Sequence
 from typing import Any
@@ -17,15 +18,16 @@ from tests.engine.engine_fixtures import (
     cases,
     small_store,
 )
-from tests.engine.fakes_llm import FakeLLM
+from tests.engine.fakes_llm import FakeLLM, gemini_answer, install_fake_genai, quota_error
 from tests.engine.fakes_retrieval import OverlapReranker
-from vgame.engine import runtime
+from vgame.engine import llm, runtime
 from vgame.engine.blocks import EngineDeps
-from vgame.engine.budget import RunBudget
+from vgame.engine.budget import DailyCap, RunBudget
 from vgame.engine.compiler import compile_graph
 from vgame.engine.constants import SUMMARY_MAX_CHARS
 from vgame.engine.grading import LevelEvaluator
 from vgame.engine.graph import GraphPayload
+from vgame.engine.index import IndexStaleError
 from vgame.engine.levels import LevelSpec
 from vgame.engine.types import (
     BudgetExceededError,
@@ -360,3 +362,147 @@ def test_internal_error_fails_the_run_generically() -> None:
     assert failed["type"] == "run.failed"
     assert failed["code"] == "internal"
     assert "evaluator bug" not in json.dumps(events)
+
+
+# --- Engine fixes 2026-10-08 (§15 open items, model chain) -------------------------------------
+
+
+def test_index_failure_inside_a_step_is_an_index_error_not_an_llm_error() -> None:
+    # A question the index never embedded (golden edited, index not rebuilt).
+    stray = [PublicCase("c1", "visible", "sv", "Câu 99: chưa có trong index?")]
+    events = run(L1_REFERENCE, cs=stray, store=True)
+    node, status = steps(events, "c1")[-1]
+    assert status == "index_error"
+    assert graded(events) == {"c1": "index_error"}
+    failed = next(e for e in events if e["type"] == "step.finished" and e["node"] == node)
+    assert "vgame-build-index" in failed["summary"]
+    assert events[-1]["type"] == "run.failed"
+    assert events[-1]["code"] == "index_stale"  # not a provider outage (llm_unavailable)
+
+
+def test_usage_of_a_failed_llm_step_counts_in_the_case_trace() -> None:
+    # Gemini OTHER (stop_reason "error") is billed: RunBudget committed it, the trace must too.
+    evaluator = RecordingEvaluator()
+    run(L1_STARTER, llm=FakeLLM("nửa câu", stop_reason="error"), evaluator=evaluator)
+    (trace,) = evaluator.traces
+    assert trace.status == "llm_error"
+    assert trace.usage.output_tokens == 2
+    assert trace.usage.input_tokens > 0
+
+
+def test_run_finished_counts_the_models_that_answered() -> None:
+    events = run(L1_STARTER, cs=cases(3))
+    finished = events[-1]
+    assert finished["type"] == "run.finished"
+    assert finished["models"] == {"fake-llm": 3}
+
+
+class DeadlineProbe:
+    provider = "fake"
+    model = "fake"
+
+    def __init__(self) -> None:
+        self.seen: list[float | None] = []
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        self.seen.append(llm.case_deadline.get())
+        return LLMResponse("x", "end", Usage(1, 1), "fake")
+
+
+def test_llm_calls_see_their_case_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(runtime, "CASE_DEADLINE_S", 7.0)
+    probe = DeadlineProbe()
+
+    async def scenario() -> float:
+        start = asyncio.get_running_loop().time()
+        await _run(L1_STARTER, L1, cases(2), make_deps(llm=probe), RecordingEvaluator(), [])
+        return start
+
+    start = asyncio.run(scenario())
+    assert len(probe.seen) == 2
+    for deadline in probe.seen:
+        assert deadline is not None
+        assert start + 7.0 <= deadline <= start + 8.0
+    assert llm.case_deadline.get() is None  # set per case task only
+
+
+def test_every_gemini_model_rate_limited_is_the_vietnamese_llm_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sdk = install_fake_genai(monkeypatch)
+    sdk.outcomes += [quota_error(429, per_day=True), quota_error(503)]
+    client = llm.GeminiClient(api_key="test-key", models=["a", "b"], daily_cap=DailyCap(10))
+    events = run(L1_STARTER, cs=cases(3), llm=client)
+    assert sdk.models == ["a", "b"]  # later cases fail fast: every model is cooling down
+    assert set(graded(events).values()) == {"llm_error"}
+    assert events[-1]["type"] == "run.failed"
+    assert events[-1]["code"] == "llm_unavailable"
+    assert events[-1]["message_vi"] == runtime.LLM_UNAVAILABLE_VI
+
+
+def test_fallback_model_is_recorded_on_the_step_and_the_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sdk = install_fake_genai(monkeypatch)
+    sdk.outcomes += [quota_error(429, retry_s="30s"), gemini_answer()]
+    client = llm.GeminiClient(api_key="test-key", models=["a", "b"], daily_cap=DailyCap(10))
+    events = run(L1_STARTER, llm=client)
+    llm_fact = next(
+        f for e in events if e["type"] == "step.finished" for f in e["facts"] if f["kind"] == "llm"
+    )
+    assert llm_fact["model"] == "b"
+    assert events[-1]["type"] == "run.finished"
+    assert events[-1]["models"] == {"b": 1}
+
+
+# --- Fix round 1 (2026-10-08) ------------------------------------------------------------------
+
+
+class NoModelInTime:
+    """GeminiClient when no model of the chain can finish before the case deadline."""
+
+    provider = "fake"
+    model = "fake"
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        raise TimeoutError("gemini: no model can answer before the case deadline")
+
+
+def test_no_model_in_time_is_a_timeout_step_and_case() -> None:
+    client: LLMClient = NoModelInTime()
+    events = run(L1_STARTER, llm=client)
+    assert steps(events, "c1")[-1] == ("llm", "timeout")
+    assert graded(events) == {"c1": "timeout"}
+    assert events[-1]["type"] == "run.failed"
+    assert events[-1]["code"] == "llm_unavailable"
+
+
+class SlowReranker(OverlapReranker):
+    model_id = "test/slow-overlap"  # own rerank cache entries
+
+    def score(self, query: str, texts: Sequence[str]) -> list[float]:
+        time.sleep(0.6)  # CPU-bound in a worker thread, like the real cross-encoder
+        return super().score(query, texts)
+
+
+def test_cases_timing_out_in_rerank_are_scored_not_a_provider_outage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runtime, "CASE_DEADLINE_S", 0.3)
+    fake = FakeLLM("Trả lời [abc].")
+    events = run(L3_REFERENCE, L3, cs=cases(2), store=True, reranker=SlowReranker(), llm=fake)
+    assert fake.requests == []  # the AI was never called
+    assert steps(events, "c1")[-1] == ("rr", "timeout")
+    assert set(graded(events).values()) == {"timeout"}
+    assert events[-1]["type"] == "run.finished"  # a slow graph, not "Dịch vụ AI quá tải"
+
+
+def test_an_index_error_fails_the_run_with_the_stale_index_message() -> None:
+    # A server-side fault: the run must not be scored as the player's 0 stars.
+    stray = [PublicCase("c9", "visible", "sv", "Câu 99: chưa có trong index?"), *cases(1)]
+    events = run(L1_REFERENCE, cs=stray, store=True)
+    assert graded(events) == {"c9": "index_error", "c1": "ok"}
+    assert not [e for e in events if e["type"] == "run.scored"]
+    assert events[-1]["type"] == "run.failed"
+    assert events[-1]["code"] == "index_stale"
+    assert events[-1]["message_vi"] == IndexStaleError.message_vi

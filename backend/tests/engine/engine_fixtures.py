@@ -335,7 +335,9 @@ L3 = _level(
         {
             "id": "N7",
             "graph": with_params(
-                L3_REFERENCE, "ix", strategy="co_dinh", chunk_size=128, overlap_pct=0
+                with_params(L3_REFERENCE, "ix", strategy="co_dinh", chunk_size=128, overlap_pct=0),
+                "rr",
+                top_n=1,
             ),
         },
         {"id": "N8", "graph": with_params(_NO_RR, "fu", top_k=3)},

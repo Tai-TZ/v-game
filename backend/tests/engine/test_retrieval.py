@@ -1,5 +1,7 @@
 """Retrievers, fusion, rerank and summaries. BM25 traps run on the real corpus (deterministic)."""
 
+import sys
+import types
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +31,10 @@ from vgame.engine.types import Chunk, DocHit, DocList, IndexHandle
 CONTENT_DIR = Settings(_env_file=None).content_dir
 L1_DOCS = frozenset({"qcdt-2024"})
 L2_DOCS = frozenset({"qcdt-2024", "qcdt-2019"})
-T01 = "Em tính nghỉ ở nhà một thời gian để đi làm kiếm tiền, sau này quay lại thì có được không ạ?"
+T01 = (
+    "Em tính nghỉ ở nhà một thời gian để đi làm kiếm tiền, điểm số và kết quả học tập có giữ "
+    "lại được không, sau này quay lại thì sao ạ?"
+)
 V01_L3 = "Điều 47 khoản 2 quy định gì?"
 
 
@@ -116,8 +121,9 @@ def _gold_ranks(docs: DocList, start: int, end: int) -> list[int]:
 def test_bm25_misses_the_paraphrase_trap_lib_l3_t01(
     store: IndexStore, variant: IndexVariant
 ) -> None:
-    # Article 12 shares no content syllable with the question (corpus README §3). co_dinh 512/1024
-    # windows are excluded: they also hold unrelated articles that do share words.
+    # Article 12 shares only the common phrase "kết quả học tập" (in 9 articles) with the question,
+    # no specific word (corpus README §3). co_dinh 512/1024 windows are excluded: they also hold
+    # unrelated articles that do share words.
     doc = store.document("qcdt-2024")
     start, end = find_quote(
         doc, "được bảo lưu kết quả học tập để gián đoạn việc học tối đa hai học kỳ"
@@ -291,3 +297,33 @@ def test_real_models_rank_the_anchor_questions() -> None:
     reranker = FastReranker(settings.rerank_model, models, local_files_only=False)
     candidates = bm25_search(real, handle, V01_L3, top_k=10)
     assert rerank(real, reranker, V01_L3, candidates, top_n=3).hits[0].chunk.dieu == 47
+
+
+def test_reranker_scores_short_pairs_in_small_batches(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # ONNX's arena kept the peak of 3 concurrent L3 reranks for good (~15 GB committed with
+    # batch 8 x 1024-token pairs); time and memory grow with batch x length^2.
+    seen: dict[str, object] = {}
+
+    class Tokenizer:
+        def enable_truncation(self, max_length: int) -> None:
+            seen["max_length"] = max_length
+
+    class CrossEncoder:
+        def __init__(self, model_id: str, **kwargs: object) -> None:
+            self.model = types.SimpleNamespace(tokenizer=Tokenizer())
+
+        def rerank(self, query: str, documents: list[str], batch_size: int) -> list[float]:
+            seen["batch_size"] = batch_size
+            return [0.5] * len(documents)
+
+    fake = types.ModuleType("fastembed.rerank.cross_encoder")
+    fake.TextCrossEncoder = CrossEncoder  # type: ignore[attr-defined]
+    for name in ("fastembed", "fastembed.rerank"):
+        monkeypatch.setitem(sys.modules, name, types.ModuleType(name))
+    monkeypatch.setitem(sys.modules, "fastembed.rerank.cross_encoder", fake)
+
+    reranker = FastReranker("m", tmp_path)
+    assert reranker.score("q", ["a", "b"]) == [0.5, 0.5]
+    assert seen == {"max_length": 512, "batch_size": 2}

@@ -133,11 +133,14 @@ def instrumented(
             expired = asyncio.get_running_loop().time() + _CLOCK_RES >= ctx.deadline
             status = "timeout" if expired else "cancelled"
             raise
+        except TimeoutError:  # the LLM chain: no model can answer before the case deadline
+            status = "timeout"
+            raise
         except BudgetExceededError as exc:
             status, message = "budget", exc.message_vi
             raise
-        except EngineError as exc:
-            status, message = "llm_error", exc.message_vi
+        except EngineError as exc:  # llm_error, or index_error for the index layer
+            status, message = exc.step_status, exc.message_vi
             raise
         finally:
             ms = round((time.perf_counter() - started) * 1000)

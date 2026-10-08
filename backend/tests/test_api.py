@@ -60,3 +60,21 @@ def test_malformed_zone_id_returns_422(client: TestClient, zone_id: str) -> None
     response = client.get(f"/api/zones/{zone_id}")
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "status", "detail"),
+    [
+        ("GET", "/api/runs/..%2f..%2fetc/events", 404, "Không tìm thấy đường dẫn."),
+        ("GET", "/api/khong-co", 404, "Không tìm thấy đường dẫn."),
+        ("DELETE", "/api/health", 405, "Phương thức này không được hỗ trợ."),
+    ],
+)
+def test_framework_errors_answer_in_vietnamese(
+    client: TestClient, method: str, path: str, status: int, detail: str
+) -> None:
+    response = client.request(method, path)
+    assert response.status_code == status
+    assert response.json() == {"detail": detail}
+    if status == 405:
+        assert response.headers["allow"] == "GET"  # the framework's headers are kept
