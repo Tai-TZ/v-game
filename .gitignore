@@ -5,6 +5,10 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
+# Local tooling: CodeGraph index and personal lefthook overrides
+.codegraph/
+lefthook-local.yml
+
 # Secrets and local environment
 .env
 .env.*
@@ -31,6 +35,8 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+# Engine artifacts: model files, index variants, replay cache (vgame-build-index)
+backend/.cache/
 
 # Data pipeline caches (models, intermediate embeddings)
 tools/**/.cache/
