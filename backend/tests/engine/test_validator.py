@@ -94,7 +94,7 @@ def test_p02_deep_nesting_that_json_accepts_but_recursion_does_not() -> None:
     assert codes(issues) == {"P02"}
 
 
-@pytest.mark.parametrize("bad", ["\x00", "‮", "⁦", "\x1b"])
+@pytest.mark.parametrize("bad", ["\x00", "\u202e", "\u2066", "\x1b"])
 def test_p02_control_and_bidi_characters_rejected(bad: str) -> None:
     graph, issues = check(with_params(L1_STARTER, "llm", system_prompt="hi" + bad))
     assert graph is None

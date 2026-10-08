@@ -98,6 +98,7 @@ class Oracle(FakeLLM):
         points = "; ".join(case.answer_points)
         # Gold quotes contain no newline, so a quote found in docs never spans two blocks.
         if not case.quotes or not all(q in docs for q in case.quotes):
+            # nosemgrep (Flask XSS rule; this is a fake LLM's answer, not a web route)
             return FABRICATED_PREFIX + points + "."
         starts = [(m.end(), m.group(1)) for m in _BLOCK_ID_RE.finditer(docs)]
         cited: dict[str, None] = {}
@@ -107,4 +108,5 @@ class Oracle(FakeLLM):
             if ids:
                 cited.setdefault(ids[-1], None)
         tags = "".join(" [" + cid + "]" for cid in cited)
+        # nosemgrep (Flask XSS rule; this is a fake LLM's answer, not a web route)
         return "Theo quy chế: " + points + tags + "."
