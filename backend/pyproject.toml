@@ -9,7 +9,16 @@ dependencies = [
     "uvicorn[standard]==0.54.0",
     "pydantic==2.13.5",
     "pydantic-settings==2.15.0",
+    "langgraph==1.2.14",
+    "google-genai==2.28.0",
+    "fastembed==0.8.1",
+    "rank-bm25==0.2.2",
+    "numpy==2.5.3",
 ]
+
+[project.scripts]
+# Precompute the 24 index variants, query embeddings and model files into ENGINE_CACHE_DIR.
+vgame-build-index = "vgame.engine.index:main"
 
 [dependency-groups]
 dev = [
@@ -53,10 +62,13 @@ warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "-m", "not slow"]
+markers = ["slow: downloads/loads real models; run with `uv run pytest -m slow`"]
 xfail_strict = true
 filterwarnings = [
     "error",
     # httpx is pinned at 0.28.1; Starlette 1.7's TestClient prefers httpx2.
     "ignore:Using `httpx` with `starlette.testclient` is deprecated:UserWarning",
+    # Windows without Developer Mode: huggingface_hub falls back to copying model files.
+    "ignore:`huggingface_hub` cache-system uses symlinks:UserWarning",
 ]

@@ -36,8 +36,11 @@ def test_cors_ignores_disallowed_origin(client: TestClient) -> None:
     assert "access-control-allow-origin" not in response.headers
 
 
-@pytest.mark.parametrize(("method", "expected_status"), [("GET", 200), ("POST", 400)])
-def test_cors_preflight_allows_only_get(
+# POST exists only for /api/runs (CORSMiddleware cannot scope methods per path).
+@pytest.mark.parametrize(
+    ("method", "expected_status"), [("GET", 200), ("POST", 200), ("PUT", 400), ("DELETE", 400)]
+)
+def test_cors_preflight_allows_only_get_and_post(
     client: TestClient, allowed_origin: str, method: str, expected_status: int
 ) -> None:
     response = client.options(
@@ -49,13 +52,13 @@ def test_cors_preflight_allows_only_get(
 
 
 @pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
-def test_docs_disabled_in_production(path: str) -> None:
-    with TestClient(create_app(Settings(env="production"))) as client:
+def test_docs_disabled_in_production(settings: Settings, path: str) -> None:
+    with TestClient(create_app(settings.model_copy(update={"env": "production"}))) as client:
         assert client.get(path).status_code == 404
 
 
-def test_docs_served_in_development_without_csp() -> None:
-    with TestClient(create_app(Settings(env="development"))) as client:
+def test_docs_served_in_development_without_csp(settings: Settings) -> None:
+    with TestClient(create_app(settings.model_copy(update={"env": "development"}))) as client:
         response = client.get("/docs")
 
     assert response.status_code == 200
@@ -63,8 +66,8 @@ def test_docs_served_in_development_without_csp() -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
-def test_unhandled_error_hides_details() -> None:
-    app = create_app(Settings(env="production"))
+def test_unhandled_error_hides_details(settings: Settings) -> None:
+    app = create_app(settings.model_copy(update={"env": "production"}))
 
     async def boom() -> None:
         raise RuntimeError("secret internal detail")

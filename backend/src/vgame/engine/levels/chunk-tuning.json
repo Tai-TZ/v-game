@@ -1,0 +1,770 @@
+{
+ "id": "chunk-tuning",
+ "version": 1,
+ "zone": "library",
+ "corpus": [
+  "qcdt-2024",
+  "qcdt-2019"
+ ],
+ "allowed_blocks": [
+  "input",
+  "output",
+  "corpus",
+  "chunker",
+  "vector_search",
+  "context_packer",
+  "llm"
+ ],
+ "locked_nodes": [
+  "q",
+  "kb",
+  "out"
+ ],
+ "param_limits": {
+  "vector_search.top_k": {
+   "ge": 1.0,
+   "le": 10.0
+  },
+  "vector_search.score_threshold": {
+   "ge": 0.0,
+   "le": 0.9,
+   "multiple_of": 0.05
+  },
+  "context_packer.token_budget": {
+   "const": 3000
+  },
+  "context_packer.on_overflow": {
+   "const": "cat_duoi"
+  },
+  "llm.profile": {
+   "const": "can_bang"
+  }
+ },
+ "prompt_cards": {
+  "G1": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.",
+  "G2": "Sau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.",
+  "G3": "Nếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»",
+  "G4": "Xưng «mình», gọi người hỏi là «bạn», giọng thân thiện.",
+  "G5": "Luôn đưa ra câu trả lời hữu ích nhất có thể, kể cả khi phải suy đoán.",
+  "G6": "Trả lời thật đầy đủ, càng chi tiết càng tốt."
+ },
+ "starter_graph": {
+  "schema": 1,
+  "nodes": [
+   {
+    "id": "q",
+    "type": "input",
+    "params": {}
+   },
+   {
+    "id": "kb",
+    "type": "corpus",
+    "params": {}
+   },
+   {
+    "id": "ix",
+    "type": "chunker",
+    "params": {
+     "strategy": "co_dinh",
+     "chunk_size": 128,
+     "overlap_pct": 0,
+     "only_in_force": false
+    }
+   },
+   {
+    "id": "vs",
+    "type": "vector_search",
+    "params": {
+     "top_k": 3,
+     "score_threshold": 0
+    }
+   },
+   {
+    "id": "pk",
+    "type": "context_packer",
+    "params": {
+     "token_budget": 3000,
+     "on_overflow": "cat_duoi",
+     "cite_ids": true
+    }
+   },
+   {
+    "id": "llm",
+    "type": "llm",
+    "params": {
+     "profile": "can_bang",
+     "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+    }
+   },
+   {
+    "id": "out",
+    "type": "output",
+    "params": {}
+   }
+  ],
+  "edges": [
+   [
+    "q.query",
+    "vs.query"
+   ],
+   [
+    "ix.index",
+    "vs.index"
+   ],
+   [
+    "vs.docs",
+    "pk.docs"
+   ],
+   [
+    "q.query",
+    "pk.query"
+   ],
+   [
+    "pk.context",
+    "llm.context"
+   ],
+   [
+    "llm.answer",
+    "out.answer"
+   ]
+  ]
+ },
+ "reference_graph": {
+  "schema": 1,
+  "nodes": [
+   {
+    "id": "q",
+    "type": "input",
+    "params": {}
+   },
+   {
+    "id": "kb",
+    "type": "corpus",
+    "params": {}
+   },
+   {
+    "id": "ix",
+    "type": "chunker",
+    "params": {
+     "strategy": "theo_dieu",
+     "chunk_size": 512,
+     "overlap_pct": 10,
+     "only_in_force": true
+    }
+   },
+   {
+    "id": "vs",
+    "type": "vector_search",
+    "params": {
+     "top_k": 3,
+     "score_threshold": 0
+    }
+   },
+   {
+    "id": "pk",
+    "type": "context_packer",
+    "params": {
+     "token_budget": 3000,
+     "on_overflow": "cat_duoi",
+     "cite_ids": true
+    }
+   },
+   {
+    "id": "llm",
+    "type": "llm",
+    "params": {
+     "profile": "can_bang",
+     "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+    }
+   },
+   {
+    "id": "out",
+    "type": "output",
+    "params": {}
+   }
+  ],
+  "edges": [
+   [
+    "q.query",
+    "vs.query"
+   ],
+   [
+    "ix.index",
+    "vs.index"
+   ],
+   [
+    "vs.docs",
+    "pk.docs"
+   ],
+   [
+    "q.query",
+    "pk.query"
+   ],
+   [
+    "pk.context",
+    "llm.context"
+   ],
+   [
+    "llm.answer",
+    "out.answer"
+   ]
+  ]
+ },
+ "naive_graphs": [
+  {
+   "id": "N1",
+   "graph": {
+    "schema": 1,
+    "nodes": [
+     {
+      "id": "q",
+      "type": "input",
+      "params": {}
+     },
+     {
+      "id": "kb",
+      "type": "corpus",
+      "params": {}
+     },
+     {
+      "id": "ix",
+      "type": "chunker",
+      "params": {
+       "strategy": "co_dinh",
+       "chunk_size": 128,
+       "overlap_pct": 0,
+       "only_in_force": false
+      }
+     },
+     {
+      "id": "vs",
+      "type": "vector_search",
+      "params": {
+       "top_k": 3,
+       "score_threshold": 0
+      }
+     },
+     {
+      "id": "pk",
+      "type": "context_packer",
+      "params": {
+       "token_budget": 3000,
+       "on_overflow": "cat_duoi",
+       "cite_ids": true
+      }
+     },
+     {
+      "id": "llm",
+      "type": "llm",
+      "params": {
+       "profile": "can_bang",
+       "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+      }
+     },
+     {
+      "id": "out",
+      "type": "output",
+      "params": {}
+     }
+    ],
+    "edges": [
+     [
+      "q.query",
+      "vs.query"
+     ],
+     [
+      "ix.index",
+      "vs.index"
+     ],
+     [
+      "vs.docs",
+      "pk.docs"
+     ],
+     [
+      "q.query",
+      "pk.query"
+     ],
+     [
+      "pk.context",
+      "llm.context"
+     ],
+     [
+      "llm.answer",
+      "out.answer"
+     ]
+    ]
+   },
+   "max_stars": 0,
+   "expect": [
+    {
+     "flag": "ret.boundary_split",
+     "cases": [
+      "lib-l2-v02",
+      "lib-l2-h03",
+      "lib-l2-h04"
+     ],
+     "mechanism": "T",
+     "needs_real_models": false
+    },
+    {
+     "flag": "ret.gold_missing",
+     "cases": [
+      "lib-l2-v01"
+     ],
+     "mechanism": "T",
+     "needs_real_models": true
+    },
+    {
+     "flag": "stale_doc",
+     "cases": [
+      "lib-l2-t01",
+      "lib-l2-t02",
+      "lib-l2-t03"
+     ],
+     "mechanism": "T",
+     "needs_real_models": true
+    }
+   ]
+  },
+  {
+   "id": "N2",
+   "graph": {
+    "schema": 1,
+    "nodes": [
+     {
+      "id": "q",
+      "type": "input",
+      "params": {}
+     },
+     {
+      "id": "kb",
+      "type": "corpus",
+      "params": {}
+     },
+     {
+      "id": "ix",
+      "type": "chunker",
+      "params": {
+       "strategy": "co_dinh",
+       "chunk_size": 1024,
+       "overlap_pct": 0,
+       "only_in_force": false
+      }
+     },
+     {
+      "id": "vs",
+      "type": "vector_search",
+      "params": {
+       "top_k": 10,
+       "score_threshold": 0
+      }
+     },
+     {
+      "id": "pk",
+      "type": "context_packer",
+      "params": {
+       "token_budget": 3000,
+       "on_overflow": "cat_duoi",
+       "cite_ids": true
+      }
+     },
+     {
+      "id": "llm",
+      "type": "llm",
+      "params": {
+       "profile": "can_bang",
+       "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+      }
+     },
+     {
+      "id": "out",
+      "type": "output",
+      "params": {}
+     }
+    ],
+    "edges": [
+     [
+      "q.query",
+      "vs.query"
+     ],
+     [
+      "ix.index",
+      "vs.index"
+     ],
+     [
+      "vs.docs",
+      "pk.docs"
+     ],
+     [
+      "q.query",
+      "pk.query"
+     ],
+     [
+      "pk.context",
+      "llm.context"
+     ],
+     [
+      "llm.answer",
+      "out.answer"
+     ]
+    ]
+   },
+   "max_stars": 1,
+   "expect": [
+    {
+     "flag": "pack.dropped",
+     "cases": [
+      "lib-l2-v01",
+      "lib-l2-v02",
+      "lib-l2-v03",
+      "lib-l2-h01",
+      "lib-l2-h02",
+      "lib-l2-h03",
+      "lib-l2-h04",
+      "lib-l2-h05",
+      "lib-l2-h06",
+      "lib-l2-h07",
+      "lib-l2-t01",
+      "lib-l2-t02",
+      "lib-l2-t03"
+     ],
+     "mechanism": "T",
+     "needs_real_models": false
+    },
+    {
+     "flag": "budget.exceeded",
+     "mechanism": "M",
+     "needs_real_models": false
+    },
+    {
+     "flag": "stale_doc",
+     "cases": [
+      "lib-l2-t01",
+      "lib-l2-t02",
+      "lib-l2-t03"
+     ],
+     "mechanism": "T",
+     "needs_real_models": true
+    }
+   ]
+  },
+  {
+   "id": "N3",
+   "graph": {
+    "schema": 1,
+    "nodes": [
+     {
+      "id": "q",
+      "type": "input",
+      "params": {}
+     },
+     {
+      "id": "kb",
+      "type": "corpus",
+      "params": {}
+     },
+     {
+      "id": "ix",
+      "type": "chunker",
+      "params": {
+       "strategy": "theo_dieu",
+       "chunk_size": 512,
+       "overlap_pct": 10,
+       "only_in_force": false
+      }
+     },
+     {
+      "id": "vs",
+      "type": "vector_search",
+      "params": {
+       "top_k": 3,
+       "score_threshold": 0
+      }
+     },
+     {
+      "id": "pk",
+      "type": "context_packer",
+      "params": {
+       "token_budget": 3000,
+       "on_overflow": "cat_duoi",
+       "cite_ids": true
+      }
+     },
+     {
+      "id": "llm",
+      "type": "llm",
+      "params": {
+       "profile": "can_bang",
+       "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+      }
+     },
+     {
+      "id": "out",
+      "type": "output",
+      "params": {}
+     }
+    ],
+    "edges": [
+     [
+      "q.query",
+      "vs.query"
+     ],
+     [
+      "ix.index",
+      "vs.index"
+     ],
+     [
+      "vs.docs",
+      "pk.docs"
+     ],
+     [
+      "q.query",
+      "pk.query"
+     ],
+     [
+      "pk.context",
+      "llm.context"
+     ],
+     [
+      "llm.answer",
+      "out.answer"
+     ]
+    ]
+   },
+   "max_stars": 2,
+   "expect": [
+    {
+     "flag": "stale_doc",
+     "cases": [
+      "lib-l2-t01",
+      "lib-l2-t02",
+      "lib-l2-t03"
+     ],
+     "mechanism": "T",
+     "needs_real_models": true
+    }
+   ]
+  },
+  {
+   "id": "N4",
+   "graph": {
+    "schema": 1,
+    "nodes": [
+     {
+      "id": "q",
+      "type": "input",
+      "params": {}
+     },
+     {
+      "id": "kb",
+      "type": "corpus",
+      "params": {}
+     },
+     {
+      "id": "ix",
+      "type": "chunker",
+      "params": {
+       "strategy": "theo_dieu",
+       "chunk_size": 512,
+       "overlap_pct": 10,
+       "only_in_force": true
+      }
+     },
+     {
+      "id": "vs",
+      "type": "vector_search",
+      "params": {
+       "top_k": 3,
+       "score_threshold": 0.8
+      }
+     },
+     {
+      "id": "pk",
+      "type": "context_packer",
+      "params": {
+       "token_budget": 3000,
+       "on_overflow": "cat_duoi",
+       "cite_ids": true
+      }
+     },
+     {
+      "id": "llm",
+      "type": "llm",
+      "params": {
+       "profile": "can_bang",
+       "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+      }
+     },
+     {
+      "id": "out",
+      "type": "output",
+      "params": {}
+     }
+    ],
+    "edges": [
+     [
+      "q.query",
+      "vs.query"
+     ],
+     [
+      "ix.index",
+      "vs.index"
+     ],
+     [
+      "vs.docs",
+      "pk.docs"
+     ],
+     [
+      "q.query",
+      "pk.query"
+     ],
+     [
+      "pk.context",
+      "llm.context"
+     ],
+     [
+      "llm.answer",
+      "out.answer"
+     ]
+    ]
+   },
+   "max_stars": 0,
+   "expect": [
+    {
+     "flag": "ret.gold_missing",
+     "mechanism": "T",
+     "needs_real_models": true
+    }
+   ]
+  },
+  {
+   "id": "N5",
+   "graph": {
+    "schema": 1,
+    "nodes": [
+     {
+      "id": "q",
+      "type": "input",
+      "params": {}
+     },
+     {
+      "id": "kb",
+      "type": "corpus",
+      "params": {}
+     },
+     {
+      "id": "ix",
+      "type": "chunker",
+      "params": {
+       "strategy": "co_dinh",
+       "chunk_size": 256,
+       "overlap_pct": 20,
+       "only_in_force": true
+      }
+     },
+     {
+      "id": "vs",
+      "type": "vector_search",
+      "params": {
+       "top_k": 1,
+       "score_threshold": 0
+      }
+     },
+     {
+      "id": "pk",
+      "type": "context_packer",
+      "params": {
+       "token_budget": 3000,
+       "on_overflow": "cat_duoi",
+       "cite_ids": true
+      }
+     },
+     {
+      "id": "llm",
+      "type": "llm",
+      "params": {
+       "profile": "can_bang",
+       "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+      }
+     },
+     {
+      "id": "out",
+      "type": "output",
+      "params": {}
+     }
+    ],
+    "edges": [
+     [
+      "q.query",
+      "vs.query"
+     ],
+     [
+      "ix.index",
+      "vs.index"
+     ],
+     [
+      "vs.docs",
+      "pk.docs"
+     ],
+     [
+      "q.query",
+      "pk.query"
+     ],
+     [
+      "pk.context",
+      "llm.context"
+     ],
+     [
+      "llm.answer",
+      "out.answer"
+     ]
+    ]
+   },
+   "expect": [
+    {
+     "flag": "ret.gold_missing",
+     "cases": [
+      "lib-l2-v01",
+      "lib-l2-h01",
+      "lib-l2-h02"
+     ],
+     "mechanism": "T",
+     "needs_real_models": true
+    }
+   ]
+  }
+ ],
+ "rules": {
+  "s1_min_normal": 8,
+  "s1_required": [
+   "lib-l2-v01"
+  ],
+  "token_budget": 30000,
+  "s3_forbidden_labels": [
+   "stale_doc"
+  ],
+  "info_cases": [],
+  "stale_fails": {
+   "roles": [
+    "trap"
+   ],
+   "vai": [
+    "van-ban-cu",
+    "da-bai-bo"
+   ]
+  },
+  "max_dieu": 84,
+  "diagnosis": {
+   "ret.boundary_split": "Câu đáp án của câu #{n} bị cắt đôi: nửa đầu ở đoạn {a}, nửa sau ở đoạn {b}. Trợ lý chỉ cầm được nửa đầu.",
+   "ret.gold_missing": "Câu #{n} cần cả khoản {k1} lẫn khoản {k2}. Khoản {k2} đứng hạng {rank}, Móc kéo dừng ở {k}.",
+   "ctx.gold_dropped": "Đoạn đúng của câu #{n} có được kéo về, hạng {rank}, nhưng thùng đầy nên bị cắt lúc đóng thùng.",
+   "ret.stale_doc": "Có {m} câu mang giấy 2019 vào thùng. Bản đó hết hiệu lực, dù chữ nghĩa giống hệt.",
+   "budget.exceeded": "Mỗi câu trung bình mang {avg} token tài liệu, thùng đầy {pct}%. Ngân sách là {budget}, run này tốn {tokens}."
+  }
+ },
+ "stars_vi": [
+  "Ít nhất 8/10 câu thường đạt, bắt buộc có câu của Hà (câu #1).",
+  "Có sao 1 và cả lượt chạy tốn không quá 30.000 token.",
+  "Có sao 1, ba câu bẫy đều đạt và không câu nào mang văn bản hết hiệu lực vào thùng."
+ ]
+}

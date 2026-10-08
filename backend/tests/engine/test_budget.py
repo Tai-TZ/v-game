@@ -1,0 +1,36 @@
+from datetime import date
+
+import pytest
+
+from vgame.engine.budget import DailyCap, RunBudget
+from vgame.engine.types import BudgetExceededError, Usage
+
+
+def test_run_budget_blocks_the_13th_call_per_case_and_sums_usage() -> None:
+    budget = RunBudget()
+    for _ in range(12):
+        budget.reserve("c1")
+        budget.commit("c1", Usage(10, 2))
+    with pytest.raises(BudgetExceededError) as exc:
+        budget.reserve("c1")
+    assert exc.value.scope == "case"
+    budget.reserve("c2")  # other cases are independent
+    assert budget.usage == Usage(120, 24)
+    assert (budget.reserved, budget.committed) == (13, 12)
+
+
+def test_daily_cap_blocks_then_resets_on_a_new_utc_day() -> None:
+    day = [date(2026, 10, 7)]
+    cap = DailyCap(2, today=lambda: day[0])
+    cap.reserve()
+    cap.reserve()
+    with pytest.raises(BudgetExceededError) as exc:
+        cap.reserve()
+    assert exc.value.scope == "daily"
+    day[0] = date(2026, 10, 8)
+    cap.reserve()
+
+
+def test_daily_cap_zero_blocks_everything() -> None:
+    with pytest.raises(BudgetExceededError):
+        DailyCap(0).reserve()
