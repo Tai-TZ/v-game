@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { SiteFooter } from "~/components/SiteFooter";
 import { SiteHeader } from "~/components/SiteHeader";
 import { CallToAction } from "~/features/landing/CallToAction";
@@ -23,6 +25,12 @@ export async function loader() {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
+  // A free-tier API sleeps when idle; waking it here hides most of the cold start before the
+  // visitor opens the campus. Fire and forget: the landing page needs no answer.
+  useEffect(() => {
+    void fetch(`${import.meta.env.VITE_API_BASE_URL ?? ""}/api/health`).catch(() => undefined);
+  }, []);
+
   return (
     <>
       <a
