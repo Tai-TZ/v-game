@@ -422,10 +422,10 @@ class CaseState(TypedDict):
 1. Kiểm trước khi phát gì: thiếu index → `run.failed{code: "index_missing"}`; graph có `rerank` mà `deps.reranker is None` → `run.failed{code: "rerank_unavailable"}`; không có LLM client → `run.failed{code: "llm_not_configured"}` (E trả 503 ngay ở POST thì càng tốt).
 2. Phát `run.started`.
 3. Mỗi ca trong `asyncio.Semaphore(3)`, mỗi ca có hạn `CASE_DEADLINE_S`, cả run có hạn `RUN_DEADLINE_S`. `instrumented()` phát `step.started`, chạy khối, và trong `finally` **luôn** phát `step.finished` với `status`:
-   - `ok`; `timeout` (hết hạn ca hoặc run); `cancelled` (bị huỷ vì lý do khác); `budget` (`BudgetExceededError`); `llm_error` (`LLMCallError`); `refusal` (`stop_reason == "refusal"`, câu trả lời vẫn đi tiếp tới `output`).
+   - `ok`; `timeout` (hết hạn ca hoặc run); `cancelled` (bị huỷ vì lý do khác); `budget` (`BudgetExceededError`); `llm_error` (`LLMCallError`); `index_error` (lỗi index trong bước, ví dụ câu hỏi chưa embed: lỗi máy chủ, không phải provider); `refusal` (`stop_reason == "refusal"`, câu trả lời vẫn đi tiếp tới `output`).
    - Bước lỗi (trừ `refusal`) dừng ca: node sau không chạy nên không có `step.started` mồ côi.
-4. Ca xong → `CaseTrace` → `evaluator.grade_case` → `case.graded`. Trạng thái ca: `ok`, `refusal`, `timeout`, `cancelled`, `llm_error`, `skipped_budget` (bước `budget`, hoặc ca chưa bắt đầu khi `DailyCap` đã cạn: không phát step nào, chỉ `case.graded`).
-5. Hết hạn run: ca chưa chạy thành `timeout`, vẫn chấm. Chấm sao → `run.scored`; báo cáo → `run.finished`. `run.failed` chỉ dành cho lỗi trước khi chạy, lỗi nội bộ (message chung, không stack trace), huỷ, hoặc provider sập: sau khi mọi ca đã `case.graded`, nếu không ca nào có bước `llm` `ok`/`refusal` **và** có ít nhất một ca `llm_error`, `timeout`, hoặc `skipped_budget` do `DailyCap` cạn, thì phát `run.failed{llm_unavailable}` thay cho `run.scored` + `run.finished` (lượt không tính sao). Cuối run log một dòng INFO `run <id> llm reserved=N committed=M` (chênh lệch = lời gọi bị huỷ giữa chừng có thể vẫn bị tính phí).
+4. Ca xong → `CaseTrace` → `evaluator.grade_case` → `case.graded`. Trạng thái ca: `ok`, `refusal`, `timeout`, `cancelled`, `llm_error`, `index_error`, `skipped_budget` (bước `budget`, hoặc ca chưa bắt đầu khi `DailyCap` đã cạn: không phát step nào, chỉ `case.graded`).
+5. Hết hạn run: ca chưa chạy thành `timeout`, vẫn chấm. Chấm sao → `run.scored`; báo cáo → `run.finished`. `run.failed` chỉ dành cho lỗi trước khi chạy, lỗi nội bộ (message chung, không stack trace), huỷ, hoặc provider sập: sau khi mọi ca đã `case.graded`, có ca `index_error` thì phát `run.failed{index_stale}` (lỗi máy chủ, không chấm); nếu không ca nào có bước `llm` `ok`/`refusal` **và** có ít nhất một ca `llm_error`, `skipped_budget` do `DailyCap` cạn, hoặc một bước `llm` `timeout` (ca hết giờ ở rerank, chưa gọi AI, không tính), thì phát `run.failed{llm_unavailable}` thay cho `run.scored` + `run.finished` (lượt không tính sao). Cuối run log một dòng INFO `run <id> llm reserved=N committed=M` (chênh lệch = lời gọi bị huỷ giữa chừng có thể vẫn bị tính phí).
 
 ## 8. Hợp đồng sự kiện (SSE)
 
@@ -438,16 +438,17 @@ Kiểu ở `types.py`. Run store thêm `seq` tăng dần từ 1; SSE: `id: <seq>
 | `step.finished` | `run`, `case`, `node`, `block`, `status`, `summary` ≤ 140, `tokens{in, out}`, `ms`, `facts[]` | luôn đi cặp với `step.started` |
 | `case.graded` | `run`, `case`, `status`, `passed`, `counted`, `criteria{…: bool}`, `labels[]` | **không** có gold, không có hạng gold |
 | `run.scored` | `run`, `score: StarResult` | `stars`, `s1..s3`, `normal_passed/total`, `traps_passed/total`, `tokens`, `budget` |
-| `run.finished` | `run`, `report{gold{case: GoldReveal}, diagnosis[]}` | gold chỉ ở đây (D4) |
-| `run.failed` | `run`, `code`, `message_vi` | `code`: `index_missing`, `rerank_unavailable`, `llm_not_configured`, `cancelled`, `internal`, `llm_unavailable` |
+| `run.finished` | `run`, `report{gold{case: GoldReveal}, diagnosis[]}`, `models{model: số lời gọi có trả lời}` | gold chỉ ở đây (D4); `models` cho biết model nào của chuỗi đã phục vụ |
+| `run.failed` | `run`, `code`, `message_vi` | `code`: `index_missing`, `rerank_unavailable`, `llm_not_configured`, `cancelled`, `internal`, `llm_unavailable`, `index_stale` |
 
 | `code` | `message_vi` |
 |---|---|
 | `llm_unavailable` | Dịch vụ AI đang quá tải hoặc hết lượt hôm nay, lượt này không tính. Hãy thử lại sau. |
+| `index_stale` | Index đã cũ so với kho quy chế hoặc bộ câu hỏi. Chủ máy chủ cần chạy lại vgame-build-index. |
 
 Facts: `retrieved{items[{chunk_id, rank, score, doc_id, dieu, khoan, hieu_luc}]}` (metadata, không phải kết luận); `pack{included, dropped, tokens{docs, query, total, budget}}`; `llm{stop_reason, cited_ids, replayed, model, system_tokens, answer?}`.
 
-Nhãn không cần gold trong `case.graded.labels`: `cite_unknown`, `cite_missing`, `abstained`, `stale_doc`, `skipped_budget`, `timeout`, `llm_error`, `refusal`. Câu hỏi của ca ẩn/bẫy không bao giờ nằm trong sự kiện nào; summary và facts không chứa câu hỏi.
+Nhãn không cần gold trong `case.graded.labels`: `cite_unknown`, `cite_missing`, `abstained`, `stale_doc`, `skipped_budget`, `timeout`, `cancelled`, `llm_error`, `index_error`, `refusal`. Câu hỏi của ca ẩn/bẫy không bao giờ nằm trong sự kiện nào; summary và facts không chứa câu hỏi.
 
 ## 9. Level
 
@@ -490,9 +491,9 @@ Nhãn không cần gold trong `case.graded.labels`: `cite_unknown`, `cite_missin
 | N2 | starter + `vs {top_k 5}` nối như reference, `cite_ids false`, `[G4, G5]` | 0 | T: `fail` (tiêu chí `cited` trượt) trên 8 ca thường; M: `cite_unknown` |
 | N3 | reference với `[G2]` | — | M: `fail` trên `lib-l1-t01`, `lib-l1-t02` |
 | N4 | reference với `top_k 10`, `[G1, G2, G3, G6]` | 1 | T: `budget.exceeded` (run) |
-| N5 | reference với `top_k 1` | — | T, `needs_real_models`: `ret.gold_rank` trên `lib-l1-v03`, `lib-l1-h04`, `lib-l1-h05` |
+| N5 | reference với `top_k 1` | — | T, `needs_real_models`: `ret.gold_rank` trên `lib-l1-h02`; M: trên `lib-l1-v03`, `h04`, `h05` (đo 2026-10-08, §14) |
 
-- **Rules:** `s1_min_normal 6`, `s1_required ["lib-l1-v01"]`, `token_budget 22000`, `s3_forbidden_labels ["cite_unknown"]`, `info_cases []`, `stale_fails null`, `max_dieu 84`.
+- **Rules:** `s1_min_normal 6`, `s1_required ["lib-l1-v01"]`, `token_budget 15000`, `s3_forbidden_labels ["cite_unknown"]`, `info_cases []`, `stale_fails null`, `max_dieu 84`.
 
 ### 9.4 L2 `chunk-tuning` (kịch bản L2 §5, §6, §10)
 
@@ -504,13 +505,13 @@ Nhãn không cần gold trong `case.graded.labels`: `cite_unknown`, `cite_missin
 
 | id | Graph | max_stars | expect |
 |---|---|---|---|
-| N1 | starter | 0 | T: `ret.boundary_split` trên `lib-l2-v02`, `lib-l2-h03`, `lib-l2-h04`; T, `needs_real_models`: `ret.gold_missing` trên `lib-l2-v01`, `ret.stale_doc` trên `lib-l2-t01`, `t02`, `t03` |
+| N1 | starter | 0 | T: `ret.boundary_split` trên `lib-l2-v02`, `lib-l2-h03`, `lib-l2-h04`; T, `needs_real_models`: `ret.stale_doc` trên `lib-l2-t01`, `t02`, `t03`; M: `ret.gold_missing` trên `lib-l2-v01` (đo 2026-10-08, §14) |
 | N2 | `ix {co_dinh, 1024, 0, false}`, `vs {top_k 10}` | 1 | T: `pack.dropped` khác rỗng ở mọi ca (kiểm qua fact `pack`); T: `budget.exceeded`; T, `needs_real_models`: `stale_doc` trên `t01`, `t02`, `t03` |
 | N3 | `ix {theo_dieu, 512, 10, false}`, `vs {top_k 3}` | 2 | T, `needs_real_models`: `stale_doc` trên `t01`, `t02`, `t03` |
 | N4 | reference với `score_threshold 0.8` | 0 | T, `needs_real_models`: `ret.gold_missing` trên đa số ca thường (xem câu hỏi mở 7) |
 | N5 | `ix {co_dinh, 256, 20, true}`, `vs {top_k 1}` | — | T, `needs_real_models`: `ret.gold_missing` trên `lib-l2-v01`, `lib-l2-h01`, `lib-l2-h02` |
 
-- **Rules:** `s1_min_normal 8`, `s1_required ["lib-l2-v01"]`, `token_budget 30000`, `s3_forbidden_labels ["stale_doc"]`, `info_cases []`, `stale_fails {roles ["trap"], vai ["van-ban-cu", "da-bai-bo"]}`, `max_dieu 84`.
+- **Rules:** `s1_min_normal 8`, `s1_required ["lib-l2-v01"]`, `token_budget 20000`, `s3_forbidden_labels ["stale_doc"]`, `info_cases []`, `stale_fails {roles ["trap"], vai ["van-ban-cu", "da-bai-bo"]}`, `max_dieu 84`.
 
 ### 9.5 L3 `article-number-lookup` (kịch bản L3 §5, §6, §10)
 
@@ -528,12 +529,12 @@ Nhãn không cần gold trong `case.graded.labels`: `cite_unknown`, `cite_missin
 | N4 | `vs {5}` và `bm {10}` cùng nối thẳng `pk.docs` (không fusion) | 1 | T: `budget.exceeded`; T: `pack.dropped` khác rỗng ở ≥ 1 ca |
 | N5 | reference bỏ `rr`, `fu.docs→pk.docs` | 1 | T: `budget.exceeded` |
 | N6 | reference với `fu {alpha, alpha 0.8, top_k 3}`, bỏ `rr` | 0 | T, `needs_real_models`: `ret.gold_rank` (fusion) trên `lib-l3-v01` |
-| N7 | reference với `ix {co_dinh, 128, 0}` | — | T, `needs_real_models`: `fail` trên `lib-l3-t02` |
+| N7 | reference với `ix {co_dinh, 128, 0}`, `rr {top_n 1}` | — | T (không cần model): `fail` và `ret.gold_missing` trên `lib-l3-t02` (đo 2026-10-08, §14) |
 | N8 | reference bỏ `rr`, `fu {rrf, 60, top_k 3}` | — | M: `ret.gold_rank` (fusion) trên `lib-l3-h04`, `h05` |
 
-- **Rules:** `s1_min_normal 8`, `s1_required ["lib-l3-v01"]`, `token_budget 30000`, `s3_forbidden_labels []`, `info_cases ["lib-l3-t03"]`, `stale_fails null`, `max_dieu 84`.
+- **Rules:** `s1_min_normal 8`, `s1_required ["lib-l3-v01"]`, `token_budget 22000`, `s3_forbidden_labels []`, `info_cases ["lib-l3-t03"]`, `stale_fails null`, `max_dieu 84`.
 
-Giới hạn `vector_search.top_k ≤ 5`, ngân sách 22k/30k/30k và mọi hạng là **tạm**; cổng hiệu chỉnh (hoãn) thay bằng số đo.
+Giới hạn `vector_search.top_k ≤ 5` và mọi hạng là **tạm**; cổng hiệu chỉnh (hoãn) thay bằng số đo. Ngân sách 15k/20k/22k đã hiệu chỉnh với Gemini thật ngày 2026-10-08 (§14, khối "hiệu chỉnh" và khối "sửa lỗi vòng 1": L1 14k → 15k).
 
 ## 10. Chấm (B)
 
@@ -548,8 +549,8 @@ Giới hạn `vector_search.top_k ≤ 5`, ngân sách 22k/30k/30k và mọi hạ
 **L2 `stale_fails`:** ca có `role ∈ roles` hoặc `vai ∈ vai` còn cần `no_stale` (không đoạn `hieu_luc = false` trong `pack.included`).
 
 **Nhãn không cần gold:**
-- `cite_unknown`: có `cited_id` không thuộc `pack.included`; **hoặc** một câu (tách theo `.`, `!`, `?`, xuống dòng) **không** chứa dấu hiệu từ chối có `theo điều N` hoặc `điều N quy định` (sau chuẩn hoá) với N không là `dieu` của đoạn nào trong thùng.
-- `cite_missing`: không có `cited_id` nào. `abstained`: có dấu hiệu từ chối. `stale_doc`: thùng có đoạn `hieu_luc = false`. Cùng nhãn trạng thái ca (`skipped_budget`, `timeout`, `llm_error`, `refusal`).
+- `cite_unknown`: có `cited_id` không thuộc `pack.included`; **hoặc** một vế (tách theo `.`, `!`, `?`, `;`, xuống dòng, "nhưng", "tuy nhiên") **không** chứa dấu hiệu từ chối có `theo điều N` hoặc `điều N quy định` (sau chuẩn hoá) với N không là `dieu` của đoạn nào trong thùng.
+- `cite_missing`: không có `cited_id` nào. `abstained`: có dấu hiệu từ chối. `stale_doc`: thùng có đoạn `hieu_luc = false`. Cùng nhãn trạng thái ca (`skipped_budget`, `timeout`, `cancelled`, `llm_error`, `index_error`, `refusal`).
 
 **Cờ cần gold** (chỉ trong `run.finished.report.gold`): `ret.gold_missing` (có quote mà các đoạn đi vào packer, gộp lại, không phủ kín `[start, end)`; khoảng trắng giữa hai đoạn liền nhau tính là phủ; hai mảnh của một quote bị cắt đôi cùng vào packer vẫn tính là tới), `ctx.gold_dropped` (quote được phủ kín bởi các đoạn vào packer nhưng không bởi `pack.included`), `ret.gold_rank` (đoạn gold tốt nhất có hạng > số lấy về của retriever đó; hạng ở retriever gốc tính trên **toàn kho** bằng `top_k=None`), `ret.boundary_split`. `budget.exceeded` là cờ cấp run. Ca chưa chạy (không có bước nào: hết hạn run trước khi bắt đầu, hoặc bị bỏ vì `DailyCap`) không có cờ truy xuất và không có chẩn đoán, chỉ có mục gold.
 
@@ -603,7 +604,7 @@ Lệnh: `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src test
 
 ## 14. Chủ dự án cần quyết
 
-1. **Key Gemini:** đặt `GEMINI_API_KEY=…` trong `backend/.env` (đã gitignore, test không đọc). Mặc định `DAILY_LLM_CALL_CAP=500` lời gọi/ngày, `MAX_CONCURRENT_RUNS=1`: tối đa 13 lời gọi LLM mỗi run; tối đa 26 lần gọi mạng tính vào `DAILY_LLM_CALL_CAP` khi retry 5xx xảy ra. Nên xoay key sau đợt thử.
+1. **Key Gemini:** đặt `GEMINI_API_KEY=…` trong `backend/.env` (đã gitignore, test không đọc). Mặc định `DAILY_LLM_CALL_CAP=500` lời gọi/ngày, `MAX_CONCURRENT_RUNS=1`: tối đa 13 lời gọi LLM mỗi run; mỗi lời gọi tối đa 4 lần gọi mạng (3 model của chuỗi mặc định + 1 lần thử lại 500/502), nên tối đa 52 lần mỗi run tính vào `DAILY_LLM_CALL_CAP` (thực tế ít hơn: model bị 429/503 nghỉ, lời gọi sau không thử lại nó). Nên xoay key sau đợt thử.
 2. **Model:** `gemini-3.8-flash` với 3 mức thinking (E1). Nếu muốn rẻ hơn: `gemini-3.5-flash-lite` (cần hiệu chỉnh lại ngân sách).
 3. **Model truy xuất:** multilingual-e5-large tải khoảng 2,2 GB về `backend/.cache`. Reranker `jina-reranker-v2-base-multilingual` có giấy phép **CC-BY-NC-4.0** (phi thương mại): chấp nhận cho pilot, hay chọn model khác?
 4. **`only_in_force` chuyển sang `chunker`** (E6): kịch bản ghi "Kính lọc → `vector_search.only_in_force`", cần sửa ở kịch bản/frontend khi tới lượt.
@@ -614,13 +615,132 @@ Lệnh: `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src test
 9. **`forbidden` trong câu từ chối** (corpus README câu hỏi mở 10): engine áp nguyên văn luật golden ("không chứa mục nào của `forbidden`"), nên câu "không có Điều 99 quy định…" sẽ trượt `lib-l1-t01`. Đề nghị bỏ "Điều 99 quy định", "khoản 9 quy định", "khoản 6 quy định" khỏi `forbidden` và dựa vào `cite_unknown`; cần người viết nội dung sửa golden.
 10. **Docker** chưa chạy được engine (thiếu `docs/content` và cache model trong image): chấp nhận cho v0.2 (chạy local)?
 
+**Trạng thái 2026-10-08 · nội dung** (golden, kịch bản, naive; mục 4, 5, 8, 9 ở trên và việc mở L1-N5, L2-N1, L3-N7, sao L3). Đo bằng e5 + jina-v2 thật từ `backend/.cache/engine` (index chưa dựng lại, câu hỏi mới embed trong RAM), LLM `Oracle`, 0 lời gọi Gemini; cùng khung với test `slow` e2e.
+
+- **Mục 9, `forbidden` trong câu từ chối: đã sửa golden.** Bỏ "Điều 99 quy định" (`lib-l1-t01`), "khoản 9 quy định" (`lib-l1-r02`), "khoản 6 quy định" (`lib-l3-t03`). Trích bịa vẫn trượt: "theo Điều 99" / "theo khoản N" còn trong `forbidden`, câu khẳng định "Điều 99 quy định …" bị `cite_unknown`, thiếu dấu hiệu từ chối thì trượt `refusal`. Test `test_grade_abstain_case` và `test_refusal_naming_the_missing_clause_passes_and_a_fabrication_fails` trượt trước khi sửa golden, đạt sau. `grading.py` không đổi.
+- **Mục 8, h03 không dấu: đã sửa golden.** `lib-l3-h03` = "khoản 2 điều 10 ghi gì ạ" (cùng nghĩa, giữ kiểu chữ thường nhắn tin). Ở `theo_dieu`-512-10: BM25 hạng 4 (trước: 8), dense 65, RRF 7, rerank 1; ca này đạt trong lời giải mẫu.
+- **Mục 4, 5, kịch bản: đã sửa.** Kính lọc → `chunker.only_in_force` ở kịch bản L2, L3, `library.md`, corpus README. Thùng 3.000 token chỉ tính tài liệu + câu hỏi, dặn dò đi riêng (L1 §5, §15; L2 §5; L3 §6 N5; `library.md`). Dòng `budget.exceeded` của L1-N4, L2-N2, L3-N5 trong kịch bản ghi [M] theo §15; số đo token thật thuộc việc hiệu chỉnh ngân sách.
+- **L1-N5: giữ graph, đổi nhãn.** `ix` khoá `theo_dieu`/512/10 và `top_k` 1 đã là sàn, không còn gì để đổi. Expect: T, `needs_real_models` `ret.gold_rank` trên `lib-l1-h02`; M trên `v03`, `h04`, `h05`. Số đo: N5 thật 2 sao (6/8), `ret.gold_rank`/`ret.gold_missing` chỉ bật ở h01, h02. Dense hạng 1 ở v03, h04, h05 (cosine 0,865 / 0,843 / 0,856 trên đúng điều). h02: Điều 10 (học kỳ chính, 0,865) trên Điều 19 (học kỳ phụ, 0,863), hạng ≥ 2 ở 24/24 biến thể. h01 (không dấu) hạng 3 nhưng cách 0,001 và chỉ ở `theo_dieu` ≥ 512, không assert. Lời giải mẫu L1 vẫn 3 sao (8/8, 6.920 token Oracle). Golden: `h02.bites` thêm N5.
+- **L2-N1: giữ graph, đổi nhãn.** N1 phải trùng starter (kịch bản L2 §6 "Khởi đầu"). `ret.gold_missing` trên `lib-l2-v01` → M. Số đo: N1 thật 0 sao (3/10 thường); `boundary_split` [T] bật ở v02, h03, h04 (và h01, h02, h05); `stale_doc` bật ở t01, t02, t03. v01 không có cờ: hạng phủ đủ 3 (đoạn 2019 hạng 1), nên top 3 có cả hai khoản và đoạn cũ; v01 trượt hay không tuỳ model đọc nhầm số liệu 2019. Đã đo và bỏ: `vs.top_k` 2 làm cắn v01 và giữ mọi kỳ vọng khác, `top_k` 1 cắn v01 nhưng mất `stale_doc` ở t01; cả hai không còn là starter. Bài thiếu khoản 3 tất định nằm ở L2-N5 (cắn v01, h01, h02 với model thật).
+- **L3-N7: đổi graph.** `rr.top_n` 3 → 1, giữ `ix {co_dinh, 128, 0}`. Expect: T, không cần model: `fail` và `ret.gold_missing` trên `lib-l3-t02`; N7 giờ chạy trong test nhanh (`test_naive_graph_produces_its_deterministic_flags`). Ở `co_dinh`-128-0 không đoạn nào chạm cả câu trích k2 lẫn k3, nên một đoạn trong thùng luôn thiếu một khoản. `top_n` 3 và 2 không cắn (rerank đưa đoạn k2, k3 lên #1, #2); `top_n` 1 cắn với model thật (0 sao, t02 có `ret.gold_missing`, `ret.gold_rank`) và với double nhanh. Đối chứng: lời giải mẫu với `top_n` 1 ở `theo_dieu`-512-10 vẫn đạt t02, nên hồi quy đến từ cách cắt. Cờ là `ret.gold_missing`, không phải `ret.boundary_split`, vì mỗi câu trích vẫn nằm trọn trong một đoạn.
+- **Lời giải mẫu L3 2 sao → 3 sao: chọn (a), viết lại `lib-l3-t01`** thành "Em tính nghỉ ở nhà một thời gian để đi làm kiếm tiền, điểm số và kết quả học tập có giữ lại được không, sau này quay lại thì sao ạ?". Không đổi `reference_graph`, trần `vector_search.top_k` ≤ 5, `info_cases ["lib-l3-t03"]`, chấm. Số đo lời giải mẫu: S0 golden cũ 2 sao (8/10; h03, h07, t01 trượt). S1 = h03 có dấu: 2 sao (9/10). S2 = S1 + trần dense 10, phương án (b): vẫn 2 sao, t01 dense hạng 13 > 10. S3 = S1 + t01 thành `info`, phương án (c): lời giải mẫu 3 sao, nhưng đồ thị chỉ BM25 (bm10→rr3, bm5→rr3, bm10→rr5) cũng 3 sao (9/10), trái bài học "Giữ cả Vòm Sao lẫn Tủ ngăn kéo"; loại. S4 = S1 + t01 mới: 3 sao (9/10, bẫy 2/2, 11.758/30.000 token Oracle). t01 mới ở `theo_dieu`-512-10: BM25 36, dense 1, RRF 2, rerank 1; dense và rerank hạng 1 trên cả 12 biến thể `theo_dieu`; BM25 hạng ≥ 15 trên mọi biến thể `theo_dieu` và `co_dinh` ≤ 256, nên `test_bm25_misses_the_paraphrase_trap_lib_l3_t01` vẫn đạt (hạng thấp nhất 15). Đồ thị không có dense dưới 3 sao: N3 1 sao, bm10→rr3 2, bm5→rr3 2; ở `co_dinh`-128 được 0, ở 256 tối đa 2. Chỉ dense (N1, N2) 0 sao. Hybrid không rerank với `fusion.top_k` 5 cũng 3 sao, `top_k` 3 được 0, khớp mục tiêu 2 "quyết định có cần xếp hạng lại". 12 câu viết lại không trùng chữ lên dense hạng 1–2 nhưng jina-v2 xếp rerank 5–10 hoặc rơi khỏi `theo_dieu`-512-10, nên bị loại. h07 vẫn trượt ở rerank hạng 4 (level cho 9/10).
+- **Phát hiện phụ** (cho hiệu chỉnh ngân sách và chủ dự án; token là của Oracle): L3-N8 [M] không cắn (h04, h05 hạng 1 ở cả dense và BM25). L3-N4 được 2 sao với model thật, cao hơn `max_stars` 1 (trường này chỉ là dữ liệu, không có test). L3-N5 tốn 27.307/30.000 và được 3 sao, nên `budget.exceeded` tuỳ token ra thật. Cổng "dense trượt `tra-so` ở trần `top_k` trên cả 24 biến thể" (kịch bản L3 §5) đã vỡ ở `co_dinh`-1024 ngay với ≤ 5 (v01 hạng 2 ở 1024-10, h01 hạng 2); nâng trần lên 10 sẽ vỡ rộng hơn.
+- **Còn phải làm:** dựng lại index (`uv run vgame-build-index`) vì câu `lib-l3-t01`, `lib-l3-h03` đổi; test `slow` cần index mới.
+
+**Trạng thái 2026-10-08 · backend** (mục 2 ở trên, các mục "Còn mở" của §15, model dự phòng). Test nhanh: 470 đạt (`ruff`, `mypy` sạch). Mỗi sửa lỗi có test trượt trước, đạt sau. 6 lời gọi Gemini thật (đều qua `GeminiClient` + `DailyCap`), không lời gọi nào ra 429.
+
+- **Mục 2, model: `gemini-3.5-flash-lite` là mặc định** (`config.py`, `.env.example`, README; `GEMINI_MODEL` vẫn ghi đè). Bằng chứng: spike 3.0 `gemini-3.8-flash` chỉ trả 429/503/504 (20 lượt/ngày của key đã hết), spike 3.0b `gemini-3.5-flash-lite` cho lời giải mẫu L1 3 sao, 10.262/22.000 token. E1 đổi theo: một chuỗi model, không còn một model.
+- **Chuỗi model dự phòng (`llm.py`).** `GEMINI_MODEL` rồi `GEMINI_FALLBACK_MODELS` = `gemini-3.1-flash-lite, gemini-3.5-flash` (3.7-flash bỏ ở khối "sửa lỗi vòng 1"). Kiểm `thinking_level` (engine gửi LOW/MEDIUM/HIGH):
+  - ai.google.dev (trang thinking): 3.5-flash-lite, 3.5-flash có minimal–high; 3.7-flash có low–high. Trang model 3.1-flash-lite ghi "Thinking: Supported" với ví dụ `thinking_level`, không liệt kê mức.
+  - Gọi thật một lần, `can_bang` → MEDIUM: 3.1-flash-lite và 3.5-flash trả lời (`stop=end`).
+  - 3.7-flash: 504, lần sau hết 20 s (`ReadTimeout`). 504 ở đây là hạn 20 s phía server do chính engine gửi (`X-Server-Timeout`, khối "sửa lỗi vòng 1"), nên chỉ biết model này không trả lời trong 20 s; đã bỏ khỏi chuỗi.
+  - **`gemini-2.5-flash` bị loại:** trang thinking ghi low/medium/high nhưng API trả `400 INVALID_ARGUMENT: Thinking level is not supported for this model.`
+- **Giới hạn RPM phía client.** Mỗi model có cửa sổ trượt 62 s (60 s của provider + 2 s biên), dùng chung cho mọi ca và mọi run của tiến trình. Mặc định theo bảng hạn mức của chủ dự án: 3.5-flash-lite, 3.1-flash-lite 15; 3.8-flash, 3.5-flash, 3.7-flash, 2.5-flash 5; model lạ 5. Đổi bằng `GEMINI_RPM=model=rpm,…`.
+  - Chỉ giới hạn số lời gọi: 15 lời gọi/phút × tối đa ~3,6k token vào mỗi lời gọi (thùng 3.000 ở mọi level + dặn dò + câu hỏi) ≈ 54k token/phút, dưới 250K. Một run đo được 11k–42k token.
+  - Không đếm RPD phía client: hạn mức ngày được nhận ra từ lỗi 429.
+  - Model có chỗ trống trước `hạn ca − MIN_CALL_S[model]` thì lời gọi chờ chỗ đó; muộn hơn thì nhường model kế tiếp, không chờ. Không còn đủ thời gian cho model nào thì không gọi mạng, bước và ca là `timeout` (khối "sửa lỗi vòng 1").
+  - Runtime đặt `llm.case_deadline` (ContextVar) cho từng ca.
+- **429/RESOURCE_EXHAUSTED hoặc 503 → nghỉ rồi chuyển model.** Model bị nghỉ theo `RetryInfo.retryDelay` của lỗi (không có thì 60 s). Nếu `QuotaFailure.quotaId` chứa `PerDay`, model nghỉ tới nửa đêm giờ Thái Bình Dương: tính theo luật DST của Mỹ, vì Windows thiếu tzdata cho zoneinfo. Cùng lời gọi đi tiếp sang model sau.
+  - 500/502 thử lại một lần trên cùng model. 504, 4xx và lỗi mạng không thử lại.
+  - Mọi model đều nghỉ hoặc bận: `LLMCallError(429)` không gọi mạng. Run không có câu trả lời nào thì kết thúc `run.failed{llm_unavailable}` với câu tiếng Việt cũ.
+  - `DailyCap` vẫn đếm mọi lần gọi mạng. Log chỉ ghi `model`, `status`, `cooldown_s`, không ghi thân lỗi.
+- **Ghi model đã phục vụ.**
+  - `LLMResponse.model` (fact `llm.model` của `step.finished`) là id trong chuỗi, không còn là `model_version`.
+  - `run.finished.models` = `{model: số lời gọi có trả lời}`.
+  - Khoá replay dùng model đã phục vụ. Khi tra, engine thử lần lượt các model của chuỗi theo thứ tự, nên câu trả lời cũ của model dự phòng vẫn được dùng lại.
+  - Test (client SDK giả, đồng hồ giả) cho: giãn cách của limiter, chuyển model khi 429/503, tôn trọng thời gian nghỉ, hết hạn mức ngày, mọi model cạn → `llm_unavailable`.
+- **§15 "Còn mở", đã đóng:**
+  - **SSE heartbeat:** sau 15 s không có sự kiện, gửi dòng chú thích `: ping`. Lượt đọc đang chờ được giữ qua các nhịp ping, vì huỷ nó sẽ đóng generator.
+  - **Lỗi index trong một bước** (ví dụ câu hỏi chưa embed) giờ là `index_error`, không phải `llm_error`, ở cả `step.finished` và `case.graded`. `EngineError.step_status`; `compiler.py` sửa một dòng. Không tính là provider sập.
+  - **Usage của bước lỗi** (Gemini `OTHER`) giờ được cộng vào `CaseTrace.usage`: lấy từ `RunBudget.case_usage`, nên sao 2 đếm cả token đã bị tính phí.
+  - **Index cũ:** lúc khởi động, so `manifest.corpus_sha256` với kho và kiểm mọi câu golden đã embed. Lệch thì không nạp index (cả reranker) và POST trả `503 index_stale`: "Index đã cũ so với kho quy chế hoặc bộ câu hỏi. Chủ máy chủ cần chạy lại vgame-build-index." Đo trên index thật hôm nay: `IndexStaleError: 2 golden questions not in the index` (t01, h03 vừa viết lại). Server và `spike_*.py` từ chối chạy cho tới khi dựng lại index.
+
+**Trạng thái 2026-10-08 · hiệu chỉnh** (mục "Còn phải làm" của khối nội dung, hiệu chỉnh ngân sách L2/L3, kiểm [M] `budget.exceeded`, kiểm mục 3/5/6/9 với model thật). Số đo đầy đủ: [engine-spike-report §3.2](engine-spike-report.md).
+
+- **Index đã dựng lại** (`HF_HUB_OFFLINE=1 uv run vgame-build-index`, 1.991 s trên máy dev, 47 câu hỏi): server không còn `index_stale`.
+- **`uv run pytest -m slow`: 13/13 đạt.**
+  - Lời giải mẫu 3 sao với e5 + jina-v2 thật và Oracle ở cả ba level (mục 6: L3 3 sao sau khi viết lại `t01`).
+  - Các kỳ vọng `needs_real_models` đều cắn: L1-N5 (h02), L2-N1…N5, L3-N1, N2, N6 (mục 5).
+  - `test_real_models_rank_the_anchor_questions` đạt; h03 có dấu (mục 3) đạt trong lời giải mẫu.
+  - Sau khi hạ ngân sách: lần đầu, lúc máy bận (225 s), test lời giải mẫu L3 không đủ 3 sao (bộ slow 12/13 đạt); ba lần sau đều đạt (riêng test đó 1/1, e2e 12/12, cả bộ 13/13); nhiều khả năng ca hết hạn 20 s vì rerank CPU (chưa xác nhận).
+- **Gemini thật: 85 lần gọi mạng** (cộng 6 của builder backend là 91 ≤ 100), 84 có trả lời, 1 lỗi 504, không có 429/503. Mọi lời gọi qua `GeminiClient` + limiter + `DailyCap` của engine (`scripts/spike_llm.py`, giờ nhận kế hoạch run tuỳ ý).
+- **Ngân sách sao 2 = làm tròn lên tới nghìn của 1,25 × p50 token lời giải mẫu** (quy tắc kịch bản §10, `library.md`), model `gemini-3.5-flash-lite`, `can_bang`:
+  - L1: mẫu 10.262 (3.0b) và 11.260 → 14.000 (trước 22.000); nâng lên **15.000** ở khối "sửa lỗi vòng 1".
+  - L2: 15.879 → **20.000** (trước 30.000).
+  - L3: 17.348 → **22.000** (trước 30.000). Mẫu thứ hai chạy dồn (17.117, thiếu `h07` vì 504) không tính; tính vào vẫn ra 22.000.
+  - Mẫu cao nhất bằng 79–80 % ngân sách. Phần vào gần như tất định; phần ra (thinking) dao động mạnh, ví dụ cùng prompt L3 `v01` ra 74 rồi 528 token. L1 áp cùng quy tắc vì 22.000 cũng là số tạm của quy tắc này (`library.md` "tạm 22k / 30k / 30k"); câu "22.000 đứng vững" của spike 3.0b chỉ nói lời giải mẫu nằm dưới.
+  - L1 mới có 2 mẫu, L2 và L3 có 1 mẫu đầy đủ (kịch bản đòi 3). Cổng `vgame-calibrate` (§12) thêm mẫu trước khi mở level cho lớp.
+- **[M] `budget.exceeded` đã kiểm và trở lại [T]** (đảo lại thay đổi ở §15, khớp bảng §9.3–9.5):
+  - Model thật vượt cả ngân sách cũ: L1-N4 29.091 (2 sao), L2-N2 41.664 (0 sao), L3-N5 35.803 (2 sao).
+  - Ở ngân sách mới, token đầu vào `regex-v1` của double nhanh đã vượt: 21.523/14.000, 29.560/20.000, 26.850/22.000.
+  - Level ghi `mechanism T`, `needs_real_models false`; `test_naive_graph_produces_its_deterministic_flags` trượt 3/3 khi đổi T trước, đạt sau khi hạ ngân sách.
+- **Token vào thật ≈ 1,13 × `regex-v1`** (84 lời gọi, 1,09–1,21). Mọi số "engine đo" bằng `FakeLLM`/Oracle thấp hơn token tính phí khoảng 13 %.
+- **Trung vị mỗi lời gọi** (`gemini-3.5-flash-lite`, 77 lời gọi): vào 1.347, ra + thinking 411 (p95 1.120, tối đa 1.713). Dưới mốc 1,1k nên `can_bang` → MEDIUM giữ nguyên.
+- **Thời gian mỗi ca p50 / p95:** L2 lời giải mẫu 1.647 / 2.942 ms. L3 lời giải mẫu 5.397 / 5.733 ms (rerank CPU khoảng 3,7 s mỗi ca khi 3 ca song song). Các naive nặng 1,9–2,5 s / 2,4–5,2 s.
+- **Limiter và chuỗi model với hạn mức thật (mục 9):**
+  - 6 run cách nhau ≥ 65 s: mọi lời gọi do model chính phục vụ, không chờ, không nhường.
+  - Run L3 chạy dồn ngay sau L1-N4: model chính nhận 5 lời gọi (chỗ còn lại của 15/phút), 8 lời gọi sau được nhường cho `gemini-3.1-flash-lite` mà không gọi model chính. Model dự phòng trả lời 7, lỗi 504 ở 1 sau ~18 s (504 không chuyển model, theo thiết kế; ca `llm_error`, run vẫn 3 sao). `run.finished.models` ghi đúng. Không có 429.
+  - Chưa gặp 429/503 thật, nên đường nghỉ (`RetryInfo`, `PerDay`) chỉ có test với client giả.
+  - `gemini-3.1-flash-lite` chậm (bước LLM p50 8,7 s), nên ca rơi sang model dự phòng dễ sát hạn 20 s.
+- **Hệ quả cho người chơi** (ước tính từ `regex-v1` × 1,13 + 380 token ra mỗi lời gọi, không gọi LLM):
+  - Mang thêm một đoạn mỗi ca so với lời giải mẫu là chạm vạch sao 2: L1 `top_k` 4 khoảng 13,0k (đạt), `top_k` 5 khoảng 14,4k (trượt ở 14.000; ở 15.000 đạt, sát).
+  - L3 không rerank với `fusion.top_k` 5: khoảng 23,8k, mất sao 2 (ở 30.000 được 3 sao, xem khối "nội dung"). `fusion.top_k` 4 khoảng 21,5k (đạt, 8/10).
+  - Khớp kịch bản §10 ("sao 2 cần `top_k` nhỏ"; L3 "Kính lúp `top_n` 3 hoặc `fusion.top_k` nhỏ") và mục tiêu 3 của L3.
+- **Phát hiện phụ, không đổi:**
+  - `max_stars` (chỉ là dữ liệu) lệch số đo: L1-N4 và L3-N5 khai 1 nhưng được 2 sao (s1 + s3), L3-N4 được 2 (khối nội dung).
+  - L3-N8 [M] vẫn không cắn ở h04, h05 (rerank/BM25 hạng 1); N8 được 0 sao vì trượt h01, h03, h07.
+- **File đổi:** 3 file level (`token_budget`, câu sao 2 trong `stars_vi`, `budget.exceeded` M → T); kịch bản L1 §6 N4 và §10, L2 §6 N2 và §10, L3 §6 N5 và §10, `library.md`; §9.3–9.5 ở trên; `engine-spike-report.md` §0.1, §1.2, §3.0b, §3.1, §3.2; `scripts/spike_llm.py`.
+
+**Trạng thái 2026-10-08 · sửa lỗi vòng 1** (phản biện QA chi phí/hiệu năng sau đợt hiệu chỉnh: 1 blocker, 3 major, 13 minor). Test nhanh 486 đạt, `uv run pytest -m slow` 13/13 đạt (87 s), `ruff`, `ruff format`, `mypy` sạch. 0 lời gọi Gemini thật trong vòng này (tổng của đợt vẫn 91/100). Mỗi sửa lỗi có test trượt khi đảo ngược thay đổi (kiểm lại bằng cách đảo từng thay đổi trong code: 9/9 test trượt). RAM và thời gian đo trên máy dev (i7-12700H, 20 luồng), `FakeLLM` 1,8 s (p50 của `gemini-3.5-flash-lite`), không mạng; chi tiết ở [engine-spike-report §3.3](engine-spike-report.md).
+
+- **Blocker, RAM của reranker: đã sửa** (`retrieval.py`). Mỗi lô rerank 2 cặp (trước 8), mỗi cặp (câu hỏi, đoạn) cắt ở 512 token (trước 1024 của jina; 512 cũng là giới hạn của e5, dense search không thấy hơn). Đồ thị L3 hợp lệ nặng nhất (`co_dinh` 1024/20, `bm` 10, `fu` 10, `rr` 5): committed sau run **3,2 GB** (trước 14,8 GB, và giữ nguyên sau run), lời giải mẫu L3 3,2 GB (trước 6,35 GB), lúc khởi động 2,1 GB.
+  - Arena CPU của ONNX vẫn bật: đỉnh đã bị chặn ở 3,2 GB, còn tắt arena thì rerank chậm hơn khoảng 20 % (p50 3,68 s so với 3,06 s; A/B xen kẽ, 3 song song). Tắt arena chỉ có lợi là trả bộ nhớ sau run (về 2,1 GB).
+  - Không cần hạ trần `param_limits` của L3, vì đỉnh RAM đã bị chặn bởi lô và độ dài cặp, không còn theo đồ thị.
+  - Không xếp hàng rerank sau một khoá, vì cách đó biến RAM thành ca hết giờ.
+  - Test: `test_reranker_scores_short_pairs_in_small_batches`. RAM ở §15, README và `.env.example` đã sửa (trước ghi ~1 GB).
+- **Major, thời gian rerank so với hạn 20 s / 90 s: đã sửa nhờ hai thay đổi trên.** 3 ca song song, cache rerank lạnh:
+  - Lời giải mẫu L3: rerank p50 2,3 s, tối đa 3,5 s; ca p50 4,1 s, tối đa 5,3 s; run 18,9 s.
+  - Đồ thị nặng nhất: rerank p50 5,5 s, tối đa 5,6 s; ca tối đa 7,4 s; run 32,9 s (trước 69 s).
+  - **Không đặt `threads`:** đo A/B xen kẽ trên cùng phiên (3 vòng × 13 ca): mặc định p50 2,87 s, 4 luồng 3,37 s, 6 luồng 3,10 s.
+  - Không làm nóng cache lúc khởi động: rerank lạnh đã vừa hạn.
+  - Khi máy bận (đo của vòng trước, có tiến trình khác chạy cùng), rerank lời giải mẫu lên tới p50 ~12 s. Con số "3,7 s mỗi ca" của khối "hiệu chỉnh" là lúc máy nhẹ tải.
+- **Major, chuỗi model dự phòng: đã sửa** (`llm.py`, `config.py`).
+  - Bỏ `gemini-3.7-flash` khỏi chuỗi mặc định: `GEMINI_FALLBACK_MODELS` = `gemini-3.1-flash-lite,gemini-3.5-flash`.
+  - `MIN_CALL_S` riêng cho từng model và áp cho cả model đang rảnh: 4 s cho `gemini-3.5-flash-lite`, 15 s cho `gemini-3.1-flash-lite` và model chưa đo. Không đủ thời gian thì không gọi mạng (không tốn `DailyCap`, không tốn hạn mức), bước và ca là `timeout`.
+  - Model chính có chỗ trước `hạn ca − 4 s` thì lời gọi chờ chỗ đó, không nhường sang model dự phòng chậm.
+  - Test: `test_a_call_that_cannot_finish_before_the_deadline_is_never_sent`, `test_each_model_needs_its_own_time_before_the_deadline`.
+  - **Không miễn sao 2 khi model dự phòng phục vụ.** Phần vào quyết định ngân sách và gần như tất định; `gemini-3.1-flash-lite` ra trung vị 478 so với 411 token mỗi lời gọi, tức khoảng +0,9k cho 13 lời gọi L3 (17,3k → ~18,2k, ngân sách 22k). Miễn sao 2 sẽ cho một đồ thị nặng ăn sao 2 chỉ vì một lời gọi rơi sang model khác. Sao 2 chỉ hiệu chỉnh trên model chính; `run.finished.models` cho biết khi model dự phòng phục vụ. `gemini-3.5-flash` chưa có mẫu token nào; vòng này không còn hạn mức gọi thật để đo.
+  - **Sức chứa cho pilot:** một run L3 dùng 13 trong 15 lời gọi/phút của model chính, nên khoảng 1 run mỗi phút ở model chính; run thứ hai trong cùng phút phần lớn sang model dự phòng. `DAILY_LLM_CALL_CAP` 500 ÷ 13 ≈ 38 run L3 mới mỗi ngày.
+- **Major, biên ngân sách sao 2 của L1: nâng 14.000 → 15.000** (file level, `stars_vi`, kịch bản L1 §10, `library.md`, §9.3). Bootstrap 200k mẫu của phản biện, từ phần ra của từng lời gọi trong `calib1`/`calib2`:
+  - Xác suất lời giải mẫu vượt ngân sách: 0,1–1,1 % ở 15.000, so với 1,6–6,3 % ở 14.000.
+  - `top_k` 4 (~13,0k) đạt. `top_k` 5 (~14,4k) nằm sát vạch, sao 2 gần như tung đồng xu.
+  - L1-N4 vẫn vượt chỉ với token vào (21.523 `regex-v1`), nên bẫy vẫn [T].
+  - Phương án chấm sao 2 chỉ bằng token vào (tất định, đúng bài học "cỡ ngữ cảnh") đổi hợp đồng chấm, nên để chủ dự án quyết.
+  - Mẫu L1 thứ ba chưa lấy, vì cần 10 lời gọi thật và đợt chỉ còn 9. Chủ dự án chạy `vgame-calibrate` trước khi mở L1 cho lớp.
+- **Minor, đã sửa** (mỗi mục có test trượt trước):
+  - `cite_unknown` xét theo vế: tách thêm theo `;`, "nhưng", "tuy nhiên", nên dấu hiệu từ chối ở một vế không che câu bịa ở vế sau. Hai dòng mới trong `test_grade_abstain_case`. Ví dụ: "Quy chế không quy định học vượt; Điều 99 quy định …" trước đạt bẫy `lib-l1-t01`, giờ trượt `no_fabrication`.
+  - Có ca `index_error` thì run kết thúc `run.failed{index_stale}`, không chấm như lỗi của người chơi (`test_an_index_error_fails_the_run_with_the_stale_index_message`).
+  - Run có mọi ca hết giờ ở rerank, khi chưa gọi AI, giờ được chấm như thường, không thành `llm_unavailable` (`test_cases_timing_out_in_rerank_are_scored_not_a_provider_outage`). Timeout chỉ tính là provider sập khi chính bước `llm` hết giờ.
+  - Chờ xong chỗ trống của limiter thì kiểm lại thời gian nghỉ của model (`test_a_model_that_cools_down_during_the_wait_for_its_slot_is_skipped`).
+  - Hạn phía server của mỗi request bằng thời gian còn lại của ca, không cố định 20 s. SDK gửi `HttpOptions.timeout` thành header `X-Server-Timeout`, nên các lỗi 504 sau ~18–19,4 s (`h07` của run chạy dồn; `3.7-flash` của builder) là hạn 20 s do chính engine gửi, không phải bằng chứng provider sập.
+  - Cửa sổ limiter 62 s thay vì 60 s, để có biên cho thời điểm tới server và bộ đếm theo phút cố định.
+  - 404/405 của framework trả câu tiếng Việt (`test_framework_errors_answer_in_vietnamese`).
+  - `vgame-build-index` dùng lại vector đã có trên đĩa (cùng `embed_model` và phiên bản fastembed), chỉ embed đoạn và câu hỏi mới (`test_rebuild_embeds_only_texts_the_old_index_lacks`, `test_cli_rebuild_reuses_the_index_on_disk`). Trước đó sửa 2 câu hỏi tốn 1.991 s.
+  - L3 có thêm mẫu `budget.exceeded:no_rerank` cho đồ thị không có rerank: L3-N5 không còn nhận câu "Kính lúp tốn 0 ms".
+  - `bites` của golden khớp nhãn [M]: bỏ N5 ở `lib-l1-v03`, `h04`, `h05` và N1 ở `lib-l2-v01`. Câu hỏi không đổi nên không phải dựng lại index.
+  - Hợp đồng: §7.4, §8 (`run.finished.models`, `index_stale`, nhãn `index_error`), §10 (vế, nhãn), §15 (thứ tự POST, "Còn mở", RAM).
+  - Con số cũ trong khối "backend": TPM (54k/phút thật, không phải "gấp 100 lần"), số lần gọi mạng mỗi run (52, không phải 26), cửa sổ 60 s.
+- **Minor, không đổi:**
+  - **`thinking_level` LOW/HIGH trên model dự phòng.** Cả ba level khoá `llm.profile` = `can_bang` (`param_limits` `const`), nên engine chỉ gửi MEDIUM, mức đã gọi thật được trên 3.1-flash-lite và 3.5-flash. Thử LOW/HIGH trên chuỗi trước khi một level mở profile khác (ghi ở docstring `llm.py`).
+  - **Số `threads` và làm nóng cache:** xem mục major về thời gian ở trên.
+
 ## 15. Integration notes (E, 2026-10-07)
 
-**API đã gắn** (`backend/src/vgame/api/`): `GET /api/blocks`, `GET /api/levels/{id}` (PublicLevel §9.2), `POST /api/runs?level=<id>` (thân = graph JSON, header tuỳ chọn `Idempotency-Key`), `GET /api/runs/{id}/events` (SSE, `Last-Event-ID`), `POST /api/runs/{id}/cancel`. Thứ tự kiểm ở POST: 415 (không phải `application/json`, chặn form chéo trang đốt key) → 404 level → 422 `{detail, issues[]}` (validator, gom lỗi) → 503 `llm_not_configured` → 503 `index_missing` (kể cả biến thể chưa dựng) → 503 `rerank_unavailable` → 409 (cùng `Idempotency-Key` cho đồ thị khác: "Idempotency-Key này đã dùng cho một đồ thị khác.") → 429 `RunBusyError` → 202 `{run_id, created, issues}` (issues info như `I01`, `W_RERANK_NOOP`); trùng `Idempotency-Key` (16-64 ký tự `[A-Za-z0-9_-]`) với cùng đồ thị (`graph_hash`) trả 200 cùng `run_id`. Lỗi 422 của framework (header/query/path sai) trả `{detail: "Yêu cầu không hợp lệ.", fields[]}`, không lặp input, không chữ tiếng Anh. Dịch vụ engine (`api/engine.py`) dựng một lần trong lifespan: index, reranker (chỉ khi index có), `ReplayStore` + `DailyCap` + client Gemini (chỉ khi có key); thiếu gì thì app vẫn chạy và POST trả 503 tiếng Việt. CORS mở `POST` và header `Content-Type`, `Idempotency-Key`, `Last-Event-ID` cho toàn app (CORSMiddleware không chia theo đường dẫn; chỉ `/api/runs` có POST).
+**API đã gắn** (`backend/src/vgame/api/`): `GET /api/blocks`, `GET /api/levels/{id}` (PublicLevel §9.2), `POST /api/runs?level=<id>` (thân = graph JSON, header tuỳ chọn `Idempotency-Key`), `GET /api/runs/{id}/events` (SSE, `Last-Event-ID`), `POST /api/runs/{id}/cancel`. Thứ tự kiểm ở POST: 415 (không phải `application/json`, chặn form chéo trang đốt key) → 404 level → 422 `{detail, issues[]}` (validator, gom lỗi) → 503 `llm_not_configured` → 503 `index_stale` (index lệch kho hoặc câu golden, kiểm lúc khởi động) → 503 `index_missing` (kể cả biến thể chưa dựng) → 503 `rerank_unavailable` → 409 (cùng `Idempotency-Key` cho đồ thị khác: "Idempotency-Key này đã dùng cho một đồ thị khác.") → 429 `RunBusyError` → 202 `{run_id, created, issues}` (issues info như `I01`, `W_RERANK_NOOP`); trùng `Idempotency-Key` (16-64 ký tự `[A-Za-z0-9_-]`) với cùng đồ thị (`graph_hash`) trả 200 cùng `run_id`. Lỗi 422 của framework (header/query/path sai) trả `{detail: "Yêu cầu không hợp lệ.", fields[]}`, không lặp input, không chữ tiếng Anh. Dịch vụ engine (`api/engine.py`) dựng một lần trong lifespan: index, reranker (chỉ khi index có), `ReplayStore` + `DailyCap` + client Gemini (chỉ khi có key); thiếu gì thì app vẫn chạy và POST trả 503 tiếng Việt. CORS mở `POST` và header `Content-Type`, `Idempotency-Key`, `Last-Event-ID` cho toàn app (CORSMiddleware không chia theo đường dẫn; chỉ `/api/runs` có POST).
 
 **Level:** ba file ở `engine/levels/` theo §3/§9 (không đặt ở `content/data/levels/`, vì `load_level` của D và bảng sở hữu đã chốt chỗ này). Thẻ G1–G6 chép nguyên văn L1 §5; `rules.diagnosis` chép nguyên văn câu cô Lan ở §11 từng level, khoá theo §10 (L1 dùng `ret.gold_rank:vector_search` cho dòng "hạng > K"; L3 dùng `regression` cho dòng "hồi quy", `trap.failed` cho "bẫy từ chối trượt"). `stars_vi` tóm điều kiện §10.
 
-**Đổi so với §9 (đo được, cần architect duyệt):** `budget.exceeded` của L1-N4, L2-N2, L3-N5 chuyển từ `T` sang `M`. Chỉ tính token đầu vào (regex-v1, `FakeLLM`), ba cấu hình này tốn 21.523/22.000, 29.560/30.000 và 26.592/30.000: chưa vượt. Chúng chỉ vượt nhờ token ra + thinking của model thật, nên chỉ cổng hiệu chỉnh kiểm được. L3-N4 vẫn `T` (37.234/30.000). Kịch bản ước "≈ 3.000 token/ca" nhưng `cat_duoi` dừng ở đoạn đầu tiên làm tràn, nên thùng thực tế khoảng 2.000–2.300 token.
+**Đổi so với §9 (đo được, cần architect duyệt):** `budget.exceeded` của L1-N4, L2-N2, L3-N5 chuyển từ `T` sang `M` (2026-10-08: đã trở lại `T` sau khi hiệu chỉnh ngân sách 14k/20k/22k, xem §14 khối "hiệu chỉnh"). Chỉ tính token đầu vào (regex-v1, `FakeLLM`), ba cấu hình này tốn 21.523/22.000, 29.560/30.000 và 26.592/30.000: chưa vượt. Chúng chỉ vượt nhờ token ra + thinking của model thật, nên chỉ cổng hiệu chỉnh kiểm được. L3-N4 vẫn `T` (37.234/30.000). Kịch bản ước "≈ 3.000 token/ca" nhưng `cat_duoi` dừng ở đoạn đầu tiên làm tràn, nên thùng thực tế khoảng 2.000–2.300 token.
 
 **Test đầu-cuối** (`tests/engine/test_levels_e2e.py`, `tests/test_api_runs.py`):
 - Mọi `expect` có `T` và `needs_real_models: false` (L1-N1, N2; L2-N1, N2; L3-N3, N4) sinh đúng cờ với `HashingEmbedder` + `OverlapReranker` + `Oracle`. Luật so: các ca khai báo ⊆ các ca có cờ (không đòi bằng nhau: ví dụ `cite_missing` cũng bật ở ca từ chối vì câu từ chối không mang mã); `cases` vắng = ít nhất một ca.
@@ -636,8 +756,6 @@ Lệnh: `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src test
 
 **Còn mở:**
 - Trần `DailyCap` chỉ được runtime biết sau khi một ca chạm trần (D đã ghi).
-- Lỗi index trong một bước hiện là `llm_error` (D đã ghi).
-- Phản hồi `error` của Gemini: `RunBudget` đã commit usage nhưng `CaseTrace.usage` không cộng (bước lỗi không có kết quả). Sao không đổi vì ca đó trượt.
-- Không so `manifest.corpus_sha256` với `docs/content` lúc khởi động (A đã ghi): sửa kho xong phải dựng lại index.
-- SSE không có heartbeat. Retrieval chạy đồng bộ trên event loop (đo vài ms mỗi bước, chấp nhận). Reranker nạp lúc khởi động (~1 GB RAM) khi index có.
+- ~~Lỗi index trong một bước hiện là `llm_error`~~, ~~usage của bước lỗi không cộng vào `CaseTrace.usage`~~, ~~không so `manifest.corpus_sha256` lúc khởi động~~, ~~SSE không có heartbeat~~: đã đóng 2026-10-08 (§14, khối "backend").
+- Retrieval L1/L2 chạy đồng bộ trên event loop (0–2 ms mỗi bước, chấp nhận). Rerank chạy trong thread. Tiến trình API nạp index + reranker khi index có: khoảng 2,1 GB committed lúc khởi động, khoảng 3,2 GB khi 3 ca L3 rerank song song, kể cả đồ thị L3 hợp lệ nặng nhất (§14, khối "sửa lỗi vòng 1"; trước đó tới 14,8 GB).
 - 9/24 biến thể trùng chữ (A đã ghi) và các mục §14 vẫn chờ chủ dự án.
