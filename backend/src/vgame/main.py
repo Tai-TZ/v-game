@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from vgame.api import api_router
 from vgame.api.engine import EngineServices, build_engine
+from vgame.api.routes.weather import WeatherService
 from vgame.config import Settings
 from vgame.content.repository import load_catalog
 from vgame.security import CONTENT_SECURITY_POLICY, SECURITY_HEADERS, SecurityHeadersMiddleware
@@ -65,8 +66,12 @@ async def _internal_error(_request: Request, _exc: Exception) -> JSONResponse:
     )
 
 
-def create_app(settings: Settings | None = None, engine: EngineServices | None = None) -> FastAPI:
-    """``engine`` is for tests (fake models/LLM); by default it is built at startup."""
+def create_app(
+    settings: Settings | None = None,
+    engine: EngineServices | None = None,
+    weather: WeatherService | None = None,
+) -> FastAPI:
+    """``engine`` and ``weather`` are for tests (fakes); by default they are built here."""
     settings = settings or Settings()
     load_catalog()  # Fail fast: invalid content must stop startup, not a request.
 
@@ -86,6 +91,10 @@ def create_app(settings: Settings | None = None, engine: EngineServices | None =
         openapi_url=OPENAPI_URL if docs else None,
         swagger_ui_oauth2_redirect_url=None,
         lifespan=lifespan,
+    )
+    # No I/O here: the first /api/weather request fetches.
+    app.state.weather = weather or WeatherService(
+        settings.weather_latitude, settings.weather_longitude
     )
     app.add_exception_handler(Exception, _internal_error)
     app.add_exception_handler(RequestValidationError, _invalid_request)
