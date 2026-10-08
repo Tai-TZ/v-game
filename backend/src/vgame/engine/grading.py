@@ -122,7 +122,9 @@ def _has(haystack: str, needle: str) -> bool:
     return normalize(needle) in haystack
 
 
-_SENTENCE_RE = re.compile(r"[.!?\n]")
+# Clauses for article claims: sentences, ";" and "nhưng"/"tuy nhiên", so a refusal marker in
+# one clause never excuses a claim in the next ("Không có thông tin, nhưng Điều 99 quy định").
+_CLAUSE_RE = re.compile(r"[.!?;\n]|\b(?:nhưng|tuy nhiên)\b", re.IGNORECASE)
 _ARTICLE_CLAIM_RE = re.compile(r"theo điều (\d+)|điều (\d+) quy định")
 
 
@@ -247,12 +249,12 @@ class LevelEvaluator:
     def _unknown_citations(
         self, text: str, cited: Sequence[str], included: Sequence[str]
     ) -> list[str]:
-        """Cited ids outside the pack, then non-refusal sentences claiming "theo Điều N" /
+        """Cited ids outside the pack, then non-refusal clauses claiming "theo Điều N" /
         "Điều N quy định" for an article no packed chunk touches."""
         unknown = [f"[{cid}]" for cid in cited if cid not in included]
         dieus = set().union(*(self._articles(self._by_id[cid]) for cid in included))
-        for sentence in _SENTENCE_RE.split(text):
-            norm = normalize(sentence)
+        for clause in _CLAUSE_RE.split(text):
+            norm = normalize(clause)
             if any(_has(norm, m) for m in self._spec.refusal_markers):
                 continue
             for match in _ARTICLE_CLAIM_RE.finditer(norm):
@@ -460,13 +462,14 @@ class LevelEvaluator:
 
         tokens = sum(t.usage.tokens for t in traces)
         if tokens > self._rules["token_budget"]:
+            # L3's line is about the rerank block: a graph without one gets its own line.
+            reranked = any(s.block == "rerank" for t in traces for s in t.steps)
+            key = "budget.exceeded" if reranked else "budget.exceeded:no_rerank"
             diagnosis.append(
                 {
                     "case": None,
                     "flag": "budget.exceeded",
-                    "message_vi": self._message(
-                        "budget.exceeded", _budget_vars(traces, tokens, self._rules)
-                    ),
+                    "message_vi": self._message(key, _budget_vars(traces, tokens, self._rules)),
                 }
             )
         return {"gold": gold, "diagnosis": diagnosis}
@@ -474,9 +477,9 @@ class LevelEvaluator:
     def _message(self, key: str, variables: Mapping[str, str], *, trap: bool = False) -> str:
         """Levels copy only their own §11 lines, so fall back to the nearest template."""
         templates = self._rules["diagnosis"]
-        candidates = [key]
+        candidates = [key, key.partition(":")[0]]  # e.g. budget.exceeded:no_rerank
         if key.startswith("ret.gold_rank"):  # L2 has only the gold_missing template
-            candidates += ["ret.gold_rank", "ret.gold_missing"]
+            candidates.append("ret.gold_missing")
         if trap:  # e.g. L3 has no llm.cite_unknown line but a refusal-trap line
             candidates.append("trap.failed")
         template = next((templates[k] for k in candidates if k in templates), _FALLBACK_TEMPLATE)

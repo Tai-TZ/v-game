@@ -311,7 +311,7 @@
      "cases": [
       "lib-l2-v01"
      ],
-     "mechanism": "T",
+     "mechanism": "M",
      "needs_real_models": true
     },
     {
@@ -433,7 +433,7 @@
     },
     {
      "flag": "budget.exceeded",
-     "mechanism": "M",
+     "mechanism": "T",
      "needs_real_models": false
     },
     {
@@ -739,7 +739,7 @@
   "s1_required": [
    "lib-l2-v01"
   ],
-  "token_budget": 30000,
+  "token_budget": 20000,
   "s3_forbidden_labels": [
    "stale_doc"
   ],
@@ -764,7 +764,7 @@
  },
  "stars_vi": [
   "Ít nhất 8/10 câu thường đạt, bắt buộc có câu của Hà (câu #1).",
-  "Có sao 1 và cả lượt chạy tốn không quá 30.000 token.",
+  "Có sao 1 và cả lượt chạy tốn không quá 20.000 token.",
   "Có sao 1, ba câu bẫy đều đạt và không câu nào mang văn bản hết hiệu lực vào thùng."
  ]
 }

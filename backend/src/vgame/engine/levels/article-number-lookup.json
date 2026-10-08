@@ -802,7 +802,7 @@
    "expect": [
     {
      "flag": "budget.exceeded",
-     "mechanism": "M",
+     "mechanism": "T",
      "needs_real_models": false
     }
    ]
@@ -986,7 +986,7 @@
       "id": "rr",
       "type": "rerank",
       "params": {
-       "top_n": 3
+       "top_n": 1
       }
      },
      {
@@ -1070,7 +1070,15 @@
       "lib-l3-t02"
      ],
      "mechanism": "T",
-     "needs_real_models": true
+     "needs_real_models": false
+    },
+    {
+     "flag": "ret.gold_missing",
+     "cases": [
+      "lib-l3-t02"
+     ],
+     "mechanism": "T",
+     "needs_real_models": false
     }
    ]
   },
@@ -1206,7 +1214,7 @@
   "s1_required": [
    "lib-l3-v01"
   ],
-  "token_budget": 30000,
+  "token_budget": 22000,
   "s3_forbidden_labels": [],
   "info_cases": [
    "lib-l3-t03"
@@ -1219,13 +1227,14 @@
    "ctx.gold_dropped": "Đoạn đúng có mặt, hạng {rank}, nhưng thùng đầy trước khi tới lượt nó.",
    "regression": "Ca của Hà trượt: {flag}. Lần đổi này làm vỡ thứ đã chạy được.",
    "trap.failed": "Có ca bẫy hỏi về một khoản không hề có, mà trợ lý vẫn đọc ra nội dung. Thùng của ca đó có {dieu_list}.",
-   "budget.exceeded": "Mỗi câu mang {avg_docs} đoạn vào thùng. Kính lúp tốn {ms} ms nhưng không tốn token nào."
+   "budget.exceeded": "Mỗi câu mang {avg_docs} đoạn vào thùng. Kính lúp tốn {ms} ms nhưng không tốn token nào.",
+   "budget.exceeded:no_rerank": "Mỗi câu mang {avg_docs} đoạn vào thùng. Kính lúp tốn mili giây, nhưng nó giúp bạn chỉ cần mang ba đoạn."
   },
   "stale_fails": null
  },
  "stars_vi": [
   "Ít nhất 8/10 câu thường đạt, bắt buộc có câu của Khang (câu #1).",
-  "Có sao 1 và cả lượt chạy tốn không quá 30.000 token.",
+  "Có sao 1 và cả lượt chạy tốn không quá 22.000 token.",
   "Có sao 1 và mọi câu bẫy đều đạt."
  ]
 }

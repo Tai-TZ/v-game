@@ -588,7 +588,7 @@
    "expect": [
     {
      "flag": "budget.exceeded",
-     "mechanism": "M",
+     "mechanism": "T",
      "needs_real_models": false
     }
    ]
@@ -679,11 +679,19 @@
     {
      "flag": "ret.gold_rank",
      "cases": [
+      "lib-l1-h02"
+     ],
+     "mechanism": "T",
+     "needs_real_models": true
+    },
+    {
+     "flag": "ret.gold_rank",
+     "cases": [
       "lib-l1-v03",
       "lib-l1-h04",
       "lib-l1-h05"
      ],
-     "mechanism": "T",
+     "mechanism": "M",
      "needs_real_models": true
     }
    ]
@@ -694,7 +702,7 @@
   "s1_required": [
    "lib-l1-v01"
   ],
-  "token_budget": 22000,
+  "token_budget": 15000,
   "s3_forbidden_labels": [
    "cite_unknown"
   ],
@@ -712,7 +720,7 @@
  },
  "stars_vi": [
   "Ít nhất 6/8 câu thường đạt, bắt buộc có câu của Minh (câu #1).",
-  "Có sao 1 và cả lượt chạy tốn không quá 22.000 token.",
+  "Có sao 1 và cả lượt chạy tốn không quá 15.000 token.",
   "Có sao 1, hai câu bẫy đều đạt và không câu nào trích nguồn bịa."
  ]
 }

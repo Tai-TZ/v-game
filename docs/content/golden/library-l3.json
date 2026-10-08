@@ -261,7 +261,7 @@
       "id": "lib-l3-h03",
       "role": "hidden",
       "vai": "tra-so",
-      "question": "khoan 2 dieu 10 ghi gi a",
+      "question": "khoản 2 điều 10 ghi gì ạ",
       "expect": "answer",
       "answer_points": [
         "25 tín chỉ"
@@ -280,7 +280,7 @@
         "N1",
         "N2"
       ],
-      "notes": "Tra số ngoài họ 41/47/74 (yêu cầu B4), gõ không dấu. Chữ số '10' và '2' vẫn khớp BM25 dù 'dieu' không dấu; nếu tokenizer BM25 không bỏ dấu thì 'dieu'/'khoan' không khớp 'điều'/'khoản' (xem README, Câu hỏi mở)."
+      "notes": "Tra số ngoài họ 41/47/74 (yêu cầu B4), gõ chữ thường kiểu nhắn tin. Đổi 2026-10-08 từ bản không dấu 'khoan 2 dieu 10 ghi gi a' (cùng nghĩa): BM25 giữ dấu (E9) nên bản cũ chỉ khớp chữ số, hạng 8, ngoài top 5 của lời giải mẫu. Đo bản có dấu (e5 + jina-v2, theo_dieu-512-10): BM25 hạng 4, dense 65, RRF 7, rerank 1."
     },
     {
       "id": "lib-l3-h04",
@@ -393,7 +393,7 @@
       "id": "lib-l3-t01",
       "role": "trap",
       "vai": "dien-dat-lai",
-      "question": "Em tính nghỉ ở nhà một thời gian để đi làm kiếm tiền, sau này quay lại thì có được không ạ?",
+      "question": "Em tính nghỉ ở nhà một thời gian để đi làm kiếm tiền, điểm số và kết quả học tập có giữ lại được không, sau này quay lại thì sao ạ?",
       "expect": "answer",
       "answer_points": [
         "bảo lưu",
@@ -412,7 +412,7 @@
       "bites": [
         "N3"
       ],
-      "notes": "Neo brief §3. Điều 12 không chứa âm tiết nội dung nào của câu hỏi (tính, nghỉ, nhà, thời, gian, đi, làm, kiếm, tiền, quay, lại; self-check kiểm), nên BM25 trượt; dense dự kiến bắt được nhờ nghĩa 'gián đoạn việc học … tiếp tục chương trình' (ƯỚC TÍNH)."
+      "notes": "Neo brief §3. Câu chỉ chung với Điều 12 cụm chung \"kết quả học tập\" (có ở 9 điều) và \"số\", không chung từ đặc thù (nghỉ, nhà, thời gian, đi làm, kiếm tiền, quay lại, giữ, điểm). Đo 2026-10-08 (e5 + jina-v2): BM25 hạng ≥ 15 trên mọi biến thể theo_dieu và co_dinh ≤ 256 (36 ở theo_dieu-512-10), dense hạng 1 và rerank hạng 1 trên cả 12 biến thể theo_dieu."
     },
     {
       "id": "lib-l3-t02",
@@ -461,12 +461,11 @@
       "answer_points": [],
       "gold": [],
       "forbidden": [
-        "khoản 6 quy định",
         "theo khoản 6"
       ],
       "trap": "nonexistent_article",
       "bites": [],
-      "notes": "Bẫy thứ ba (brief yêu cầu ≥ 3). Điều 41 có thật nhưng chỉ có 4 khoản; BM25 kéo Điều 41 lên rất mạnh nên model dễ đọc khoản 2 hoặc 4 thay vào. Không có cấu hình ngây thơ nào của L3 nhắm riêng ca này; nó kiểm G3 (thẻ từ chối) còn giữ khi lắp hybrid. [M]: đề xuất tính info cho tới khi qua cổng hiệu chỉnh. Danh sách dấu hiệu từ chối cần thêm 'không có khoản'."
+      "notes": "Bẫy thứ ba (brief yêu cầu ≥ 3). Điều 41 có thật nhưng chỉ có 4 khoản; BM25 kéo Điều 41 lên rất mạnh nên model dễ đọc khoản 2 hoặc 4 thay vào. Không có cấu hình ngây thơ nào của L3 nhắm riêng ca này; nó kiểm G3 (thẻ từ chối) còn giữ khi lắp hybrid. [M]: đề xuất tính info cho tới khi qua cổng hiệu chỉnh. Danh sách dấu hiệu từ chối cần thêm 'không có khoản'. Bỏ 'khoản 6 quy định' khỏi forbidden (2026-10-08): mục đó khớp cả câu từ chối đúng; trích bịa vẫn trượt qua 'theo khoản 6' và llm.cite_unknown."
     },
     {
       "id": "lib-l3-r01",

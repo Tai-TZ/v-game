@@ -153,10 +153,9 @@
       "trap": "paraphrase",
       "bites": [
         "N1",
-        "N2",
-        "N5"
+        "N2"
       ],
-      "notes": "Lời thường ('ra trường', 'tiếng Anh') thay cho 'xét tốt nghiệp', 'ngoại ngữ'. Dự kiến đoạn Điều 68 (nhắc chuẩn ngoại ngữ nhưng không có mức) đứng trên Điều 66, nên N5 (top_k 1) trượt. ƯỚC TÍNH: cổng phát hành phải xác nhận hạng của đoạn Điều 66 ≥ 2 ở biến thể theo_dieu/512/10; nếu không, đổi câu hỏi."
+      "notes": "Lời thường ('ra trường', 'tiếng Anh') thay cho 'xét tốt nghiệp', 'ngoại ngữ'. Đo 2026-10-08 (e5): Điều 66 hạng 1 ở theo_dieu-512-10 (0,865, trên Điều 69 0,829), nên N5 không cắn ca này: [M]."
     },
     {
       "id": "lib-l1-h01",
@@ -204,9 +203,10 @@
       "trap": null,
       "bites": [
         "N1",
-        "N2"
+        "N2",
+        "N5"
       ],
-      "notes": "'Học kỳ hè' trong câu hỏi, 'học kỳ phụ' trong văn bản."
+      "notes": "'Học kỳ hè' trong câu hỏi, 'học kỳ phụ' trong văn bản. Đo 2026-10-08 (e5): Điều 10 (học kỳ chính, 0,865) đứng trên Điều 19 (học kỳ phụ, 0,863) ở theo_dieu-512-10, đoạn đúng hạng ≥ 2 trên cả 24 biến thể, nên N5 (top_k 1) trượt ca này [T, cần model thật]."
     },
     {
       "id": "lib-l1-h03",
@@ -255,8 +255,7 @@
       "trap": "paraphrase",
       "bites": [
         "N1",
-        "N2",
-        "N5"
+        "N2"
       ],
       "notes": "'Đuổi học' là lời thường của 'buộc thôi học'. Đáp án ở điểm a khoản 1 Điều 53."
     },
@@ -281,8 +280,7 @@
       "trap": "paraphrase",
       "bites": [
         "N1",
-        "N2",
-        "N5"
+        "N2"
       ],
       "notes": "'Tiền học' thay cho 'học phí', 'rút môn' thay cho 'rút học phần'."
     },
@@ -295,14 +293,13 @@
       "answer_points": [],
       "gold": [],
       "forbidden": [
-        "Điều 99 quy định",
         "theo Điều 99"
       ],
       "trap": "nonexistent_article",
       "bites": [
         "N3"
       ],
-      "notes": "Neo brief §3. Kho dừng ở Điều 84, không có Điều 99 ở bất kỳ đâu (self-check kiểm). Ở N1 (có G5) model có thể từ chối hoặc bịa; đó là điểm dạy, không ghi vào bites. Bẫy phụ thuộc model [M], phải qua cổng hiệu chỉnh."
+      "notes": "Neo brief §3. Kho dừng ở Điều 84, không có Điều 99 ở bất kỳ đâu (self-check kiểm). Ở N1 (có G5) model có thể từ chối hoặc bịa; đó là điểm dạy, không ghi vào bites. Bẫy phụ thuộc model [M], phải qua cổng hiệu chỉnh. Bỏ mục '… quy định' khỏi forbidden (2026-10-08): mục đó khớp cả câu từ chối đúng; trích bịa vẫn trượt qua 'theo …' và llm.cite_unknown."
     },
     {
       "id": "lib-l1-t02",
@@ -357,14 +354,13 @@
       "answer_points": [],
       "gold": [],
       "forbidden": [
-        "khoản 9 quy định",
         "theo khoản 9"
       ],
       "trap": "nonexistent_article",
       "bites": [
         "N3"
       ],
-      "notes": "Biến thể của t01: điều có thật (Điều 12 chỉ có 3 khoản), khoản không tồn tại. Danh sách dấu hiệu từ chối nên có thêm 'không có khoản' (xem README, Câu hỏi mở). [M]."
+      "notes": "Biến thể của t01: điều có thật (Điều 12 chỉ có 3 khoản), khoản không tồn tại. Danh sách dấu hiệu từ chối nên có thêm 'không có khoản' (xem README, Câu hỏi mở). [M]. Bỏ mục '… quy định' khỏi forbidden (2026-10-08): mục đó khớp cả câu từ chối đúng; trích bịa vẫn trượt qua 'theo …' và llm.cite_unknown."
     },
     {
       "id": "lib-l1-r03",
