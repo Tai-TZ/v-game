@@ -15,7 +15,7 @@ import { useActiveTheme } from "~/features/theme/context";
 import type { CampusTheme } from "~/features/theme/schema";
 
 import { CAMERA_OFFSET } from "../camera";
-import { NPC_SPOT } from "../layout";
+import { NPC_SPOT, SITES } from "../layout";
 import type { InteractTarget, SiteInfoMap } from "../sites";
 import {
   BLOB_SEGMENTS,
@@ -120,15 +120,20 @@ function Campus({ campus, sites, options }: CampusProps) {
     invalidate();
   }, [materials, g.palette, invalidate]);
 
-  const { player, playerBlob, lan, ring } = useHubFrame(options);
+  const { player, playerBlob, lan, ring, statics } = useHubFrame(options);
 
   return (
     <>
-      {[g.terrain, g.landmark, g.library, g.watchtower, g.market].map((geometry, i) => (
-        <mesh key={i} geometry={geometry} material={materials.baked} />
-      ))}
-      <Trees geometry={g.roundTree} material={materials.figure} trees={ROUND} />
-      <Trees geometry={g.cypress} material={materials.figure} trees={CYPRESS} />
+      {/* Everything a click can land on (clickGoal); the figures, blobs and ring stay out. */}
+      <group ref={statics}>
+        <mesh geometry={g.terrain} material={materials.baked} />
+        <mesh geometry={g.landmark} material={materials.baked} />
+        {SITES.map(({ id }) => (
+          <mesh key={id} geometry={g[id]} material={materials.baked} userData={{ site: id }} />
+        ))}
+        <Trees geometry={g.roundTree} material={materials.figure} trees={ROUND} />
+        <Trees geometry={g.cypress} material={materials.figure} trees={CYPRESS} />
+      </group>
 
       <group ref={player}>
         <mesh geometry={g.player} material={materials.xray} renderOrder={1} />

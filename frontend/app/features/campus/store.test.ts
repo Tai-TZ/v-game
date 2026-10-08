@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { INTERACT_RADIUS, NPC_TALK_SPOT, SITES, SPAWN } from "./layout";
+import { BACK_SPOT, INTERACT_RADIUS, NPC_TALK_SPOT, routeTo, SITES, SPAWN } from "./layout";
 import { nearestWithin } from "./movement";
 import { hintFor, INTERACT_POINTS, siteInfo } from "./sites";
 import { createHubStore } from "./store";
@@ -56,6 +56,26 @@ describe("hub store", () => {
     expect(nearby).toBe("lan");
     expect(dialog).toBe("first");
     expect(wake).toHaveBeenCalled();
+  });
+
+  it("walks to the back of campus along the route, and placing the player drops the route", () => {
+    const store = createHubStore();
+    const wake = vi.fn();
+    store.getState().setWake(wake);
+    store.getState().motion.talkOnArrival = true;
+
+    store.getState().walkTo(BACK_SPOT);
+
+    const { motion } = store.getState();
+    expect([motion.target, ...motion.route]).toEqual(routeTo(SPAWN, BACK_SPOT));
+    expect(motion.route.length).toBeGreaterThan(0);
+    expect(motion.route.at(-1)).toEqual(BACK_SPOT);
+    expect(motion.talkOnArrival).toBe(false);
+    expect(wake).toHaveBeenCalled();
+
+    store.getState().placePlayer(SPAWN, 0);
+    expect(store.getState().motion.target).toBeNull();
+    expect(store.getState().motion.route).toEqual([]);
   });
 
   it("recomputes the nearby target whenever the player is placed", () => {

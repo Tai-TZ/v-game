@@ -5,6 +5,7 @@ import {
   INTERACT_RADIUS,
   NPC_SPOT,
   NPC_TALK_SPOT,
+  routeTo,
   SPAWN,
   SPAWN_HEADING,
   type Vec2,
@@ -21,6 +22,8 @@ export interface Motion {
   heading: number;
   /** Click/tap destination, cleared on arrival. */
   target: Vec2 | null;
+  /** Waypoints still to walk after `target` (front to back of campus, v0.3 §2.5). */
+  route: Vec2[];
   /** Open the dialog when the current walk target is reached (clicked the librarian). */
   talkOnArrival: boolean;
   keys: Set<string>;
@@ -47,6 +50,8 @@ export interface HubState {
   /** Accessible path: place the player next to the librarian and open the dialog. */
   talkToLan: () => void;
   placePlayer: (position: Vec2, heading: number) => void;
+  /** Click-to-move to `goal`, through the lane waypoints when it is in another part of campus. */
+  walkTo: (goal: Vec2) => void;
   setSheetInset: (px: number) => void;
   setWake: (wake: () => void) => void;
 }
@@ -63,6 +68,7 @@ export function createHubStore() {
       position: { ...SPAWN },
       heading: SPAWN_HEADING,
       target: null,
+      route: [],
       talkOnArrival: false,
       keys: new Set(),
     },
@@ -89,9 +95,19 @@ export function createHubStore() {
       motion.position = { ...position };
       motion.heading = heading;
       motion.target = null;
+      motion.route = [];
       motion.talkOnArrival = false;
       motion.keys.clear();
       get().setNearby(nearestWithin(position, INTERACT_POINTS, INTERACT_RADIUS)?.id ?? null);
+      get().wake();
+    },
+    walkTo: (goal) => {
+      const { motion } = get();
+      const [next, ...rest] = routeTo(motion.position, goal);
+      motion.target = next ?? null;
+      motion.route = rest;
+      motion.talkOnArrival = false;
+      motion.keys.clear();
       get().wake();
     },
     setSheetInset: (sheetInset) => {

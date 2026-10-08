@@ -9,6 +9,7 @@ import { ZoneCard, ZonesErrorNotice } from "~/features/zones/ZoneCard";
 import { AUTHOR } from "~/lib/site";
 import { useDelayedFlag } from "~/lib/useSettled";
 
+import { BACK_SPOT, BACK_Z, SPAWN } from "../layout";
 import { hubStore } from "../store";
 
 const PANEL_ID = "hub-zone-list";
@@ -27,6 +28,8 @@ interface HubTopBarProps {
  */
 export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
   const [open, setOpen] = useState(false);
+  /** Where the player stood when the list opened: behind the main building or in front. */
+  const [inBack, setInBack] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -76,7 +79,10 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
           type="button"
           aria-expanded={open}
           aria-controls={PANEL_ID}
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => {
+            setInBack(hubStore.getState().motion.position.z < BACK_Z);
+            setOpen((value) => !value);
+          }}
           className={buttonClass("secondary")}
         >
           Các khu
@@ -101,6 +107,19 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
               className="min-h-12 w-full px-4 text-left text-sm font-semibold hover:bg-subtle"
             >
               Nói chuyện với cô Lan
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                toggleRef.current?.focus();
+                hubStore.getState().walkTo(inBack ? SPAWN : BACK_SPOT);
+              }}
+              className="min-h-12 w-full px-4 text-left text-sm font-semibold hover:bg-subtle"
+            >
+              {inBack ? "Về mặt trước" : "Đi tới khuôn viên phía sau"}
             </button>
           </li>
           {zones === undefined &&

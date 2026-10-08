@@ -1,6 +1,6 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
-import { Plane, Raycaster, Vector2, Vector3, type Group, type Mesh } from "three";
+import { Plane, Raycaster, Vector2, Vector3, type Group, type Mesh, type Object3D } from "three";
 
 import {
   CAMERA_OFFSET,
@@ -19,6 +19,7 @@ import {
   OBSTACLES,
   SITES,
   WORLD_BOUNDS,
+  type Vec2,
 } from "../layout";
 import { isMovementKey, nearestWithin, step } from "../movement";
 import { INTERACT_POINTS, type InteractTarget } from "../sites";
@@ -72,6 +73,27 @@ const hit = new Vector3();
 const projected = new Vector3();
 
 /**
+ * Where a click walks to (campus-scene v0.3 §2.5): the first surface drawn under the ray
+ * (`statics`: buildings, terrain, trees), else the ground plane. A zone building's door when
+ * that surface is the building's own mesh (tagged `userData.site`, awnings included, QA r4) or
+ * the point is on its footprint. A click high on a tower thus lands on the tower, not on the
+ * ground far behind it, and routeTo stands the player in front of the face that was clicked.
+ */
+export function clickGoal(ray: Raycaster, statics: Object3D | null): Vec2 | null {
+  const [surface] = statics ? ray.intersectObject(statics, true) : [];
+  const point = surface?.point ?? ray.ray.intersectPlane(groundPlane, hit);
+  if (!point) return null;
+  const tag: unknown = surface?.object.userData.site;
+  const site =
+    SITES.find(({ id }) => id === tag) ??
+    SITES.find(
+      ({ footprint: f }) =>
+        Math.abs(point.x - f.x) <= f.halfX + 0.2 && Math.abs(point.z - f.z) <= f.halfZ + 0.2,
+    );
+  return site ? site.door : { x: point.x, z: point.z };
+}
+
+/**
  * The hub's per-frame loop and input. Reads and mutates `hubStore.motion` directly; the only
  * store writes that re-render React are coarse (nearby target, dialog). Requests a new frame
  * only while something moves, so an idle scene renders nothing (`frameloop="demand"`).
@@ -88,6 +110,7 @@ export function useHubFrame(options: {
   const playerBlob = useRef<Mesh>(null);
   const lan = useRef<Group>(null);
   const ring = useRef<Mesh>(null);
+  const statics = useRef<Group>(null);
   const onInteract = useRef(options.onInteract);
   const reducedMotion = useRef(options.reducedMotion);
   useEffect(() => {
@@ -126,6 +149,7 @@ export function useHubFrame(options: {
         event.preventDefault();
         motion.keys.add(event.code);
         motion.target = null;
+        motion.route = [];
         motion.talkOnArrival = false;
         invalidate();
       } else if (event.code === "KeyE" && !event.repeat) {
@@ -153,7 +177,7 @@ export function useHubFrame(options: {
     };
   }, [invalidate]);
 
-  // Click / tap to walk: ray against the librarian's body height, then the ground plane.
+  // Click / tap to walk: ray against the librarian's body height, then the scenery (clickGoal).
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
       const state = hubStore.getState();
@@ -164,26 +188,18 @@ export function useHubFrame(options: {
         -((event.clientY - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      const { motion } = state;
       const body = raycaster.ray.intersectPlane(bodyPlane, hit);
       if (body && Math.hypot(body.x - NPC_SPOT.x, body.z - NPC_SPOT.z) < 0.45) {
         if (state.nearby === "lan") {
           onInteract.current("lan");
           return;
         }
-        motion.target = { ...NPC_TALK_SPOT };
-        motion.talkOnArrival = true;
+        state.walkTo(NPC_TALK_SPOT);
+        state.motion.talkOnArrival = true;
       } else {
-        const ground = raycaster.ray.intersectPlane(groundPlane, hit);
-        if (!ground) return;
-        const site = SITES.find(
-          ({ footprint: f }) =>
-            Math.abs(ground.x - f.x) <= f.halfX + 0.2 && Math.abs(ground.z - f.z) <= f.halfZ + 0.2,
-        );
-        motion.target = site ? { ...site.door } : { x: ground.x, z: ground.z };
-        motion.talkOnArrival = false;
+        const goal = clickGoal(raycaster, statics.current);
+        if (goal) state.walkTo(goal);
       }
-      invalidate();
     };
     canvas.addEventListener("click", onClick);
     return () => canvas.removeEventListener("click", onClick);
@@ -205,6 +221,7 @@ export function useHubFrame(options: {
     if (state.dialog) {
       motion.keys.clear();
       motion.target = null;
+      motion.route = [];
     }
     const moved = step(
       motion.position,
@@ -218,18 +235,20 @@ export function useHubFrame(options: {
         moved.position.x - motion.position.x,
         moved.position.z - motion.position.z,
       );
-      motion.position = moved.position;
       busy = true;
     } else {
       a.walked = 0;
     }
+    motion.position = moved.position; // also the ≤ 0.08 snap onto a reached target
     if (moved.heading !== null) motion.heading = moved.heading;
 
     const near = nearestWithin(motion.position, INTERACT_POINTS, INTERACT_RADIUS)?.id ?? null;
     state.setNearby(near);
     if (moved.targetDone) {
-      motion.target = null;
-      if (motion.talkOnArrival) {
+      // On to the next waypoint; the walk is over only when the route is empty.
+      motion.target = motion.route.shift() ?? null;
+      if (motion.target) busy = true;
+      else if (motion.talkOnArrival) {
         motion.talkOnArrival = false;
         if (near === "lan") onInteract.current("lan");
       }
@@ -347,5 +366,5 @@ export function useHubFrame(options: {
     if (busy) three.invalidate();
   });
 
-  return { player, playerBlob, lan, ring };
+  return { player, playerBlob, lan, ring, statics };
 }
