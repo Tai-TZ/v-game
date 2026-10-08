@@ -75,8 +75,8 @@
 | Vòm Sao + Đèn pin | `vector_search` | như L1 | mở |
 | Móc kéo K | `vector_search.top_k` | 1–10 | mở |
 | Màn lọc mờ | `vector_search.score_threshold` | 0–0,9, bước 0,05 | **mở** |
-| Kính lọc hiệu lực | `vector_search.only_in_force` | `false` / `true` | **mở** |
-| Thùng Context, Máy đóng tem | `context_packer` | `token_budget` 3000, `on_overflow` `cat_duoi` (khoá); `cite_ids` | như L1 |
+| Kính lọc hiệu lực | `chunker.only_in_force` (tầng Index, engine-v0.2 E6: lọc trước khi tìm, mọi retriever cắm vào index đó đều không thấy văn bản hết hiệu lực) | `false` / `true` | **mở** |
+| Thùng Context, Máy đóng tem | `context_packer` | `token_budget` 3000 (tài liệu + câu hỏi; dặn dò đi riêng, E8), `on_overflow` `cat_duoi` (khoá); `cite_ids` | như L1 |
 | Bộ Óc, Lăng kính | `llm` | `profile` `can_bang` (khoá); thẻ G1–G6 như L1 | như L1 |
 
 - Mỗi lần đổi Lược dao, Nam châm hay Băng keo chỉ là **chọn 1 trong 24 biến thể index đã tính sẵn** (Phần 3 §3.2, §3.7). Không có index lại khi đang chơi.
@@ -85,7 +85,7 @@
 **Cấu hình khởi đầu:**
 - bản sao lời giải tốt nhất ở L1 của người chơi;
 - ghi đè `chunker` thành `{"strategy": "co_dinh", "chunk_size": 128, "overlap_pct": 0}` (index Bống vừa nạp);
-- `only_in_force: false`, `score_threshold: 0`;
+- `chunker.only_in_force: false`, `score_threshold: 0`;
 - kho thêm `qcdt-2019`.
 
 Trạng thái này đúng với cấu hình dở "chunk 128 với overlap 0%" của Phần 3 §3.3.
@@ -103,7 +103,7 @@ Trạng thái này đúng với cấu hình dở "chunk 128 với overlap 0%" c�
  "llm.profile": {"const": "can_bang"}}
 ```
 
-**Lời giải mẫu (hiệu chỉnh, không hiện):** `chunker` `theo_dieu`/512/10, `top_k` 3, `only_in_force: true`, `score_threshold` 0, tem bật, G1–G3.
+**Lời giải mẫu (hiệu chỉnh, không hiện):** `chunker` `theo_dieu`/512/10 với `only_in_force: true`, `top_k` 3, `score_threshold` 0, tem bật, G1–G3.
 
 **Xem trước tất định (miễn phí, không gọi LLM, không gold):**
 - dải đoạn của điều đang xem, với ranh giới thật của biến thể và câu bị cắt ngang tô đỏ (dò ranh giới câu, không cần gold);
@@ -118,8 +118,8 @@ Không có đồng hồ "Độ phủ/Độ sạch" của gameplay-direction, vì
 
 | # | Cấu hình | Cơ chế | Ca trượt | Cờ |
 |---|---|---|---|---|
-| N1 | Khởi đầu: `co_dinh` 128/0, `top_k` lấy từ L1 (thường 3), lọc tắt | [T] Ở biến thể 128/0, khoản 2 và khoản 3 Điều 12 nằm ở hai đoạn khác nhau, và đoạn khoản 3 đứng hạng > K cho câu của Hà (cổng phát hành xác nhận). Dữ kiện riêng của khoản 3 không vào thùng nên `answer_points` trượt. [T] Câu đáp án dài của các ca vai `cau-dai` (một ca thấy được, các ca ẩn) bắc qua ranh giới 128. [T] Đoạn 2019 gần giống đứng hạng ≤ K cho mọi ca bẫy | `lib-l2-v01`, ca thấy được vai `cau-dai`, ca ẩn vai `ngoai-le-khoan-sau` và `cau-dai`; mọi ca bẫy `lib-l2-t01`, `t02`, `t03` (vì `ret.stale_doc`) | `ret.gold_missing`, `ret.boundary_split`, `ret.stale_doc` |
-| N2 | `co_dinh` 1024/0, `top_k` 10, lọc tắt ("kéo nhiều cho chắc") | [T] 10 đoạn × ~1.000 token ≫ thùng 3.000, nên `cat_duoi` cắt 7 đoạn trở lên. Đoạn đúng đứng hạng ≥ 3 bị cắt (`ctx.gold_dropped`). Mỗi ca đẩy ≈ 3.000 token vào, vượt ngân sách sao 2. [T] Đoạn 2019 đứng hạng 1–2 nên vẫn còn trong thùng | mọi ca bẫy `lib-l2-t01`, `t02`, `t03`; các ca ẩn có đoạn đúng đứng hạng ≥ 3; **sao 2** | `pack.dropped`, `ctx.gold_dropped`, `budget.exceeded`, `ret.stale_doc` |
+| N1 | Khởi đầu: `co_dinh` 128/0, `top_k` lấy từ L1 (thường 3), lọc tắt | [M] Ở biến thể 128/0, khoản 2 và khoản 3 Điều 12 nằm ở hai đoạn khác nhau. Đo 2026-10-08: e5 đưa đủ đoạn khoản 2 và khoản 3 vào top 3 (hạng phủ đủ 3), đoạn 2019 hạng 1 cũng vào thùng; v01 trượt hay không tuỳ model có đọc nhầm số liệu 2019; bẫy thiếu khoản 3 tất định nằm ở N5. [T] Câu đáp án dài của các ca vai `cau-dai` (một ca thấy được, các ca ẩn) bắc qua ranh giới 128. [T] Đoạn 2019 gần giống đứng hạng ≤ K cho mọi ca bẫy | `lib-l2-v01`, ca thấy được vai `cau-dai`, ca ẩn vai `ngoai-le-khoan-sau` và `cau-dai`; mọi ca bẫy `lib-l2-t01`, `t02`, `t03` (vì `ret.stale_doc`) | `ret.gold_missing`, `ret.boundary_split`, `ret.stale_doc` |
+| N2 | `co_dinh` 1024/0, `top_k` 10, lọc tắt ("kéo nhiều cho chắc") | [T] 10 đoạn × ~1.000 token ≫ thùng 3.000, nên `cat_duoi` cắt 7 đoạn trở lên. Đoạn đúng đứng hạng ≥ 3 bị cắt (`ctx.gold_dropped`). [T] Mỗi ca đẩy gần 3.000 token vào, nên riêng token đầu vào đã vượt ngân sách sao 2: engine đo 29.560/20.000 (regex-v1), Gemini thật 41.664/20.000 (2026-10-08, engine-spike-report §3.2). [T] Đoạn 2019 đứng hạng 1–2 nên vẫn còn trong thùng | mọi ca bẫy `lib-l2-t01`, `t02`, `t03`; các ca ẩn có đoạn đúng đứng hạng ≥ 3; **sao 2** | `pack.dropped`, `ctx.gold_dropped`, `budget.exceeded`, `ret.stale_doc` |
 | N3 | `theo_dieu` 512/10, `top_k` 3, lọc **tắt** | [T] Chunk tốt nên đủ sao 1–2, nhưng đoạn 2019 vẫn vào thùng ở mọi ca bẫy | `lib-l2-t01`, `t02`, `t03` → **sao 3** | `ret.stale_doc` |
 | N4 | Như mẫu nhưng `score_threshold` 0,8 | [T] Cosine của đoạn đúng ở phần lớn ca < 0,8 (cổng phát hành đo) nên thùng rỗng. [M] Có G3 thì model từ chối, không có G3 thì có thể bịa | đa số ca thường → **sao 1** | `ret.gold_missing` (đoạn bị lọc), `pack.tokens` ≈ 0 |
 | N5 | `co_dinh` 256/20, `top_k` 1, lọc bật | [T] `top_k` 1 không chứa được cả khoản 2 lẫn khoản 3 khi chúng nằm ở hai đoạn | `lib-l2-v01`, ca `ngoai-le-khoan-sau` | `ret.gold_missing` |
@@ -128,7 +128,7 @@ Không có đồng hồ "Độ phủ/Độ sạch" của gameplay-direction, vì
 
 | Cấu hình | v01 | ca thấy được `cau-dai` | t01 | t02 (`da-bai-bo`) | t03 | Token/ca | Sao |
 |---|---|---|---|---|---|---|---|
-| N1 (khởi đầu) | trượt | trượt | trượt | trượt | trượt | ~1.100 | 0 |
+| N1 (khởi đầu) | trượt [M] | trượt | trượt | trượt | trượt | ~1.100 | 0 |
 | N2 | đạt | đạt | trượt | trượt | trượt | ~3.400 | 0–1 |
 | N3 | đạt | đạt | trượt | trượt | trượt | ~1.800 | 2 |
 | Mẫu | đạt | đạt | đạt | đạt | đạt | ~1.800 | 3 |
@@ -169,7 +169,7 @@ Giống [L1 mục 9](library-l1-grounded-citation.md#9-tiêu-chí-chấm-một-c
 | Sao | Điều kiện | Ghi chú |
 |---|---|---|
 | 1 | Ít nhất 8/10 ca thường đạt (`v01`–`v03` + 7 ca ẩn), **bắt buộc có `lib-l2-v01`** | Mở L3. Đơn của Hà được nhận |
-| 2 | Có sao 1 **và** tổng token ≤ **30.000** (tạm) | 1,25 × p50 của lời giải mẫu, làm tròn lên tới nghìn. Ước tính lời giải mẫu ≈ 1.800 × 13 ≈ 23.400 |
+| 2 | Có sao 1 **và** tổng token ≤ **20.000** | 1,25 × p50 của lời giải mẫu, làm tròn lên tới nghìn. Hiệu chỉnh 2026-10-08 với `gemini-3.5-flash-lite`, `can_bang`: lời giải mẫu 15.879 token (engine-spike-report §3.2) |
 | 3 | Có sao 1 **và** mọi ca bẫy (`lib-l2-t01`, `t02`, `t03`) đều đạt **và** cả run không có ca nào có `ret.stale_doc` | Điều kiện "văn bản cũ trong thùng" là tất định. Phần câu chữ của câu trả lời là [M] |
 
 **Cơ chế trượt của từng ca bẫy:**
@@ -211,7 +211,7 @@ Giống [L1 mục 9](library-l1-grounded-citation.md#9-tiêu-chí-chấm-một-c
 
 ## 12. Lật mặt sau
 
-1. **Cấu hình:** graph JSON, kèm khác biệt so với lời giải L1 (`chunker`, `vector_search.only_in_force`, `score_threshold`).
+1. **Cấu hình:** graph JSON, kèm khác biệt so với lời giải L1 (`chunker`, kể cả `chunker.only_in_force`, và `score_threshold`).
 2. **Ingestion và đồ thị:** dòng `IndexHandle(level_version, variant="theo_dieu-512-10")`, và chú thích rằng `corpus` + `chunker` không sinh node runtime (Phần 3 §3.6 bước 1); đoạn LangGraph giống L1.
 3. **Prompt thật (X-quang)** của câu đang chọn.
 4. **Bảng biến thể đã thử:** mỗi hàng là một biến thể người chơi đã chạy, gồm số ca đạt, token và số ca có giấy cũ. Đây là "nấc đã đo", không có nấc tốt nhất.
@@ -278,4 +278,4 @@ Như L1, thêm:
 4. **`reorder_docs`** (phản biện, mức low): không đưa thành đồ chơi; codex nói về lost in the middle với nhãn "chỉ để thông tin". Nếu giữ thì chỉ là tiêu chí `info`.
 5. **Đồng hồ "Độ phủ/Độ sạch" và "sao vàng" lúc xem trước** của gameplay-direction cần gold, nên trái D4. Đã thay bằng các số đo không cần gold (câu bị cắt ngang, độ đầy thùng).
 6. **"Overlap 15%"** của gameplay-direction không nằm trong {0, 10, 20}. Kịch bản chỉ dùng 0, 10, 20.
-7. **Hạng của đoạn khoản 3** cho câu của Hà ở biến thể 128/0 và 256/0 là ước tính. Nếu cổng phát hành đo thấy khoản 3 vẫn vào top-3, người viết nội dung phải chỉnh câu hỏi v01 sao cho nó không gợi tới hoàn cảnh ngoại lệ, ví dụ không nhắc "ốm" hay "viện".
+7. **Đã đo (2026-10-08): hạng của đoạn khoản 3** cho câu của Hà. Ở `co_dinh` 128/0, e5 đưa cả đoạn khoản 2 lẫn đoạn khoản 3 vào top 3 (hạng phủ đủ 3; trên 24 biến thể từ 1 đến 4). Câu v01 vốn không nhắc "ốm" hay "viện", nên giữ nguyên câu: kỳ vọng `ret.gold_missing` của N1 trên v01 chuyển sang [M], bẫy thiếu khoản 3 tất định nằm ở N5 (`top_k` 1). N1 vẫn là cấu hình khởi đầu nguyên trạng (`vs.top_k` 2 hoặc 1 làm bẫy cắn nhưng N1 sẽ không còn là khởi đầu).

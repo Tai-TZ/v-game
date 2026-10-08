@@ -16,7 +16,7 @@ Trường Đại học Sao Mai (hư cấu) có một trợ lý tra cứu quy ch�
 | Ca test (golden) | 10 ca: 3 `v` + 5 `h` + 2 `t` (`t01` Điều 99, `t02` ngoài phạm vi) | 13 ca: 3 `v` + 7 `h` + 3 `t` (`t01` và `t03` văn bản cũ, `t02` đã bãi bỏ) | 13 ca: 3 `v` + 7 `h` + 3 `t` (`t01` diễn đạt lại, `t02` hồi quy, `t03` khoản không tồn tại) |
 | Mục tiêu đo được | ≥ 6/8 ca thường đúng **và** có nguồn, gồm `lib-l1-v01`; mọi ca bẫy nói "không có" | ≥ 8/10 ca thường đủ ý, gồm `lib-l2-v01`; không ca nào dùng bản 2019 | ≥ 8/10 ca thường đúng, gồm `lib-l3-v01`; ca hồi quy `lib-l3-t02` vẫn đạt; ca `lib-l3-t03` được từ chối |
 | Hiểu lầm nhắm tới | "Không có tài liệu thì model sẽ nói không biết" | "top-k càng lớn càng chắc"; "cắt càng nhỏ càng chuẩn" | "Tìm theo nghĩa hiểu cả số hiệu"; "rerank lúc nào cũng đáng" |
-| Đồ chơi mới → khối | Vòm Sao → `vector_search`; Móc kéo → `top_k` 1–10; Máy đóng tem → `context_packer.cite_ids`; Lăng kính → `llm.system_prompt` (thẻ G1–G6) | Lược dao → `chunker.chunk_size` {128, 256, 512, 1024}; Nam châm → `strategy` {co_dinh, theo_dieu}; Băng keo → `overlap_pct` {0, 10, 20}; Màn lọc → `score_threshold`; Kính lọc → `only_in_force` | Tủ ngăn kéo → `bm25_search`; Phễu / Bập bênh → `fusion` (rrf, k / alpha); Kính lúp → `rerank.top_n`; `vector_search.top_k` giới hạn ≤ 5 |
+| Đồ chơi mới → khối | Vòm Sao → `vector_search`; Móc kéo → `top_k` 1–10; Máy đóng tem → `context_packer.cite_ids`; Lăng kính → `llm.system_prompt` (thẻ G1–G6) | Lược dao → `chunker.chunk_size` {128, 256, 512, 1024}; Nam châm → `strategy` {co_dinh, theo_dieu}; Băng keo → `overlap_pct` {0, 10, 20}; Màn lọc → `score_threshold`; Kính lọc → `chunker.only_in_force` | Tủ ngăn kéo → `bm25_search`; Phễu / Bập bênh → `fusion` (rrf, k / alpha); Kính lúp → `rerank.top_n`; `vector_search.top_k` giới hạn ≤ 5 |
 | Cơ chế bẫy tất định | Thùng rỗng nên thiếu dữ kiện; không có mã đoạn nên không trích được | Ranh giới đoạn tách khoản 3; thùng 3.000 token cắt đoạn thừa; đoạn `in_force: false` vào thùng | Hạng dense của Điều 47 > giới hạn `top_k`; BM25 không trùng chữ với câu diễn đạt lại |
 | Đoán → chạy → giải thích | 3 phiếu đoán; menu "Vì sao câu #N sai?" | 3 phiếu đoán (có phiếu về token khi tăng `top_k`) | 3 phiếu đoán (có phiếu về hạng sau gộp, ms của rerank) |
 | Gợi ý 1 → 3 | "Trong thùng có gì?" → thanh token → "Gắn Vòm Sao…" | "Đoạn dừng ở đâu?" → dải đoạn có vết cắt → "Nam châm hoặc 512 + Băng keo" | **"Chạy lại lời giải cũ"** → đường đời hạng → "Lắp ngăn kéo cạnh Vòm Sao rồi gộp" |
@@ -28,7 +28,7 @@ Số ca, vai và tiêu chí chấm lấy từ `docs/content/golden/*.json`; bả
 
 **Sao ở cả ba level:**
 - sao 1 = mục tiêu chính;
-- sao 2 = tổng token ≤ ngân sách, bằng 1,25 × p50 của lời giải mẫu (tạm 22k / 30k / 30k);
+- sao 2 = tổng token ≤ ngân sách, bằng 1,25 × p50 của lời giải mẫu (hiệu chỉnh 2026-10-08: 15k / 20k / 22k; L1 nâng từ 14k để lời giải mẫu không mất sao 2 vì thinking dao động);
 - sao 3 = mọi ca bẫy của level đều đạt; L1 thêm "không ca nào bịa nguồn", L2 thêm "không ca nào có giấy 2019 trong thùng".
 
 Sao 2 và 3 chỉ tính khi đã có sao 1.
@@ -51,8 +51,8 @@ Theo research §3.5: thao tác trên ẩn dụ, có cấu hình thật chạy so
 | Kệ sách (+ xe lưu trữ 2019 ở L2) | `corpus` | khoá | L1, L3: `qcdt-2024`; L2: thêm `qcdt-2019` (D7) |
 | Lược dao, Nam châm, Băng keo | `chunker` | thấy ở L1 (khoá `theo_dieu`/512/10); mở ở L2 | mỗi lựa chọn là 1 trong 24 biến thể tính sẵn |
 | Vòm Sao + Đèn pin, Móc kéo | `vector_search` | L1 | Đèn pin chỉ chiếu câu có sẵn; không embed lúc chạy |
-| Màn lọc mờ, Kính lọc hiệu lực | `vector_search.score_threshold`, `only_in_force` | L2 | |
-| Thùng Context | `context_packer` | L1, cỡ cố định 3.000 token | Chợ model mới cho đổi cỡ |
+| Màn lọc mờ, Kính lọc hiệu lực | `vector_search.score_threshold`, `chunker.only_in_force` | L2 | Kính lọc lọc ở tầng Index, mọi retriever đều không thấy văn bản hết hiệu lực (engine-v0.2 E6) |
+| Thùng Context | `context_packer` | L1, cỡ cố định 3.000 token | Chỉ tính tài liệu + câu hỏi; dặn dò của Lăng kính đi riêng (engine-v0.2 E8). Chợ model mới cho đổi cỡ |
 | Máy đóng tem | `context_packer.cite_ids` | L1 | |
 | Bộ Óc | `llm` | L1, `profile` khoá `can_bang` | |
 | Lăng kính (3 khe, thẻ G1–G6) | `llm.system_prompt` | L1 | Văn bản thẻ ở [L1 mục 5](library-l1-grounded-citation.md#5-đồ-chơi-và-khối-phần-3) |
@@ -96,7 +96,7 @@ Danh sách này là những gì ba kịch bản Thư viện **dựa vào**. Từ
 - **Khoản 3:** ngoại lệ nộp muộn (ví dụ ốm đau, tai nạn có xác nhận của cơ sở y tế), với ít nhất một dữ kiện riêng không có ở khoản 2, ví dụ thời hạn nộp muộn. Dữ kiện này là `answer_points` phân biệt của `lib-l2-v01`.
 - **Số khoản:** Điều 12 có đúng 3 khoản, để `lib-l1-r02` ("Điều 12 khoản 9") hỏi một khoản không tồn tại.
 - **Độ dài:** toàn văn Điều 12 ≤ 450 token (count_tokens), để biến thể `theo_dieu`/512 giữ trọn trong một đoạn.
-- **Từ ngữ:** Điều 12 không chứa các từ nội dung của câu `lib-l3-t01` (ví dụ "nghỉ", "tạm", "một thời gian"), để BM25 trượt; câu t01 vẫn phải gần nghĩa với Điều 12.
+- **Từ ngữ:** Điều 12 không chứa các từ nội dung của câu `lib-l3-t01` (ví dụ "nghỉ", "tạm", "một thời gian"), để BM25 trượt; câu t01 vẫn phải gần nghĩa với Điều 12. Cụm chung như "kết quả học tập" được phép; điều kiện kiểm là BM25 top 10 trượt trên mọi biến thể `theo_dieu` và `co_dinh` ≤ 256 (`test_retrieval`).
 
 **A3. Họ Điều 41, 47, 74:**
 - cùng một chủ đề, cùng cấu trúc khoản, lời văn na ná nhau;
@@ -167,7 +167,7 @@ Danh sách này là những gì ba kịch bản Thư viện **dựa vào**. Từ
 **B4. Vai đề xuất cho các ca không phải neo** (bạn đặt số; vai và số lượng là thứ kịch bản dựa vào):
 - **L1:**
   - `v02`: `su-kien`, điều khác Điều 12;
-  - `v03`: `dien-dat-lai`, và đoạn đáp án đứng hạng ≥ 2 ở biến thể L1 (để cấu hình ngây thơ N5 cắn);
+  - `v03`: `dien-dat-lai`, và đoạn đáp án đứng hạng ≥ 2 ở biến thể L1 (để cấu hình ngây thơ N5 cắn). Đo 2026-10-08: e5 xếp đoạn đáp án của v03 hạng 1, nên N5 trên các ca diễn đạt lại là [M]; N5 cắn tất định trên `lib-l1-h02` (engine-v0.2 §14);
   - 5 ca `h`: ≥ 3 `su-kien` ở các điều khác nhau, ≥ 1 `dien-dat-lai`;
   - L1 không dùng họ 41/47/74;
   - `forbidden` của `v01` có "email".
