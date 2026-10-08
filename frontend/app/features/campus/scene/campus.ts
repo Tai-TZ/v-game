@@ -1,12 +1,16 @@
 import {
   type BufferGeometry,
+  CircleGeometry,
   type Color,
   ConeGeometry,
   CylinderGeometry,
+  ExtrudeGeometry,
   Matrix4,
   PlaneGeometry,
   Quaternion,
   RingGeometry,
+  Shape,
+  Vector2,
   Vector3,
 } from "three";
 
@@ -15,14 +19,18 @@ import type { ZoneStatus } from "~/features/zones/schema";
 
 import {
   arcPoint,
+  BACK,
+  BASE,
   COLONNADE_COLUMNS,
   COLONNADE_PIERS,
+  CYPRESS_TREES,
+  GATE,
+  LAKE,
   LANDMARK,
+  PARK_TREES,
   PLAZA,
   ROUND_TREES,
   SITES,
-  TREES,
-  WORLD_BOUNDS,
   type Box,
   type Vec2,
 } from "../layout";
@@ -48,7 +56,8 @@ import {
 } from "./primitives";
 
 /*
- * Procedural campus, built to campus-scene v0.2 §5 with the helpers of art-direction §5.0.
+ * Procedural campus, built to campus-scene v0.2 §5 and v0.3 §6 with the helpers of art-direction
+ * §5.0.
  * Each exported builder returns the merged geometry of one draw call. Coordinates are absolute
  * world units from layout.ts (D9).
  */
@@ -83,18 +92,30 @@ export interface TreeInstance {
   kind: "round" | "cypress";
 }
 
-export const TREE_INSTANCES: readonly TreeInstance[] = TREES.map((tree, i) => {
-  const scale = 0.9 + 0.22 * hash(i, 0);
+/** Each list brings its kind and size factor; park trees are small round trees (v0.3 §6.5). */
+const TREE_LISTS = [
+  { trees: ROUND_TREES, kind: "round", factor: 1 },
+  { trees: CYPRESS_TREES, kind: "cypress", factor: 1 },
+  { trees: PARK_TREES, kind: "round", factor: 0.55 },
+] as const;
+
+export const TREE_INSTANCES: readonly TreeInstance[] = TREE_LISTS.flatMap(
+  ({ trees, kind, factor }) => trees.map((tree) => ({ ...tree, kind, factor })),
+).map(({ x, z, kind, factor }, i) => {
+  const scale = factor * (0.9 + 0.22 * hash(i, 0));
   return {
-    x: tree.x,
-    z: tree.z,
+    x,
+    z,
     scale,
     scaleY: scale * (0.95 + 0.2 * hash(i, 1)),
     yaw: 2 * PI * hash(i, 2),
     brightness: 0.9 + 0.18 * hash(i, 3),
-    kind: i < ROUND_TREES.length ? "round" : "cypress",
+    kind,
   };
 });
+
+/** Front trees stand on bare ground; park trees on the park lawn and paths (y 0.010–0.011). */
+const FRONT_TREES = ROUND_TREES.length + CYPRESS_TREES.length;
 
 export function treeMatrix(tree: TreeInstance): Matrix4 {
   return new Matrix4().compose(
@@ -114,7 +135,7 @@ function groundQuad([a, b, c, d]: readonly [Vec2, Vec2, Vec2, Vec2], y: number, 
   );
 }
 
-function skirt(footprint: Box, pal: Palette) {
+function skirt(footprint: Box, pal: Palette, y = 0.006) {
   const x0 = footprint.x - footprint.halfX;
   const x1 = footprint.x + footprint.halfX;
   const z0 = footprint.z - footprint.halfZ;
@@ -132,10 +153,10 @@ function skirt(footprint: Box, pal: Palette) {
     const [b, bOut] = corners[(i + 1) % 4] ?? corners[0];
     return [a, aOut, bOut, a, bOut, b];
   });
-  return groundTriangles(vertices, 0.006);
+  return groundTriangles(vertices, y);
 }
 
-function contactDisc(tree: TreeInstance, color: Color) {
+function contactDisc(tree: TreeInstance, color: Color, y: number) {
   const r = (tree.kind === "round" ? 0.62 : 0.26) * tree.scale;
   const vertices = [];
   for (let i = 0; i < 12; i += 1) {
@@ -147,7 +168,23 @@ function contactDisc(tree: TreeInstance, color: Color) {
       { x: tree.x + Math.cos(a1) * r, z: tree.z + Math.sin(a1) * r, color },
     );
   }
-  return groundTriangles(vertices, 0.006);
+  return groundTriangles(vertices, y);
+}
+
+/** Flat fan from `centre` through consecutive `points` (n − 1 triangles), one colour. */
+function fan(centre: Vec2, points: readonly Vec2[], y: number, color: Color) {
+  const vertices = points
+    .slice(1)
+    .flatMap((p, i) => [centre, points[i] ?? p, p].map((q) => ({ ...q, color })));
+  return groundTriangles(vertices, y);
+}
+
+/** Closed track outline: 13 points round (xc, za) bulging to +z, 13 round (xc, zb) to −z (v0.3 §6.0). */
+function oval(xc: number, za: number, zb: number, r: number): Vec2[] {
+  return range(26).map((i) => {
+    const a = (PI * (i % 13)) / 12 + (i < 13 ? 0 : PI);
+    return { x: xc + r * Math.cos(a), z: (i < 13 ? za : zb) + r * Math.sin(a) };
+  });
 }
 
 function lamp({ x, z }: Vec2, pal: Palette): Parts {
@@ -175,8 +212,6 @@ function statue(x: number, z: number, pal: Palette, small = false): Parts {
   ];
 }
 
-/** Lake shore: a quarter ellipse around the front-right corner of the base (§2.2). */
-const LAKE = { x: 14.8, z: 10.8, rx: 8.2, rz: 5.0 } as const;
 const LAKE_STEPS = 16;
 const shore = (i: number, k: number, grow = 0): Vec2 => {
   const t = (PI / 2) * (i / LAKE_STEPS);
@@ -310,10 +345,201 @@ function forecourtRays(pal: Palette) {
   );
 }
 
+/** Lanes to the back, the back park, courts, running track and open-air stage (v0.3 §6.1). */
+function backGrounds(pal: Palette): Parts {
+  const track = { xc: 12.0, za: -13.6, zb: -18.6 };
+  const trackCentre = { x: track.xc, z: (track.za + track.zb) / 2 };
+  /** The track outline at radius r, closed (27 points, 26 segments). */
+  const loop = (r: number) => {
+    const points = oval(track.xc, track.za, track.zb, r);
+    return [...points, points[0] ?? trackCentre];
+  };
+  const laneLine = (r: number) => {
+    const inner = loop(r - 0.02);
+    const outer = loop(r + 0.02);
+    const at = (points: Vec2[], i: number) => points[i] ?? trackCentre;
+    return range(26).map((i) =>
+      groundQuad(
+        [at(inner, i), at(outer, i), at(outer, i + 1), at(inner, i + 1)],
+        0.0115,
+        pal.plaza,
+      ),
+    );
+  };
+  const sand = range(13).map((i) => ({
+    x: track.xc + 1.45 * Math.cos((PI * i) / 12),
+    z: track.za + 1.45 * Math.sin((PI * i) / 12),
+  }));
+  const stage = [
+    { r0: 0.3, r1: 0.55, y: 0.02, color: pal.lm.trim },
+    { r0: 0.55, r1: 0.75, y: 0.1, color: pal.ground },
+    { r0: 0.75, r1: 0.95, y: 0.18, color: pal.lm.trim },
+  ];
+  const courts = [
+    { x0: 0.5, x1: 2.4 },
+    { x0: 2.7, x1: 4.6 },
+  ];
+  return [
+    // E1, E2, E4, E5, E7 lanes; E6 forecourt of the domed hall. E1 runs on to x 13.1 so the
+    // corner at the lane mouth is paved.
+    P(rect(3.1, 13.1, -0.55, 0.05, 0.012), pal.path),
+    P(rect(12.3, 13.1, -10.25, -0.55, 0.012), pal.path),
+    P(rect(4.1, 13.1, -11.25, -10.25, 0.012), pal.path),
+    P(rect(-9.6, 4.6, -12.95, -12.0, 0.012), pal.path),
+    P(rect(4.6, 8.6, -12.85, -11.25, 0.012), pal.asphalt),
+    P(rect(-1.3, -0.5, BASE.minZ, -16.6, 0.012), pal.path),
+    // K1, K2: park lawn and its paths.
+    P(rect(-14.6, -1.6, -21.4, -16.4, 0.01), pal.park),
+    groundQuad(
+      [
+        { x: -14.6, z: -17.1 },
+        { x: -14.3, z: -16.9 },
+        { x: -1.8, z: -21.4 },
+        { x: -2.1, z: -21.4 },
+      ],
+      0.011,
+      pal.path,
+    ),
+    P(rect(-14.6, -1.6, -19.45, -19.25, 0.011), pal.path),
+    // S1, S2: two courts on a hedge-green surround, with nets.
+    P(rect(0.2, 4.9, -21.1, -18.0, 0.01), pal.hedge),
+    ...courts.flatMap(({ x0, x1 }) => [
+      P(rect(x0, x1, -20.8, -18.3, 0.012), pal.court),
+      P(rect(x0, x1, -19.57, -19.53, 0.013), pal.plaza),
+    ]),
+    // S3-S7: running track, striped pitch, sand at the near end, two lane lines.
+    fan(trackCentre, loop(2.1), 0.01, pal.track),
+    fan(trackCentre, loop(1.45), 0.011, pal.foliage),
+    ...[1, 3, 5].map((k) =>
+      P(rect(10.7, 13.3, track.zb + 0.833 * k, track.zb + 0.833 * (k + 1), 0.012), pal.cypress),
+    ),
+    fan({ x: track.xc, z: track.za }, sand, 0.013, pal.sand),
+    ...[1.88, 1.66].flatMap(laneLine),
+    // S8: open-air stage, three solid half-ring tiers stepping up from the ground, on the +x side.
+    ...stage.map(({ r0, r1, y, color }) =>
+      P(arcSlab(r0, r1, 0, PI, 0, y, { x: 9.4, z: -12.25 }), color),
+    ),
+  ];
+}
+
+/** Back buildings fade 15% towards white after shading (v0.3 §5.2). */
+const HAZE = 0.15;
+
+/** Annex A and its glass bridges, building G, H, the domed hall B, chiller, carports, stand (§6.4). */
+function backCampus(pal: Palette): Parts {
+  const { wall, trim, roof, accent } = pal.lm;
+  const g = pal.glass;
+  const h = { haze: HAZE };
+  const ha = { ao: true, haze: HAZE };
+  const vault = new CylinderGeometry(1.9, 1.9, 4.6, 10, 1, false, 0, PI)
+    .rotateZ(PI / 2)
+    .scale(1, 1.12 / 1.9, 1)
+    .translate(6.6, 1.58, -15.6);
+  const pediment = new ExtrudeGeometry(
+    new Shape([new Vector2(5.3, 1.56), new Vector2(7.9, 1.56), new Vector2(6.6, 2.0)]),
+    { depth: 0.72, bevelEnabled: false },
+  ).translate(0, 0, -13.6);
+  /** Carport roof height: 0.36 at its middle, tilted 0.043 rad so the west end is higher. */
+  const carportY = (x: number) => 0.36 - Math.tan(0.043) * (x + 13.1);
+  const hallBays = [
+    ...range(6).map((k) => ["+z", -13.3, -14.1 + 0.7 * k] as const),
+    ...range(4).map((k) => ["+x", -10.3, -15.65 + 0.7 * k] as const),
+  ];
+  const steps = [
+    { x0: 14.2, y1: 0.25 },
+    { x0: 14.38, y1: 0.5 },
+    { x0: 14.56, y1: 0.75 },
+  ];
+  return [
+    // A1, A2: annex A with a paved roof and two lawn beds; two glass bridges to building G.
+    P(box(-3.8, 3.8, 0, 1.3, -11.8, -10.15), wall, ha),
+    P(box(-3.86, 3.86, 1.3, 1.36, -11.86, -10.1), trim, h),
+    P(rect(-3.7, 3.7, -11.75, -10.2, 1.362), pal.sand, h),
+    ...[-3.4, 0.5].map((x0) => P(rect(x0, x0 + 2.9, -11.5, -10.45, 1.364), pal.ground)),
+    ...[-2.25, 1.0].flatMap((x) => [
+      P(box(x - 0.27, x + 0.27, 1.36, 1.66, -13.1, -9.95), pal.water),
+      P(box(x - 0.3, x + 0.3, 1.66, 1.7, -13.1, -9.95), trim, h),
+    ]),
+    // GS1-GS4: building G with a solar roof and a skylight box.
+    P(box(-2.6, 2.6, 0, 1.8, -16.6, -13.1), wall, ha),
+    P(box(-2.66, 2.66, 1.8, 1.86, -16.66, -13.04), trim, h),
+    P(rect(-2.55, 2.55, -16.55, -13.15, 1.862), roof, h),
+    ...[-2.4, 0.55].flatMap((x0) => [
+      P(rect(x0, x0 + 1.85, -16.3, -13.4, 1.864), pal.solar),
+      ...[1, 2, 3].map((k) => {
+        const zk = -16.3 + 0.725 * k;
+        return P(rect(x0, x0 + 1.85, zk - 0.02, zk + 0.02, 1.866), trim, h);
+      }),
+    ]),
+    P(box(-0.4, 0.4, 1.86, 2.14, -15.8, -13.9), roof, h),
+    ...grid([0.45, 1.05, 1.5], range(9), (y, k) =>
+      P(quad("+z", -13.1, -2.2 + 0.55 * k, y, 0.26, 0.32), g, h),
+    ),
+    ...grid([0.45, 1.05, 1.5], range(5), (y, k) =>
+      P(quad("+x", 2.6, -16.1 + 0.65 * k, y, 0.26, 0.32), g, h),
+    ),
+    // H1, H2: building H, ten bays of a tall arched window over a short one.
+    P(box(-14.5, -10.3, 0, 1.5, -16.0, -13.3), wall, ha),
+    P(box(-14.56, -10.24, 1.5, 1.57, -16.06, -13.24), trim, h),
+    P(rect(-14.45, -10.35, -15.95, -13.35, 1.572), roof, h),
+    ...hallBays.flatMap(([face, plane, u]) => [
+      P(quad(face, plane, u, 0.4, 0.26, 0.36), g, h),
+      P(quad(face, plane, u, 1.0, 0.26, 0.5), g, h),
+      P(arch(face, plane, u, 1.25, 0.13), g, h),
+    ]),
+    // B1-B8: domed hall with a barrel vault, a six-column gold-banded portico and a pediment.
+    P(box(4.2, 9.0, 0, 1.5, -17.6, -13.6), wall, ha),
+    P(box(4.14, 9.06, 1.5, 1.58, -17.66, -13.54), trim, h),
+    P(vault, pal.vault, h),
+    P(box(5.25, 7.95, 0, 0.18, -13.6, -12.85), trim, h),
+    ...range(6).flatMap((k) => {
+      const x = 5.5 + 0.44 * k;
+      return [
+        P(cyl(0.075, 0.085, 6, 0.18, 1.4, x, -13.05), wall, h),
+        P(cyl(0.095, 0.095, 6, 0.74, 0.82, x, -13.05), accent),
+        P(cyl(0.1, 0.1, 6, 1.3, 1.4, x, -13.05), accent),
+      ];
+    }),
+    P(box(5.3, 7.9, 1.4, 1.56, -13.6, -12.88), trim, h),
+    P(pediment, { top: pal.vault, side: trim }, h),
+    ...[4.65, 8.55].flatMap((x) => [
+      P(box(x - 0.42, x + 0.42, 0, 1.95, -13.8, -13.1), wall, h),
+      P(box(x - 0.3, x + 0.3, 1.95, 2.25, -13.68, -13.22), wall, h),
+      P(box(x - 0.46, x + 0.46, 1.95, 2.0, -13.84, -13.06), trim, h),
+    ]),
+    ...range(5).flatMap((k) => [
+      P(quad("+x", 9.0, -17.0 + 0.72 * k, 0.62, 0.3, 0.55), g, h),
+      P(arch("+x", 9.0, -17.0 + 0.72 * k, 0.9, 0.15), g, h),
+    ]),
+    // C1: chiller plant with six fans.
+    P(box(-6.9, -4.0, 0, 0.62, -18.6, -17.0), trim, h),
+    ...grid([-6.35, -5.45, -4.55], [-18.2, -17.4], (x, z) =>
+      P(circle(0.24, 8, x, 0.625, z), pal.band),
+    ),
+    // C2: two rows of solar carports; posts stop just under the tilted roof.
+    ...[-11.95, -12.65].flatMap((z) => [
+      P(
+        new PlaneGeometry(2.8, 0.6)
+          .rotateX(-PI / 2)
+          .rotateZ(-0.043)
+          .translate(-13.1, 0.36, z),
+        pal.solar,
+      ),
+      ...[-14.2, -12.0].map((x) => P(cyl(0.03, 0.03, 4, 0, carportY(x) - 0.005, x, z), pal.dark)),
+    ]),
+    // S9: three-step stand with a solar canopy on three posts.
+    ...steps.map(({ x0, y1 }) => P(box(x0, 14.75, 0, y1, -18.0, -14.2), trim, h)),
+    P(box(14.1, 14.8, 1.1, 1.16, -18.1, -14.1), pal.solar),
+    ...[-17.9, -16.1, -14.3].map((z) => P(cyl(0.03, 0.03, 4, 0.75, 1.1, 14.7, z), wall)),
+  ];
+}
+
 export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry {
-  const hx = WORLD_BOUNDS.halfX + 0.8;
-  const hz = WORLD_BOUNDS.halfZ + 0.8;
+  const { minX, maxX, minZ, maxZ } = BASE;
   const lamps: Vec2[] = [
+    // East lane to the back (v0.3 E3).
+    { x: 13.4, z: -3.0 },
+    { x: 13.4, z: -7.0 },
     ...SIDES.flatMap((s) => [
       { x: s * 3.55, z: -3.7 },
       arcPoint(s * 0.3 * PI, 4.6),
@@ -327,8 +553,10 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
     ...grid([-3.3, 3.3], [-2.05, -5.5], (x, z) => ({ x, z })),
   ];
   return merge([
-    P(box(-hx, hx, -0.6, 0, -hz, hz), { top: pal.ground, side: pal.soil }),
-    P(box(-hx - 0.25, hx + 0.25, -0.8, -0.6, -hz - 0.25, hz + 0.25), pal.plaza),
+    P(box(minX, maxX, -0.6, 0, minZ, maxZ), { top: pal.ground, side: pal.soil }),
+    P(box(minX - 0.25, maxX + 0.25, -0.8, -0.6, minZ - 0.25, maxZ + 0.25), pal.plaza),
+    // Loop road inside the gate (v0.3 F1).
+    P(rect(minX, 6.6, 10.5, 11.2, 0.011), pal.path),
     // Forecourt, lawn walks, entrance paths, rose-garden gravel.
     P(rect(-3.4, 3.4, -6.0, -1.8, 0.012), pal.path),
     P(rect(-3.1, -2.0, -1.8, 1.7, 0.012), pal.path),
@@ -355,7 +583,15 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
       }),
     ),
     ...[...LANDMARK.footprints, ...SITES.map((site) => site.footprint)].map((f) => skirt(f, pal)),
-    ...TREE_INSTANCES.map((tree) => contactDisc(tree, pal.contact)),
+    // Back skirts sit just above the park lawn (0.010) and under the lanes (0.012).
+    ...[BACK.annex, BACK.solarHall, BACK.westHall, BACK.hall, BACK.chiller].map((f) =>
+      skirt(f, pal, 0.0105),
+    ),
+    ...TREE_INSTANCES.map((tree, i) =>
+      contactDisc(tree, pal.contact, i < FRONT_TREES ? 0.006 : 0.0125),
+    ),
+    ...backGrounds(pal),
+    ...backCampus(pal),
   ]);
 }
 
@@ -444,6 +680,27 @@ function spireHall(pal: Palette): Parts {
   return [
     // Porch: four columns, wider middle bay.
     ...[-1.4, -0.6, 0.6, 1.4].map((x) => P(cyl(0.09, 0.1, 8, 0.3, 1.3, x, -4.4), wall)),
+    // Parterre round the tower base roof and a lawn on wing E (v0.3 §6.3).
+    ...[
+      [-3.0, -1.9],
+      [-1.6, -0.45],
+      [0.45, 1.6],
+      [1.9, 3.0],
+    ].map(([x0 = 0, x1 = 0]) => P(rect(x0, x1, -6.0, -5.3, 3.024), pal.ground)),
+    ...[
+      [-9.9, -8.1],
+      [-7.1, -6.2],
+    ].map(([z0 = 0, z1 = 0]) => P(rect(2.05, 3.0, z0, z1, 3.024), pal.ground)),
+    ...[
+      { x: 0, z: -5.3, from: 0 },
+      { x: 3.0, z: -7.6, from: PI / 2 },
+    ].map(({ x, z, from }) =>
+      P(new CircleGeometry(0.42, 8, from, PI).rotateX(-PI / 2).translate(x, 3.026, z), pal.bloom),
+    ),
+    ...[
+      [4.6, 6.2],
+      [6.5, 8.1],
+    ].map(([x0 = 0, x1 = 0]) => P(rect(x0, x1, -9.35, -6.5, 2.374), pal.ground)),
     P(box(-1.65, 1.65, 1.3, 1.46, -5.3, -4.22), trim),
     P(quad("+z", -5.3, 0, 0.75, 1.0, 0.9), g),
     // Tier 2.
@@ -585,11 +842,78 @@ function hedgeArcs(pal: Palette): Parts {
   return SIDES.map((s) => P(arcSlab(3.25, 3.55, s * 0.36 * PI, s * 0.68 * PI, 0, 0.3), pal.hedge));
 }
 
+/** Three-arch gate with paired columns and plain gold bands, and a stone-and-iron fence (§6.2). */
+function archGate(pal: Palette): Parts {
+  const { wall, trim, accent } = pal.lm;
+  const fz = GATE.face;
+  const iron = pal.iron;
+  const ao = { ao: true };
+  const span = (s: number, a: number, b: number) => [
+    Math.min(s * a, s * b),
+    Math.max(s * a, s * b),
+  ];
+  const fenceRuns = [
+    [-14.55, -2.66],
+    [2.66, 6.4],
+  ];
+  const fencePiers = [...range(12).map((k) => -14.55 + k), ...range(4).map((k) => 3.4 + k)];
+  return [
+    P(box(-1.54, 1.54, 0, 2.62, 11.5, fz), wall, ao),
+    P(box(-1.82, 1.82, 2.62, 2.8, GATE.back, 12.5), trim),
+    P(quad("+z", fz, 0, 2.57, 3.08, 0.05), accent),
+    P(box(-1.16, 1.16, 2.8, 3.0, 11.7, 12.2), wall),
+    P(quad("+z", fz, 0, 0.63, 1.29, 1.26), iron),
+    P(arch("+z", fz, 0, 1.26, 0.645), iron),
+    P(quad("+z", fz, 0, 2.1, 3.08, 0.08), accent),
+    P(box(-0.14, 0.14, 1.93, 2.2, fz, fz + 0.05), accent),
+    ...[-1.28, -0.86, 0.86, 1.28].flatMap((x) => [
+      P(box(x - 0.12, x + 0.12, 0, 0.3, fz, BASE.maxZ), trim),
+      P(box(x - 0.125, x + 0.125, 0.22, 0.27, fz, BASE.maxZ + 0.005), accent),
+      P(cyl(0.08, 0.09, 8, 0.3, 1.98, x, 12.51), wall),
+      P(box(x - 0.12, x + 0.12, 1.98, 2.06, fz, BASE.maxZ), trim),
+    ]),
+    ...SIDES.flatMap((s) => {
+      const [x0 = 0, x1 = 0] = span(s, 1.54, 2.66);
+      const [c0 = 0, c1 = 0] = span(s, 1.54, 2.8);
+      return [
+        P(box(x0, x1, 0, 1.66, 11.6, 12.36), wall, ao),
+        P(box(c0, c1, 1.66, 1.78, 11.55, fz), trim),
+        P(quad("+z", 12.36, s * 2.1, 0.405, 0.67, 0.81), iron),
+        P(arch("+z", 12.36, s * 2.1, 0.81, 0.335), iron),
+      ];
+    }),
+    ...fenceRuns.flatMap(([x0 = 0, x1 = 0]) => [
+      P(box(x0, x1, 0, 0.06, 12.38, 12.52), wall),
+      P(box(x0, x1, 0.06, 0.26, 12.44, 12.46), iron),
+    ]),
+    ...fencePiers.map((x) => P(box(x - 0.07, x + 0.07, 0, 0.32, 12.36, 12.54), wall)),
+  ];
+}
+
+/** Town gateway: two open piers under a roof-coloured lintel, and a clipped hedge fence (§6.2). */
+function pierGate(pal: Palette): Parts {
+  const { wall, trim, roof } = pal.lm;
+  return [
+    ...SIDES.flatMap((s) => {
+      const [x0, x1] = s < 0 ? [-1.65, -1.25] : [1.25, 1.65];
+      return [
+        P(box(x0, x1, 0, 1.3, 11.95, 12.35), wall, { ao: true }),
+        P(box(x0 - 0.05, x1 + 0.05, 1.3, 1.4, 11.9, 12.4), trim),
+      ];
+    }),
+    P(box(-1.7, 1.7, 1.4, 1.58, 12.0, 12.3), roof),
+    ...[
+      [-14.55, -1.7],
+      [1.7, 6.4],
+    ].map(([x0 = 0, x1 = 0]) => P(box(x0, x1, 0, 0.26, 12.36, 12.56), pal.hedge)),
+  ];
+}
+
 export function buildLandmark(pal: Palette, archetype: LandmarkArchetype, colonnades: boolean) {
   return merge([
     ...mainBuilding(pal),
     ...(archetype === "spire-hall" ? spireHall(pal) : clockTower(pal)),
-    ...(colonnades ? colonnade(pal) : hedgeArcs(pal)),
+    ...(colonnades ? [...colonnade(pal), ...archGate(pal)] : [...hedgeArcs(pal), ...pierGate(pal)]),
   ]);
 }
 

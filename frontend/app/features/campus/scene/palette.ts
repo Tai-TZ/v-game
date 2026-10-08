@@ -11,6 +11,7 @@ const WHITE = new Color(1, 1, 1);
 
 const mul = (c: Color, k: number) => c.clone().multiplyScalar(k);
 const lerpW = (c: Color, t: number) => c.clone().lerp(WHITE, t);
+const lerp = (a: Color, b: Color, t: number) => a.clone().lerp(b, t);
 
 /** "Coming soon" look (art §2.2): pull towards grey of the same luminance, then darken a touch. */
 export function desaturate(c: Color): Color {
@@ -59,9 +60,12 @@ export function palette(campus: CampusTheme) {
     accent: c(campus.landmark.accent),
   };
   const mk = building(campus.buildings.market);
+  const wt = building(campus.buildings.watchtower);
+  const band = mul(lm.trim, 0.5);
+  const path = c(campus.path);
   return {
     ground,
-    path: c(campus.path),
+    path,
     plaza: c(campus.plaza),
     water,
     foliage,
@@ -70,7 +74,7 @@ export function palette(campus: CampusTheme) {
     npc,
     lm,
     lib: building(campus.buildings.library),
-    wt: building(campus.buildings.watchtower),
+    wt,
     mk,
     soil: mul(ground, 0.45),
     skirt: mul(ground, 0.7),
@@ -84,8 +88,17 @@ export function palette(campus: CampusTheme) {
     xray: lerpW(player, 0.45),
     cypress: mul(foliage, 0.82),
     /** Dark inlaid paving bands (campus-scene v0.2 §4.2). */
-    band: mul(lm.trim, 0.5),
+    band,
     hedge: mul(foliage, 0.7),
     bloom: mul(lerpW(mk.roof, 0.35), 0.85),
+    // Back of campus (campus-scene v0.3 §5.1): derived, so each theme gets its own sports ground.
+    track: mul(lerpW(mk.roof, 0.06), 0.72),
+    vault: lerp(lm.roof, water, 0.35),
+    solar: lerpW(wt.roof, 0.03),
+    sand: mul(path, 0.8),
+    court: mul(water, 0.78),
+    asphalt: mul(band, 0.42),
+    park: lerp(ground, trunk, 0.12),
+    iron: mul(lm.trim, 0.06),
   };
 }
