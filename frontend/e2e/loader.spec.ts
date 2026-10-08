@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { expect, test } from "./fixtures";
+import { expect, mockApi, test, waitForIdleScene } from "./fixtures";
 
 const CLIENT_DIR = path.resolve(import.meta.dirname, "..", "build", "client");
 
@@ -12,6 +12,27 @@ test.describe("scene loader", () => {
       expect(html, file).not.toMatch(/\sstyle=/);
       expect(html, file).not.toMatch(/<style[\s>]/);
     }
+  });
+
+  test("marks every load stage in order and leaves an idle scene idle", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await mockApi(page);
+    await page.goto("/play?debug=frames");
+    const frames = await waitForIdleScene(page);
+    const marks = await page.evaluate(() =>
+      performance
+        .getEntriesByType("mark")
+        .map((mark) => mark.name)
+        .filter((name) => name.startsWith("vg-scene-")),
+    );
+    expect(marks).toEqual(["vg-scene-1", "vg-scene-2", "vg-scene-3", "vg-scene-4", "vg-scene-5"]);
+    const before = await frames();
+    // Measuring idleness needs time to pass; no state is being waited for here.
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 2000)));
+    expect(await frames()).toBe(before);
+    expect(consoleErrors).toEqual([]);
   });
 
   test.describe("before any JS runs", () => {

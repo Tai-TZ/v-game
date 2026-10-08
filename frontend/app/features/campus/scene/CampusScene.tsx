@@ -1,4 +1,4 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { addAfterEffect, Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Color,
@@ -15,6 +15,7 @@ import { useActiveTheme } from "~/features/theme/context";
 import type { CampusTheme } from "~/features/theme/schema";
 
 import { CAMERA_OFFSET } from "../camera";
+import { advanceScene, sceneMounted, STAGE } from "../hud/sceneLoad";
 import { NPC_SPOT, SITES } from "../layout";
 import type { InteractTarget, SiteInfoMap } from "../sites";
 import {
@@ -50,6 +51,15 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
   const [countFrames] = useState(
     () => new URLSearchParams(window.location.search).get("debug") === "frames",
   );
+  // Loader signals (hud/sceneLoad): canvas in the DOM, scene graph built, first frame shown.
+  const offFirstFrame = useRef<() => void>(undefined);
+  useLayoutEffect(() => {
+    sceneMounted(true);
+    return () => {
+      offFirstFrame.current?.();
+      sceneMounted(false);
+    };
+  }, []);
 
   return (
     <>
@@ -65,6 +75,16 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
             far: 200,
             zoom: 30,
             position: [CAMERA_OFFSET, CAMERA_OFFSET, CAMERA_OFFSET],
+          }}
+          onCreated={(state) => {
+            advanceScene(STAGE.paint);
+            // Runs after every loop tick and never invalidates, so an idle scene stays idle.
+            offFirstFrame.current = addAfterEffect(() => {
+              if (state.gl.info.render.frame === 0) return; // a tick that rendered nothing
+              offFirstFrame.current?.();
+              // The next animation frame starts once the rendered one has been presented.
+              requestAnimationFrame(() => advanceScene(STAGE.done));
+            });
           }}
         >
           <hemisphereLight args={["#ffffff", "#d1d1d1", 2.306]} />
