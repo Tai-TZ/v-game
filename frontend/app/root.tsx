@@ -18,7 +18,12 @@ import { AUTHOR } from "./lib/site";
 
 // Runs at build time only (pre-render and SPA shell); the result is embedded in the HTML.
 export async function loader() {
-  return { catalog: await loadThemeCatalog(import.meta.env.VITE_DEFAULT_THEME) };
+  return {
+    catalog: await loadThemeCatalog(
+      import.meta.env.VITE_DEFAULT_THEME,
+      import.meta.env.VITE_THEME_PACKS,
+    ),
+  };
 }
 
 export const meta: Route.MetaFunction = () => [

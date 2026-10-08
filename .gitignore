@@ -24,6 +24,7 @@ frontend/coverage/
 frontend/test-results/
 frontend/playwright-report/
 frontend/blob-report/
+frontend/.vercel/
 *.tsbuildinfo
 
 # Python / backend

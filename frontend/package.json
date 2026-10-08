@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "react-router dev",
     "build": "react-router build && node scripts/check-bundle.mjs && node scripts/postbuild-csp.mjs",
+    "build:vercel": "node scripts/build-vercel.mjs",
     "preview": "node scripts/serve-build.mjs",
     "typecheck": "react-router typegen && tsc",
     "lint": "react-router typegen && eslint . --max-warnings=0",

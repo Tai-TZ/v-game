@@ -83,6 +83,8 @@ export async function mockApi(
  */
 export const test = base.extend<{ consoleErrors: string[] }>({
   consoleErrors: async ({ page }, provide) => {
+    // The landing page pings /api/health to wake a sleeping API; no backend runs in e2e.
+    await page.route("**/api/health", (route) => route.fulfill({ json: { status: "ok" } }));
     const errors: string[] = [];
     page.on("console", (message) => {
       if (message.type() !== "error") return;
