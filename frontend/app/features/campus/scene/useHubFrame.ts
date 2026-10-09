@@ -120,8 +120,9 @@ const bodyBox = new Box3();
 
 /**
  * The person whose body the ray meets before any static surface (orbit-camera §2.6): a box
- * 0.7 wide and 1.6 tall round each spot, head and feet included. From a turned view a building
- * can stand in front of someone; the click then belongs to the building.
+ * 0.7 wide and 1.5 tall round each spot, head and feet included (statues 1.46, figures 1.31),
+ * so a click over a head is not theirs. From a turned view a building can stand in front of
+ * someone; the click then belongs to the building.
  */
 export function pickNpc<T>(
   ray: Raycaster,
@@ -133,7 +134,7 @@ export function pickNpc<T>(
   let nearest = surface?.distance ?? Infinity;
   for (const { id, spot } of spots) {
     bodyBox.min.set(spot.x - 0.35, 0, spot.z - 0.35);
-    bodyBox.max.set(spot.x + 0.35, 1.6, spot.z + 0.35);
+    bodyBox.max.set(spot.x + 0.35, 1.5, spot.z + 0.35);
     const at = ray.ray.intersectBox(bodyBox, hit);
     const distance = at ? at.distanceTo(ray.ray.origin) : Infinity;
     if (distance < nearest) [best, nearest] = [id, distance];

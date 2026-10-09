@@ -1040,6 +1040,14 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
           expect(pickNpc(raycaster, group, SPEAKERS), `${id} at ${y}`).toBe(id);
         }
       }
+      // A click just over the tallest head (statues 1.46, figures 1.31) is not theirs: aim
+      // over the box's far top corner, the highest point the box shows on screen.
+      const away = viewDirection(HOME_YAW);
+      for (const { id, spot } of SPEAKERS) {
+        const [x, z] = [spot.x + 0.35 * Math.sign(away.x), spot.z + 0.35 * Math.sign(away.z)];
+        aim(HOME_YAW, x, 1.55, z);
+        expect(pickNpc(raycaster, group, SPEAKERS), `over ${id}`).not.toBe(id);
+      }
       // From behind the main building the registrar is hidden: the click is the building's.
       const registrar = NPCS.find(({ id }) => id === "registrar")?.spot ?? SPAWN;
       aim(deg(180), registrar.x, 0.7, registrar.z);
