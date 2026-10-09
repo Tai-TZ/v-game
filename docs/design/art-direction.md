@@ -802,3 +802,13 @@ Nguồn: báo cáo "Insight edtech nâng cấp V-Game", mục "Đẹp hơn với
 10. **Sau QA vòng 5 (2026-10-09).**
    - `~lit` có màu riêng lúc hoàng hôn (§2.2): `full(lerp(lm.accent, dusk.sun, 0.5))`, hổ phách đậm. Màu ngày cũ trùng với tường `+z` hứng nắng chiều (tương phản 1,03:1), nên khe sáng đỉnh Tháp canh biến mất và đèn lồng Chợ đọc như hộp nhạt; khi bật `STARS_SAVED`, `lit` và `open` của Tháp canh sẽ chỉ khác nhau một vòm nhỏ. Ban ngày giữ nguyên. Một unit test buộc `~lit` cách tường `+z`, `+x` của ba toà và sàn Chợ ít nhất ΔE 20 ở mọi theme và giờ (campus-scene v0.3 §13.5). Câu hỏi mở ở mục 9 (cỏ, nước, trời lúc hoàng hôn) không đổi.
    - Bàn giao N9 (mục 6) vẫn chưa gửi, và có thêm một điều kiện: sau `recordStars`, campus phải mount lại hoặc đọc lại tiến độ, kèm một e2e quay về `/play` không tải lại trang (campus-scene v0.3 §13.5).
+
+## 13. Quyết định 2026-10-09: props CC0 quanh sa bàn
+
+Chủ dự án thấy xung quanh các toà còn trống và duyệt dùng props CC0 có sẵn thay vì tự dựng (Kenney Nature Kit, Kenney City Kit Commercial, Quaternius qua Poly Pizza; nguồn ở `CREDITS.md`). Chỗ đặt nằm trong `frontend/app/features/campus/dressing.ts`, ghi chú dựng ở campus-scene v0.3 §14.
+
+1. **Màu vẫn chỉ từ manifest.** Props bỏ màu và texture gốc: mỗi material được gán một ô màu của `palette.ts` (`hedge`, `trunk`, `lm.wall`, `mk.roof`…), nên hai theme tự đổi màu props như mọi thứ khác. Ô kẻ của bàn ô dù (texture) được chia theo độ cao: tán → `mk.roof`, chân và mặt bàn → `lm.wall`.
+2. **Bụi cây màu hàng rào, không hồng.** Ô `bloom` trên `plant_bush` ra màu hồng kẹo, nên mọi bụi cây lấy `hedge` (chủ dự án, 2026-10-09). `bloom` chỉ còn ở hoa sen.
+3. **Nướng như phần tĩnh.** Tô bóng theo pháp tuyến thế giới và preset giờ (§2.3), không đèn, không Lambert; tán dù hở được nướng thêm mặt sau. Một mesh, một draw call, không chuyển động idle (§1.2 nguyên tắc 6).
+4. **Không làm:** xe máy (khoảng 3 000 tam giác, quá ngân sách 8k), xe đạp, rổ bóng, nhà chờ xe buýt (không có bản CC0 dùng được). Đèn thêm dùng lại `lamp()` có sẵn, không thêm kiểu đèn thứ hai.
+5. **Đá vách đế** là mỏm đá thấp trên bốn mặt đất, dưới mặt cỏ, cách góc đế ít nhất 3,8 để góc HUD sạch ở mọi góc xoay.

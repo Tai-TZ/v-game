@@ -683,3 +683,47 @@ Sửa sau QA vòng 1 (2026-10-08):
 Nằm ngoài repo: `scratchpad/wt-scene-shots/` (bản đầu), `scratchpad/wt-scene-shots-r1/` (sau QA vòng 1, bóng phủ nhân) và `scratchpad/wt-scene-shots-r2/` (sau QA vòng 2: preset ngày ấm hơn, bóng cây và cổng, đèn lối vào; thêm `allopen_<giờ>_<market|tower>.png` khi cả ba khu mở, chụp bằng `n8/shots-r2-open.mjs`), chụp bằng `scratchpad/n8/shots-n8.mjs` trên bản build (`serve-build --port 4371`). Ảnh cận so sánh khe sau Tháp canh: `scratchpad/n8/r1-gap-old.png`, `r1-gap-new.png`. So sánh vòng 1 / vòng 2 quanh cổng: `scratchpad/n8/r2-gate-day.png`, `r2-gate-dusk.png` (trái vòng 1, phải vòng 2). Sau QA vòng 3: `scratchpad/wt-scene-shots-r3/` (đèn Thư viện dời ra lối vào, cây trong bóng toà nhà tối; ảnh 1280×800, 375×812 và ảnh cận 2×); so sánh cây vòng 2 / vòng 3 lúc hoàng hôn: `scratchpad/n8/r5-trees-vinuni-dusk.png`, `r5-trees-town-dusk.png` (trái vòng 2, phải vòng 3).
 - Mỗi theme × giờ có ảnh 1280×800 và 375×812 (Thư viện chưa sao; ở vòng 2 vẫn sáng vì `STARS_SAVED = false`), 1280×800 khi Thư viện có 1 sao, và các ảnh cận 2× của Thư viện, Tháp canh, kim tháp.
 - Tên file: `<theme>_<w>x<h>_<giờ>[_star][_2x_crop_<chỗ>].png`.
+
+## 14. Props CC0 (2026-10-09)
+
+Kế hoạch đặt: `scratchpad/dressing/placement-plan.md`. Màu và quyết định hình ở art-direction §13.
+
+### 14.1 Dữ liệu và dựng
+
+- `campus/dressing.ts` (chỉ dữ liệu, không three): 21 props, 77 bản, ô màu theo tên material (`PROP_COLOURS`), `PROP_YAW0` (quầy hàng ăn −90°), 10 hộp chặn (`DRESSING_BLOCKS`, `layout.ts` thêm vào `OBSTACLES`) và 6 đèn (`DRESSING_LAMPS`, `buildTerrain` thêm vào mảng đèn).
+- `scene/useDressing.ts`: `fetchProps` đọc `/models/props.json` khi bộ nạp tới `done` (khung đầu đã lên màn hình), nên props không giữ khung đầu và tới trong lúc bộ nạp mờ đi. Lỗi mạng, HTTP hay file hỏng: không có props, cảnh vẫn như cũ. `buildDressing` dựng từng bản (`buildProp`, `paintProp`, ma trận đặt), nướng qua `part()` như các nhóm tĩnh rồi gộp thành một geometry; dựng lại khi đổi theme hay giờ, `dispose` khi thay và khi unmount.
+- `CampusScene`: mesh props nằm trong nhóm `statics` (click lên props đi tới chỗ đứng gần đó, như cây). Khi props tới, `wake()` vẽ đúng một khung. Trong lúc props chưa xong, `?debug=frames` giữ `data-scene-busy`, để e2e không coi khoảng giữa khung đầu và khung props là đứng yên.
+
+### 14.2 Lệch so với kế hoạch (do `layout.test.ts` bắt)
+
+Kiểm lưới 0,1 của kế hoạch không thấy các khe hẹp mà `routeTo` không đi được (cần ≥ 0,8 với `LEG_MARGIN`).
+- Quầy hàng ăn (8,3; 6,3) → (8,3; 6,5): khe 0,72 tới Chợ làm 51 cú click quanh quán không có chỗ đứng.
+- Bàn ô dù (5,9; 7,5) (6,6; 8,7) (7,3; 7,6) → (6,0; 7,3) (6,5; 9,0) (7,4; 8,15): mỗi cặp hoặc kín hẳn hoặc hở ≥ 0,85.
+- Dừa thấp (10,8; −7,4) → (11,1; −7,1) và bụi (11,8; −6,5) → (11,9; −6,3): dừa chặn điểm làn (10,3; −7,5) của §2.5.
+
+### 14.3 Ngân sách đo được
+
+| | Trước | Sau |
+|---|---|---|
+| Draw call | 14 | 15 (14 tới khi props tới) |
+| Tam giác ngày, spire-hall / clock-tower | 21 413 / 18 268 | 29 879 / 26 734 (mọi khu sáng: 30 051) |
+| Trong đó props / đèn mới | | 8 202 (7 914 + 288 mặt sau tán dù) / 264 |
+| Trần test | 23 000 | 31 500 (thêm chỗ cho dàn NPC v0.4, khoảng 1 020) |
+| `props.json` | | 84,8 kB, gzip ≤ 24 kB, tải sau khung đầu |
+| JS `/play` (gzip) | | 281,4 kB (trần 300 kB) |
+| Khung khi đứng yên | 0 | 0 |
+
+### 14.4 Test
+
+- `campus/dressing.test.ts`: mọi prop của `props.json` được đặt và mọi material có ô màu; trên đế, dải hàng rào và trong hồ; không đè toà, đường, quảng trường, cây, đèn, tượng; cách cửa, chỗ đứng và chỗ nói của cả 5 NPC (gồm dàn v0.4), `SPAWN`, `BACK_SPOT`; không chồng nhau; không che người hay cửa ở góc mặc định; không lấn khung nhãn DOM; luật elip `r + √2·h ≤ 22,58` (góc HUD và cụm "Góc nhìn" ở mọi yaw); đá vách nằm trên vách; quét lưới 0,1 không có túi kín; `routeTo` tới 3 cửa, 5 chỗ nói và `BACK_SPOT`.
+- `scene/useDressing.test.ts`: `fetchProps` trả `null` khi lỗi; mesh chỉ có `position` và `color`, đúng 8 202 tam giác, màu trong [0, 1]; hàng rào đúng màu `hedge` đã nướng; mọi đỉnh trong elip quỹ đạo; đổi theme chỉ đổi màu.
+- `scene.test.ts`: ngân sách với props, góc HUD trên 1280×800 có cả props.
+
+### 14.5 Ảnh
+
+`scratchpad/dressing/shots-v1/`: `/play` mặc định 1280×800, 375×812 và 2× của hai theme, bản build (`dressing/tools/shots-v1.mjs`). Ở cả sáu ảnh `props.json` trả 200 và cảnh đứng yên sau khung props.
+
+### 14.6 Mở
+
+- Cầu tàu đứng trên cột, sàn cao khoảng 0,9 trên mặt nước (cao đúng như kế hoạch). Nếu thấy cao, hạ `y` xuống khoảng −0,6: cột chìm vào đế, sàn còn khoảng 0,3.
+- Hộp chặn không xoay theo `yaw`; mọi bản chặn hiện là hình gần vuông hoặc đặt ở 0°.
