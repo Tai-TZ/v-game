@@ -422,8 +422,16 @@ def test_save_load_keeps_the_rerank_table(one_variant: IndexStore, tmp_path: Pat
     assert loaded.rerank is not None
     assert loaded.rerank.model_id == table.model_id
     assert loaded.rerank.regime == table.regime  # the next build's reuse check reads it
+    assert loaded.rerank.timing == table.timing
     l1 = _texts(store, L1_DOCS)
     assert loaded.rerank.score(QUESTION, l1) == table.score(QUESTION, l1)
+    meta_path = tmp_path / "rerank.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    for bad in ({"source": "x"}, {"ms_per_pair": "nan"}, {"ms_per_pair": 0}, {"ms_per_pair": -1}):
+        # A broken timing failed every L3 rerank step as run.failed{internal}, not at startup.
+        meta_path.write_text(json.dumps({**meta, "timing": bad}), encoding="utf-8")
+        with pytest.raises(IndexNotBuiltError):
+            IndexStore.load(tmp_path)
     store.rerank = None  # saving without a table removes the old one
     store.save(tmp_path)
     assert IndexStore.load(tmp_path).rerank is None

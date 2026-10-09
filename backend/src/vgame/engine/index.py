@@ -169,6 +169,9 @@ class RerankTable:
         self._model_id = model_id
         self.regime = dict(regime or {})
         self.timing = dict(timing or RERANK_TIMING_FALLBACK)
+        self.ms_per_pair = float(self.timing["ms_per_pair"])
+        if not 0 < self.ms_per_pair < float("inf"):  # NaN too: fail at load, not in every run
+            raise ValueError("rerank timing ms_per_pair invalid")
         self.questions, self.texts, self.scores = list(questions), list(texts), scores
         self._rows = {k: i for i, k in enumerate(self.questions)}
         self._cols = {k: i for i, k in enumerate(self.texts)}
@@ -176,10 +179,6 @@ class RerankTable:
     @property
     def model_id(self) -> str:
         return self._model_id
-
-    @property
-    def ms_per_pair(self) -> float:
-        return float(self.timing["ms_per_pair"])
 
     def get(self, question: str, text: str) -> float | None:
         row, col = self._rows.get(question_key(question)), self._cols.get(text_key(text))
@@ -526,7 +525,7 @@ def build_rerank_table(
     timing = old.timing if old is not None else None
     if scored:
         timing = {
-            "ms_per_pair": round(scoring_s * 1000 / scored, 1),
+            "ms_per_pair": scoring_s * 1000 / scored,  # unrounded: a fake model's ~0 must load
             "pairs": scored,
             "cpu": platform.processor() or platform.machine(),
             "measured": datetime.now(UTC).date().isoformat(),
