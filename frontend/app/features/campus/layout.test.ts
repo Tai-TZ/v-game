@@ -319,6 +319,26 @@ describe("click-to-move (campus-scene v0.2 §1.6, v0.3 §2.5)", () => {
     expect(routeTo(SPAWN, back).at(-2)?.z).toBeGreaterThan(-6);
   });
 
+  it.each([0, 90, 180, 270])(
+    "finds a stand point off every edge and on every building, viewed from %i°",
+    (yaw) => {
+      // An axis yaw walks straight along x or z, so each edge's exit in pastBounds is reached.
+      const toward = towardFor(deg(yaw));
+      const { minX, maxX, minZ, maxZ } = WORLD_BOUNDS;
+      const clicks: Vec2[] = [
+        { x: minX - 2, z: 0 },
+        { x: maxX + 2, z: 0 },
+        { x: 0, z: minZ - 2 },
+        { x: 0, z: maxZ + 2 },
+        ...SITES.map(({ footprint }) => ({ x: footprint.x, z: footprint.z })),
+      ];
+      for (const click of clicks) {
+        const stand = routeTo(SPAWN, click, toward).at(-2);
+        expect(stand && isBlocked(stand, OBSTACLES, WORLD_BOUNDS), label(SPAWN, click)).toBe(false);
+      }
+    },
+  );
+
   it("keeps the home view's routes bit for bit (towardFor(HOME_YAW) is exactly (1, 1))", () => {
     expect(towardFor(HOME_YAW)).toEqual(HOME_TOWARD);
     expect(HOME_TOWARD).toEqual({ x: 1, z: 1 });
