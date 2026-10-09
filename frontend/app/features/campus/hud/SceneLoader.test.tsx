@@ -157,6 +157,18 @@ describe("SceneLoader", () => {
     run(() => vi.advanceTimersByTime(1000));
     expect(status().textContent).toMatch(/sa bàn hơi nặng/);
   });
+
+  it("keeps the card as it is once the scene exists", () => {
+    renderLoader();
+    const card = () => screen.getByRole("region").textContent;
+    run(() => advanceScene(STAGE.build));
+    const before = card().replace(LABELS[STAGE.build], "");
+    // Starved timers fire late, at the handover.
+    run(() => vi.advanceTimersByTime(20_000));
+    run(() => advanceScene(STAGE.done));
+    expect(card().replace(LABELS[STAGE.done], "")).toBe(before.replace("Bước 4/5", "Bước 5/5"));
+    expect(screen.queryByText(/sa bàn hơi nặng/)).toBeNull();
+  });
 });
 
 describe("tips", () => {

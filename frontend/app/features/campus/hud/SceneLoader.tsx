@@ -46,6 +46,11 @@ const SLOW_MS = 10_000;
 const ANNOUNCE_MS = 1000;
 const TIP_MS = 8000;
 const TICK_MS = 100;
+/**
+ * Once the scene exists the main thread freezes (geometry, first frame) and starved timers fire
+ * at the handover: the card keeps its content from then on, so it never changes in the fade.
+ */
+const frozen = () => sceneLoad.getState().stage >= STAGE.build;
 
 const TIP_KEY = "vg-tip";
 /** The tip the next loader starts with, remembered per viewer so each visit shows unseen ones. */
@@ -157,6 +162,7 @@ function LiveLoader({ onGone }: { onGone: () => void }) {
     if (done) return;
     const timer = window.setTimeout(
       () => {
+        if (frozen()) return;
         setSlow(true);
         setSaid(SLOW);
       },
@@ -175,7 +181,9 @@ function LiveLoader({ onGone }: { onGone: () => void }) {
     }
   }, [tip]);
   useEffect(() => {
-    const id = window.setInterval(() => setTip((t) => (t + 1) % TIPS.length), TIP_MS);
+    const id = window.setInterval(() => {
+      if (!frozen()) setTip((t) => (t + 1) % TIPS.length);
+    }, TIP_MS);
     return () => window.clearInterval(id);
   }, []);
 
