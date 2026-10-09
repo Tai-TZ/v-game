@@ -3,11 +3,13 @@ import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState
 import {
   Color,
   GreaterDepth,
+  Group,
   MeshBasicMaterial,
   MeshLambertMaterial,
   MultiplyBlending,
   NotEqualStencilFunc,
   ReplaceStencilOp,
+  SkinnedMesh,
   type BufferGeometry,
   type InstancedMesh,
   type Material,
@@ -19,9 +21,9 @@ import { useActiveTheme } from "~/features/theme/context";
 import type { CampusTheme, TimeOfDay } from "~/features/theme/schema";
 
 import { cameraOffset } from "../camera";
-import { advanceScene, sceneMounted, STAGE } from "../hud/sceneLoad";
+import { advanceScene, sceneLoad, sceneMounted, STAGE, type SceneLoad } from "../hud/sceneLoad";
 import { ViewControls } from "../hud/ViewControls";
-import { NPC_SPOT, SITES } from "../layout";
+import { NPC_SPOT, NPCS, SITES, SPEAKERS, type Speaker } from "../layout";
 import { siteLooks, type InteractTarget, type SiteInfoMap } from "../sites";
 import { hubStore, useHub } from "../store";
 import {
@@ -31,8 +33,19 @@ import {
   treeMatrix,
   type TreeInstance,
 } from "./campus";
+import {
+  buildFigure,
+  CAST_SCALE,
+  castClips,
+  createAnim,
+  disposeFigure,
+  loadCast,
+  paintFigure,
+  type CastJson,
+  type CastRole,
+} from "./cast";
 import { useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
-import { useHubFrame } from "./useHubFrame";
+import { FIGURE_Y, useHubFrame, type CastFigure, type Figures } from "./useHubFrame";
 import { WorldLabels } from "./WorldLabels";
 
 export interface CampusSceneProps {
@@ -130,8 +143,45 @@ interface CampusProps {
   campus: CampusTheme;
   time: TimeOfDay;
   sites: SiteInfoMap;
-  options: Parameters<typeof useHubFrame>[0];
+  options: Omit<Parameters<typeof useHubFrame>[0], "castPending" | "figures">;
 }
+
+type Materials = Record<"figure" | "xray", Material>;
+
+/**
+ * One skinned figure per person, posed at rest (integration spec §3): the player's x-ray shares
+ * its geometry and skeleton; the NPCs stand at their spots, the player and the librarian go in
+ * the groups the frame loop moves and turns.
+ */
+function castFigures(cast: CastJson, materials: Materials): Figures {
+  const clips = castClips(cast);
+  const make = (role: CastRole): CastFigure => {
+    const mesh = buildFigure(cast, role, materials.figure);
+    const body = new Group();
+    body.scale.setScalar(CAST_SCALE);
+    body.add(mesh);
+    return { mesh, body, anim: createAnim(mesh, clips) };
+  };
+  const player = make("player");
+  const xray = new SkinnedMesh(player.mesh.geometry, materials.xray);
+  xray.bind(player.mesh.skeleton, player.mesh.bindMatrix);
+  xray.frustumCulled = false;
+  xray.renderOrder = 1;
+  player.mesh.renderOrder = 2;
+  player.body.add(xray);
+  const people = Object.fromEntries(SPEAKERS.map(({ id }) => [id, make(id)])) as Record<
+    Speaker,
+    CastFigure
+  >;
+  for (const { id, spot, yaw } of NPCS) {
+    people[id].body.position.set(spot.x, FIGURE_Y, spot.z);
+    people[id].body.rotation.y = yaw;
+  }
+  return { player, people };
+}
+
+/** The first frame is on screen: the cast's download starts only then (integration spec §2). */
+const painted = (s: SceneLoad) => s.stage >= STAGE.done;
 
 function Campus({ campus, time, sites, options }: CampusProps) {
   // Read once per visit: the workbench saves stars on a sibling route, so going back remounts
@@ -142,7 +192,22 @@ function Campus({ campus, time, sites, options }: CampusProps) {
   const g = useCampusGeometry(campus, time, looks.library, looks.watchtower, looks.market);
   const preset = campus.lights[time];
   const sunPosition = useMemo(() => g.palette.light.sun.clone().multiplyScalar(30), [g.palette]);
-  const { player, playerBlob, lan, ring, statics, wake } = useHubFrame(options);
+  // undefined while cast.json loads, null if it failed: the statues stand in until (unless) then.
+  const [cast, setCast] = useState<CastJson | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    const start = (s: SceneLoad) => {
+      if (!painted(s)) return;
+      off();
+      void loadCast().then((c) => live && setCast(c));
+    };
+    const off = sceneLoad.subscribe(start);
+    start(sceneLoad.getState());
+    return () => {
+      live = false;
+      off();
+    };
+  }, []);
   const materials = useMemo(
     () => ({
       baked: new MeshBasicMaterial({ vertexColors: true }),
@@ -174,6 +239,20 @@ function Campus({ campus, time, sites, options }: CampusProps) {
     () => () => Object.values(materials).forEach((material: Material) => material.dispose()),
     [materials],
   );
+  const figures = useMemo(() => (cast ? castFigures(cast, materials) : null), [cast, materials]);
+  useEffect(
+    () => () => {
+      if (!figures) return;
+      disposeFigure(figures.player.mesh); // the x-ray shares its geometry and skeleton
+      for (const { mesh } of Object.values(figures.people)) disposeFigure(mesh);
+    },
+    [figures],
+  );
+  const { player, playerBlob, lan, ring, statics, wake } = useHubFrame({
+    ...options,
+    figures,
+    castPending: cast === undefined,
+  });
   // A re-bake (time or theme) wakes the scene the way a walk does, so ?debug=frames flags it
   // busy until the new geometry is drawn.
   useEffect(() => {
@@ -181,6 +260,33 @@ function Campus({ campus, time, sites, options }: CampusProps) {
     materials.ring.color.copy(g.palette.player);
     wake();
   }, [materials, g.palette, wake]);
+  // Theme colours onto the figures (only colours change; integration spec §4), before the
+  // frame that first shows them, so no figure is ever drawn unpainted.
+  useLayoutEffect(() => {
+    if (!figures || !cast) return;
+    const pal = g.palette;
+    const paint = (who: CastRole, mesh: SkinnedMesh, looks: Parameters<typeof paintFigure>[2]) =>
+      paintFigure(mesh, cast.roles[who], looks);
+    paint("player", figures.player.mesh, { top: pal.player, bottom: pal.pants });
+    paint("lan", figures.people.lan.mesh, { top: pal.npc, bottom: pal.lanSkirt });
+    for (const { id } of NPCS) {
+      const look = campus.npcs[id];
+      paint(id, figures.people[id].mesh, {
+        top: new Color(look.top),
+        bottom: new Color(look.bottom),
+        accent: new Color(look.accent),
+      });
+    }
+    wake();
+  }, [figures, cast, g.palette, campus.npcs, wake]);
+  // The cast settled: one frame shows it (or keeps the statues). ?debug=frames tells e2e.
+  useEffect(() => {
+    if (options.countFrames) {
+      document.documentElement.dataset.cast =
+        cast === undefined ? "loading" : cast ? "ready" : "failed";
+    }
+    wake();
+  }, [cast, options.countFrames, wake]);
 
   // `?debug=frames` also exposes the building looks, so e2e can check the stars reach the scene.
   const looksKey = Object.entries(looks)
@@ -207,20 +313,33 @@ function Campus({ campus, time, sites, options }: CampusProps) {
       </group>
       <mesh geometry={g.shadow} material={materials.shadow} />
 
+      {/* The people: statues until the baked cast arrives (kept if it fails). */}
       <group ref={player}>
-        <mesh geometry={g.player} material={materials.xray} renderOrder={1} />
-        <mesh geometry={g.player} material={materials.figure} renderOrder={2} />
+        {figures ? (
+          <primitive object={figures.player.body} />
+        ) : (
+          <>
+            <mesh geometry={g.player} material={materials.xray} renderOrder={1} />
+            <mesh geometry={g.player} material={materials.figure} renderOrder={2} />
+          </>
+        )}
       </group>
       <mesh ref={playerBlob} rotation-x={FLAT} material={materials.blob}>
         <circleGeometry args={[0.36, BLOB_SEGMENTS]} />
       </mesh>
 
-      <group ref={lan} position={[NPC_SPOT.x, 0.045, NPC_SPOT.z]}>
-        <mesh geometry={g.lan} material={materials.figure} />
+      <group ref={lan} position={[NPC_SPOT.x, FIGURE_Y, NPC_SPOT.z]}>
+        {figures ? (
+          <primitive object={figures.people.lan.body} />
+        ) : (
+          <mesh geometry={g.lan} material={materials.figure} />
+        )}
       </group>
-      <mesh position={[NPC_SPOT.x, 0.05, NPC_SPOT.z]} rotation-x={FLAT} material={materials.blob}>
-        <circleGeometry args={[0.4, BLOB_SEGMENTS]} />
-      </mesh>
+      {figures ? (
+        NPCS.map(({ id }) => <primitive key={id} object={figures.people[id].body} />)
+      ) : (
+        <mesh geometry={g.npcs} material={materials.figure} />
+      )}
 
       <mesh ref={ring} rotation-x={FLAT} visible={false} material={materials.ring}>
         <ringGeometry args={[0.55, 0.66, RING_SEGMENTS]} />

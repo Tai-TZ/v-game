@@ -376,6 +376,18 @@ describe("cast animation (integration spec §5.1)", () => {
     expect(snapshot(nodder.mesh)).toBe(nodder.rest);
   });
 
+  it("starts a gesture over when asked again mid-way: a greeting, then the dialog's talk", () => {
+    const { mesh, anim, rest } = animated("registrar");
+    setState(anim, "talk");
+    for (let i = 0; i < 30; i += 1) updateAnim(anim, 1 / 60, 0, false);
+    setState(anim, "talk", { times: 2 });
+    let t = 0;
+    while (updateAnim(anim, 1 / 60, 0, false)) t += 1 / 60;
+    expect(t).toBeGreaterThan(1.2);
+    expect(t).toBeLessThanOrEqual(1.6);
+    expect(snapshot(mesh)).toBe(rest);
+  });
+
   it("with reduced motion, walks without fades and stops at rest in the frame it stops", () => {
     const { mesh, anim, rest } = animated();
     for (let i = 0; i < 20; i += 1) updateAnim(anim, 1 / 60, 3, true);

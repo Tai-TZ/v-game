@@ -9,6 +9,7 @@ import {
   type Group,
   type Mesh,
   type Object3D,
+  type SkinnedMesh,
 } from "three";
 
 import {
@@ -29,22 +30,44 @@ import {
 import { sceneLoad, STAGE } from "../hud/sceneLoad";
 import {
   INTERACT_RADIUS,
-  NPC_SPOT,
+  NPCS,
   OBSTACLES,
   SITES,
   speakerSpot,
   SPEAKERS,
   talkSpot,
   WORLD_BOUNDS,
+  type Speaker,
   type Vec2,
 } from "../layout";
 import { isMovementKey, nearestWithin, step } from "../movement";
 import { INTERACT_POINTS, type InteractTarget } from "../sites";
-import { easeView, hubStore } from "../store";
+import { easeView, hubStore, type HubDialog } from "../store";
+import { setState, updateAnim, type CastAnim } from "./cast";
 import { LABEL_ANCHORS, labelElements, labelWidths, viewNeedle, type LabelId } from "./labels";
 
-const FIGURE_Y = 0.045;
+/** People stand this far above the ground (their baked discs lie under it). */
+export const FIGURE_Y = 0.045;
 const LAN_REST_YAW = Math.PI / 4;
+/** A figure turns to watch the player inside WATCH and back to rest beyond RELEASE. */
+const WATCH = 3;
+const RELEASE = 3.4;
+/** Greeting trigger: armed beyond ARM, fired when the player walks inside GREET (§5.2). */
+const ARM = 4;
+const GREET = 2.6;
+
+/** One baked figure: its skinned mesh, the scaled group that holds it, its clips. */
+export interface CastFigure {
+  mesh: SkinnedMesh;
+  body: Group;
+  anim: CastAnim;
+}
+
+/** The baked cast once cast.json is in (CampusScene); null keeps the statues. */
+export interface Figures {
+  player: CastFigure;
+  people: Record<Speaker, CastFigure>;
+}
 const RING_INTRO = 0.18;
 const RING_PULSE = 0.7;
 const RING_TOTAL = RING_INTRO + 2 * RING_PULSE;
@@ -149,6 +172,9 @@ export function useHubFrame(options: {
   countFrames: boolean;
   /** A new light preset is picked but not baked yet: e2e must not see the scene as idle. */
   rebaking: boolean;
+  /** cast.json is still on its way: its arrival draws a frame, so the scene is not idle yet. */
+  castPending: boolean;
+  figures: Figures | null;
   onInteract: (target: InteractTarget) => void;
 }) {
   const camera = useThree((state) => state.camera);
@@ -162,16 +188,24 @@ export function useHubFrame(options: {
   const onInteract = useRef(options.onInteract);
   const reducedMotion = useRef(options.reducedMotion);
   const rebaking = useRef(options.rebaking);
+  const castPending = useRef(options.castPending);
+  const figures = useRef(options.figures);
   useEffect(() => {
     onInteract.current = options.onInteract;
     reducedMotion.current = options.reducedMotion;
     rebaking.current = options.rebaking;
+    castPending.current = options.castPending;
+    figures.current = options.figures;
   });
 
   const anim = useRef({
     yaw: hubStore.getState().motion.heading,
-    lanYaw: LAN_REST_YAW,
-    lanTarget: LAN_REST_YAW,
+    /** Everyone who turns towards the player; the NPC statues stand still until the cast is in. */
+    people: SPEAKERS.map(({ id, spot }) => {
+      const rest = NPCS.find((npc) => npc.id === id)?.yaw ?? LAN_REST_YAW;
+      return { who: id, spot, rest, yaw: rest, target: rest, armed: false };
+    }),
+    lastDialog: null as HubDialog | null,
     walked: 0,
     ringFor: null as InteractTarget | null,
     ringTime: RING_TOTAL,
@@ -384,11 +418,12 @@ export function useHubFrame(options: {
       OBSTACLES,
       WORLD_BOUNDS,
     );
+    const stride = Math.hypot(
+      moved.position.x - motion.position.x,
+      moved.position.z - motion.position.z,
+    );
     if (moved.moving) {
-      a.walked += Math.hypot(
-        moved.position.x - motion.position.x,
-        moved.position.z - motion.position.z,
-      );
+      a.walked += stride;
       busy = true;
     } else {
       a.walked = 0;
@@ -408,23 +443,44 @@ export function useHubFrame(options: {
       }
     }
 
-    // Player figure: turn, bob while walking, blob shadow stays on the ground.
+    // Player figure: turn, walk (the cast's clips; the statue bobs), blob stays on the ground.
     const { x, z } = motion.position;
+    const cast = figures.current;
     a.yaw = turn(a.yaw, motion.heading, 0.06, dt, reduced);
     if (a.yaw !== motion.heading) busy = true;
     const bob =
-      reduced || !moved.moving ? 0 : 0.035 * Math.abs(Math.sin((Math.PI * a.walked) / 0.5));
+      reduced || !moved.moving || cast ? 0 : 0.035 * Math.abs(Math.sin((Math.PI * a.walked) / 0.5));
     player.current?.position.set(x, FIGURE_Y + bob, z);
     player.current?.rotation.set(0, a.yaw, 0);
     playerBlob.current?.position.set(x, 0.05, z);
+    if (cast && updateAnim(cast.player.anim, dt, moved.moving ? stride / dt : 0, reduced)) {
+      busy = true;
+    }
 
-    // The librarian turns to watch the player inside 3.0 and back to rest beyond 3.4.
-    const lanDistance = Math.hypot(x - NPC_SPOT.x, z - NPC_SPOT.z);
-    if (lanDistance < 3) a.lanTarget = Math.atan2(x - NPC_SPOT.x, z - NPC_SPOT.z);
-    else if (lanDistance > 3.4) a.lanTarget = LAN_REST_YAW;
-    a.lanYaw = turn(a.lanYaw, a.lanTarget, 0.12, dt, reduced);
-    if (a.lanYaw !== a.lanTarget) busy = true;
-    lan.current?.rotation.set(0, a.lanYaw, 0);
+    // People turn to watch the player and back to rest (the NPC statues stand still). A figure
+    // greets once as the player walks up (a nod once met) and talks as its dialog opens
+    // (integration spec §5.2): each starts in a frame the player caused and ends by itself.
+    const { dialog } = state;
+    const opened = dialog !== a.lastDialog ? dialog?.who : undefined;
+    a.lastDialog = dialog;
+    for (const p of a.people) {
+      const figure = cast?.people[p.who];
+      if (!figure && p.who !== "lan") continue;
+      const distance = Math.hypot(x - p.spot.x, z - p.spot.z);
+      if (distance < WATCH) p.target = Math.atan2(x - p.spot.x, z - p.spot.z);
+      else if (distance > RELEASE) p.target = p.rest;
+      p.yaw = turn(p.yaw, p.target, 0.12, dt, reduced);
+      if (p.yaw !== p.target) busy = true;
+      (p.who === "lan" ? lan.current : figure?.body)?.rotation.set(0, p.yaw, 0);
+      if (!figure) continue;
+      if (distance > ARM) p.armed = true;
+      if (!reduced && p.armed && moved.moving && distance < GREET && !dialog) {
+        setState(figure.anim, state.met[p.who] ? "nod" : "talk");
+        p.armed = false;
+      }
+      if (!reduced && opened === p.who) setState(figure.anim, "talk", { times: 2 });
+      if (updateAnim(figure.anim, dt, 0, reduced)) busy = true;
+    }
 
     // Interaction ring under the nearest point, with a short intro then still.
     const ringMesh = ring.current;
@@ -534,7 +590,7 @@ export function useHubFrame(options: {
       root.dataset.yaw = (((((v.yaw * 180) / Math.PI) % 360) + 360) % 360).toFixed(3);
       root.dataset.player = `${x.toFixed(2)},${z.toFixed(2)}`;
       // The re-bake's own commit wakes the scene again (Campus), so the flag spans the gap.
-      if (busy || rebaking.current) root.dataset.sceneBusy = "";
+      if (busy || rebaking.current || castPending.current) root.dataset.sceneBusy = "";
       else delete root.dataset.sceneBusy;
     }
 

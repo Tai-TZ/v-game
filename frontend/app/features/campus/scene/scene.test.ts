@@ -42,11 +42,13 @@ import {
   BASE,
   LANDMARK,
   NPC_SPOT,
+  NPCS,
   OBSTACLES,
   routeTo,
   siteFor,
   SITES,
   SPAWN,
+  SPEAKERS,
   towardFor,
   WORLD_BOUNDS,
   type Vec2,
@@ -62,9 +64,12 @@ import {
   entranceLampSpots,
   SHADOW_Y,
   shadowCasters,
+  SPEAKER_DISC_SEGMENTS,
+  SPEAKER_DISC_Y,
   TREE_INSTANCES,
   treeMatrix,
 } from "./campus";
+import { parseCast } from "./cast";
 import { LABEL_ANCHORS } from "./labels";
 import { desaturate, light, palette, shade, type Palette } from "./palette";
 import { triangleCount, type Face } from "./primitives";
@@ -72,6 +77,9 @@ import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampus
 import { clickGoal, pickNpc } from "./useHubFrame";
 
 const THEMES_DIR = path.resolve(process.cwd(), "public", "themes");
+const CAST = parseCast(
+  JSON.parse(readFileSync(path.resolve(process.cwd(), "public", "models", "cast.json"), "utf8")),
+);
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"));
 const themeIds = parseThemeIndex(readJson(path.join(THEMES_DIR, "index.json"))).map((t) => t.id);
 const manifests: ThemeManifest[] = themeIds.map((id) =>
@@ -312,6 +320,7 @@ const geometries = (g: CampusGeometry) => [
   g.roundTree,
   g.cypress,
   g.player,
+  g.npcs,
   g.lan,
 ];
 
@@ -692,15 +701,48 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     // Measured 14 draw calls (v0.3's 13 plus the sun-shadow overlay). Triangles with the looks
     // built here (open, coming soon, coming soon): 19,248 (spire-hall) / 16,186 (clock-tower) in
     // v0.3; N8/N9 drop the unstarred library's shelves (-88) and add foam and the sun-shadow
-    // overlay (campus-scene v0.3 §13.4 has the measured totals). The cap stays v0.3's (§8).
-    // v0.4 dresses all four sides (orbit-camera §5.2) inside the same groups: by day 20,097 ->
-    // 21,413 (spire-hall) and 17,020 -> 18,268 (clock-tower); 21,585 with every zone lit.
+    // overlay (campus-scene v0.3 §13.4 has the measured totals). v0.4 dresses all four sides
+    // (orbit-camera §5.2) inside the same groups: by day 20,097 -> 21,413 (spire-hall) and
+    // 17,020 -> 18,268 (clock-tower); 21,585 with every zone lit.
+    // v0.4 people (npc-cast v0.4, integration spec §6): five baked ground discs replace the
+    // librarian's blob (draw calls stay 14 with the statues: +1 merged NPC statues, -1 blob),
+    // then the baked cast swaps the four statue meshes for seven skinned ones: 17 draw calls.
+    // Measured by day: statues 22,177 (spire-hall) / 19,032 (clock-tower), cast 26,112 /
+    // 22,967 (the six figures are 5,235 with the player's x-ray, cast.test.ts).
+    // Caps raised with the cast (integration spec §6): 20 draw calls, 28,000 triangles.
     it.each(TIMES)("stays well inside 40 draw calls and 60k triangles at %s", (time) => {
       const { result, unmount } = build(manifest, time);
-      const budget = sceneBudget(result.current);
-      expect(budget.drawCalls).toBeLessThanOrEqual(16);
-      expect(budget.drawCalls).toBe(14);
-      expect(budget.triangles).toBeLessThanOrEqual(23_000);
+      const statues = sceneBudget(result.current);
+      expect(statues.drawCalls).toBe(14);
+      expect(statues.triangles).toBeLessThanOrEqual(28_000);
+      if (!CAST) throw new Error("cast.json does not parse");
+      const cast = sceneBudget(result.current, CAST);
+      expect(cast.drawCalls).toBe(17);
+      expect(cast.drawCalls).toBeLessThanOrEqual(20);
+      expect(cast.triangles).toBeLessThanOrEqual(28_000);
+      unmount();
+    });
+
+    it("stands the four NPC statues at their spots, 1.36 tall, and bakes a disc under everyone", () => {
+      const { result, unmount } = build(manifest);
+      const { npcs, terrain } = result.current;
+      expect(triangleCount(npcs)).toBe(4 * (32 + 32 + 80 + 32));
+      npcs.computeBoundingBox();
+      expect(npcs.boundingBox?.max.y).toBeCloseTo(0.045 + 1.36, 6);
+      const position = terrain.getAttribute("position");
+      const discs = new Map<string, number>();
+      for (let i = 0; i + 2 < position.count; i += 3) {
+        const ys = [0, 1, 2].map((k) => position.getY(i + k));
+        if (ys.some((y) => Math.abs(y - SPEAKER_DISC_Y) > 1e-6)) continue;
+        const a = new Vector3().fromBufferAttribute(position, i);
+        const b = new Vector3().fromBufferAttribute(position, i + 1);
+        const c = new Vector3().fromBufferAttribute(position, i + 2);
+        expect(b.sub(a).cross(c.sub(a)).y).toBeGreaterThan(0);
+        const who = SPEAKERS.find(({ spot }) => Math.hypot(a.x - spot.x, a.z - spot.z) <= 0.4001);
+        if (!who) throw new Error(`disc vertex (${a.x}, ${a.z}) under nobody`);
+        discs.set(who.id, (discs.get(who.id) ?? 0) + 1);
+      }
+      expect(discs).toEqual(new Map(SPEAKERS.map(({ id }) => [id, SPEAKER_DISC_SEGMENTS])));
       unmount();
     });
 
@@ -991,6 +1033,17 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       // Her head counts too (the v0.3 plane at 0.7 missed it).
       aim(HOME_YAW, NPC_SPOT.x, 1.4, NPC_SPOT.z);
       expect(pickNpc(raycaster, group, speakers)).toBe("lan");
+      // Every NPC stands in clear view from home (npc-cast v0.4 §4), feet to head.
+      for (const { id, spot } of NPCS) {
+        for (const y of [0.2, 0.7, 1.3]) {
+          aim(HOME_YAW, spot.x, y, spot.z);
+          expect(pickNpc(raycaster, group, SPEAKERS), `${id} at ${y}`).toBe(id);
+        }
+      }
+      // From behind the main building the registrar is hidden: the click is the building's.
+      const registrar = NPCS.find(({ id }) => id === "registrar")?.spot ?? SPAWN;
+      aim(deg(180), registrar.x, 0.7, registrar.z);
+      expect(pickNpc(raycaster, group, SPEAKERS)).toBeNull();
       material.dispose();
       unmount();
     });

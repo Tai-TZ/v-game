@@ -11,6 +11,7 @@ import {
   buildLandmark,
   buildLibrary,
   buildMarket,
+  buildNpcs,
   buildPlayer,
   buildRoundTree,
   buildShadows,
@@ -21,6 +22,7 @@ import {
   treesInShade,
   type TreeInstance,
 } from "./campus";
+import { CAST_ROLES, type CastJson } from "./cast";
 import { palette, type Palette } from "./palette";
 import { triangleCount } from "./primitives";
 
@@ -39,9 +41,13 @@ export interface CampusGeometry {
   /** Instanced (one draw call per kind). */
   roundTree: BufferGeometry;
   cypress: BufferGeometry;
-  /** Dynamic figures; the player geometry is drawn twice (body + x-ray silhouette). */
+  /**
+   * Statues shown until the baked cast arrives (and kept if it fails); the player geometry is
+   * drawn twice (body + x-ray silhouette), the four NPCs are one merged mesh.
+   */
   player: BufferGeometry;
   lan: BufferGeometry;
+  npcs: BufferGeometry;
 }
 
 /** Disposes a geometry when it is replaced (theme or status change) or on unmount. */
@@ -84,26 +90,44 @@ export function useCampusGeometry(
     cypress: useDisposable(useMemo(() => buildCypress(pal), [pal])),
     player: useDisposable(useMemo(() => buildPlayer(pal), [pal])),
     lan: useDisposable(useMemo(() => buildLan(pal), [pal])),
+    // Plain colours, no baked light: a new hour keeps them.
+    npcs: useDisposable(useMemo(() => buildNpcs(palette(campus), campus.npcs), [campus])),
   };
 }
 
 const ROUND_TREES = TREE_INSTANCES.filter((tree) => tree.kind === "round").length;
 const CYPRESSES = TREE_INSTANCES.length - ROUND_TREES;
 
+/** Triangles of the baked figures: the player's twice (body + x-ray), everyone else's once. */
+export const castTriangles = (cast: CastJson) =>
+  CAST_ROLES.reduce(
+    (sum, role) => sum + (cast.roles[role].index.length / 3) * (role === "player" ? 2 : 1),
+    0,
+  );
+
 /**
  * Draw calls and triangles of the hub scene as CampusScene renders it: 5 static groups, the
- * sun-shadow overlay, 2 instanced tree meshes, player + x-ray, librarian, 2 ground blobs and the
- * interaction ring.
+ * sun-shadow overlay, 2 instanced tree meshes, the people, the player's ground blob and the
+ * interaction ring. The people are the statues (player + x-ray, librarian, the four NPCs
+ * merged) until `cast` arrives, then one skinned mesh each plus the player's x-ray.
  */
-export function sceneBudget(g: CampusGeometry): { drawCalls: number; triangles: number } {
+export function sceneBudget(
+  g: CampusGeometry,
+  cast: CastJson | null = null,
+): { drawCalls: number; triangles: number } {
   const statics = [g.terrain, g.landmark, g.library, g.watchtower, g.market, g.shadow];
+  const people = cast
+    ? { drawCalls: CAST_ROLES.length + 1, triangles: castTriangles(cast) }
+    : {
+        drawCalls: 4,
+        triangles: triangleCount(g.player) * 2 + triangleCount(g.lan) + triangleCount(g.npcs),
+      };
   const triangles =
     statics.reduce((sum, geometry) => sum + triangleCount(geometry), 0) +
     triangleCount(g.roundTree) * ROUND_TREES +
     triangleCount(g.cypress) * CYPRESSES +
-    triangleCount(g.player) * 2 +
-    triangleCount(g.lan) +
-    BLOB_SEGMENTS * 2 +
+    people.triangles +
+    BLOB_SEGMENTS +
     RING_SEGMENTS * 2;
-  return { drawCalls: statics.length + 2 + 2 + 1 + 2 + 1, triangles };
+  return { drawCalls: statics.length + 2 + people.drawCalls + 1 + 1, triangles };
 }

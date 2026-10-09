@@ -150,6 +150,24 @@ export function parseCast(json: unknown): CastJson | null {
   return ok ? (json as unknown as CastJson) : null;
 }
 
+let request: Promise<CastJson | null> | null = null;
+
+/**
+ * public/models/cast.json, fetched once per page. Null when it fails or does not parse: the
+ * scene then keeps its statues, with one warning.
+ */
+export function loadCast(): Promise<CastJson | null> {
+  request ??= fetch("/models/cast.json")
+    .then((response) => (response.ok ? (response.json() as Promise<unknown>) : null))
+    .then(parseCast)
+    .catch(() => null)
+    .then((cast) => {
+      if (!cast) console.warn("cast.json is unavailable; the hub keeps its statues.");
+      return cast;
+    });
+  return request;
+}
+
 /** One SkinnedMesh (1 draw call), bound at the origin; place it through a parent group. */
 export function buildFigure(cast: CastJson, role: CastRole, material: Material): SkinnedMesh {
   const d = cast.roles[role];
@@ -274,15 +292,18 @@ export function setState(
   name: CastClip,
   { fade = FADE, times = 1 }: { fade?: number; times?: number } = {},
 ): void {
-  if (a.current === name) return;
-  const next = a.actions[name].reset();
   const gesture = name === "talk" || name === "nod";
+  // A gesture asked for again while it plays starts over (a greeting, then the dialog's talk).
+  if (a.current === name && !gesture) return;
+  const next = a.actions[name].reset();
   next.setLoop(LoopRepeat, gesture ? times : Infinity);
   next.play();
-  if (fade > 0) a.actions[a.current].crossFadeTo(next, fade, false);
-  else a.actions[a.current].stop();
-  a.current = name;
-  a.fade = fade;
+  if (a.current !== name) {
+    if (fade > 0) a.actions[a.current].crossFadeTo(next, fade, false);
+    else a.actions[a.current].stop();
+    a.current = name;
+    a.fade = fade;
+  }
   // Hand back to rest one fade before the end, so rest fades in while the gesture still plays
   // and the bind pose never shows for a frame.
   a.left = gesture ? next.getClip().duration * times - fade : 0;
