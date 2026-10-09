@@ -52,7 +52,7 @@ export function useSkyClock(place: Pick<Place, "lat" | "lon">) {
       const request = new AbortController();
       controller = request;
       const timeout = window.setTimeout(() => request.abort(), FETCH_TIMEOUT_MS);
-      // No referrer: Open-Meteo learns the visitor's IP (the popover says so), not the page.
+      // No referrer: Open-Meteo sees the visitor's IP and our origin (CORS Origin header), never the page path.
       void fetch(forecastUrl({ lat, lon }), {
         signal: request.signal,
         referrerPolicy: "no-referrer",
