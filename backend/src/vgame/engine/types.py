@@ -36,6 +36,8 @@ CaseStatus = Literal[
     "ok", "timeout", "cancelled", "skipped_budget", "llm_error", "index_error", "refusal"
 ]
 Retriever = Literal["vector_search", "bm25_search", "fusion", "rerank"]
+# "mau": N2 "Thử 3 câu mẫu", the visible cases only and never a star score (roadmap-v0.4 B0).
+RunScope = Literal["mau"]
 
 
 # --- Usage --------------------------------------------------------------------------------
@@ -391,6 +393,7 @@ class RunStartedEvent(TypedDict):
     level: str
     cases: list[CaseInfo]
     ingestion: list[IngestionInfo]
+    scope: NotRequired[RunScope]  # absent on a star run
 
 
 class StepStartedEvent(TypedDict):
@@ -423,6 +426,9 @@ class CaseGradedEvent(TypedDict):
     counted: bool
     criteria: dict[str, bool]
     labels: list[str]
+    # skipped_budget because the server's DailyCap ran out (not the player's per-case cap): the
+    # run is not a star attempt (daily-shift §3.3).
+    reason: NotRequired[Literal["daily_cap"]]
 
 
 class RunScoredEvent(TypedDict):
@@ -436,6 +442,7 @@ class RunFinishedEvent(TypedDict):
     run: str
     report: RunReport
     models: dict[str, int]  # model id -> answered LLM calls (replays included)
+    scope: NotRequired[RunScope]  # "mau": no run.scored came before it
 
 
 class RunFailedEvent(TypedDict):
