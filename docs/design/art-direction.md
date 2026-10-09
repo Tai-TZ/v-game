@@ -100,10 +100,10 @@ Mọi phép tính làm trên `THREE.Color` trong không gian **linear** (`new Co
 |---|---|---|---|
 | `~soil` | `mul(ground, 0.45)` | `#81966f` | `#8b9a7a` |
 | `~subsoil` (2026-10-09) | `lerp(~soil, trunk, 0.35)` | `#767b51` | `#88896a` |
-| `~mow` (2026-10-09) | `mul(ground, 0.955)` | `#a4c181` | `#c4d8ac` |
+| `~mow` (2026-10-09, sửa sau review cùng ngày) | `mul(ground, 0.925)` (0.955 không nhìn thấy ở 1280 px) | `#a1be7f` | `#c1d5aa` |
 | `~kerb` (2026-10-09) | `mul(lm.trim, 0.92 × lát)`, `lát = 1 − 0.22w` (§14 mục 4), nên ướt thì tối hơn | `#d7d1c7` | `#c7beaa` |
 | `~deep` (2026-10-09) | `mul(water, 0.78)` | `#80a5b9` | `#8bb9c1` |
-| `~ao` (2026-10-09) | Hệ số nhân `lerpW(~shadow, 0.35)`: sắc của bóng nắng, 65% độ đậm | ngày `#dce0e6`, hoàng hôn `#ccdaf8` | như campus |
+| `~ao` (2026-10-09, sửa sau review cùng ngày) | Hệ số nhân `lerpW(lerp(~shadow, xám(~shadow), 0.5), 0.2)`: bóng nắng kéo nửa đường về xám cùng độ sáng, 80% độ đậm. Tiếp đất che cả ánh trời xanh, nên vệt dưới đèn trên đường ấm lúc hoàng hôn ra xám ấm, không ngả tím | ngày `#d5d7db`, hoàng hôn `#c7d0e4` | như campus |
 | `~glass` | `mul(water, 0.45)` | `#6288a1` | `#6c9097` |
 | `~lit` (hoàng hôn sửa 2026-10-09, sau QA vòng 5) | Ngày: `lerpW(lm.accent, 0.20)`. Hoàng hôn: `full(lerp(lm.accent, dusk.sun, 0.5))`, với `full` chia cho kênh lớn nhất, vì tường `+z` hứng nắng chiều nướng ra gần đúng màu ngày (§12 mục 10) | ngày `#ddba8b`, hoàng hôn `#ffbc49` | ngày `#c9937d`, hoàng hôn `#ffa930` |
 | `~waterHi` | `lerpW(water, 0.35)` | `#c0daef` | `#c6e1e7` |
@@ -773,7 +773,7 @@ Chụp ở **1280×800** và **375×812**, mỗi kích thước cho **cả hai t
 - [ ] Hội thoại mở ở panel phải, cô Lan vẫn thấy được bên trái; có lớp phủ nhẹ; hai nút đúng thứ tự.
 - [ ] Đi tới cửa Chợ `(0, 5.3)`: bóng x-ray nhạt của người chơi hiện qua mái.
 - [ ] (2026-10-09) Tiếp đất: quanh chân toà, dưới cây, prop, đèn và tượng có vệt tối mềm, mép tan vào cỏ, không còn đĩa xám mép cứng; vũng sáng dưới người ban đêm không bị tối. Đường có bờ lát mảnh; cỏ có vạch cắt rất nhẹ, lấy mẫu pixel cỏ ở vạch sáng; mặt cắt đế thấy ba lớp và dải nước dưới hồ; lòng hồ đậm dần về góc đế.
-- [ ] `renderer.info.render.calls ≤ 18` (sửa 2026-10-09 lần hai: +1 lớp tiếp đất; trước đó ≤ 17; v0.4: 17 với bộ nhân vật và vòng tương tác, 16 khi vòng ẩn; khi còn tượng 14/13; trước đó ≤ 13 với lớp bóng nắng), tam giác theo campus-scene v0.3 §13.4; đứng yên 3 s thì bộ đếm frame không tăng.
+- [ ] `renderer.info.render.calls ≤ 19` khi vòng tương tác hiện, `≤ 18` khi vòng ẩn, khớp `sceneBudget()` (sửa 2026-10-09 lần hai: +1 lớp tiếp đất, e2e `play.spec.ts` đếm 18 lệnh vẽ lúc đứng yên; trước đó ≤ 17; v0.4: 17 với bộ nhân vật và vòng tương tác, 16 khi vòng ẩn; khi còn tượng 14/13; trước đó ≤ 13 với lớp bóng nắng), tam giác theo campus-scene v0.3 §13.4; đứng yên 3 s thì bộ đếm frame không tăng.
 - [ ] Vào `/play` lần đầu (tải chậm): nền trời ngay từ đầu, không nền trắng; thẻ có logo, tên bước + "Bước n/5", mẹo của cô Lan; thẻ không che nút trên; khi cảnh hiện, sa bàn trùng chỗ rồi mờ đi trong 200 ms; `?debug=loader` thấy hai lớp trùng nhau.
 
 **Hub `/play`, 375×812:**
@@ -870,7 +870,7 @@ Nguồn: `campus-v0.4-plan.md` mục "Thời tiết và giờ thật" (W0 chốt
 Nguồn: chủ dự án hỏi "có cách nào làm cho đẹp hơn, nâng đồ hoạ mà vẫn tối ưu, không lag". Kế hoạch và bảng ứng viên ở `feat/campus-visual-polish` (plan B1–B7, C1–C6).
 
 1. **Mọi thứ nướng khi dựng look**, không có gì mới chạy mỗi khung ngoài một lưới phủ nhỏ. Không phụ thuộc mới, program shader vẫn 4, đứng yên vẫn 0 frame.
-2. **Lớp tiếp đất `G-ao`** (§2.4 mục 2): +1 draw call. Hệ số `~ao = lerpW(~shadow, 0.35)` thay cho `~shadow × 0.9` của kế hoạch: bản kế hoạch tối gần bằng bóng nắng (≈ 0.5 linear ban ngày), đậm hơn skirt cũ (0.7), đọc như bóng chứ không như tiếp đất. `AO_Y` đặt dưới đĩa người nói chuyện (0.0133 < 0.0135) thay vì trên lớp bóng: vũng sáng ban đêm sạch theo cấu trúc, không cần kiểm từng blob.
+2. **Lớp tiếp đất `G-ao`** (§2.4 mục 2): +1 draw call. Hệ số `~ao = lerpW(~shadow, 0.35)` thay cho `~shadow × 0.9` của kế hoạch: bản kế hoạch tối gần bằng bóng nắng (≈ 0.5 linear ban ngày), đậm hơn skirt cũ (0.7), đọc như bóng chứ không như tiếp đất. Sửa sau review cùng ngày: `0.35` nhạt quá, ở 1280 px vệt dưới cây và đèn gần như không thấy, nên nay `lerpW(lerp(~shadow, xám, 0.5), 0.2)` (đậm hơn, nửa đường về xám để hoàng hôn không ngả tím), và vạch cỏ cắt `× 0.955` thành `× 0.925`. `AO_Y` đặt dưới đĩa người nói chuyện (0.0133 < 0.0135) thay vì trên lớp bóng: vũng sáng ban đêm sạch theo cấu trúc, không cần kiểm từng blob.
 3. **Bờ lát, mặt cắt ba lớp, lòng hồ sâu, vạch cỏ cắt, AO chân prop** (§5.1 T1, T11–T13; §2.4 mục 3): 0 draw call. Khối ngoài của đế và tấm đế giữ nguyên, sa bàn tải (`.bp-shell`, `.bp-soil`) vẫn trùng.
 4. **DPR thích ứng có đường lên lại:** bộ chặn cũ chỉ hạ (2 → 1.5 → 1) khi quá nửa 45 khung bận chậm hơn 22 ms, nên một lần khựng (bake rơi giữa lúc đi) giữ máy mạnh ở DPR thấp cả phiên. Nay khung bận đầu tiên của một lần tương tác mới, sau lần hạ ≥ 5 s, thử lên một nấc (tối đa `initialDpr`); hạ lại sau lần thử thì khoá cho cả phiên. Logic là hàm thuần `stepDpr()` có test; chỉ chạy trong khung bận.
 5. **Ngân sách:** 18 → 19 draw call, đỉnh 34 422 → 34 986 tam giác (trần 35 500), `/play` 293,2 → 293,8 kB gzip (+0,65 kB).
