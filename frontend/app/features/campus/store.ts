@@ -74,7 +74,11 @@ export interface HubState {
   /** Light preset the player picked (N8); null follows the theme's default. */
   time: TimeOfDay | null;
   motion: Motion;
-  /** Camera azimuth; module scope, so it outlives a visit to a zone page (not a reload). */
+  /**
+   * Camera azimuth. Lasts for the current scene, revalidations included (a `?at=` change, a zone
+   * retry); each new entry to /play resets it to HOME_YAW (resetView), where the loader's
+   * blueprint is drawn.
+   */
   view: ViewYaw;
   /** Coarse: the view is away from HOME_YAW (the compass button's disabled state). */
   rotated: boolean;
