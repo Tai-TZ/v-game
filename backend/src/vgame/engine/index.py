@@ -138,9 +138,10 @@ def _chunk_from_json(raw: dict[str, Any]) -> Chunk:
 
 
 # Live jina-v2 cost when no build has timed it (engine-spike-report §3.4): 873 pairs per question
-# took 102-195 s on an idle i7-12700H, batch 2, pairs cut at 512 tokens.
+# took 102-195 s on an idle i7-12700H, batch 2, pairs cut at 512 tokens (9 idle questions).
 RERANK_TIMING_FALLBACK: dict[str, Any] = {
     "ms_per_pair": 120.0,
+    "pairs": 9 * 873,
     "source": "engine-spike-report §3.4: i7-12700H idle, batch 2, pairs <= 512 tokens",
 }
 
@@ -492,7 +493,7 @@ def build_rerank_table(
     """Scores every required pair once, keeping ``reuse`` scores of the same model and
     ``rerank_regime`` (a question edit then scores ~870 pairs, not ~11k). Scores do not depend
     on the batch (measured), so each question's texts go shortest first: less padding. The
-    time spent scoring becomes the table's ``timing``; nothing scored keeps ``reuse``'s."""
+    time spent scoring joins ``reuse``'s ``timing``, weighted by pairs."""
     by_question: dict[str, set[str]] = {}
     for question, text in required_rerank_pairs(store, rerank):
         by_question.setdefault(question, set()).add(text)
@@ -520,13 +521,17 @@ def build_rerank_table(
         if missing:
             scored, scoring_s = scored + len(missing), scoring_s + took
         log(f"rerank {n}/{len(by_question)}: {len(known)} pairs, {len(missing)} new, {took:.0f} s")
-    # ponytail: one mean per table, from whatever load the build machine had; a few new pairs
-    # (a corpus edit) give a noisy mean. Re-time on an idle machine if the L3 numbers look off.
+    # ponytail: one mean per table, weighted by pairs so a corpus edit's few dozen pairs barely
+    # move it; it mixes the load (and CPU) of every build that scored. Re-time: delete rerank.*
+    # and rebuild on an idle machine.
     timing = old.timing if old is not None else None
     if scored:
+        p0 = int(old.timing.get("pairs", 0)) if old is not None else 0
+        old_ms = old.ms_per_pair * p0 if old is not None else 0.0
         timing = {
-            "ms_per_pair": scoring_s * 1000 / scored,  # unrounded: a fake model's ~0 must load
-            "pairs": scored,
+            # unrounded: a fake model's ~0 ms must still load
+            "ms_per_pair": (old_ms + scoring_s * 1000) / (p0 + scored),
+            "pairs": p0 + scored,
             "cpu": platform.processor() or platform.machine(),
             "measured": datetime.now(UTC).date().isoformat(),
         }

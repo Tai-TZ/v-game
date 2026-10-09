@@ -375,6 +375,19 @@ def test_rerank_table_keeps_the_scoring_time_per_pair(one_variant: IndexStore) -
         one_variant, CountingReranker(), {QUESTION: L1_DOCS}, reuse=table, log=_quiet
     )
     assert again.timing == table.timing  # nothing scored: the measured value stays
+    big = {"ms_per_pair": 100.0, "pairs": 100_000}  # e.g. a full rebuild on an idle machine
+    timed = RerankTable(
+        table.model_id, table.questions, table.texts, table.scores, table.regime, big
+    )
+    edit = build_rerank_table(  # a corpus edit: a few new pairs, timed on any machine
+        one_variant,
+        CountingReranker(),
+        {QUESTION: L1_DOCS, OTHER: L1_DOCS},
+        reuse=timed,
+        log=_quiet,
+    )
+    assert edit.timing["pairs"] == 100_000 + len(set(_texts(one_variant, L1_DOCS)))
+    assert edit.ms_per_pair == pytest.approx(100.0, abs=0.5)  # weighted by pairs, not replaced
 
 
 def test_rerank_scores_of_other_scoring_settings_are_not_reused(
@@ -464,6 +477,7 @@ def test_shipped_index_is_fresh_and_complete() -> None:
     assert shipped.rerank is not None
     assert shipped.rerank.model_id == settings.rerank_model
     assert shipped.rerank.regime["max_tokens"] == retrieval.RERANK_MAX_TOKENS
+    assert shipped.rerank.timing["pairs"] >= 873  # a corpus edit's few pairs barely move it
     data = SHIPPED_INDEX_DIR.parent
     assert sum(p.stat().st_size for p in data.rglob("*") if p.is_file()) < 10_000_000
 
