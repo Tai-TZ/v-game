@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type Env, graphFromBench, starterBench } from "./bench";
+import { EMPTY_SLIP } from "./guess";
 import { RunPanel, type RequestState } from "./RunPanel";
 import { testEnv } from "./test-fixtures";
 
@@ -28,6 +29,8 @@ function Panel({ request, env = l1 }: { request: RequestState; env?: Env }) {
         stop={null}
         followedId={null}
         backTo="/play/library"
+        slip={EMPTY_SLIP}
+        onSlip={nothing}
         onOpen={nothing}
         onRetry={nothing}
         onRestore={nothing}

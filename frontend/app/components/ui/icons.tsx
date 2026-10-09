@@ -77,6 +77,41 @@ export function AlertIcon({ className = ICON }: { className?: string }) {
   );
 }
 
+/** Not run yet: an open dashed ring. */
+export function CircleDashIcon({ className = ICON }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
+      <circle
+        cx="10"
+        cy="10"
+        r="6.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeDasharray="3 2.5"
+      />
+    </svg>
+  );
+}
+
+/** Waiting its turn. */
+export function ClockIcon({ className = ICON }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
+      <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 6.5V10l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Running now (a still mark, never a spinner). */
+export function PlayIcon({ className = ICON }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
+      <path d="M7 5.5v9l7-4.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Turn the campus view (orbit-camera §2.3): an arc with its arrowhead at the top left. */
 export function RotateCcwIcon({ className = ICON }: { className?: string }) {
   return (

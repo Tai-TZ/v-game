@@ -4,8 +4,12 @@ import {
   AlertIcon,
   CheckIcon,
   ChevronDownIcon,
+  CircleDashIcon,
+  ClockIcon,
   CrossIcon,
   LockIcon,
+  PlayIcon,
+  RotateCwIcon,
   StarIcon,
 } from "~/components/ui/icons";
 
@@ -27,6 +31,7 @@ import {
   type Env,
 } from "./bench";
 import {
+  BLOCK_STATE_VI,
   CRITERIA_VI,
   fmt,
   fmtValue,
@@ -40,7 +45,14 @@ import {
   vaiVi,
   variantVi,
 } from "./copy";
-import type { CaseView, RunView, StepView } from "./run";
+import {
+  blockState,
+  type BenchRun,
+  type BlockState,
+  type CaseView,
+  type RunView,
+  type StepView,
+} from "./run";
 import type { BlockType, Fact, Graph, Issue, JsonValue } from "./schema";
 import { fixFor } from "./validate";
 
@@ -90,6 +102,8 @@ interface BenchProps {
   issues: readonly Issue[];
   highlight: BlockType | null;
   view: BenchRunView | null;
+  /** The bench against the run on show (N6 slot states). */
+  benchRun: BenchRun;
   saved: boolean;
   discarded: boolean;
 }
@@ -190,6 +204,39 @@ function Connector({ label }: { label: string }) {
   );
 }
 
+/** A radio drawn as a chip: the span after a `peer sr-only` input. */
+export const CHIP =
+  "flex h-11 items-center rounded-sm border border-fg-muted bg-surface px-3 text-sm peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand peer-disabled:cursor-not-allowed peer-disabled:opacity-60";
+
+/** Each N6 state has its own icon and colour token besides its words. */
+const STATE_LOOK: Readonly<
+  Record<BlockState, { Icon: (props: { className?: string }) => ReactNode; tone: string }>
+> = {
+  idle: { Icon: CircleDashIcon, tone: "border-line-strong text-fg-muted" },
+  stale: { Icon: RotateCwIcon, tone: "border-warning text-warning" },
+  queued: { Icon: ClockIcon, tone: "border-line-strong text-fg-muted" },
+  running: { Icon: PlayIcon, tone: "border-brand text-brand" },
+  passed: { Icon: CheckIcon, tone: "border-success text-success" },
+  error: { Icon: CrossIcon, tone: "border-danger text-danger" },
+};
+
+/** Words in the text colour; the border and the icon carry the state's colour. */
+export function StateChip({ state }: { state: BlockState }) {
+  const { Icon, tone } = STATE_LOOK[state];
+  return (
+    <span
+      data-state={state}
+      className={`inline-flex items-center gap-1 rounded-sm border bg-surface px-1.5 py-0.5 text-xs font-semibold ${tone}`}
+    >
+      <Icon className="size-3.5 shrink-0" />
+      <span className="text-fg">
+        <span className="sr-only">Trạng thái khối: </span>
+        {BLOCK_STATE_VI[state]}
+      </span>
+    </span>
+  );
+}
+
 const WARN = new Set(["timeout", "cancelled", "budget"]);
 const DANGER = new Set(["llm_error", "index_error"]);
 
@@ -216,6 +263,7 @@ function Slot({
   issues,
   highlight,
   view,
+  benchRun,
 }: BenchProps & { type: BlockType }) {
   const { level, blocks } = env;
   const id = nodeIds(level)[type];
@@ -227,6 +275,11 @@ function Slot({
   const step = view ? view.followed.steps[id] : undefined;
   const own = issues.filter((issue) => issue.node === id);
   const graded = type === "output" ? view?.followed.graded : undefined;
+  const state = blockState(benchRun, step, {
+    started: (view?.run.cases.length ?? 0) > 0,
+    ingest: type === "corpus" || type === "chunker",
+    failedAnswer: graded?.counted === true && !graded.passed,
+  });
 
   if (optional && !bench.attached[type]) {
     const retrievalEmpty =
@@ -262,12 +315,15 @@ function Slot({
       className={`rounded-md border p-4 transition-colors duration-150 ${frameClass(step, highlight === type, graded?.counted === true && !graded.passed)}`}
     >
       <SlotHead titleId={titleId} toy={toy} type={type} env={env}>
-        {locked && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-fg-muted">
-            <LockIcon className="size-3.5 shrink-0" />
-            Khóa ở màn này
-          </span>
-        )}
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {locked && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-fg-muted">
+              <LockIcon className="size-3.5 shrink-0" />
+              Khóa ở màn này
+            </span>
+          )}
+          <StateChip state={state} />
+        </span>
       </SlotHead>
       {optional && (
         <AttachSwitch toy={toy} on onToggle={() => onChange(setAttached(bench, type, false))} />
@@ -505,9 +561,7 @@ function Control({
                   onChange={() => onValue(option)}
                   className="peer sr-only"
                 />
-                <span className="flex h-11 items-center rounded-sm border border-fg-muted bg-surface px-3 text-sm peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand peer-disabled:cursor-not-allowed peer-disabled:opacity-60">
-                  {fmtValue(param, option)}
-                </span>
+                <span className={CHIP}>{fmtValue(param, option)}</span>
               </label>
             ))}
           </div>
@@ -631,11 +685,6 @@ function StepState({
   return (
     <div className="mt-3 border-t border-line pt-3 text-sm">
       <p className="font-semibold">{stepStatusText(step.status, step.ms)}</p>
-      {step.state === "running" && (
-        <div className="mt-2 h-1 overflow-hidden rounded-sm bg-subtle">
-          <div className="h-full w-1/3 animate-poster-bar bg-brand motion-reduce:animate-none" />
-        </div>
-      )}
       {step.summary && <p className="mt-1 text-fg-muted">{step.summary}</p>}
       {step.facts && step.facts.length > 0 && (
         <details className="group mt-2">

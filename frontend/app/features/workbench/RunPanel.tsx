@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Link } from "react-router";
 
 import { buttonClass } from "~/components/ui/button";
-import { AlertIcon, ChevronDownIcon } from "~/components/ui/icons";
+import { AlertIcon, CheckIcon, ChevronDownIcon, ClockIcon, PlayIcon } from "~/components/ui/icons";
 
 import type { PostError } from "./api";
 import type { Env } from "./bench";
@@ -18,6 +18,8 @@ import {
   toyName,
   vaiVi,
 } from "./copy";
+import type { Slip } from "./guess";
+import { GuessSlip } from "./GuessSlip";
 import { isActive, runningNodes, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, Issue } from "./schema";
 import { fixFor } from "./validate";
@@ -49,6 +51,9 @@ interface RunPanelProps {
   stop: StopState;
   followedId: string | null;
   backTo: string;
+  /** The guess slip draft for the next run (B1). */
+  slip: Slip;
+  onSlip: (next: Slip) => void;
   onOpen: () => void;
   onRetry: () => void;
   onRestore: () => void;
@@ -111,6 +116,8 @@ function Editing({
   run,
   stop,
   backTo,
+  slip,
+  onSlip,
   onOpen,
   onRetry,
   onRestore,
@@ -243,6 +250,11 @@ function Editing({
           )}
         </div>
       )}
+
+      {/* Locked while the graph is out: the slip leaves with this run. */}
+      <fieldset disabled={sending} className="min-w-0">
+        <GuessSlip env={env} slip={slip} onChange={onSlip} />
+      </fieldset>
 
       <button
         type="button"
@@ -462,6 +474,14 @@ function CaseTable({
       </h3>
       <ul className="mt-2 space-y-1">
         {run.cases.map((c) => {
+          const running = !c.graded && runningNodes(c).length > 0;
+          const Icon = !c.graded
+            ? running
+              ? PlayIcon
+              : ClockIcon
+            : c.graded.passed
+              ? CheckIcon
+              : AlertIcon;
           const tone = !c.graded
             ? "bg-surface"
             : !c.graded.counted
@@ -475,12 +495,13 @@ function CaseTable({
                 type="button"
                 aria-pressed={c.id === followedId}
                 onClick={() => onFollow(c.id)}
-                className={`flex min-h-12 w-full flex-col items-start gap-0.5 rounded-sm border px-3 py-2 text-left text-sm ${tone} ${c.id === followedId ? "border-brand ring-1 ring-brand" : "border-line"}`}
+                // N18: the row turns over as its case.graded arrives; instant with reduced motion.
+                className={`flex min-h-12 w-full flex-col items-start gap-0.5 rounded-sm border px-3 py-2 text-left text-sm ${tone} ${c.graded ? "motion-safe:animate-flip" : ""} ${c.id === followedId ? "border-brand ring-1 ring-brand" : "border-line"}`}
               >
                 <span className="font-semibold">{caseTitle(c, env.level.id)}</span>
                 {c.question && <span className="line-clamp-2 text-fg-muted">{c.question}</span>}
                 <span className="inline-flex items-center gap-1">
-                  {c.graded && !c.graded.passed && <AlertIcon className="size-3.5 shrink-0" />}
+                  <Icon className="size-3.5 shrink-0" />
                   {caseState(c, env)}
                 </span>
               </button>

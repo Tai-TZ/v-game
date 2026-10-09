@@ -17,6 +17,8 @@
   --animate-hover: vg-hover 1.2s ease-in-out infinite alternate;
   /* The page-loading bar of PageFrame and the bench (workbench); also only while loading. */
   --animate-poster-bar: vg-poster-bar 1.2s linear infinite;
+  /* A case row turning over as its case.graded arrives (workbench N18); motion-safe only. */
+  --animate-flip: vg-flip 300ms ease-out both;
 
   @keyframes vg-enter {
     from {
@@ -37,6 +39,12 @@
   @keyframes vg-hover {
     to {
       transform: translateY(-2px);
+    }
+  }
+  @keyframes vg-flip {
+    from {
+      opacity: 0;
+      transform: perspective(600px) rotateX(-90deg);
     }
   }
   @keyframes vg-poster-bar {
