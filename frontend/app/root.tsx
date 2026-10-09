@@ -75,6 +75,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 __html: themeBootstrapScript(
                   catalog.themes.map((theme) => theme.id),
                   themeId,
+                  catalog.manifests[themeId]?.place.timeZone ?? "Asia/Ho_Chi_Minh",
                 ),
               }}
             />

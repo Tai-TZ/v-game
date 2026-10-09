@@ -36,6 +36,17 @@ const settle = () =>
   });
 
 describe("useSkyClock", () => {
+  it("takes over the sky from the bootstrap's hint on <html>", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => reply(503)),
+    );
+    document.documentElement.dataset.sky = "night";
+    const { unmount } = renderHook(() => useSkyClock(HANOI));
+    expect(document.documentElement.dataset.sky).toBeUndefined();
+    unmount();
+  });
+
   it("sets the phase at once, retries the weather 2 min after a failure, then every 30 min", async () => {
     const fetch = vi.fn(() => reply(503));
     vi.stubGlobal("fetch", fetch);

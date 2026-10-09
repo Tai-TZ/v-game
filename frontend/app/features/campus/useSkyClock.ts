@@ -22,6 +22,8 @@ export function useSkyClock(place: Pick<Place, "lat" | "lon">) {
   const { lat, lon } = place;
   // Before the first paint, so the sky never shows day for a frame at night.
   useLayoutEffect(() => {
+    // The theme bootstrap's pre-hydration hint; <main data-sky> carries the exact phase now.
+    delete document.documentElement.dataset.sky;
     const store = hubStore.getState();
     const tick = () => store.setPhase(phaseAt(Date.now(), { lat, lon }));
     store.setDisplay(readDisplay());
