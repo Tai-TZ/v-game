@@ -89,7 +89,6 @@ answered. Star 2 budgets are calibrated on the primary model only. Rotate the ke
 | `POST /api/runs?level={level_id}`  | body = graph JSON; `202 {run_id, created, issues}`                      |
 | `GET /api/runs/{run_id}/events`    | SSE stream; send `Last-Event-ID: n` to replay events after `n`          |
 | `POST /api/runs/{run_id}/cancel`   | `202`; the run ends with `run.failed` (`cancelled`)                     |
-| `GET /api/weather`                 | `{condition, temperature_c, updated_at}` (UTC) from Open-Meteo; max-age 300 (60 when stale); 503 + `Retry-After: 120` when nothing is cached |
 
 `POST /api/runs` needs `Content-Type: application/json` (415 otherwise) and accepts an optional
 `Idempotency-Key` header, 16-64 chars of `[A-Za-z0-9_-]` (same key, level and graph returns the
