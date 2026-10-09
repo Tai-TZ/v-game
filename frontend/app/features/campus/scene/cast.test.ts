@@ -2,15 +2,28 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { brotliCompressSync, gzipSync } from "node:zlib";
 
-import { AnimationMixer, Box3, Color, MeshLambertMaterial, Vector3, type SkinnedMesh } from "three";
+import {
+  AnimationMixer,
+  Box3,
+  Color,
+  MathUtils,
+  MeshLambertMaterial,
+  SRGBColorSpace,
+  Vector3,
+  type SkinnedMesh,
+} from "three";
 import { describe, expect, it } from "vitest";
 
 import {
   buildFigure,
   CAST_ROLES,
   CAST_SCALE,
+  CAST_JOINTS,
+  CAST_PARENTS,
   castClips,
+  disposeFigure,
   paintFigure,
+  parseCast,
   unpackIndex,
   type CastJson,
   type CastRole,
@@ -85,6 +98,7 @@ describe("cast.json format", () => {
       "head",
     ]);
     expect(cast.parents).toEqual([-1, 0, 0, 0, 3, 3, 3]);
+    expect([cast.joints, cast.parents]).toEqual([CAST_JOINTS, CAST_PARENTS]);
     expect(Object.keys(cast.roles).sort()).toEqual([...CAST_ROLES].sort());
   });
 
@@ -97,6 +111,40 @@ describe("cast.json format", () => {
     expect(bytes.length).toBeLessThanOrEqual(130_000);
     expect(gzipSync(bytes).length).toBeLessThanOrEqual(23_000);
     expect(brotliCompressSync(bytes).length).toBeLessThanOrEqual(16_000);
+  });
+});
+
+describe("parseCast", () => {
+  /** A fresh copy of cast.json with `edit` applied to it. */
+  const broken = (edit: (j: CastJson) => void) => {
+    const j = JSON.parse(text) as CastJson;
+    edit(j);
+    return parseCast(j);
+  };
+
+  it("accepts the baked file", () => {
+    expect(parseCast(JSON.parse(text))).not.toBeNull();
+  });
+
+  it.each<[string, (j: CastJson) => void]>([
+    ["a wrong version", (j) => Object.assign(j, { version: 2 })],
+    ["q = 0", (j) => Object.assign(j, { q: 0 })],
+    ["another rig", (j) => j.parents.reverse()],
+    ["a missing role", (j) => Reflect.deleteProperty(j.roles, "guard")],
+    ["an index past the last vertex", (j) => j.roles.guard.index.splice(0, 3, 0, 5, 0)],
+    ["a triangle cut short", (j) => j.roles.lan.index.pop()],
+    ["a short position array", (j) => j.roles.player.position.pop()],
+    ["a short colour array", (j) => j.roles.player.color.pop()],
+    ["a slot out of range", (j) => j.roles.operator.slot.splice(0, 1, 4)],
+    ["a joint out of range", (j) => j.roles.examiner.joint.splice(0, 1, 7)],
+    ["a missing rest row", (j) => j.roles.registrar.rest.pop()],
+    ["a clip without a uuid", (j) => Reflect.deleteProperty(j.clips[0] ?? {}, "uuid")],
+  ])("rejects %s", (_, edit) => {
+    expect(broken(edit)).toBeNull();
+  });
+
+  it("rejects what is not a cast at all", () => {
+    for (const bad of [null, 1, "cast", [], {}]) expect(parseCast(bad)).toBeNull();
   });
 });
 
@@ -118,6 +166,16 @@ describe("cast decoding", () => {
       expect(mesh.skeleton.bones[4]?.parent).toBe(mesh.skeleton.bones[3]);
     },
   );
+
+  it("disposeFigure frees the geometry and the skeleton's bone texture", () => {
+    const mesh = buildFigure(cast, "guard", material);
+    mesh.skeleton.computeBoneTexture(); // what the renderer does on the first frame
+    const freed: string[] = [];
+    mesh.geometry.addEventListener("dispose", () => freed.push("geometry"));
+    mesh.skeleton.boneTexture?.addEventListener("dispose", () => freed.push("bones"));
+    disposeFigure(mesh);
+    expect(freed.sort()).toEqual(["bones", "geometry"]);
+  });
 
   it("unpacks the high-water-mark index", () => {
     expect(unpackIndex([0, 0, 0, 1, 3, 0])).toEqual([0, 1, 2, 2, 0, 3]);
@@ -157,6 +215,49 @@ describe("cast recolouring", () => {
     d.slot.forEach((s, i) => {
       const same = [0, 1, 2].every((k) => color.array[i * 3 + k] === first[i * 3 + k]);
       expect(same, `${role} vertex ${i} slot ${s}`).toBe(s === 0);
+    });
+  });
+});
+
+describe("cast colour slots", () => {
+  const top = new Color("#c72127");
+  const bottom = new Color("#2a2a2e");
+  const accent = new Color("#134d8b");
+  const d = cast.roles.guard;
+  const first = (slot: number) => d.slot.indexOf(slot);
+  /** What a slot-1..3 vertex must get: the theme colour with its sRGB lightness shifted. */
+  const shifted = (look: Color, v: number) => {
+    const hsl = look.getHSL({ h: 0, s: 0, l: 0 }, SRGBColorSpace);
+    const l = MathUtils.clamp(hsl.l + v / 100, 0.04, 0.97);
+    return new Color().setHSL(hsl.h, hsl.s, l, SRGBColorSpace);
+  };
+  const colorAt = (mesh: SkinnedMesh, i: number) =>
+    new Color().fromBufferAttribute(mesh.geometry.getAttribute("color"), i);
+  const expectColor = (got: Color, want: Color, label: string) => {
+    for (const k of ["r", "g", "b"] as const)
+      expect(got[k], `${label}.${k}`).toBeCloseTo(want[k], 5);
+  };
+
+  it("maps keep, top, bottom and accent to exactly their colours", () => {
+    const mesh = buildFigure(cast, "guard", material);
+    paintFigure(mesh, d, { top, bottom, accent });
+    const want = [
+      new Color(d.color[first(0)]),
+      shifted(top, d.color[first(1)] ?? NaN),
+      shifted(bottom, d.color[first(2)] ?? NaN),
+      shifted(accent, d.color[first(3)] ?? NaN),
+    ];
+    want.forEach((w, s) => {
+      expect(first(s), `slot ${s}`).toBeGreaterThanOrEqual(0);
+      expectColor(colorAt(mesh, first(s)), w, `slot ${s}`);
+    });
+  });
+
+  it("paints the accent slot from the top colour when a theme has no accent", () => {
+    const mesh = buildFigure(cast, "guard", material);
+    paintFigure(mesh, d, { top, bottom });
+    d.slot.forEach((s, i) => {
+      if (s === 3) expectColor(colorAt(mesh, i), shifted(top, d.color[i] ?? NaN), `vertex ${i}`);
     });
   });
 });

@@ -5,7 +5,7 @@ import { brotliCompressSync, gzipSync } from "node:zlib";
 import { Box3, Color } from "three";
 import { describe, expect, it } from "vitest";
 
-import { baseColors, buildProp, paintProp, type PropsJson } from "./props";
+import { baseColors, buildProp, paintProp, parseProps, type PropsJson } from "./props";
 
 const FILE = path.resolve(process.cwd(), "public", "models", "props.json");
 const text = readFileSync(FILE, "utf8");
@@ -67,6 +67,44 @@ describe("props.json format", () => {
       });
     }
     expect(json.props["parasol-table"]?.mats.every((m) => m.startsWith("colormap:"))).toBe(true);
+  });
+
+  it("flags the one double-sided source (the parasol's open canopy)", () => {
+    const flagged = entries.filter(([, p]) => p.doubleSided).map(([id]) => id);
+    expect(flagged).toEqual(["parasol-table"]);
+  });
+});
+
+describe("parseProps", () => {
+  const broken = (edit: (j: PropsJson) => void) => {
+    const j = JSON.parse(text) as PropsJson;
+    edit(j);
+    return parseProps(j);
+  };
+  const pot = (j: PropsJson) => {
+    const p = j.props.pot;
+    if (!p) throw new Error("pot");
+    return p;
+  };
+
+  it("accepts the baked file", () => {
+    expect(parseProps(JSON.parse(text))).not.toBeNull();
+  });
+
+  it.each<[string, (j: PropsJson) => void]>([
+    ["a wrong version", (j) => Object.assign(j, { version: 2 })],
+    ["q = 0", (j) => Object.assign(j, { q: 0 })],
+    ["an index past the last vertex", (j) => pot(j).index.splice(0, 3, 0, 5, 0)],
+    ["a triangle cut short", (j) => pot(j).index.pop()],
+    ["a short position array", (j) => pot(j).position.pop()],
+    ["a material past the list", (j) => pot(j).mat.splice(0, 1, pot(j).mats.length)],
+    ["a material without a colour", (j) => pot(j).base.pop()],
+  ])("rejects %s", (_, edit) => {
+    expect(broken(edit)).toBeNull();
+  });
+
+  it("rejects what is not a props file at all", () => {
+    for (const bad of [null, 1, "props", [], {}]) expect(parseProps(bad)).toBeNull();
   });
 });
 

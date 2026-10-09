@@ -1,6 +1,6 @@
 import { BufferAttribute, BufferGeometry, Color } from "three";
 
-import { unpackIndex } from "./cast";
+import { isIndices, isNumbers, isObject, isPackedIndex, unpackIndex } from "./cast";
 
 /*
  * Decoder for public/models/props.json (baked offline by tools/props/bake-props.mjs): one merged,
@@ -21,12 +21,42 @@ export interface PropData {
   mat: number[];
   /** Packed triangle index; see `unpackIndex` in cast.ts. */
   index: number[];
+  /** A source material was double-sided (open faces): draw with `side: DoubleSide`. */
+  doubleSided?: true;
 }
 
 export interface PropsJson {
   version: 1;
   q: number;
   props: Record<string, PropData>;
+}
+
+function isProp(p: unknown): p is PropData {
+  if (!isObject(p) || !Array.isArray(p.mat) || !Array.isArray(p.mats)) return false;
+  const n = p.mat.length;
+  const m = p.mats.length;
+  return (
+    typeof p.source === "string" &&
+    p.mats.every((name) => typeof name === "string") &&
+    isNumbers(p.base, m) &&
+    isIndices(p.mat, n, m) &&
+    isNumbers(p.position, n * 3) &&
+    isPackedIndex(p.index, n) &&
+    (p.doubleSided === undefined || p.doubleSided === true)
+  );
+}
+
+/** Checks a fetched props.json like `parseCast` does: anything malformed gives null. */
+export function parseProps(json: unknown): PropsJson | null {
+  if (!isObject(json) || json.version !== 1) return null;
+  const { q, props } = json;
+  const ok =
+    typeof q === "number" &&
+    Number.isFinite(q) &&
+    q > 0 &&
+    isObject(props) &&
+    Object.values(props).every(isProp);
+  return ok ? (json as unknown as PropsJson) : null;
 }
 
 /** Geometry of one prop with a zeroed `color` attribute; paint it with `paintProp`. */
