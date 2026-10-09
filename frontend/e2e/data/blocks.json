@@ -1,0 +1,401 @@
+{
+  "blocks": [
+    {
+      "type": "input",
+      "name_vi": "Câu hỏi khách",
+      "inputs": {},
+      "outputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "InputParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": []
+    },
+    {
+      "type": "output",
+      "name_vi": "Trả lời",
+      "inputs": {
+        "answer": {
+          "type": "Answer",
+          "type_vi": "Câu trả lời",
+          "many": false,
+          "required": true
+        }
+      },
+      "outputs": {},
+      "params": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "OutputParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": []
+    },
+    {
+      "type": "corpus",
+      "name_vi": "Kho luật",
+      "inputs": {},
+      "outputs": {},
+      "params": {
+        "additionalProperties": false,
+        "description": "No params: the corpus is the level's (``level.corpus``).",
+        "properties": {},
+        "title": "CorpusParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": false,
+      "concepts": ["N7.ingestion"]
+    },
+    {
+      "type": "chunker",
+      "name_vi": "Chia chunk",
+      "inputs": {},
+      "outputs": {
+        "index": {
+          "type": "Index",
+          "type_vi": "Chỉ mục",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "strategy": {
+            "default": "theo_dieu",
+            "enum": ["co_dinh", "theo_dieu"],
+            "title": "Cách chia",
+            "type": "string"
+          },
+          "chunk_size": {
+            "default": 512,
+            "enum": [128, 256, 512, 1024],
+            "title": "Cỡ đoạn (token)",
+            "type": "integer"
+          },
+          "overlap_pct": {
+            "default": 10,
+            "enum": [0, 10, 20],
+            "title": "Chồng lấp (%)",
+            "type": "integer"
+          },
+          "only_in_force": {
+            "default": false,
+            "title": "Chỉ văn bản còn hiệu lực",
+            "type": "boolean"
+          }
+        },
+        "title": "ChunkerParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": false,
+      "concepts": ["N7.chunking", "N7.overlap", "N7.only_in_force"]
+    },
+    {
+      "type": "vector_search",
+      "name_vi": "Tìm theo nghĩa",
+      "inputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        },
+        "index": {
+          "type": "Index",
+          "type_vi": "Chỉ mục",
+          "many": false,
+          "required": true
+        }
+      },
+      "outputs": {
+        "docs": {
+          "type": "Docs",
+          "type_vi": "Tài liệu",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "top_k": {
+            "default": 5,
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Số đoạn lấy về",
+            "type": "integer"
+          },
+          "score_threshold": {
+            "default": 0.0,
+            "maximum": 0.9,
+            "minimum": 0,
+            "multipleOf": 0.05,
+            "title": "Ngưỡng điểm",
+            "type": "number"
+          }
+        },
+        "title": "VectorSearchParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": ["N7.embedding", "N7.top_k", "N7.score_threshold"]
+    },
+    {
+      "type": "bm25_search",
+      "name_vi": "Tìm từ khóa",
+      "inputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        },
+        "index": {
+          "type": "Index",
+          "type_vi": "Chỉ mục",
+          "many": false,
+          "required": true
+        }
+      },
+      "outputs": {
+        "docs": {
+          "type": "Docs",
+          "type_vi": "Tài liệu",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "top_k": {
+            "default": 5,
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Số đoạn lấy về",
+            "type": "integer"
+          }
+        },
+        "title": "BM25SearchParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": ["N8.sparse", "N8.top_k"]
+    },
+    {
+      "type": "fusion",
+      "name_vi": "Hợp nhất kết quả",
+      "inputs": {
+        "docs": {
+          "type": "Docs",
+          "type_vi": "Tài liệu",
+          "many": true,
+          "required": true
+        }
+      },
+      "outputs": {
+        "docs": {
+          "type": "Docs",
+          "type_vi": "Tài liệu",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "method": {
+            "default": "rrf",
+            "enum": ["rrf", "alpha"],
+            "title": "Cách gộp",
+            "type": "string"
+          },
+          "k": {
+            "default": 60,
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Hằng số k của RRF",
+            "type": "integer"
+          },
+          "alpha": {
+            "default": 0.5,
+            "maximum": 1,
+            "minimum": 0,
+            "multipleOf": 0.1,
+            "title": "Trọng số tìm theo nghĩa",
+            "type": "number"
+          },
+          "top_k": {
+            "default": 10,
+            "maximum": 30,
+            "minimum": 1,
+            "title": "Số đoạn giữ lại",
+            "type": "integer"
+          }
+        },
+        "title": "FusionParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": ["N8.hybrid", "N8.rrf", "N8.alpha"]
+    },
+    {
+      "type": "rerank",
+      "name_vi": "Xếp hạng lại",
+      "inputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        },
+        "docs": {
+          "type": "Docs",
+          "type_vi": "Tài liệu",
+          "many": false,
+          "required": true
+        }
+      },
+      "outputs": {
+        "docs": {
+          "type": "Docs",
+          "type_vi": "Tài liệu",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "top_n": {
+            "default": 3,
+            "maximum": 10,
+            "minimum": 1,
+            "title": "Số đoạn giữ lại",
+            "type": "integer"
+          }
+        },
+        "title": "RerankParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": ["N8.rerank", "N8.top_n"]
+    },
+    {
+      "type": "context_packer",
+      "name_vi": "Đóng gói context",
+      "inputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        },
+        "docs": {
+          "type": "Docs",
+          "type_vi": "Tài liệu",
+          "many": true,
+          "required": false
+        }
+      },
+      "outputs": {
+        "context": {
+          "type": "Context",
+          "type_vi": "Context",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "token_budget": {
+            "default": 3000,
+            "maximum": 16000,
+            "minimum": 300,
+            "title": "Ngân sách thùng (token)",
+            "type": "integer"
+          },
+          "on_overflow": {
+            "const": "cat_duoi",
+            "default": "cat_duoi",
+            "title": "Khi tràn thùng",
+            "type": "string"
+          },
+          "cite_ids": {
+            "default": false,
+            "title": "Đóng tem mã đoạn",
+            "type": "boolean"
+          }
+        },
+        "title": "ContextPackerParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": ["N4.context_packet", "N4.token_budget", "N8.cite_ids"]
+    },
+    {
+      "type": "llm",
+      "name_vi": "Gọi LLM",
+      "inputs": {
+        "context": {
+          "type": "Context",
+          "type_vi": "Context",
+          "many": false,
+          "required": true
+        }
+      },
+      "outputs": {
+        "answer": {
+          "type": "Answer",
+          "type_vi": "Câu trả lời",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "default": "can_bang",
+            "enum": ["nhe", "can_bang", "sau"],
+            "title": "Mức suy nghĩ",
+            "type": "string"
+          },
+          "system_prompt": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Dặn dò (system prompt)",
+            "type": "string"
+          }
+        },
+        "title": "LLMParams",
+        "type": "object"
+      },
+      "llm_calls": 1,
+      "runtime": true,
+      "concepts": ["N1.token_economy", "N1.system_prompt"]
+    }
+  ]
+}

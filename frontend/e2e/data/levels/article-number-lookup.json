@@ -1,0 +1,161 @@
+{
+  "id": "article-number-lookup",
+  "version": 1,
+  "zone": "library",
+  "title": "Hỏi bằng số điều",
+  "brief": "Sự cố: người dùng hỏi theo số hiệu điều luật và tìm theo nghĩa trả về sai điều. Kết hợp tìm theo từ khoá với tìm theo nghĩa, rồi xếp hạng lại kết quả.",
+  "kind": "incident",
+  "corpus": ["qcdt-2024"],
+  "allowed_blocks": [
+    "input",
+    "output",
+    "corpus",
+    "chunker",
+    "vector_search",
+    "context_packer",
+    "llm",
+    "bm25_search",
+    "fusion",
+    "rerank"
+  ],
+  "locked_nodes": ["q", "kb", "out"],
+  "param_limits": {
+    "vector_search.top_k": {
+      "ge": 1.0,
+      "le": 5.0
+    },
+    "vector_search.score_threshold": {
+      "ge": 0.0,
+      "le": 0.9,
+      "multiple_of": 0.05
+    },
+    "bm25_search.top_k": {
+      "ge": 1.0,
+      "le": 10.0
+    },
+    "fusion.top_k": {
+      "ge": 1.0,
+      "le": 10.0
+    },
+    "fusion.k": {
+      "ge": 1.0,
+      "le": 100.0
+    },
+    "fusion.alpha": {
+      "multiple_of": 0.1
+    },
+    "rerank.top_n": {
+      "ge": 1.0,
+      "le": 5.0
+    },
+    "context_packer.token_budget": {
+      "const": 3000
+    },
+    "context_packer.on_overflow": {
+      "const": "cat_duoi"
+    },
+    "llm.profile": {
+      "const": "can_bang"
+    }
+  },
+  "prompt_cards": {
+    "G1": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.",
+    "G2": "Sau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.",
+    "G3": "Nếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»",
+    "G4": "Xưng «mình», gọi người hỏi là «bạn», giọng thân thiện.",
+    "G5": "Luôn đưa ra câu trả lời hữu ích nhất có thể, kể cả khi phải suy đoán.",
+    "G6": "Trả lời thật đầy đủ, càng chi tiết càng tốt."
+  },
+  "starter_graph": {
+    "schema": 1,
+    "nodes": [
+      {
+        "id": "q",
+        "type": "input",
+        "params": {}
+      },
+      {
+        "id": "kb",
+        "type": "corpus",
+        "params": {}
+      },
+      {
+        "id": "ix",
+        "type": "chunker",
+        "params": {
+          "strategy": "theo_dieu",
+          "chunk_size": 512,
+          "overlap_pct": 10,
+          "only_in_force": true
+        }
+      },
+      {
+        "id": "vs",
+        "type": "vector_search",
+        "params": {
+          "top_k": 3,
+          "score_threshold": 0
+        }
+      },
+      {
+        "id": "pk",
+        "type": "context_packer",
+        "params": {
+          "token_budget": 3000,
+          "on_overflow": "cat_duoi",
+          "cite_ids": true
+        }
+      },
+      {
+        "id": "llm",
+        "type": "llm",
+        "params": {
+          "profile": "can_bang",
+          "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+        }
+      },
+      {
+        "id": "out",
+        "type": "output",
+        "params": {}
+      }
+    ],
+    "edges": [
+      ["q.query", "vs.query"],
+      ["ix.index", "vs.index"],
+      ["vs.docs", "pk.docs"],
+      ["q.query", "pk.query"],
+      ["pk.context", "llm.context"],
+      ["llm.answer", "out.answer"]
+    ],
+    "ui": null
+  },
+  "budget_metric": "tokens",
+  "token_budget": 22000,
+  "stars_vi": [
+    "Ít nhất 8/10 câu thường đạt, bắt buộc có câu của Khang (câu #1).",
+    "Có sao 1 và cả lượt chạy tốn không quá 22.000 token.",
+    "Có sao 1 và mọi câu bẫy đều đạt."
+  ],
+  "visible_cases": [
+    {
+      "id": "lib-l3-v01",
+      "vai": "tra-so",
+      "question": "Điều 47 khoản 2 quy định gì?"
+    },
+    {
+      "id": "lib-l3-v02",
+      "vai": "tra-so",
+      "question": "Khoản 2 Điều 41 quy định gì ạ?"
+    },
+    {
+      "id": "lib-l3-v03",
+      "vai": "don-gian",
+      "question": "Thi online thì có phải bật camera suốt buổi không ạ?"
+    }
+  ],
+  "case_counts": {
+    "normal": 10,
+    "trap": 2
+  }
+}
