@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 import { ZoneStatusText } from "~/features/zones/ui";
 
-import { NPC_TALK_SPOT, siteFor, type Vec2 } from "../layout";
+import { NPC_TALK_SPOT, siteFor, type Speaker, type Vec2 } from "../layout";
 import type { SiteInfoMap } from "../sites";
 import { hubStore, useHub } from "../store";
 import { labelElements, labelWidths, type LabelId } from "./labels";
@@ -15,7 +15,7 @@ const BOX = "absolute top-0 left-0 will-change-transform";
  * the badge's walk opens the dialog on arrival, like a click on the librarian. Mouse-down keeps
  * focus where it was, so the movement keys still reach the scene.
  */
-const walk = (goal: Vec2, talk = false) => ({
+const walk = (goal: Vec2, talk: Speaker | null = null) => ({
   tabIndex: -1,
   onMouseDown: (event: { preventDefault: () => void }) => event.preventDefault(),
   onClick: () => {
@@ -38,7 +38,7 @@ const register = (id: LabelId) => (element: HTMLElement | null) => {
  * assistive tech and out of the tab order: the "Các khu" list has the same names and actions.
  */
 export function WorldLabels({ sites }: { sites: SiteInfoMap }) {
-  const showBadge = useHub((state) => !state.metLan && state.dialog === null);
+  const showBadge = useHub((state) => !state.met.lan && state.dialog === null);
 
   // Widths for keeping labels inside the viewport, measured on show and on text change only,
   // so the frame loop never reads layout.
@@ -74,7 +74,7 @@ export function WorldLabels({ sites }: { sites: SiteInfoMap }) {
         {showBadge && (
           <button
             type="button"
-            {...walk(NPC_TALK_SPOT, true)}
+            {...walk(NPC_TALK_SPOT, "lan")}
             className="pointer-events-auto grid size-7 cursor-pointer place-items-center rounded-sm bg-accent text-lg leading-none font-bold text-on-brand"
           >
             !

@@ -30,9 +30,11 @@ import { sceneLoad, STAGE } from "../hud/sceneLoad";
 import {
   INTERACT_RADIUS,
   NPC_SPOT,
-  NPC_TALK_SPOT,
   OBSTACLES,
   SITES,
+  speakerSpot,
+  SPEAKERS,
+  talkSpot,
   WORLD_BOUNDS,
   type Vec2,
 } from "../layout";
@@ -57,8 +59,6 @@ const MOUSE_SLOP = 6;
 const TOUCH_SLOP = 10;
 /** A released drag settles on a diagonal in this long (orbit §2.4). */
 const SNAP_SECONDS = 0.18;
-/** The people a click can pick; the NPC cast adds theirs here. */
-const SPEAKERS = [{ id: "lan", spot: NPC_SPOT }] as const;
 
 /** Exponential approach of an angle; returns the target once within 0.01 rad. */
 function turn(current: number, target: number, tau: number, dt: number, reduced: boolean) {
@@ -226,7 +226,7 @@ export function useHubFrame(options: {
         motion.keys.add(event.code);
         motion.target = null;
         motion.route = [];
-        motion.talkOnArrival = false;
+        motion.talkOnArrival = null;
         wake();
       } else if (event.code === "KeyE" && !event.repeat) {
         const { nearby } = hubStore.getState();
@@ -312,7 +312,7 @@ export function useHubFrame(options: {
     };
   }, [canvas]);
 
-  // Click / tap to walk: the librarian if the ray meets her first (pickNpc), else the scenery
+  // Click / tap to walk: a person if the ray meets them first (pickNpc), else the scenery
   // (clickGoal). The click that ends a drag does nothing.
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
@@ -328,13 +328,14 @@ export function useHubFrame(options: {
         -((event.clientY - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      if (pickNpc(raycaster, statics.current, SPEAKERS) === "lan") {
-        if (state.nearby === "lan") {
-          onInteract.current("lan");
+      const who = pickNpc(raycaster, statics.current, SPEAKERS);
+      if (who) {
+        if (state.nearby === who) {
+          onInteract.current(who);
           return;
         }
-        state.walkTo(NPC_TALK_SPOT);
-        state.motion.talkOnArrival = true;
+        state.walkTo(talkSpot(who));
+        state.motion.talkOnArrival = who;
       } else {
         const goal = clickGoal(raycaster, statics.current);
         if (goal) state.walkTo(goal);
@@ -402,8 +403,8 @@ export function useHubFrame(options: {
       motion.target = motion.route.shift() ?? null;
       if (motion.target) busy = true;
       else if (motion.talkOnArrival) {
-        motion.talkOnArrival = false;
-        if (near === "lan") onInteract.current("lan");
+        if (near === motion.talkOnArrival) onInteract.current(near);
+        motion.talkOnArrival = null;
       }
     }
 
@@ -445,7 +446,7 @@ export function useHubFrame(options: {
     // Camera: overview orbiting PIVOT, or follow with a dead-zone (art §4), both in the screen
     // axes of the current yaw.
     const view = viewFor(size.width, size.height, state.sheetInset);
-    const at = state.dialog ? NPC_SPOT : motion.position;
+    const at = state.dialog ? speakerSpot(state.dialog.who) : motion.position;
     // Turn the look-at with the view: round what follow tracks, or round PIVOT in overview, whose
     // look-at is PIVOT + 0.416·h(yaw) (orbit-camera §1.4). Nothing slides on screen meanwhile.
     if (turned !== 0 && a.look) {

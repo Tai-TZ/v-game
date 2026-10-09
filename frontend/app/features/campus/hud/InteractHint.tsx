@@ -1,10 +1,12 @@
+import { useActiveTheme } from "~/features/theme/context";
+
 import { hintFor, type InteractTarget, type SiteInfoMap } from "../sites";
 import { useHub } from "../store";
 
 export const HINT_BUTTON_ID = "hub-interact-hint";
 
 /**
- * What the player can do here. A real button (clicking = pressing E) for the librarian and
+ * What the player can do here. A real button (clicking = pressing E) for a person and
  * open buildings; plain text for buildings that are not open yet. The wrapper is a polite
  * live region, so screen readers hear each new target once, not every frame.
  */
@@ -16,7 +18,8 @@ export function InteractHint({
   onInteract: (target: InteractTarget) => void;
 }) {
   const nearby = useHub((state) => (state.dialog ? null : state.nearby));
-  const hint = nearby ? hintFor(nearby, sites) : null;
+  const { npcs } = useActiveTheme().campus;
+  const hint = nearby ? hintFor(nearby, sites, npcs) : null;
   const box =
     "border-line-strong bg-surface animate-enter pointer-events-auto inline-flex min-h-12 w-full max-w-xl items-center gap-3 rounded-md border px-4 py-2 text-left text-sm sm:w-auto";
 

@@ -6,12 +6,13 @@ import type { TimeOfDay } from "~/features/theme/schema";
 import { HOME_YAW, nextIsoYaw, wrapAngle } from "./camera";
 import {
   INTERACT_RADIUS,
-  NPC_SPOT,
-  NPC_TALK_SPOT,
   routeTo,
   SPAWN,
   SPAWN_HEADING,
+  speakerSpot,
+  talkSpot,
   towardFor,
+  type Speaker,
   type Vec2,
 } from "./layout";
 import { nearestWithin } from "./movement";
@@ -28,8 +29,8 @@ export interface Motion {
   target: Vec2 | null;
   /** Waypoints still to walk after `target` (front to back of campus, v0.3 §2.5). */
   route: Vec2[];
-  /** Open the dialog when the current walk target is reached (clicked the librarian). */
-  talkOnArrival: boolean;
+  /** Who to talk to when the walk ends next to them (a click on a person or a "!" badge). */
+  talkOnArrival: Speaker | null;
   keys: Set<string>;
 }
 
@@ -62,13 +63,19 @@ export function easeView(view: ViewYaw, target: number, duration: number, dir: -
 
 export type DialogLines = "first" | "again";
 
+/** The open conversation: who with, and whether it is the first meeting in this session. */
+export interface HubDialog {
+  who: Speaker;
+  lines: DialogLines;
+}
+
 export interface HubState {
   /** Coarse state for the HUD: the interaction point the player stands next to. */
   nearby: InteractTarget | null;
-  /** Which lines the open dialog shows; null when closed. */
-  dialog: DialogLines | null;
-  /** The player has talked to the librarian in this session. */
-  metLan: boolean;
+  /** The open dialog; null when closed. */
+  dialog: HubDialog | null;
+  /** Dialogs closed with each speaker in this session (npc-cast v0.4 §7.3). */
+  met: Partial<Record<Speaker, number>>;
   /** Height (px) of the bottom sheet covering the scene, for the follow camera. */
   sheetInset: number;
   /** Light preset the player picked (N8); null follows the theme's default. */
@@ -88,10 +95,10 @@ export interface HubState {
   sceneUp: boolean;
 
   setNearby: (target: InteractTarget | null) => void;
-  openDialog: () => void;
+  openDialog: (who: Speaker) => void;
   closeDialog: () => void;
-  /** Accessible path: place the player next to the librarian and open the dialog. */
-  talkToLan: () => void;
+  /** Accessible path: place the player at `who`'s talk spot, facing them, and open the dialog. */
+  talkTo: (who: Speaker) => void;
   placePlayer: (position: Vec2, heading: number) => void;
   /** Click-to-move to `goal`, through the lane waypoints when it is in another part of campus. */
   walkTo: (goal: Vec2) => void;
@@ -115,7 +122,7 @@ export function createHubStore() {
   return createStore<HubState>()((set, get) => ({
     nearby: null,
     dialog: null,
-    metLan: false,
+    met: {},
     sheetInset: 0,
     time: null,
     motion: {
@@ -123,7 +130,7 @@ export function createHubStore() {
       heading: SPAWN_HEADING,
       target: null,
       route: [],
-      talkOnArrival: false,
+      talkOnArrival: null,
       keys: new Set(),
     },
     view: { yaw: HOME_YAW, from: HOME_YAW, to: null, t: 0, duration: 0 },
@@ -134,18 +141,28 @@ export function createHubStore() {
     setNearby: (nearby) => {
       if (nearby !== get().nearby) set({ nearby });
     },
-    openDialog: () => {
+    openDialog: (who) => {
       if (get().dialog) return;
-      set({ dialog: get().metLan ? "again" : "first" });
-    },
-    closeDialog: () => {
-      if (get().dialog) set({ dialog: null, metLan: true, sheetInset: 0 });
+      set({ dialog: { who, lines: get().met[who] ? "again" : "first" } });
+      // The camera turns to the speaker and they start talking (useHubFrame).
       get().wake();
     },
-    talkToLan: () => {
-      const heading = Math.atan2(NPC_SPOT.x - NPC_TALK_SPOT.x, NPC_SPOT.z - NPC_TALK_SPOT.z);
-      get().placePlayer(NPC_TALK_SPOT, heading);
-      get().openDialog();
+    closeDialog: () => {
+      const { dialog, met } = get();
+      if (dialog) {
+        set({
+          dialog: null,
+          met: { ...met, [dialog.who]: (met[dialog.who] ?? 0) + 1 },
+          sheetInset: 0,
+        });
+      }
+      get().wake();
+    },
+    talkTo: (who) => {
+      const spot = speakerSpot(who);
+      const talk = talkSpot(who);
+      get().placePlayer(talk, Math.atan2(spot.x - talk.x, spot.z - talk.z));
+      get().openDialog(who);
     },
     placePlayer: (position, heading) => {
       const { motion } = get();
@@ -153,7 +170,7 @@ export function createHubStore() {
       motion.heading = heading;
       motion.target = null;
       motion.route = [];
-      motion.talkOnArrival = false;
+      motion.talkOnArrival = null;
       motion.keys.clear();
       get().setNearby(nearestWithin(position, INTERACT_POINTS, INTERACT_RADIUS)?.id ?? null);
       get().wake();
@@ -163,7 +180,7 @@ export function createHubStore() {
       const [next, ...rest] = routeTo(motion.position, goal, towardFor(get().view.yaw));
       motion.target = next ?? null;
       motion.route = rest;
-      motion.talkOnArrival = false;
+      motion.talkOnArrival = null;
       motion.keys.clear();
       get().wake();
     },

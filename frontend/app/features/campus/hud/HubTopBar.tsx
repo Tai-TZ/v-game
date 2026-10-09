@@ -10,7 +10,7 @@ import { ZoneCard, ZonesErrorNotice } from "~/features/zones/ZoneCard";
 import { AUTHOR } from "~/lib/site";
 import { useDelayedFlag } from "~/lib/useSettled";
 
-import { BACK_SPOT, BACK_Z, SPAWN } from "../layout";
+import { BACK_SPOT, BACK_Z, SPAWN, type Speaker } from "../layout";
 import { hubStore, useHub } from "../store";
 
 const PANEL_ID = "hub-zone-list";
@@ -18,7 +18,7 @@ const PANEL_ID = "hub-zone-list";
 interface HubTopBarProps {
   /** Undefined while loading. */
   zones: ZoneListResult | undefined;
-  onTalk: () => void;
+  onTalk: (who: Speaker) => void;
   onRetry: () => void;
 }
 
@@ -132,7 +132,7 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
           <li>
             <button
               type="button"
-              onClick={onTalk}
+              onClick={() => onTalk("lan")}
               className="min-h-12 w-full px-4 text-left text-sm font-semibold hover:bg-subtle"
             >
               Nói chuyện với cô Lan

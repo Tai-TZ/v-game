@@ -8,7 +8,12 @@ import { LanDialog } from "~/features/campus/hud/LanDialog";
 import { advanceScene, beginScene, STAGE } from "~/features/campus/hud/sceneLoad";
 import { SceneBoundary } from "~/features/campus/hud/SceneBoundary";
 import { SceneLoader } from "~/features/campus/hud/SceneLoader";
-import { FIRST_LIBRARY_LEVEL, siteInfo, type InteractTarget } from "~/features/campus/sites";
+import {
+  FIRST_LIBRARY_LEVEL,
+  isSpeaker,
+  siteInfo,
+  type InteractTarget,
+} from "~/features/campus/sites";
 import { hubStore, useHub } from "~/features/campus/store";
 import { loadZoneList } from "~/features/zones/api";
 import { ZoneCard } from "~/features/zones/ZoneCard";
@@ -74,8 +79,8 @@ export default function Play({ loaderData }: Route.ComponentProps) {
 
   const onInteract = useCallback(
     (target: InteractTarget) => {
-      if (target === "lan") {
-        hubStore.getState().openDialog();
+      if (isSpeaker(target)) {
+        hubStore.getState().openDialog(target);
         return;
       }
       const site = sites[target];
@@ -114,12 +119,12 @@ export default function Play({ loaderData }: Route.ComponentProps) {
       </div>
 
       <SceneLoader />
-      <HubTopBar zones={zones} onTalk={() => hubStore.getState().talkToLan()} onRetry={retry} />
+      <HubTopBar zones={zones} onTalk={(who) => hubStore.getState().talkTo(who)} onRetry={retry} />
       <InteractHint sites={sites} onInteract={onInteract} />
 
-      {dialog && (
+      {dialog?.who === "lan" && (
         <LanDialog
-          lines={dialog}
+          lines={dialog.lines}
           library={library}
           // The dialog stays open, saying the level is opening, until the level has loaded.
           onTeach={() =>
