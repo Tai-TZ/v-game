@@ -41,6 +41,27 @@
       "library": { "wall": "#efe7d8", "trim": "#d6cbb6", "roof": "#1d6b62" },
       "watchtower": { "wall": "#e4e8e6", "trim": "#c9d1ce", "roof": "#12343b" },
       "market": { "wall": "#f3e6d6", "trim": "#dccbb5", "roof": "#b85f12" }
+    },
+    "lights": {
+      "default": "day",
+      "day": {
+        "sky": "#d0e5ff",
+        "ground": "#bfb5a9",
+        "hemisphere": 3.054,
+        "sun": "#ffd059",
+        "sunIntensity": 1.561,
+        "sunDirection": [-0.35, 1, 0.75],
+        "rim": 0.25
+      },
+      "dusk": {
+        "sky": "#9dccff",
+        "ground": "#f4d9f2",
+        "hemisphere": 1.262,
+        "sun": "#ffb736",
+        "sunIntensity": 2.661,
+        "sunDirection": [-0.62, 0.55, 0.6],
+        "rim": 0.6
+      }
     }
   }
 }

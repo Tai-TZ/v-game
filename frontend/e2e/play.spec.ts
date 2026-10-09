@@ -5,6 +5,7 @@ import {
   toScreen,
   viewFor,
 } from "../app/features/campus/camera";
+import { STARS_SAVED } from "../app/features/progress/progress";
 import {
   expect,
   mockApi,
@@ -30,6 +31,7 @@ test.describe("campus hub", () => {
     page.on("request", (request) => requested.push(request.url()));
     await page.goto("/play?debug=frames");
     const frames = await waitForIdleScene(page);
+    await expect(page.locator("[data-scene-loader]")).toHaveCount(0);
     const before = await frames();
     // Measuring idleness needs time to pass; no state is being waited for here.
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 2000)));
@@ -193,6 +195,35 @@ test.describe("campus hub", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("counts a walk as busy through a stalled frame", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      "Checks the e2e idle signal; one project is enough.",
+    );
+    test.slow();
+    await mockApi(page);
+    await page.goto("/play?debug=frames");
+    await waitForIdleScene(page);
+    // Every 8th animation frame comes 700 ms late, as on a starved CI runner (software WebGL):
+    // a walk then has gaps between frames longer than any quiet spell an idle check could use.
+    await page.evaluate(() => {
+      const raf = window.requestAnimationFrame.bind(window);
+      let n = 0;
+      window.requestAnimationFrame = (callback) =>
+        (n += 1) % 8 ? raf(callback) : window.setTimeout(() => raf(callback), 700);
+    });
+    const zonesButton = page.getByRole("button", { name: "Các khu" });
+    const list = page.locator("#hub-zone-list");
+    await zonesButton.click();
+    await list.getByRole("button", { name: "Đi tới khuôn viên phía sau", exact: true }).click();
+    await waitForIdleScene(page, 45_000);
+    // The list names the way back only once the player stands behind the main building.
+    await zonesButton.click();
+    await expect(list.getByRole("button", { name: "Về mặt trước", exact: true })).toBeVisible({
+      timeout: 1000,
+    });
+  });
+
   test("walks to what the market's awning, a zone label and the librarian's badge name", async ({
     page,
     consoleErrors,
@@ -228,15 +259,101 @@ test.describe("campus hub", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("re-bakes the campus at dusk and back, with a starred library, then rests", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await mockApi(page);
+    await page.goto("/play?debug=frames");
+    await waitForIdleScene(page);
+    const looks = (library: string) =>
+      expect(page.locator("html")).toHaveAttribute(
+        "data-looks",
+        `library:${library} watchtower:coming_soon market:coming_soon`,
+      );
+    // No star yet: open, or lit while nothing saves stars (STARS_SAVED, QA r3). With the flag
+    // off this pair cannot tell a broken storage → siteLooks path; flipping it checks both.
+    await looks(STARS_SAVED ? "open" : "lit");
+    // A library star (N9) under the progress module's storage key, read when the scene mounts.
+    await page.evaluate(() =>
+      localStorage.setItem(
+        "vg-progress-v1",
+        JSON.stringify({ library: { "grounded-citation": 1 } }),
+      ),
+    );
+    await page.reload();
+    const frames = await waitForIdleScene(page);
+    await looks("lit");
+    // Overlapping sun shadows darken once only through the stencil test, which needs a stencil
+    // buffer; without one the test is off and fails silently (QA r2).
+    const stencil = await page.evaluate(
+      () => document.querySelector("canvas")?.getContext("webgl2")?.getContextAttributes()?.stencil,
+    );
+    expect(stencil).toBe(true);
+    const light = page.getByRole("button", { name: "Hoàng hôn" });
+    const duskSky = page.locator(".bg-scene-dusk");
+    await expect(light).toHaveAttribute("aria-pressed", "false");
+    await expect(duskSky).toHaveCount(0);
+
+    const day = await frames();
+    await light.click();
+    await expect(light).toHaveAttribute("aria-pressed", "true");
+    await expect(duskSky).toHaveCount(1);
+    await waitForIdleScene(page);
+    expect(await frames()).toBeGreaterThan(day);
+
+    await light.click();
+    await expect(light).toHaveAttribute("aria-pressed", "false");
+    await expect(duskSky).toHaveCount(0);
+    await waitForIdleScene(page);
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("survives stored progress keyed by an inherited name", async ({ page, consoleErrors }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem("vg-progress-v1", JSON.stringify({ constructor: { keys: 1 } })),
+    );
+    await mockApi(page);
+    await page.goto("/play?debug=frames");
+    await waitForIdleScene(page);
+    // The inherited name is no library star; every open zone is lit while no star is saved.
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-looks",
+      `library:${STARS_SAVED ? "open" : "lit"} watchtower:coming_soon market:coming_soon`,
+    );
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("hides the dusk toggle when the scene cannot start", async ({ page }) => {
+    await page.addInitScript(() => {
+      // Test double: a device without WebGL.
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- re-bound with apply below
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (
+        this: HTMLCanvasElement,
+        ...args: Parameters<typeof getContext>
+      ) {
+        return args[0].startsWith("webgl") ? null : getContext.apply(this, args);
+      } as typeof getContext;
+    });
+    await mockApi(page);
+    await page.goto("/play");
+    await expect(page.getByText("Trình duyệt chưa hiển thị được cảnh 3D.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Các khu" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Hoàng hôn" })).toHaveCount(0);
+  });
+
   test("keeps the top HUD inside the corners the overview leaves clear", async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "The corner rule is for the desktop overview.");
     await mockApi(page);
-    await page.goto("/play");
+    await page.goto("/play?debug=frames");
+    await waitForIdleScene(page);
     const width = page.viewportSize()?.width ?? 0;
     const controls = [
       page.getByRole("link", { name: "Về trang chủ" }),
+      page.getByRole("button", { name: "Hoàng hôn" }),
       page.getByRole("button", { name: "Các khu" }),
       page.getByRole("button", { name: /Đổi giao diện/ }),
     ];
@@ -249,6 +366,21 @@ test.describe("campus hub", () => {
       const right = box.x >= width - HUD_CORNER.width;
       expect(left || right, `${JSON.stringify(box)} outside HUD_CORNER`).toBe(true);
     }
+  });
+
+  test("keeps the two top HUD groups apart at 640 px", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "One narrow desktop width is enough.");
+    await page.setViewportSize({ width: 640, height: 800 });
+    await mockApi(page);
+    await page.goto("/play?debug=frames");
+    await waitForIdleScene(page);
+    const light = await page.getByRole("button", { name: "Hoàng hôn" }).boundingBox();
+    const zones = await page.getByRole("button", { name: "Các khu" }).boundingBox();
+    expect(light && zones).toBeTruthy();
+    if (!light || !zones) return;
+    // Icon only below md: the gap between the groups stays well over the 8 px inside a group.
+    expect(light.width).toBeLessThanOrEqual(44);
+    expect(zones.x - (light.x + light.width)).toBeGreaterThanOrEqual(48);
   });
 
   test("shows the watchtower and the market as coming soon, without a way in", async ({ page }) => {

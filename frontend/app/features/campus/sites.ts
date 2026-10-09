@@ -1,3 +1,4 @@
+import { hasStar, STARS_SAVED, type Progress } from "~/features/progress/progress";
 import type { ZoneLocation, ZoneStatus, ZoneSummary } from "~/features/zones/schema";
 
 import { NPC_SPOT, SITES, type Vec2 } from "./layout";
@@ -44,6 +45,35 @@ export function siteInfo(zones: readonly ZoneSummary[] | null): SiteInfoMap {
     };
   };
   return { library: entry("library"), watchtower: entry("watchtower"), market: entry("market") };
+}
+
+/**
+ * How a zone building looks (N9, 2026-10-08): scaffolded and pale until its zone opens; open
+ * with a lit door; windows lit too once the player has a star on any of its levels.
+ */
+export type SiteLook = "coming_soon" | "open" | "lit";
+
+export function siteLook(status: ZoneStatus, starred: boolean): SiteLook {
+  if (status !== "open") return "coming_soon";
+  return starred ? "lit" : "open";
+}
+
+/**
+ * The look of every building, from the zone statuses and the stars stored under each zone id.
+ * Until stars are saved (`STARS_SAVED`), every open zone counts as starred.
+ */
+export function siteLooks(
+  sites: SiteInfoMap,
+  progress: Progress,
+  starsSaved = STARS_SAVED,
+): Record<ZoneLocation, SiteLook> {
+  const look = ({ status, zoneId }: SiteInfo) =>
+    siteLook(status, !starsSaved || hasStar(progress, zoneId));
+  return {
+    library: look(sites.library),
+    watchtower: look(sites.watchtower),
+    market: look(sites.market),
+  };
 }
 
 /** Things the player can stand next to and use. */

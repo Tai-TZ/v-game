@@ -114,24 +114,16 @@ export const test = base.extend<{ consoleErrors: string[] }>({
 
 export { expect };
 
-/** Waits until the scene has drawn its first frame and stopped drawing. */
+/**
+ * Waits until the scene has drawn its first frame and has nothing left to move (`?debug=frames`
+ * flags `data-scene-busy` from the wake-up to the first frame that moves nothing). Not a quiet
+ * spell between frames: under load a walk can go 500 ms without one.
+ */
 export async function waitForIdleScene(page: Page, timeout = 15_000) {
   await expect(page.locator("canvas")).toBeVisible();
   await expect(page.locator("html[data-frames]")).toBeAttached();
-  const frames = () => page.evaluate(() => Number(document.documentElement.dataset.frames));
-  let previous = -1;
-  await expect
-    .poll(
-      async () => {
-        const now = await frames();
-        const settled = now === previous;
-        previous = now;
-        return settled;
-      },
-      { intervals: [500], timeout },
-    )
-    .toBe(true);
-  return frames;
+  await expect(page.locator("html[data-scene-busy]")).toHaveCount(0, { timeout });
+  return () => page.evaluate(() => Number(document.documentElement.dataset.frames));
 }
 
 /** Captured SSE bodies (e2e/data); see e2e/data/README.md. */

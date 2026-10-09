@@ -26,6 +26,8 @@ for (const viewport of VIEWPORTS) {
       await mockApi(page);
       await page.goto("/play");
       await expect(page.locator("canvas")).toBeVisible();
+      // Mid-fade, the loader card's text is translucent and axe reads it as low contrast.
+      await expect(page.locator("[data-scene-loader]")).toHaveCount(0);
       await page.getByRole("button", { name: "Các khu" }).click();
       await expect(page.getByRole("link", { name: "Vào Thư viện" })).toBeVisible();
       expect(await seriousViolations(page)).toEqual([]);

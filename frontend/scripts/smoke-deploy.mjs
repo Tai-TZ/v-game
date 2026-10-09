@@ -40,6 +40,12 @@ check(home.headers.get("x-content-type-options") === "nosniff", "X-Content-Type-
 for (const pathname of ["/play", "/play/library"]) {
   const page = await get(pathname);
   check(page.status === 200, `GET ${pathname} -> ${page.status} (SPA fallback)`);
+  if (pathname === "/play") {
+    check(
+      (await page.text()).includes("data-scene-loader"),
+      "/play is prerendered with the loader",
+    );
+  }
 }
 
 // Every pack in the repo that is not public must answer 404, so a brand-licensed pack never

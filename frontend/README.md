@@ -13,7 +13,8 @@ Architecture and budgets: [`docs/design/frontend-architecture.md`](../docs/desig
 | `/play/:zoneId` | Zone page: levels from `GET /api/zones/:id`; locked / not found / error |
 
 `/play?at=<library|watchtower|market>` puts the player at that building's door.
-`/play?debug=frames` counts rendered frames in `<html data-frames>` (used by e2e).
+`/play?debug=frames` counts rendered frames in `<html data-frames>` and sets `<html data-scene-busy>`
+while the scene still has something to move (used by e2e).
 
 ## Commands
 
@@ -24,6 +25,7 @@ npm run build        # build, bundle budget check, CSP headers
 npm run preview      # serve the production build
 npx playwright install chromium
 npm run test:e2e     # Playwright on the production build, API mocked per test
+E2E_PORT=4180 npm run test:e2e   # a second checkout or worktree needs its own port (default 4173)
 ```
 
 E2E serves the build on port 4173 and reuses a server already there. Another checkout

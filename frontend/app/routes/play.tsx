@@ -5,8 +5,9 @@ import { arrivalPose, parseArrival, SPAWN, SPAWN_HEADING } from "~/features/camp
 import { HubTopBar } from "~/features/campus/hud/HubTopBar";
 import { InteractHint } from "~/features/campus/hud/InteractHint";
 import { LanDialog } from "~/features/campus/hud/LanDialog";
+import { advanceScene, beginScene, STAGE } from "~/features/campus/hud/sceneLoad";
 import { SceneBoundary } from "~/features/campus/hud/SceneBoundary";
-import { ScenePoster } from "~/features/campus/hud/ScenePoster";
+import { SceneLoader } from "~/features/campus/hud/SceneLoader";
 import { FIRST_LIBRARY_LEVEL, siteInfo, type InteractTarget } from "~/features/campus/sites";
 import { hubStore, useHub } from "~/features/campus/store";
 import { loadZoneList } from "~/features/zones/api";
@@ -22,8 +23,13 @@ const CampusScene = lazy(loadScene);
 export const meta: Route.MetaFunction = () => [{ title: "Khuôn viên · V-Game" }];
 
 export function clientLoader({ request }: Route.ClientLoaderArgs) {
-  // Start the scene chunk download now, in parallel with the route render.
-  void loadScene();
+  // Start the scene chunk download now, in parallel with the route render. A failure reaches
+  // SceneBoundary through lazy().
+  beginScene();
+  void loadScene().then(
+    () => advanceScene(STAGE.boot),
+    () => undefined,
+  );
   return {
     arrival: parseArrival(new URL(request.url).searchParams.get("at")),
     // Not awaited: the scene never waits for the API (brief §4.3).
@@ -34,7 +40,7 @@ export function clientLoader({ request }: Route.ClientLoaderArgs) {
 export function HydrateFallback() {
   return (
     <main className="relative h-dvh overflow-hidden bg-scene">
-      <ScenePoster />
+      <SceneLoader shell />
     </main>
   );
 }
@@ -98,12 +104,14 @@ export default function Play({ loaderData }: Route.ComponentProps) {
           làm được qua nút Các khu.
         </p>
         <SceneBoundary>
-          <Suspense fallback={<ScenePoster />}>
+          {/* The loader below covers the wait, outside Suspense, until the first frame. */}
+          <Suspense fallback={null}>
             <CampusScene sites={sites} onInteract={onInteract} />
           </Suspense>
         </SceneBoundary>
       </div>
 
+      <SceneLoader />
       <HubTopBar zones={zones} onTalk={() => hubStore.getState().talkToLan()} onRetry={retry} />
       <InteractHint sites={sites} onInteract={onInteract} />
 

@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Plane, Raycaster, Vector2, Vector3, type Group, type Mesh, type Object3D } from "three";
 
 import {
@@ -101,6 +101,8 @@ export function clickGoal(ray: Raycaster, statics: Object3D | null): Vec2 | null
 export function useHubFrame(options: {
   reducedMotion: boolean;
   countFrames: boolean;
+  /** A new light preset is picked but not baked yet: e2e must not see the scene as idle. */
+  rebaking: boolean;
   onInteract: (target: InteractTarget) => void;
 }) {
   const camera = useThree((state) => state.camera);
@@ -113,9 +115,11 @@ export function useHubFrame(options: {
   const statics = useRef<Group>(null);
   const onInteract = useRef(options.onInteract);
   const reducedMotion = useRef(options.reducedMotion);
+  const rebaking = useRef(options.rebaking);
   useEffect(() => {
     onInteract.current = options.onInteract;
     reducedMotion.current = options.reducedMotion;
+    rebaking.current = options.rebaking;
   });
 
   const anim = useRef({
@@ -134,10 +138,22 @@ export function useHubFrame(options: {
     sampledFrames: 0,
   });
 
+  const countFrames = options.countFrames;
+  /**
+   * Requests a frame. With ?debug=frames it also flags <html data-scene-busy> at once, so e2e
+   * waits for the walk itself to end, never for a quiet spell (a starved software renderer can
+   * go 500 ms between two frames mid-walk). The frame loop clears it on a frame that moves
+   * nothing. Every input that starts motion goes through here (the store's `wake` included).
+   */
+  const wake = useCallback(() => {
+    if (countFrames) document.documentElement.dataset.sceneBusy = "";
+    invalidate();
+  }, [countFrames, invalidate]);
+
   useEffect(() => {
-    hubStore.getState().setWake(invalidate);
-    return () => hubStore.getState().setWake(() => undefined);
-  }, [invalidate]);
+    hubStore.getState().setWake(wake);
+    return () => hubStore.getState().setWake(null);
+  }, [wake]);
 
   // Keyboard: movement keys and E. Ignored while focus is in a button, input or dialog.
   useEffect(() => {
@@ -151,7 +167,7 @@ export function useHubFrame(options: {
         motion.target = null;
         motion.route = [];
         motion.talkOnArrival = false;
-        invalidate();
+        wake();
       } else if (event.code === "KeyE" && !event.repeat) {
         const { nearby } = hubStore.getState();
         if (nearby) {
@@ -161,11 +177,11 @@ export function useHubFrame(options: {
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      if (motion.keys.delete(event.code)) invalidate();
+      if (motion.keys.delete(event.code)) wake();
     };
     const release = () => {
       motion.keys.clear();
-      invalidate();
+      wake();
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
@@ -175,7 +191,7 @@ export function useHubFrame(options: {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", release);
     };
-  }, [invalidate]);
+  }, [wake]);
 
   // Click / tap to walk: ray against the librarian's body height, then the scenery (clickGoal).
   useEffect(() => {
@@ -203,9 +219,7 @@ export function useHubFrame(options: {
     };
     canvas.addEventListener("click", onClick);
     return () => canvas.removeEventListener("click", onClick);
-  }, [canvas, camera, invalidate]);
-
-  const countFrames = options.countFrames;
+  }, [canvas, camera]);
 
   useFrame((three, delta) => {
     const { size } = three;
@@ -360,11 +374,14 @@ export function useHubFrame(options: {
     if (countFrames) {
       const root = document.documentElement;
       root.dataset.frames = String(Number(root.dataset.frames ?? "0") + 1);
+      // The re-bake's own commit wakes the scene again (Campus), so the flag spans the gap.
+      if (busy || rebaking.current) root.dataset.sceneBusy = "";
+      else delete root.dataset.sceneBusy;
     }
 
     a.wasBusy = busy;
     if (busy) three.invalidate();
   });
 
-  return { player, playerBlob, lan, ring, statics };
+  return { player, playerBlob, lan, ring, statics, wake };
 }

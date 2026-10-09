@@ -1,7 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// E2E_PORT: a second checkout running e2e at the same time needs its own port, or
-// reuseExistingServer hands it the other checkout's build.
+// Each checkout or worktree that runs e2e at the same time needs its own port (`E2E_PORT`).
 const PORT = Number(process.env.E2E_PORT ?? 4173);
 
 export default defineConfig({
@@ -30,6 +29,8 @@ export default defineConfig({
   webServer: {
     command: `node scripts/serve-build.mjs --port ${PORT}`,
     url: `http://127.0.0.1:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    // Never reuse: a server already on the port may be another checkout's build, which would be
+    // tested quietly in place of this one (QA r2). A taken port fails the run instead.
+    reuseExistingServer: false,
   },
 });
