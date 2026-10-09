@@ -90,9 +90,6 @@ export interface LevelCopy {
   intro: string;
   win1: string;
   win3: string;
-  /** Star rules PublicLevel does not return (engine/levels/<id>.json `rules`); see §8.2. */
-  s1Required: readonly string[];
-  s3ForbiddenLabels: readonly string[];
   /** Knobs that do nothing at this level, by param, with why (shown dimmed, scenario §5). */
   inertKnobs?: Readonly<Record<string, string>>;
 }
@@ -105,8 +102,6 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Tối nay có mười câu hỏi. Mình cần ít nhất sáu trên tám câu thường đúng và có nguồn, còn hai câu bẫy thì nó phải biết nói 'không có'.",
     win1: "Bảng tin sạch rồi. Chú Bảy dặn lần sau in ít thôi.",
     win3: "Biết nói 'không có' đúng lúc, đó là kỹ năng mình quý nhất ở một thủ thư.",
-    s1Required: ["lib-l1-v01"],
-    s3ForbiddenLabels: ["cite_unknown"],
   },
   "chunk-tuning": {
     asker: "Hà",
@@ -114,8 +109,6 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Mười ba câu tối nay: ít nhất tám trên mười câu thường phải đủ ý, và không câu nào được trả lời theo bản cũ.",
     win1: "Phòng đào tạo nhận đơn của Hà rồi. Bạn ấy gửi hộp bánh cảm ơn, mình sẽ không chia cho Bống.",
     win3: "Không một tờ giấy vàng nào lọt vào thùng. Phòng lưu trữ sẽ tự hào về bạn.",
-    s1Required: ["lib-l2-v01"],
-    s3ForbiddenLabels: ["stale_doc"],
   },
   "article-number-lookup": {
     asker: "Khang",
@@ -123,8 +116,6 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Tối nay có người hỏi bằng số điều, có người hỏi bằng lời thường. Tám trên mười câu thường phải đúng, kể cả câu của Khang, và ca của Hà hôm trước không được vỡ.",
     win1: "Hàng người giải tán rồi. Hai cách tìm, mỗi cách che điểm mù cho cách kia.",
     win3: "Ca của Hà vẫn xanh. Cái bảng đó là thứ mình xem đầu tiên mỗi khi có ai sửa trợ lý.",
-    s1Required: ["lib-l3-v01"],
-    s3ForbiddenLabels: [],
     inertKnobs: { only_in_force: "Kho tối nay không có văn bản hết hiệu lực." },
   },
 };
@@ -204,16 +195,6 @@ export function shownLabels(labels: readonly string[]): readonly string[] {
   return labels.includes("abstained") ? labels.filter((l) => l !== "cite_missing") : labels;
 }
 
-/** Flag keys the server can leave in a message (the regression and fallback templates). */
-const FLAG_KEY = /\b(?:ret|llm|ctx|trap)\.[a-z_]+(?::[a-z0-9_]+)?/g;
-
-/** "Ca của Hà trượt: ret.gold_rank:vector_search." -> "… đoạn đáp án đứng ngoài …". */
-export const flagWords = (text: string) =>
-  text.replace(FLAG_KEY, (key) => {
-    const label = FLAG_VI[key.split(":")[0] ?? key];
-    return label ? lowerFirst(label) : key;
-  });
-
 /** Flags whose fix is always the same knob (§8.6); the rank flags depend on the graph. */
 const FLAG_TARGET: Readonly<Record<string, Target>> = {
   "ret.gold_missing": { slot: "vector_search", param: "top_k" },
@@ -236,19 +217,16 @@ const SEARCHES = ["vector_search", "bm25_search"] as const;
 
 /**
  * Where "Xem ở …" goes (§8.6): the control that can fix the lesson in the graph that ran.
- * A regression item names the flag that broke in its message. Ranks are the first case's
+ * A regression item carries the flag that broke in `cause`. Ranks are the first case's
  * `report.gold[case].ranks` (whole-corpus rank for a search, rank in the kept list after it).
  */
 export function diagnosisTarget(
   env: Env,
-  group: Pick<DiagnosisGroup, "flag" | "message_vi" | "cases">,
+  group: Pick<DiagnosisGroup, "flag" | "cause" | "cases">,
   gold: RunReport["gold"] | undefined,
   graph: Graph | null,
 ): Target | null {
-  const flag =
-    group.flag === "regression"
-      ? (group.message_vi.match(FLAG_KEY)?.[0] ?? group.flag)
-      : group.flag;
+  const flag = group.flag === "regression" ? (group.cause ?? group.flag) : group.flag;
   const fixed = FLAG_TARGET[flag];
   if (fixed) return fixed;
   const ids = nodeIds(env.level);
@@ -304,6 +282,8 @@ export function diagnosisTarget(
 
 export interface DiagnosisGroup {
   flag: string;
+  /** "regression" only: the flag that broke. */
+  cause?: string;
   message_vi: string;
   cases: string[];
 }
@@ -318,6 +298,7 @@ export function groupDiagnosis(items: readonly RunReport["diagnosis"][number][])
     } else {
       groups.set(item.flag, {
         flag: item.flag,
+        ...(item.cause !== undefined && { cause: item.cause }),
         message_vi: item.message_vi,
         cases: item.case ? [item.case] : [],
       });

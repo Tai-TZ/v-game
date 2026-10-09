@@ -3,7 +3,7 @@
   "version": 1,
   "zone": "library",
   "title": "Hỏi bằng số điều",
-  "brief": "Sự cố: người dùng hỏi theo số hiệu điều luật và tìm theo nghĩa trả về sai điều. Kết hợp tìm theo từ khoá với tìm theo nghĩa, rồi xếp hạng lại kết quả.",
+  "brief": "Sự cố: người dùng hỏi theo số hiệu điều luật và tìm theo nghĩa trả về sai điều. Kết hợp tìm theo từ khóa với tìm theo nghĩa, rồi xếp hạng lại kết quả.",
   "kind": "incident",
   "corpus": ["qcdt-2024"],
   "allowed_blocks": [
@@ -137,6 +137,8 @@
     "Có sao 1 và cả lượt chạy tốn không quá 22.000 token.",
     "Có sao 1 và mọi câu bẫy đều đạt."
   ],
+  "s1_required": ["lib-l3-v01"],
+  "s3_forbidden_labels": [],
   "visible_cases": [
     {
       "id": "lib-l3-v01",
@@ -156,6 +158,7 @@
   ],
   "case_counts": {
     "normal": 10,
-    "trap": 2
+    "trap": 2,
+    "info": 1
   }
 }

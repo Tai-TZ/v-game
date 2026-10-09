@@ -344,6 +344,7 @@ class GoldReveal(TypedDict):
 class Diagnosis(TypedDict):
     case: str | None  # None for run-level flags (budget.exceeded)
     flag: str
+    cause: NotRequired[str]  # "regression" only: the flag that broke, e.g. ret.gold_missing
     message_vi: str
 
 

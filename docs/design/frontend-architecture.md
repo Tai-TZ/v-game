@@ -57,7 +57,7 @@ app/
 |---|---|---|
 | Trang chủ không có three | 0 chunk | `scripts/check-bundle.mjs` (manifest + dò chuỗi `THREE.WebGLRenderer`) và `e2e/landing.spec.ts` (danh sách chunk từ `build/bundle-report.json`) |
 | `/play` ≤ 300 kB gzip ¹ | 268,9 kB (sau N8/N9 và QA vòng 2, campus-scene v0.3 §13.4) | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
-| ≤ 40 draw call, ≤ 60k tam giác | 14 (lớp bóng nắng riêng, QA vòng 1 2026-10-08); 20 185 (campus) / 17 108 (town) ban ngày với Thư viện `lit`, đo bằng `sceneBudget()` sau QA vòng 2 (campus-scene v0.3 §13.4) | `scene.test.ts` (fail nếu > 16 hoặc > 23 000) |
+| ≤ 40 draw call, ≤ 60k tam giác | 14 (lớp bóng nắng riêng, QA vòng 1 2026-10-08); 20 185 (campus) / 17 108 (town) ban ngày với Thư viện `lit`, đo bằng `sceneBudget()` sau QA vòng 2 (campus-scene v0.3 §13.4) | `scene.test.ts` (fail nếu > 16 hoặc > 23 000). Xoay 360° (v0.4) không thêm draw call hay tam giác; `scene.test.ts` còn kiểm khung `ORBIT_FRAME` và góc HUD ở mọi yaw |
 | `frameloop="demand"` | không frame khi đứng yên | `e2e/play.spec.ts` với `?debug=frames` |
 | Không shadow map / postprocessing | — | `scene.test.ts` grep `app/features/campus` |
 | DPR | `dpr={[1, 2]}`, `[1, 1.5]` khi `(pointer: coarse)` hoặc < 768 px | xem dưới |

@@ -102,8 +102,14 @@ export const PublicLevelSchema = v.looseObject({
   starter_graph: GraphSchema,
   token_budget: Int,
   stars_vi: v.array(v.string()),
+  // Star rules stars_vi words (engine-v0.2 §9.2); the star evidence of §8.6 reads them.
+  // Optional here and in case_counts.info: Vercel deploys before Render, so the page meets the
+  // older backend for a while; the evidence then just leaves those parts out.
+  s1_required: v.optional(v.array(v.string()), []),
+  s3_forbidden_labels: v.optional(v.array(v.string()), []),
   visible_cases: v.array(v.looseObject({ id: v.string(), vai: v.string(), question: v.string() })),
-  case_counts: v.looseObject({ normal: Int, trap: Int }),
+  // `info`: cases that run (one AI call each) but earn no star.
+  case_counts: v.looseObject({ normal: Int, trap: Int, info: v.optional(Int, 0) }),
 });
 export type PublicLevel = v.InferOutput<typeof PublicLevelSchema>;
 
@@ -194,7 +200,13 @@ export type GoldReveal = v.InferOutput<typeof GoldRevealSchema>;
 const RunReportSchema = v.looseObject({
   gold: v.record(v.string(), GoldRevealSchema),
   diagnosis: v.array(
-    v.looseObject({ case: v.nullable(v.string()), flag: v.string(), message_vi: v.string() }),
+    v.looseObject({
+      case: v.nullable(v.string()),
+      flag: v.string(),
+      // "regression" only: the flag that broke, for "Xem ở".
+      cause: v.optional(v.string()),
+      message_vi: v.string(),
+    }),
   ),
 });
 export type RunReport = v.InferOutput<typeof RunReportSchema>;

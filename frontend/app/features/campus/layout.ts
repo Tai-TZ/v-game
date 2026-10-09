@@ -295,19 +295,44 @@ function nearestRoomy(p: Vec2, h: number, x0: number, x1: number, z0: number, z1
   return best;
 }
 
+/** The ground step towards the camera of the home view (+x, +z). */
+export const HOME_TOWARD: Vec2 = { x: 1, z: 1 };
+
+/**
+ * Ground step towards a camera at `yaw` (camera.ts h(yaw)), scaled so its larger component is 1
+ * and rounded to 1e-9: exactly HOME_TOWARD at the home view (orbit-camera §2.5).
+ */
+export function towardFor(yaw: number): Vec2 {
+  const x = Math.sin(yaw);
+  const z = Math.cos(yaw);
+  const m = Math.max(Math.abs(x), Math.abs(z));
+  const round = (n: number) => Math.round((n / m) * 1e9) / 1e9 || 0;
+  return { x: round(x), z: round(z) };
+}
+
+/** Whether a walk along `toward` from p has left WORLD_BOUNDS for good. */
+const pastBounds = (p: Vec2, toward: Vec2) =>
+  (toward.x > 0 && p.x > WORLD_BOUNDS.maxX) ||
+  (toward.x < 0 && p.x < WORLD_BOUNDS.minX) ||
+  (toward.z > 0 && p.z > WORLD_BOUNDS.maxZ) ||
+  (toward.z < 0 && p.z < WORLD_BOUNDS.minZ);
+
 /**
  * Where to stand for a click on something blocked. Off every footprint (paving or grass beside a
  * wall, a tree crown): the roomy point nearest to p within 1 (QA r4). On a footprint: the first
- * roomy point from p towards the camera (+x, +z), in front of what the click landed on. Else
- * (the lake, off the model) the roomy point nearest to p on a 0.25 grid.
+ * roomy point from p towards the camera (`toward`), on the face the click landed on. Else (the
+ * lake, off the model) the roomy point nearest to p on a 0.25 grid.
  */
-function standFor(p: Vec2): Vec2 {
+function standFor(p: Vec2, toward: Vec2): Vec2 {
   if (!OBSTACLES.some((box) => overlapsBox(p, box, 0))) {
     const near = nearestRoomy(p, 0.05, p.x - 1, p.x + 1, p.z - 1, p.z + 1);
     if (near) return near;
   }
-  for (let t = 0; p.x + t <= WORLD_BOUNDS.maxX && p.z + t <= WORLD_BOUNDS.maxZ; t += 0.05) {
-    if (roomy({ x: p.x + t, z: p.z + t })) return { x: p.x + t, z: p.z + t };
+  // At home `t * 1 === t`, so this walks the same points as v0.3's +x, +z walk.
+  for (let t = 0; ; t += 0.05) {
+    const q = { x: p.x + t * toward.x, z: p.z + t * toward.z };
+    if (pastBounds(q, toward)) break;
+    if (roomy(q)) return q;
   }
   const { minX, maxX, minZ, maxZ } = WORLD_BOUNDS;
   return nearestRoomy(p, 0.25, minX + 0.125, maxX, minZ + 0.125, maxZ) ?? p;
@@ -316,12 +341,12 @@ function standFor(p: Vec2): Vec2 {
 /**
  * Click-to-move waypoints (campus-scene v0.3 §2.5): the shortest route, bending only at the
  * corners of obstacles (a visibility graph). A blocked `to` (a building, a trunk, the lake) is
- * walked to via `standFor(to)` and ends with `to`, which step() gives up at the first wall: the
- * player stops at the stand point, facing `to`. A `to` no route reaches is walked to in a
- * straight line.
+ * walked to via `standFor(to, toward)` and ends with `to`, which step() gives up at the first
+ * wall: the player stops at the stand point, facing `to`. A `to` no route reaches is walked to
+ * in a straight line. `toward` is towardFor(view yaw) of the click.
  */
-export function routeTo(from: Vec2, to: Vec2): Vec2[] {
-  const goal = isBlocked(to, OBSTACLES, WORLD_BOUNDS) ? standFor(to) : to;
+export function routeTo(from: Vec2, to: Vec2, toward: Vec2 = HOME_TOWARD): Vec2[] {
+  const goal = isBlocked(to, OBSTACLES, WORLD_BOUNDS) ? standFor(to, toward) : to;
   const route = goal === to ? [to] : [goal, to];
   if (clearLeg(from, goal, 0)) return route;
   // Dijkstra from `from`. `from` and `goal` join the graph by straight legs with no margin, as

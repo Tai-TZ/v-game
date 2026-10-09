@@ -3,7 +3,7 @@
   "version": 1,
   "zone": "library",
   "title": "Thôi bịa điều luật",
-  "brief": "Agent đang bịa ra điều luật không tồn tại. Gắn bước truy xuất để agent trích đúng điều luật từ văn bản gốc.",
+  "brief": "Trợ lý đang bịa ra điều luật không tồn tại. Gắn bước truy xuất để trợ lý trích đúng điều luật từ văn bản gốc.",
   "kind": "standard",
   "corpus": ["qcdt-2024"],
   "allowed_blocks": [
@@ -114,6 +114,8 @@
     "Có sao 1 và cả lượt chạy tốn không quá 15.000 token.",
     "Có sao 1, hai câu bẫy đều đạt và không câu nào trích nguồn bịa."
   ],
+  "s1_required": ["lib-l1-v01"],
+  "s3_forbidden_labels": ["cite_unknown"],
   "visible_cases": [
     {
       "id": "lib-l1-v01",
@@ -133,6 +135,7 @@
   ],
   "case_counts": {
     "normal": 8,
-    "trap": 2
+    "trap": 2,
+    "info": 0
   }
 }

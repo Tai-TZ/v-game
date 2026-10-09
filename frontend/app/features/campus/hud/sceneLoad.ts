@@ -41,10 +41,13 @@ export const sceneLoad = createStore<SceneLoad>(() => ({
 
 export const useSceneLoad = <T>(pick: (state: SceneLoad) => T) => useStore(sceneLoad, pick);
 
-/** clientLoader: a new entry to /play. Revalidation (zone retry, `?at=` change) keeps a live scene. */
-export function beginScene() {
+/**
+ * clientLoader: a new entry to /play, true when it starts one. Revalidation (zone retry, `?at=`
+ * change) keeps a live scene.
+ */
+export function beginScene(): boolean {
   const s = sceneLoad.getState();
-  if (s.live || s.failed) return;
+  if (s.live || s.failed) return false;
   const now = performance.now();
   // Direct load: the pre-rendered loader's appear delay started with the first paint (of the
   // sky). Not first-contentful-paint: the loader is at opacity 0 during that delay, so FCP
@@ -55,6 +58,7 @@ export function beginScene() {
     : now;
   sceneLoad.setState({ stage: STAGE.fetch, since: now, begun, run: s.run + 1 });
   performance.mark("vg-scene-1");
+  return true;
 }
 
 /** Monotonic: a repeated or late signal (StrictMode, a cached chunk) changes nothing. */

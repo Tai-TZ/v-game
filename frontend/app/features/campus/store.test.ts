@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BACK_SPOT, INTERACT_RADIUS, NPC_TALK_SPOT, routeTo, SITES, SPAWN } from "./layout";
+import { HOME_YAW, wrapAngle } from "./camera";
+import {
+  BACK_SPOT,
+  INTERACT_RADIUS,
+  NPC_TALK_SPOT,
+  routeTo,
+  SITES,
+  SPAWN,
+  towardFor,
+} from "./layout";
 import { nearestWithin } from "./movement";
 import { hintFor, INTERACT_POINTS, siteInfo } from "./sites";
 import { createHubStore } from "./store";
@@ -98,6 +107,71 @@ describe("hub store", () => {
       store.getState().placePlayer(site.door, 0);
       expect(store.getState().nearby).toBe(site.id);
     }
+  });
+});
+
+describe("view yaw (orbit-camera §2, §3)", () => {
+  const deg = (d: number) => (d * Math.PI) / 180;
+  /** Runs the frame loop's ease to its end. */
+  const settle = (store: ReturnType<typeof createHubStore>) => {
+    const { view } = store.getState();
+    if (view.to !== null) view.yaw = wrapAngle(view.to);
+    view.to = null;
+  };
+
+  it("turns 90° a press, chaining from the running target, and back home", () => {
+    const store = createHubStore();
+    const wake = vi.fn();
+    store.getState().setWake(wake);
+    const { view } = store.getState();
+    expect(view.yaw).toBe(HOME_YAW);
+
+    store.getState().rotateView(1);
+    store.getState().rotateView(1);
+    expect(view.to).not.toBeNull();
+    expect(wrapAngle(view.to ?? 0)).toBeCloseTo(deg(-135));
+    // Clockwise all the way: 180° from where the view shows, not back the short way.
+    expect((view.to ?? 0) - view.from).toBeCloseTo(Math.PI);
+    expect(view.duration).toBeCloseTo(0.3);
+    expect(wake).toHaveBeenCalledTimes(2);
+
+    settle(store);
+    store.getState().rotateView(-1);
+    expect(wrapAngle(view.to ?? 0)).toBeCloseTo(deg(135));
+    settle(store);
+    store.getState().rotateView(0);
+    expect(wrapAngle(view.to ?? 0)).toBeCloseTo(HOME_YAW);
+  });
+
+  it("keeps turning counter-clockwise for quick presses, not back the short way", () => {
+    const store = createHubStore();
+    const { view } = store.getState();
+    for (let i = 0; i < 3; i += 1) store.getState().rotateView(-1);
+    expect(wrapAngle(view.to ?? 0)).toBeCloseTo(deg(135));
+    expect((view.to ?? 0) - view.from).toBeCloseTo((-3 * Math.PI) / 2);
+  });
+
+  it("walks to the stand point on the side the view shows", () => {
+    const store = createHubStore();
+    const back = { x: 0, z: -9.8 };
+    store.getState().view.yaw = deg(-135);
+    store.getState().walkTo(back);
+    const { motion } = store.getState();
+    expect([motion.target, ...motion.route]).toEqual(routeTo(SPAWN, back, towardFor(deg(-135))));
+  });
+
+  it("keeps the view when the player is placed, and resets it for a new entry", () => {
+    const store = createHubStore();
+    store.getState().view.yaw = deg(135);
+    store.getState().setRotated(true);
+    store.getState().placePlayer(SPAWN, 0);
+    expect(store.getState().view.yaw).toBe(deg(135));
+
+    store.getState().view.to = deg(225);
+    store.getState().resetView();
+    expect(store.getState().view.yaw).toBe(HOME_YAW);
+    expect(store.getState().view.to).toBeNull();
+    expect(store.getState().rotated).toBe(false);
   });
 });
 
