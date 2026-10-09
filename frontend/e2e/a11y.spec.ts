@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
-import { expect, mockApi, test } from "./fixtures";
+import { expect, mockApi, mockWorkbenchApi, test } from "./fixtures";
 
 const VIEWPORTS = [
   { width: 375, height: 812 },
@@ -53,6 +53,22 @@ for (const viewport of VIEWPORTS) {
         await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
         expect(await seriousViolations(page)).toEqual([]);
       }
+    });
+
+    test("workbench L3 while editing and with results", async ({ page }) => {
+      await mockWorkbenchApi(page);
+      await page.goto("/play/library/article-number-lookup");
+      await expect(page.getByRole("heading", { level: 1, name: "Hỏi bằng số điều" })).toBeVisible();
+      await page.getByRole("switch", { name: "Gắn Phễu" }).check();
+      expect(await seriousViolations(page)).toEqual([]);
+
+      await page.getByRole("switch", { name: "Gắn Tủ ngăn kéo" }).check();
+      await page.getByRole("button", { name: "Mở ca" }).click();
+      await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
+      for (const details of await page.locator("details").all()) {
+        await details.evaluate((element) => element.setAttribute("open", ""));
+      }
+      expect(await seriousViolations(page)).toEqual([]);
     });
 
     test("library zone page", async ({ page }) => {

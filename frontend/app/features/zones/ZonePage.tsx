@@ -1,10 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
+import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
-import { ChevronLeftIcon } from "~/components/ui/icons";
-import { ThemeToggle } from "~/features/theme/ThemeToggle";
-import { AUTHOR } from "~/lib/site";
 
 import type { ZonePageData } from "./api";
 import type { Zone } from "./schema";
@@ -17,21 +15,9 @@ const hubAt = (zone: Zone | null) => (zone ? `/play?at=${zone.location}` : "/pla
 
 function Frame({ back, children }: { back: string; children: ReactNode }) {
   return (
-    <>
-      <header className="h-16 border-b border-line bg-surface">
-        <div className="mx-auto flex h-full max-w-3xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link to={back} className={buttonClass("quiet", "-ml-3 px-3")}>
-            <ChevronLeftIcon />
-            {BACK_LABEL}
-          </Link>
-          <ThemeToggle />
-        </div>
-      </header>
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">{children}</main>
-      <footer className="mx-auto max-w-3xl px-4 pb-10 sm:px-6">
-        <p className="border-t border-line pt-5 text-xs text-fg-muted">V-Game · {AUTHOR}</p>
-      </footer>
-    </>
+    <PageFrame back={back} backLabel={BACK_LABEL}>
+      {children}
+    </PageFrame>
   );
 }
 
@@ -59,7 +45,7 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
         <Frame back={hubAt(data.zone)}>
           <ZoneHeader zone={data.zone} />
           <ol className="mt-10 space-y-4">
-            {byOrder(data.zone).map((level) => (
+            {byOrder(data.zone).map((level, index) => (
               <li
                 key={level.id}
                 className="grid grid-cols-[2rem_1fr] gap-x-4 rounded-md border border-line bg-surface p-5 sm:grid-cols-[2rem_1fr_auto]"
@@ -76,18 +62,22 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
                   <ConceptChips concepts={level.concepts} className="mt-3" />
                 </div>
                 <div className="col-span-2 mt-4 sm:col-span-1 sm:mt-0">
-                  <button
-                    type="button"
-                    disabled
-                    className={buttonClass("secondary", "w-full sm:w-auto")}
+                  <Link
+                    to={`/play/${data.zone.id}/${level.id}`}
+                    aria-label={`Vào màn ${level.title}`}
+                    // No progress is stored yet, so the first level is the one to start with.
+                    className={buttonClass(
+                      index === 0 ? "primary" : "secondary",
+                      "w-full sm:w-auto",
+                    )}
                   >
-                    Đang xây
-                  </button>
+                    Vào màn
+                  </Link>
                 </div>
               </li>
             ))}
           </ol>
-          <Link to={hubAt(data.zone)} className={buttonClass("primary", "mt-10")}>
+          <Link to={hubAt(data.zone)} className={buttonClass("secondary", "mt-10")}>
             {BACK_LABEL}
           </Link>
         </Frame>

@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page, type Request } from "@playwright/test";
+
+import { blocksJson, publicLevelJson, readText } from "../app/features/workbench/test-fixtures";
 
 /** The content seed the backend serves; mocks answer with the same data. */
 interface SeedZone {
@@ -89,7 +91,11 @@ export const test = base.extend<{ consoleErrors: string[] }>({
     page.on("console", (message) => {
       if (message.type() !== "error") return;
       const text = message.text();
-      if (/Failed to load resource: the server responded with a status of (404|500)/.test(text))
+      if (
+        /Failed to load resource: the server responded with a status of (404|409|422|429|500|503)/.test(
+          text,
+        )
+      )
         return;
       errors.push(text);
     });
@@ -118,4 +124,97 @@ export async function waitForIdleScene(page: Page, timeout = 15_000) {
   await expect(page.locator("html[data-frames]")).toBeAttached();
   await expect(page.locator("html[data-scene-busy]")).toHaveCount(0, { timeout });
   return () => page.evaluate(() => Number(document.documentElement.dataset.frames));
+}
+
+/** Captured SSE bodies (e2e/data); see e2e/data/README.md. */
+export const sse = {
+  short: () => readText("e2e", "data", "run-l1-short.sse"),
+  reference: () => readText("e2e", "data", "run-l1-reference.sse"),
+};
+
+export const runId = (n: number) => n.toString(16).padStart(32, "0");
+
+export interface WorkbenchReply extends Reply {
+  headers?: Record<string, string>;
+}
+
+export interface WorkbenchMock {
+  /** Every POST /api/runs, in order. */
+  posts: { key: string | null; contentType: string | null; body: string }[];
+  /** Run ids of every POST /api/runs/{id}/cancel. */
+  cancels: string[];
+  /** GET /api/runs/{id}/events requests so far. */
+  streams: number;
+}
+
+/**
+ * Mocks the zones API plus the engine API the workbench uses: levels and blocks from e2e/data,
+ * POST /api/runs (202 with run ids 1, 2, … unless `post` says otherwise), the SSE stream (the
+ * short L1 run unless `events` says otherwise) and cancel (202).
+ */
+export async function mockWorkbenchApi(
+  page: Page,
+  options: {
+    /** Reply to the n-th POST; a promise holds the request open until it settles. */
+    post?: (
+      n: number,
+      request: Request,
+    ) => WorkbenchReply | undefined | Promise<WorkbenchReply | undefined>;
+    /** Body of the n-th stream. Chrome adds Last-Event-ID below Playwright's interception, so
+     * a test of that header needs a real server (see the reconnect test). */
+    events?: (n: number) => string | Promise<string>;
+    /** Status of the n-th cancel (202 unless it says otherwise); a promise holds it open. */
+    cancel?: (n: number) => number | Promise<number>;
+  } = {},
+): Promise<WorkbenchMock> {
+  await mockApi(page);
+  const mock: WorkbenchMock = { posts: [], cancels: [], streams: 0 };
+  await page.route("**/api/blocks", (route) => route.fulfill({ json: blocksJson() }));
+  await page.route("**/api/levels/*", (route) => {
+    const id = new URL(route.request().url()).pathname.split("/").at(-1) ?? "";
+    try {
+      return route.fulfill({ json: publicLevelJson(id) });
+    } catch {
+      return route.fulfill({ status: 404, json: { detail: "Không tìm thấy level." } });
+    }
+  });
+  await page.route(
+    (url) => url.pathname === "/api/runs",
+    async (route) => {
+      const request = route.request();
+      mock.posts.push({
+        key: request.headers()["idempotency-key"] ?? null,
+        contentType: request.headers()["content-type"] ?? null,
+        body: request.postData() ?? "",
+      });
+      const n = mock.posts.length;
+      const reply = (await options.post?.(n, request)) ?? {
+        status: 202,
+        body: { run_id: runId(n), created: true, issues: [] },
+      };
+      return route.fulfill({
+        status: reply.status,
+        json: reply.body ?? {},
+        ...(reply.headers ? { headers: reply.headers } : {}),
+      });
+    },
+  );
+  await page.route("**/api/runs/*/events", async (route) => {
+    mock.streams += 1;
+    const body = await (options.events?.(mock.streams) ?? sse.short());
+    return route.fulfill({
+      status: 200,
+      headers: { "content-type": "text/event-stream", "cache-control": "no-store" },
+      body,
+    });
+  });
+  await page.route("**/api/runs/*/cancel", async (route) => {
+    mock.cancels.push(new URL(route.request().url()).pathname.split("/").at(-2) ?? "");
+    const status = (await options.cancel?.(mock.cancels.length)) ?? 202;
+    return route.fulfill({
+      status,
+      json: status === 202 ? { cancelled: true } : { detail: "Máy chủ gặp lỗi." },
+    });
+  });
+  return mock;
 }

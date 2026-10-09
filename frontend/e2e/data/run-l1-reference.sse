@@ -1,0 +1,452 @@
+id: 1
+event: run.started
+data: {"type": "run.started", "run": "db839cb99bc74c2e817042679d9b070c", "level": "grounded-citation", "cases": [{"id": "lib-l1-v01", "role": "visible", "vai": "su-kien", "question": "Em muốn bảo lưu kết quả học tập một học kỳ thì cần làm gì?"}, {"id": "lib-l1-v02", "role": "visible", "vai": "su-kien", "question": "Vắng bao nhiêu phần trăm số tiết thì bị cấm thi cuối kỳ vậy ạ?"}, {"id": "lib-l1-v03", "role": "visible", "vai": "dien-dat-lai", "question": "Cuối khóa muốn ra trường thì tiếng Anh phải tới cỡ nào ạ?"}, {"id": "lib-l1-h01", "role": "hidden", "vai": "su-kien"}, {"id": "lib-l1-h02", "role": "hidden", "vai": "su-kien"}, {"id": "lib-l1-h03", "role": "hidden", "vai": "su-kien"}, {"id": "lib-l1-h04", "role": "hidden", "vai": "dien-dat-lai"}, {"id": "lib-l1-h05", "role": "hidden", "vai": "dien-dat-lai"}, {"id": "lib-l1-t01", "role": "trap", "vai": "dieu-khong-ton-tai"}, {"id": "lib-l1-t02", "role": "trap", "vai": "ngoai-pham-vi"}], "ingestion": [{"node": "ix", "variant": "theo_dieu-512-10", "chunks": 84, "avg_tokens": 158}]}
+
+id: 2
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "q", "block": "input"}
+
+id: 3
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 4
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "q", "block": "input"}
+
+id: 5
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 6
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "q", "block": "input"}
+
+id: 7
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 8
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "vs", "block": "vector_search"}
+
+id: 9
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 12 (0,89), Điều 46 (0,85), Điều 29 (0,85)", "tokens": {"in": 0, "out": 0}, "ms": 3, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "e004ac54", "rank": 1, "score": 0.8858, "doc_id": "qcdt-2024", "dieu": 12, "khoan": [1, 2, 3], "hieu_luc": true}, {"chunk_id": "c9a8b80d", "rank": 2, "score": 0.8521, "doc_id": "qcdt-2024", "dieu": 46, "khoan": [1, 2], "hieu_luc": true}, {"chunk_id": "a517d37c", "rank": 3, "score": 0.8494, "doc_id": "qcdt-2024", "dieu": 29, "khoan": [1, 2], "hieu_luc": true}]}]}
+
+id: 10
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "vs", "block": "vector_search"}
+
+id: 11
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 18 (0,88), Điều 36 (0,85), Điều 35 (0,85)", "tokens": {"in": 0, "out": 0}, "ms": 1, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "1daa4def", "rank": 1, "score": 0.8829, "doc_id": "qcdt-2024", "dieu": 18, "khoan": [1, 2, 3], "hieu_luc": true}, {"chunk_id": "d7c9dd41", "rank": 2, "score": 0.8546, "doc_id": "qcdt-2024", "dieu": 36, "khoan": [1, 2, 3], "hieu_luc": true}, {"chunk_id": "600bb301", "rank": 3, "score": 0.8475, "doc_id": "qcdt-2024", "dieu": 35, "khoan": [], "hieu_luc": true}]}]}
+
+id: 12
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "vs", "block": "vector_search"}
+
+id: 13
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 66 (0,87), Điều 69 (0,83), Điều 60 (0,83)", "tokens": {"in": 0, "out": 0}, "ms": 1, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "1b4d2d24", "rank": 1, "score": 0.8654, "doc_id": "qcdt-2024", "dieu": 66, "khoan": [1, 2], "hieu_luc": true}, {"chunk_id": "58eb0c9f", "rank": 2, "score": 0.8292, "doc_id": "qcdt-2024", "dieu": 69, "khoan": [1, 2, 3], "hieu_luc": true}, {"chunk_id": "bb4aba0e", "rank": 3, "score": 0.8278, "doc_id": "qcdt-2024", "dieu": 60, "khoan": [1, 2], "hieu_luc": true}]}]}
+
+id: 14
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "pk", "block": "context_packer"}
+
+id: 15
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 440/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "pack", "included": ["e004ac54", "c9a8b80d", "a517d37c"], "dropped": [], "tokens": {"docs": 421, "query": 19, "total": 440, "budget": 3000}}]}
+
+id: 16
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "pk", "block": "context_packer"}
+
+id: 17
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 434/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "pack", "included": ["1daa4def", "d7c9dd41", "600bb301"], "dropped": [], "tokens": {"docs": 415, "query": 19, "total": 434, "budget": 3000}}]}
+
+id: 18
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "pk", "block": "context_packer"}
+
+id: 19
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 358/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "pack", "included": ["1b4d2d24", "58eb0c9f", "bb4aba0e"], "dropped": [], "tokens": {"docs": 341, "query": 17, "total": 358, "budget": 3000}}]}
+
+id: 20
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "llm", "block": "llm"}
+
+id: 21
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (609 vào, 252 ra token). Kết quả đã lưu.", "tokens": {"in": 609, "out": 252}, "ms": 1, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": ["e004ac54"], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94, "answer": "Để bảo lưu kết quả học tập (trong đó có trường hợp bảo lưu một học kỳ), sinh viên cần thực hiện các thủ tục sau:\n\n* Sinh viên nộp đơn bảo lưu cho phòng đào tạo chậm nhất hai tuần trước ngày bắt đầu học kỳ, kèm theo ý kiến của cố vấn học tập [e004ac54]. \n* Đơn cần ghi rõ học kỳ bắt đầu bảo lưu, số học kỳ đề nghị bảo lưu (trong trường hợp này là một học kỳ) và lý do [e004ac54]. \n* Đơn được nộp trực tiếp tại bộ phận một cửa của phòng đào tạo [e004ac54].\n* *Lưu ý:* Sinh viên còn nợ học phí của học kỳ trước sẽ chưa được xét bảo lưu [e004ac54]. Trường hợp phải điều trị dài ngày do ốm đau, tai nạn hoặc nhận lệnh gọi nhập ngũ, sinh viên có thể nộp đơn muộn (chậm nhất 15 ngày kể từ ngày bắt đầu học kỳ) kèm giấy xác nhận y tế hoặc lệnh gọi nhập ngũ và không cần ý kiến cố vấn học tập [e004ac54]."}]}
+
+id: 22
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "llm", "block": "llm"}
+
+id: 23
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (621 vào, 45 ra token). Kết quả đã lưu.", "tokens": {"in": 621, "out": 45}, "ms": 0, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": ["1daa4def"], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94, "answer": "Sinh viên vắng mặt quá 20% tổng số tiết của một học phần, kể cả vắng có phép, thì không được dự thi kết thúc học phần (thi cuối kỳ) [1daa4def]."}]}
+
+id: 24
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "llm", "block": "llm"}
+
+id: 25
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (537 vào, 658 ra token). Kết quả đã lưu.", "tokens": {"in": 537, "out": 658}, "ms": 0, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": ["1b4d2d24"], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94, "answer": "Để được xét tốt nghiệp, sinh viên phải đạt trình độ ngoại ngữ tương đương bậc 3 theo khung năng lực ngoại ngữ sáu bậc, trừ sinh viên các ngành ngôn ngữ sẽ thực hiện theo chuẩn riêng của chương trình đào tạo [1b4d2d24]. Chứng chỉ ngoại ngữ được công nhận phải còn thời hạn sử dụng tại thời điểm nộp và thuộc danh mục do Trường công bố hằng năm [1b4d2d24]."}]}
+
+id: 26
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "out", "block": "output"}
+
+id: 27
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 28
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "out", "block": "output"}
+
+id: 29
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 30
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "out", "block": "output"}
+
+id: 31
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 32
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v01", "status": "ok", "passed": true, "counted": true, "criteria": {"points": true, "cited": true, "no_fabrication": true, "no_forbidden": true}, "labels": []}
+
+id: 33
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v02", "status": "ok", "passed": true, "counted": true, "criteria": {"points": true, "cited": true, "no_fabrication": true, "no_forbidden": true}, "labels": []}
+
+id: 34
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-v03", "status": "ok", "passed": true, "counted": true, "criteria": {"points": true, "cited": true, "no_fabrication": true, "no_forbidden": true}, "labels": []}
+
+id: 35
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "q", "block": "input"}
+
+id: 36
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 37
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "q", "block": "input"}
+
+id: 38
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 39
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "q", "block": "input"}
+
+id: 40
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 41
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "vs", "block": "vector_search"}
+
+id: 42
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 4 (0,81), Điều 34 (0,81), Điều 39 (0,81)", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "e513b936", "rank": 1, "score": 0.8077, "doc_id": "qcdt-2024", "dieu": 4, "khoan": [1, 2, 3], "hieu_luc": true}, {"chunk_id": "ef687881", "rank": 2, "score": 0.8074, "doc_id": "qcdt-2024", "dieu": 34, "khoan": [1, 2], "hieu_luc": true}, {"chunk_id": "0ca11021", "rank": 3, "score": 0.8073, "doc_id": "qcdt-2024", "dieu": 39, "khoan": [1, 2, 3, 4, 5, 6], "hieu_luc": true}]}]}
+
+id: 43
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "vs", "block": "vector_search"}
+
+id: 44
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 10 (0,86), Điều 19 (0,86), Điều 59 (0,85)", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "35f6696a", "rank": 1, "score": 0.8649, "doc_id": "qcdt-2024", "dieu": 10, "khoan": [1, 2, 3, 4], "hieu_luc": true}, {"chunk_id": "c48de891", "rank": 2, "score": 0.8633, "doc_id": "qcdt-2024", "dieu": 19, "khoan": [1, 2, 3], "hieu_luc": true}, {"chunk_id": "d2e8d408", "rank": 3, "score": 0.8476, "doc_id": "qcdt-2024", "dieu": 59, "khoan": [1, 2, 3], "hieu_luc": true}]}]}
+
+id: 45
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "vs", "block": "vector_search"}
+
+id: 46
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 30 (0,89), Điều 71 (0,86), Điều 72 (0,84)", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "65163a94", "rank": 1, "score": 0.8902, "doc_id": "qcdt-2024", "dieu": 30, "khoan": [1, 2], "hieu_luc": true}, {"chunk_id": "5e8ba22e", "rank": 2, "score": 0.8609, "doc_id": "qcdt-2024", "dieu": 71, "khoan": [1, 2, 3], "hieu_luc": true}, {"chunk_id": "fafefa65", "rank": 3, "score": 0.8392, "doc_id": "qcdt-2024", "dieu": 72, "khoan": [], "hieu_luc": true}]}]}
+
+id: 47
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "pk", "block": "context_packer"}
+
+id: 48
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 649/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "pack", "included": ["e513b936", "ef687881", "0ca11021"], "dropped": [], "tokens": {"docs": 634, "query": 15, "total": 649, "budget": 3000}}]}
+
+id: 49
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "pk", "block": "context_packer"}
+
+id: 50
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 460/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "pack", "included": ["35f6696a", "c48de891", "d2e8d408"], "dropped": [], "tokens": {"docs": 443, "query": 17, "total": 460, "budget": 3000}}]}
+
+id: 51
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "pk", "block": "context_packer"}
+
+id: 52
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 300/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "pack", "included": ["65163a94", "5e8ba22e", "fafefa65"], "dropped": [], "tokens": {"docs": 283, "query": 17, "total": 300, "budget": 3000}}]}
+
+id: 53
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "llm", "block": "llm"}
+
+id: 54
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (853 vào, 26 ra token). Kết quả đã lưu.", "tokens": {"in": 853, "out": 26}, "ms": 0, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": ["0ca11021"], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94}]}
+
+id: 55
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "llm", "block": "llm"}
+
+id: 56
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (640 vào, 50 ra token). Kết quả đã lưu.", "tokens": {"in": 640, "out": 50}, "ms": 0, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": ["c48de891"], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94}]}
+
+id: 57
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "llm", "block": "llm"}
+
+id: 58
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (456 vào, 35 ra token). Kết quả đã lưu.", "tokens": {"in": 456, "out": 35}, "ms": 0, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": ["65163a94"], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94}]}
+
+id: 59
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "out", "block": "output"}
+
+id: 60
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 61
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "out", "block": "output"}
+
+id: 62
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 63
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "out", "block": "output"}
+
+id: 64
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 1, "facts": []}
+
+id: 65
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h01", "status": "ok", "passed": true, "counted": true, "criteria": {"points": true, "cited": true, "no_fabrication": true, "no_forbidden": true}, "labels": []}
+
+id: 66
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h02", "status": "ok", "passed": true, "counted": true, "criteria": {"points": true, "cited": true, "no_fabrication": true, "no_forbidden": true}, "labels": []}
+
+id: 67
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h03", "status": "ok", "passed": true, "counted": true, "criteria": {"points": true, "cited": true, "no_fabrication": true, "no_forbidden": true}, "labels": []}
+
+id: 68
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "q", "block": "input"}
+
+id: 69
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 70
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "q", "block": "input"}
+
+id: 71
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 72
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "q", "block": "input"}
+
+id: 73
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 74
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "vs", "block": "vector_search"}
+
+id: 75
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 53 (0,84), Điều 81 (0,84), Điều 18 (0,84)", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "b108e456", "rank": 1, "score": 0.843, "doc_id": "qcdt-2024", "dieu": 53, "khoan": [1, 2, 3, 4, 5, 6], "hieu_luc": true}, {"chunk_id": "f1b36cbe", "rank": 2, "score": 0.8378, "doc_id": "qcdt-2024", "dieu": 81, "khoan": [1, 2, 3, 4, 5], "hieu_luc": true}, {"chunk_id": "1daa4def", "rank": 3, "score": 0.8365, "doc_id": "qcdt-2024", "dieu": 18, "khoan": [1, 2, 3], "hieu_luc": true}]}]}
+
+id: 76
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "vs", "block": "vector_search"}
+
+id: 77
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 78 (0,86), Điều 11 (0,85), Điều 79 (0,83)", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "279f66e2", "rank": 1, "score": 0.856, "doc_id": "qcdt-2024", "dieu": 78, "khoan": [1, 2, 3, 4, 5, 6, 7], "hieu_luc": true}, {"chunk_id": "60d22e2c", "rank": 2, "score": 0.8518, "doc_id": "qcdt-2024", "dieu": 11, "khoan": [1, 2, 3, 4], "hieu_luc": true}, {"chunk_id": "4157be6b", "rank": 3, "score": 0.8298, "doc_id": "qcdt-2024", "dieu": 79, "khoan": [], "hieu_luc": true}]}]}
+
+id: 78
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "vs", "block": "vector_search"}
+
+id: 79
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 53 (0,84), Điều 2 (0,84), Điều 25 (0,83)", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "b108e456", "rank": 1, "score": 0.8388, "doc_id": "qcdt-2024", "dieu": 53, "khoan": [1, 2, 3, 4, 5, 6], "hieu_luc": true}, {"chunk_id": "cc91bd27", "rank": 2, "score": 0.836, "doc_id": "qcdt-2024", "dieu": 2, "khoan": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "hieu_luc": true}, {"chunk_id": "0c18d7b7", "rank": 3, "score": 0.8326, "doc_id": "qcdt-2024", "dieu": 25, "khoan": [1, 2, 3, 4, 5, 6], "hieu_luc": true}]}]}
+
+id: 80
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "pk", "block": "context_packer"}
+
+id: 81
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 927/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 1, "facts": [{"kind": "pack", "included": ["b108e456", "f1b36cbe", "1daa4def"], "dropped": [], "tokens": {"docs": 910, "query": 17, "total": 927, "budget": 3000}}]}
+
+id: 82
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "pk", "block": "context_packer"}
+
+id: 83
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 673/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 1, "facts": [{"kind": "pack", "included": ["279f66e2", "60d22e2c", "4157be6b"], "dropped": [], "tokens": {"docs": 650, "query": 23, "total": 673, "budget": 3000}}]}
+
+id: 84
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "pk", "block": "context_packer"}
+
+id: 85
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 1.323/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 2, "facts": [{"kind": "pack", "included": ["b108e456", "cc91bd27", "0c18d7b7"], "dropped": [], "tokens": {"docs": 1304, "query": 19, "total": 1323, "budget": 3000}}]}
+
+id: 86
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "llm", "block": "llm"}
+
+id: 87
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (1.143 vào, 560 ra token). Kết quả đã lưu.", "tokens": {"in": 1143, "out": 560}, "ms": 1, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": ["b108e456"], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94}]}
+
+id: 88
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "llm", "block": "llm"}
+
+id: 89
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (872 vào, 43 ra token). Kết quả đã lưu.", "tokens": {"in": 872, "out": 43}, "ms": 0, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": ["279f66e2"], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94}]}
+
+id: 90
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "llm", "block": "llm"}
+
+id: 91
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (1.565 vào, 478 ra token). Kết quả đã lưu.", "tokens": {"in": 1565, "out": 478}, "ms": 5, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": [], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94}]}
+
+id: 92
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "out", "block": "output"}
+
+id: 93
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 94
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "out", "block": "output"}
+
+id: 95
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 96
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "out", "block": "output"}
+
+id: 97
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 98
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h04", "status": "ok", "passed": true, "counted": true, "criteria": {"points": true, "cited": true, "no_fabrication": true, "no_forbidden": true}, "labels": []}
+
+id: 99
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-h05", "status": "ok", "passed": true, "counted": true, "criteria": {"points": true, "cited": true, "no_fabrication": true, "no_forbidden": true}, "labels": []}
+
+id: 100
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t01", "status": "ok", "passed": true, "counted": true, "criteria": {"refusal": true, "no_fabrication": true, "no_forbidden": true}, "labels": ["cite_missing", "abstained"]}
+
+id: 101
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "q", "block": "input"}
+
+id: 102
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "q", "block": "input", "status": "ok", "summary": "Nhận câu hỏi.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 103
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "vs", "block": "vector_search"}
+
+id: 104
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "vs", "block": "vector_search", "status": "ok", "summary": "Lấy 3 đoạn: Điều 67 (0,84), Điều 59 (0,82), Điều 60 (0,82)", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "retrieved", "items": [{"chunk_id": "c18ccf16", "rank": 1, "score": 0.8429, "doc_id": "qcdt-2024", "dieu": 67, "khoan": [], "hieu_luc": true}, {"chunk_id": "d2e8d408", "rank": 2, "score": 0.8189, "doc_id": "qcdt-2024", "dieu": 59, "khoan": [1, 2, 3], "hieu_luc": true}, {"chunk_id": "bb4aba0e", "rank": 3, "score": 0.8183, "doc_id": "qcdt-2024", "dieu": 60, "khoan": [1, 2], "hieu_luc": true}]}]}
+
+id: 105
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "pk", "block": "context_packer"}
+
+id: 106
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "pk", "block": "context_packer", "status": "ok", "summary": "Thùng: 267/3.000 token. Bị cắt: 0 đoạn.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": [{"kind": "pack", "included": ["c18ccf16", "d2e8d408", "bb4aba0e"], "dropped": [], "tokens": {"docs": 243, "query": 24, "total": 267, "budget": 3000}}]}
+
+id: 107
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "llm", "block": "llm"}
+
+id: 108
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "llm", "block": "llm", "status": "ok", "summary": "Trợ lý trả lời (428 vào, 391 ra token). Kết quả đã lưu.", "tokens": {"in": 428, "out": 391}, "ms": 1, "facts": [{"kind": "llm", "stop_reason": "end", "cited_ids": [], "replayed": true, "model": "gemini-3.5-flash-lite", "system_tokens": 94}]}
+
+id: 109
+event: step.started
+data: {"type": "step.started", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "out", "block": "output"}
+
+id: 110
+event: step.finished
+data: {"type": "step.finished", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "node": "out", "block": "output", "status": "ok", "summary": "Đã ghi câu trả lời.", "tokens": {"in": 0, "out": 0}, "ms": 0, "facts": []}
+
+id: 111
+event: case.graded
+data: {"type": "case.graded", "run": "db839cb99bc74c2e817042679d9b070c", "case": "lib-l1-t02", "status": "ok", "passed": true, "counted": true, "criteria": {"refusal": true, "no_fabrication": true, "no_forbidden": true}, "labels": ["cite_missing", "abstained"]}
+
+id: 112
+event: run.scored
+data: {"type": "run.scored", "run": "db839cb99bc74c2e817042679d9b070c", "score": {"stars": 3, "s1": true, "s2": true, "s3": true, "normal_passed": 8, "normal_total": 8, "traps_passed": 2, "traps_total": 2, "tokens": 10262, "budget": 15000}}
+
+id: 113
+event: run.finished
+data: {"type": "run.finished", "run": "db839cb99bc74c2e817042679d9b070c", "report": {"gold": {"lib-l1-v01": {"gold_chunks": ["e004ac54"], "ranks": {"vs": 1}, "in_pack": true, "flags": []}, "lib-l1-v02": {"gold_chunks": ["1daa4def"], "ranks": {"vs": 1}, "in_pack": true, "flags": []}, "lib-l1-v03": {"gold_chunks": ["1b4d2d24"], "ranks": {"vs": 1}, "in_pack": true, "flags": []}, "lib-l1-h01": {"gold_chunks": ["0ca11021"], "ranks": {"vs": 3}, "in_pack": true, "flags": []}, "lib-l1-h02": {"gold_chunks": ["c48de891"], "ranks": {"vs": 2}, "in_pack": true, "flags": []}, "lib-l1-h03": {"gold_chunks": ["65163a94"], "ranks": {"vs": 1}, "in_pack": true, "flags": []}, "lib-l1-h04": {"gold_chunks": ["b108e456"], "ranks": {"vs": 1}, "in_pack": true, "flags": []}, "lib-l1-h05": {"gold_chunks": ["279f66e2"], "ranks": {"vs": 1}, "in_pack": true, "flags": []}, "lib-l1-t01": {"gold_chunks": [], "ranks": {}, "in_pack": false, "flags": []}, "lib-l1-t02": {"gold_chunks": [], "ranks": {}, "in_pack": false, "flags": []}}, "diagnosis": []}, "models": {"gemini-3.5-flash-lite": 10}}
+

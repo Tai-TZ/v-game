@@ -1,0 +1,100 @@
+id: 1
+event: run.started
+data: {"type":"run.started","run":"0123456789abcdef0123456789abcdef","level":"grounded-citation","cases":[{"id":"lib-l1-v01","role":"visible","vai":"su-kien","question":"Em muốn bảo lưu kết quả học tập một học kỳ thì cần làm gì?"},{"id":"lib-l1-t01","role":"trap","vai":"dieu-khong-ton-tai"}],"ingestion":[{"node":"ix","variant":"theo_dieu-512-10","chunks":118,"avg_tokens":262}]}
+
+id: 2
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"q","block":"input"}
+
+id: 3
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"q","block":"input","status":"ok","summary":"Nhận câu hỏi.","tokens":{"in":0,"out":0},"ms":1,"facts":[]}
+
+id: 4
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"q","block":"input"}
+
+id: 5
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"q","block":"input","status":"ok","summary":"Nhận câu hỏi.","tokens":{"in":0,"out":0},"ms":1,"facts":[]}
+
+id: 6
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"vs","block":"vector_search"}
+
+id: 7
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"vs","block":"vector_search","status":"ok","summary":"Lấy 3 đoạn: Điều 13 (0,86), Điều 14 (0,81), Điều 35 (0,79).","tokens":{"in":0,"out":0},"ms":41,"facts":[{"kind":"retrieved","items":[{"chunk_id":"a1b2c3d4","rank":1,"score":0.86,"doc_id":"qcdt-2024","dieu":13,"khoan":[1],"hieu_luc":true},{"chunk_id":"b2c3d4e5","rank":2,"score":0.81,"doc_id":"qcdt-2024","dieu":14,"khoan":[1],"hieu_luc":true},{"chunk_id":"c3d4e5f6","rank":3,"score":0.79,"doc_id":"qcdt-2024","dieu":35,"khoan":[1],"hieu_luc":true}]}]}
+
+id: 8
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"vs","block":"vector_search"}
+
+id: 9
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"vs","block":"vector_search","status":"ok","summary":"Lấy 3 đoạn: Điều 84 (0,74), Điều 1 (0,72), Điều 2 (0,70).","tokens":{"in":0,"out":0},"ms":38,"facts":[{"kind":"retrieved","items":[{"chunk_id":"d4e5f6a7","rank":1,"score":0.74,"doc_id":"qcdt-2024","dieu":84,"khoan":[1],"hieu_luc":true},{"chunk_id":"e5f6a7b8","rank":2,"score":0.72,"doc_id":"qcdt-2024","dieu":1,"khoan":[1],"hieu_luc":true},{"chunk_id":"f6a7b8c9","rank":3,"score":0.7,"doc_id":"qcdt-2024","dieu":2,"khoan":[1],"hieu_luc":true}]}]}
+
+id: 10
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"pk","block":"context_packer"}
+
+id: 11
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"pk","block":"context_packer","status":"ok","summary":"Thùng: 812/3.000 token. Bị cắt: 0 đoạn.","tokens":{"in":0,"out":0},"ms":1,"facts":[{"kind":"pack","included":["a1b2c3d4","b2c3d4e5","c3d4e5f6"],"dropped":[],"tokens":{"docs":790,"query":22,"total":812,"budget":3000}}]}
+
+id: 12
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"pk","block":"context_packer"}
+
+id: 13
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"pk","block":"context_packer","status":"ok","summary":"Thùng: 705/3.000 token. Bị cắt: 0 đoạn.","tokens":{"in":0,"out":0},"ms":1,"facts":[{"kind":"pack","included":["d4e5f6a7","e5f6a7b8","f6a7b8c9"],"dropped":[],"tokens":{"docs":688,"query":17,"total":705,"budget":3000}}]}
+
+id: 14
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"llm","block":"llm"}
+
+id: 15
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"llm","block":"llm","status":"ok","summary":"Trợ lý trả lời (1.180 vào, 150 ra token). Kết quả đã lưu.","tokens":{"in":1180,"out":150},"ms":2310,"facts":[{"kind":"llm","stop_reason":"end","cited_ids":["a1b2c3d4"],"replayed":true,"model":"gemini-3.5-flash-lite","system_tokens":96,"answer":"Bạn nộp đơn xin bảo lưu cho phòng đào tạo trước khi học kỳ bắt đầu [a1b2c3d4]."}]}
+
+id: 16
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"llm","block":"llm"}
+
+id: 17
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"llm","block":"llm","status":"ok","summary":"Trợ lý trả lời (1.020 vào, 40 ra token).","tokens":{"in":1020,"out":40},"ms":1980,"facts":[{"kind":"llm","stop_reason":"end","cited_ids":[],"replayed":false,"model":"gemini-3.5-flash-lite","system_tokens":96}]}
+
+id: 18
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"out","block":"output"}
+
+id: 19
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","node":"out","block":"output","status":"ok","summary":"Đã ghi câu trả lời.","tokens":{"in":0,"out":0},"ms":1,"facts":[]}
+
+id: 20
+event: case.graded
+data: {"type":"case.graded","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-v01","status":"ok","passed":true,"counted":true,"criteria":{"points":true,"cited":true,"no_fabrication":true,"no_forbidden":true},"labels":[]}
+
+id: 21
+event: step.started
+data: {"type":"step.started","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"out","block":"output"}
+
+id: 22
+event: step.finished
+data: {"type":"step.finished","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","node":"out","block":"output","status":"ok","summary":"Đã ghi câu trả lời.","tokens":{"in":0,"out":0},"ms":1,"facts":[]}
+
+id: 23
+event: case.graded
+data: {"type":"case.graded","run":"0123456789abcdef0123456789abcdef","case":"lib-l1-t01","status":"ok","passed":true,"counted":true,"criteria":{"refusal":true,"no_fabrication":true,"no_forbidden":true},"labels":["cite_missing","abstained"]}
+
+id: 24
+event: run.scored
+data: {"type":"run.scored","run":"0123456789abcdef0123456789abcdef","score":{"stars":1,"s1":true,"s2":true,"s3":false,"normal_passed":1,"normal_total":1,"traps_passed":1,"traps_total":1,"tokens":2390,"budget":15000}}
+
+id: 25
+event: run.finished
+data: {"type":"run.finished","run":"0123456789abcdef0123456789abcdef","report":{"gold":{"lib-l1-v01":{"gold_chunks":["a1b2c3d4"],"ranks":{"vs":1},"in_pack":true,"flags":[]},"lib-l1-t01":{"gold_chunks":[],"ranks":{"vs":null},"in_pack":false,"flags":[]}},"diagnosis":[]},"models":{"gemini-3.5-flash-lite":2}}
+

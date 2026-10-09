@@ -38,4 +38,15 @@ test.describe("QA regressions", () => {
       ),
     ).toBe(true);
   });
+
+  test("a focus ring shows in its own colour at once, without fading in", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/play/library");
+    const back = page.getByRole("banner").getByRole("link").first();
+    await back.focus();
+    // transition-colors also animates outline-color: the ring faded in from the text colour.
+    expect(await back.evaluate((el) => getComputedStyle(el).transitionProperty)).not.toMatch(
+      /outline/,
+    );
+  });
 });

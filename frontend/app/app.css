@@ -15,6 +15,8 @@
   --animate-leave: vg-leave 200ms ease-in forwards;
   /* The scene loader's waited logo block: the only loop, and only while loading (art §7). */
   --animate-hover: vg-hover 1.2s ease-in-out infinite alternate;
+  /* The page-loading bar of PageFrame and the bench (workbench); also only while loading. */
+  --animate-poster-bar: vg-poster-bar 1.2s linear infinite;
 
   @keyframes vg-enter {
     from {
@@ -35,6 +37,14 @@
   @keyframes vg-hover {
     to {
       transform: translateY(-2px);
+    }
+  }
+  @keyframes vg-poster-bar {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
     }
   }
 }

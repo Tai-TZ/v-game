@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import * as v from "valibot";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -37,11 +37,13 @@ const zone = (id: string): Zone => {
 };
 
 function renderPage(data: ZonePageData, onRetry = vi.fn()) {
+  // A data router: the page frame reads the navigation and revalidation state.
+  const router = createMemoryRouter([
+    { path: "*", element: <ZonePage data={data} onRetry={onRetry} /> },
+  ]);
   render(
     <ThemeProvider catalog={catalog}>
-      <MemoryRouter>
-        <ZonePage data={data} onRetry={onRetry} />
-      </MemoryRouter>
+      <RouterProvider router={router} />
     </ThemeProvider>,
   );
   return onRetry;
@@ -50,16 +52,20 @@ function renderPage(data: ZonePageData, onRetry = vi.fn()) {
 afterEach(cleanup);
 
 describe("ZonePage", () => {
-  it("lists the open zone's levels in order, each with a disabled 'Đang xây' button", () => {
+  it("lists the open zone's levels in order, each with a 'Vào màn' link to its workbench", () => {
     renderPage({ kind: "open", zone: zone("library") });
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1, name: "Thư viện" })).toBeDefined();
     const titles = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(titles).toEqual(["Thôi bịa điều luật", "Lược dao chunk", "Hỏi bằng số điều"]);
-    const building = screen.getAllByRole("button", { name: "Đang xây" });
-    expect(building).toHaveLength(3);
-    for (const button of building) expect((button as HTMLButtonElement).disabled).toBe(true);
+    const enter = screen.getAllByRole("link", { name: /^Vào màn / });
+    expect(enter.map((link) => link.getAttribute("href"))).toEqual([
+      "/play/library/grounded-citation",
+      "/play/library/chunk-tuning",
+      "/play/library/article-number-lookup",
+    ]);
+    expect(screen.queryByRole("button", { name: "Đang xây" })).toBeNull();
     expect(screen.getAllByText("Sự cố")).toHaveLength(1);
 
     const back = screen.getAllByRole("link", { name: "Về khuôn viên" });

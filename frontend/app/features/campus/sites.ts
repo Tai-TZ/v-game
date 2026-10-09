@@ -19,6 +19,9 @@ const FALLBACK_NAME: Readonly<Record<ZoneLocation, string>> = {
   market: "Chợ model",
 };
 
+/** Level cô Lan's dialog opens: "Dạy trợ lý tra sách" (workbench-v0.1 §8.1). */
+export const FIRST_LIBRARY_LEVEL = "grounded-citation";
+
 export interface SiteInfo {
   location: ZoneLocation;
   /** Zone id for `/play/:zoneId`; the seed uses the location as the id. */

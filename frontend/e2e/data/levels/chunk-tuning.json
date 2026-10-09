@@ -1,0 +1,139 @@
+{
+  "id": "chunk-tuning",
+  "version": 1,
+  "zone": "library",
+  "title": "Lược dao chunk",
+  "brief": "Câu trả lời bị cụt hoặc lạc đề. Chỉnh kích thước chunk, độ chồng lấp và top-k cho đến khi agent lấy đủ ngữ cảnh.",
+  "kind": "standard",
+  "corpus": ["qcdt-2024", "qcdt-2019"],
+  "allowed_blocks": [
+    "input",
+    "output",
+    "corpus",
+    "chunker",
+    "vector_search",
+    "context_packer",
+    "llm"
+  ],
+  "locked_nodes": ["q", "kb", "out"],
+  "param_limits": {
+    "vector_search.top_k": {
+      "ge": 1.0,
+      "le": 10.0
+    },
+    "vector_search.score_threshold": {
+      "ge": 0.0,
+      "le": 0.9,
+      "multiple_of": 0.05
+    },
+    "context_packer.token_budget": {
+      "const": 3000
+    },
+    "context_packer.on_overflow": {
+      "const": "cat_duoi"
+    },
+    "llm.profile": {
+      "const": "can_bang"
+    }
+  },
+  "prompt_cards": {
+    "G1": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.",
+    "G2": "Sau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.",
+    "G3": "Nếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»",
+    "G4": "Xưng «mình», gọi người hỏi là «bạn», giọng thân thiện.",
+    "G5": "Luôn đưa ra câu trả lời hữu ích nhất có thể, kể cả khi phải suy đoán.",
+    "G6": "Trả lời thật đầy đủ, càng chi tiết càng tốt."
+  },
+  "starter_graph": {
+    "schema": 1,
+    "nodes": [
+      {
+        "id": "q",
+        "type": "input",
+        "params": {}
+      },
+      {
+        "id": "kb",
+        "type": "corpus",
+        "params": {}
+      },
+      {
+        "id": "ix",
+        "type": "chunker",
+        "params": {
+          "strategy": "co_dinh",
+          "chunk_size": 128,
+          "overlap_pct": 0,
+          "only_in_force": false
+        }
+      },
+      {
+        "id": "vs",
+        "type": "vector_search",
+        "params": {
+          "top_k": 3,
+          "score_threshold": 0
+        }
+      },
+      {
+        "id": "pk",
+        "type": "context_packer",
+        "params": {
+          "token_budget": 3000,
+          "on_overflow": "cat_duoi",
+          "cite_ids": true
+        }
+      },
+      {
+        "id": "llm",
+        "type": "llm",
+        "params": {
+          "profile": "can_bang",
+          "system_prompt": "Chỉ dùng thông tin trong các đoạn tài liệu được đưa kèm.\nSau mỗi ý, ghi mã đoạn đã dùng trong ngoặc vuông.\nNếu các đoạn tài liệu không có câu trả lời, chỉ nói: «Quy chế hiện hành không có thông tin này.»"
+        }
+      },
+      {
+        "id": "out",
+        "type": "output",
+        "params": {}
+      }
+    ],
+    "edges": [
+      ["q.query", "vs.query"],
+      ["ix.index", "vs.index"],
+      ["vs.docs", "pk.docs"],
+      ["q.query", "pk.query"],
+      ["pk.context", "llm.context"],
+      ["llm.answer", "out.answer"]
+    ],
+    "ui": null
+  },
+  "budget_metric": "tokens",
+  "token_budget": 20000,
+  "stars_vi": [
+    "Ít nhất 8/10 câu thường đạt, bắt buộc có câu của Hà (câu #1).",
+    "Có sao 1 và cả lượt chạy tốn không quá 20.000 token.",
+    "Có sao 1, ba câu bẫy đều đạt và không câu nào mang văn bản hết hiệu lực vào thùng."
+  ],
+  "visible_cases": [
+    {
+      "id": "lib-l2-v01",
+      "vai": "ngoai-le-khoan-sau",
+      "question": "Hạn chót nộp đơn bảo lưu là lúc nào vậy ạ? Nếu em lỡ nộp trễ hạn thì còn được xét không?"
+    },
+    {
+      "id": "lib-l2-v02",
+      "vai": "cau-dai",
+      "question": "Điều kiện để được xét tốt nghiệp gồm những gì ạ?"
+    },
+    {
+      "id": "lib-l2-v03",
+      "vai": "don-gian",
+      "question": "Chuẩn đầu ra tin học là gì, thi ở đâu ạ?"
+    }
+  ],
+  "case_counts": {
+    "normal": 10,
+    "trap": 3
+  }
+}
