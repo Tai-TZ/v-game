@@ -330,7 +330,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           highlight={highlight}
           view={benchView}
           saved={saved}
-          discarded={initial.discarded}
+          // Gone once an edit is saved: the two notices would contradict each other.
+          discarded={initial.discarded && !saved}
         />
         <aside
           aria-label="Mở ca và lượt chạy"
