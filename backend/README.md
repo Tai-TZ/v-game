@@ -135,8 +135,6 @@ Read from the process environment, or from `backend/.env` (see `.env.example`).
 | `CONTENT_DIR`         | `<repo>/docs/content`                       | corpus and golden files                               |
 | `EMBED_MODEL`         | `intfloat/multilingual-e5-large`            | rebuild the index after changing it                   |
 | `RERANK_MODEL`        | `jinaai/jina-reranker-v2-base-multilingual` | CC-BY-NC-4.0 licence                                  |
-| `WEATHER_LATITUDE`    | `21.0285`                                   | campus place; change together with the theme `place`  |
-| `WEATHER_LONGITUDE`   | `105.8542`                                  | campus place; change together with the theme `place`  |
 
 ## Docker
 

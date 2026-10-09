@@ -78,7 +78,7 @@ app/
 | `/play` ≤ 300 kB gzip ¹ | 292,8 kB (2026-10-09, sau giờ thật và thời tiết: +3,8 kB cho `sky.ts`, chip, lớp phủ, 9 icon; trước đó khoảng 289 kB) | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
 | ≤ 40 draw call, ≤ 60k tam giác | v0.4: 14 khi còn tượng, 17 khi bộ nhân vật Kenney đã tải (6 SkinnedMesh + x-ray người chơi); ban ngày 22 177 / 19 032 (tượng) và 26 112 (campus) / 22 967 (town) (bộ nhân vật), đo bằng `sceneBudget()` | `scene.test.ts` (fail nếu > 20 hoặc > 28 000; trước v0.4 là 16 và 23 000). Xoay 360° (v0.4) không thêm draw call hay tam giác; `scene.test.ts` còn kiểm khung `ORBIT_FRAME` và góc HUD ở mọi yaw |
 | `frameloop="demand"` | không frame khi đứng yên, kể cả lúc mưa dông ban đêm (mưa và chớp là CSS) | `e2e/play.spec.ts`, `e2e/weather.spec.ts` với `?debug=frames` |
-| Thời tiết | +0 draw call, +0 program, +0 tam giác trên cả 20 look; dựng lại khoảng 6 lần/ngày; 1 GET cùng origin khi vào hub rồi 30 phút/lần khi tab hiện; `rain.svg` < 1 kB nhúng `data:` | `scene.test.ts` (trần 18 draw call / 34 500 tam giác, tường orbit trên mọi look), `useSkyClock.test.ts`, `weather.spec.ts` |
+| Thời tiết | +0 draw call, +0 program, +0 tam giác trên cả 20 look; dựng lại khoảng 6 lần/ngày; 1 GET tới api.open-meteo.com khi vào hub rồi 30 phút/lần khi tab hiện; `rain.svg` < 1 kB nhúng `data:` | `scene.test.ts` (trần 18 draw call / 34 500 tam giác, tường orbit trên mọi look), `useSkyClock.test.ts`, `weather.spec.ts` |
 | Không shadow map / postprocessing | — | `scene.test.ts` grep `app/features/campus` |
 | DPR | `dpr={[1, 2]}`, `[1, 1.5]` khi `(pointer: coarse)` hoặc < 768 px | xem dưới |
 | Dispose khi đổi theme | — | `scene.test.ts` |
