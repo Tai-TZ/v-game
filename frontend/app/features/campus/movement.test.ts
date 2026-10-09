@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { toScreen } from "./camera";
 import { OBSTACLES, SITES, SPAWN, WORLD_BOUNDS, type Box } from "./layout";
 import { isBlocked, keyboardDirection, nearestWithin, step, WALK_SPEED } from "./movement";
 
@@ -16,6 +17,41 @@ describe("keyboardDirection", () => {
     const up = keyboardDirection(["KeyW"]);
     expect(up && Math.hypot(up.x, up.z)).toBeCloseTo(1);
     expect(keyboardDirection(["KeyW", "KeyS"])).toBeNull();
+  });
+
+  it("walks world (-1, -1)/√2 for up at the home view", () => {
+    const up = keyboardDirection(["ArrowUp"]);
+    expect(up?.x).toBeCloseTo(-Math.SQRT1_2, 12);
+    expect(up?.z).toBeCloseTo(-Math.SQRT1_2, 12);
+  });
+
+  it("follows the screen axes of the current view (orbit-camera §2.5)", () => {
+    const keys = [
+      ["ArrowUp", "KeyW", 0, 1],
+      ["ArrowDown", "KeyS", 0, -1],
+      ["ArrowLeft", "KeyA", -1, 0],
+      ["ArrowRight", "KeyD", 1, 0],
+    ] as const;
+    for (let d = 0; d < 360; d += 10) {
+      const yaw = (d * Math.PI) / 180;
+      for (const [arrow, letter, right, up] of keys) {
+        const direction = keyboardDirection([arrow], yaw);
+        expect(keyboardDirection([letter], yaw)).toEqual(direction);
+        if (!direction) throw new Error(`${arrow} at ${d}° walks nowhere`);
+        const moved = toScreen(direction.x, 0, direction.z, yaw);
+        const at = `${arrow} at ${d}°`;
+        expect(moved.sx, at).toBeCloseTo(right * Math.hypot(moved.sx, moved.sy), 9);
+        expect(Math.sign(Math.round(moved.sy * 1e9)), at).toBe(up);
+      }
+    }
+  });
+
+  it("passes the view's yaw from step to the keys", () => {
+    const yaw = (200 * Math.PI) / 180;
+    const moved = step({ x: 0, z: 0 }, { keys: ["ArrowUp"], target: null, yaw }, 0.1, [], BOUNDS);
+    const screen = toScreen(moved.position.x, 0, moved.position.z, yaw);
+    expect(screen.sx).toBeCloseTo(0, 9);
+    expect(screen.sy).toBeGreaterThan(0);
   });
 });
 

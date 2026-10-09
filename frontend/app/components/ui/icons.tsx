@@ -74,3 +74,56 @@ export function AlertIcon({ className = ICON }: { className?: string }) {
     </svg>
   );
 }
+
+/** Turn the campus view (orbit-camera §2.3): an arc with its arrowhead at the top left. */
+export function RotateCcwIcon({ className = ICON }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
+      <path
+        d="M4 10a6 6 0 1 0 1.8-4.3L4 7.5m0-4v4h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function RotateCwIcon({ className = ICON }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
+      <path
+        d="M16 10a6 6 0 1 1-1.8-4.3L16 7.5m0-4v4h-4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A compass whose needle (`needleRef`) the caller turns; at rest it points up. */
+export function CompassIcon({
+  className = ICON,
+  needleRef,
+}: {
+  className?: string;
+  needleRef?: (element: SVGGElement | null) => void;
+}) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className={className} fill="none">
+      <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
+      <g ref={needleRef} className="origin-center [transform-box:fill-box]">
+        <path d="M10 4.75 12 10H8Z" fill="currentColor" />
+        <path
+          d="M10 15.25 8 10h4Z"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinejoin="round"
+        />
+      </g>
+    </svg>
+  );
+}
