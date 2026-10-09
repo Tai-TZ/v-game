@@ -1,5 +1,6 @@
 > **Trạng thái:** Bản thiết kế, chưa triển khai; cần sửa các vấn đề ở cuối trước khi code engine.
 > **Nguồn:** bản cuối của Phần 3 và báo cáo của agent phản biện, chép nguyên văn (chỉ hạ cấp tiêu đề của báo cáo phản biện). "Phần 4" (evaluator) và "Phần 5" (giáo viên duyệt level) được nhắc trong bài nhưng chưa có tài liệu.
+> **Sửa 2026-10-08:** nguyên tắc 5 ("không gợi ý gì trước khi chạy") được nới bởi [roadmap-v0.4](roadmap-v0.4.md) X11: xem trước tất định được phép nhưng chỉ hiện hạng, cosine và chữ của đoạn, không bao giờ đánh dấu đoạn đáp án; đáp án chỉ lộ sau `run.finished`. Thân bài dưới đây giữ nguyên văn.
 > **Liên quan:** [Đặc tả tổng hợp](../specs/2026-10-07-v-game-design.md) · [Hướng gameplay đề xuất](gameplay-direction.md) · [ADR 0003](../adr/0003-backend-stack.md)
 
 # Phần 3. Hệ khối và cách dựng agent từ khối
@@ -79,7 +80,7 @@ Mỗi level có:
 - một **starter graph** chạy được ngay;
 - một palette chỉ gồm các khối được phép.
 
-M1 chạy ở chế độ dẫn dắt: bố cục tự động, khối thả gần một cổng hợp lệ thì tự nối. Từ M2 trở đi người chơi nối tự do. Hai level sự cố (M3, L3) bắt đầu từ bản sao lời giải tốt nhất của người chơi ở level trước, và gợi ý đầu tiên là "chạy lại lời giải cũ" để thấy nó vỡ.
+M1 chạy ở chế độ dẫn dắt: bố cục tự động, khối thả gần một cổng hợp lệ thì tự nối. Từ M2 trở đi người chơi nối tự do. Hai level sự cố (M3, L3) bắt đầu từ bản sao lời giải tốt nhất của người chơi ở level trước, và gợi ý đầu tiên là "chạy lại lời giải cũ" để thấy nó vỡ (L3 làm việc này bằng chiếu đèn miễn phí trên lời giải cũ, không chạy lượt thật, vì mỗi lượt tốn quỹ ngày; sửa 2026-10-08, rà soát vòng 6, [L3 §11](../content/scenarios/library-l3-article-number-lookup.md#11-chẩn-đoán-và-gợi-ý)).
 
 Bảng dưới đây cũng chính là danh sách các cấu hình **được chạy để thất bại**.
 

@@ -9,7 +9,7 @@
 
 - **Tuỳ chọn, không chặn tiến độ, không tính sao.** Điểm dạy lại là số đo mức hiểu, tách khỏi số sao (research: "Tin vào số sao" là bẫy).
 - **Không viết bài luận.** Mọi ô chấm điểm là menu hoặc ô có cấu trúc, nên máy chấm được. Có thêm một ô ghi chú tự do ≤ 140 ký tự, không chấm, giáo viên đọc được.
-- **Bằng chứng lấy từ vết chạy thật của chính người chơi.** Hệ thống sinh 4 thẻ bằng chứng từ facts của lần chạy người chơi chọn: 1–2 thẻ quyết định, còn lại là dữ kiện đúng nhưng không liên quan. Nếu run của người chơi không có tình huống cần hỏi (ví dụ họ không bao giờ trượt), dùng run đã ghi của cấu hình khởi đầu, đóng tem "kết quả đã lưu".
+- ~~**Bằng chứng lấy từ vết chạy thật của chính người chơi.**~~ **Bằng chứng lấy từ vết chạy thật** (sửa 2026-10-08, rà soát vòng 5, theo [L1 §13](library-l1-grounded-citation.md#13-dạy-lại) và N4): lượt đã ghi mở màn level, tức lần chạy 1, hoặc các lượt thật của chính người chơi. Hệ thống sinh 4 thẻ bằng chứng từ facts của lượt người chơi chọn: 1–2 thẻ quyết định, còn lại là dữ kiện đúng nhưng không liên quan. Thẻ lấy từ lượt đã ghi mang tem "Lượt chạy đã ghi"; ở L2, L3 lượt đó là của lời giải mẫu level trước, nên thẻ ghi rõ "lời giải mẫu, không phải cấu hình của bạn" ([frontend architecture §8.4](../../design/frontend-architecture.md#84-tem-nguồn-và-trung-thực-số-liệu)). ~~Nếu run của người chơi không có tình huống cần hỏi (ví dụ họ không bao giờ trượt), dùng run đã ghi của cấu hình khởi đầu, đóng tem "kết quả đã lưu".~~
 - **Thời lượng:** 2–3 phút.
 
 **Phản ứng của Bống theo điểm** (tổng 8):
@@ -47,7 +47,7 @@ Bống hỏi: "Hôm qua trợ lý nói về Điều 47, ca sáng hỏi em vì sa
 | Tiêu chí | 2 điểm | 1 điểm | 0 điểm |
 |---|---|---|---|
 | **B. Cơ chế** | "Thùng không có đoạn tài liệu nào, model lấp chỗ trống bằng một câu nghe hợp lý" | "Trợ lý chưa có bước truy xuất" (đúng thành phần, chưa nói vì sao lại bịa) | "Model quá yếu, cần model lớn hơn" · "Câu hỏi của Minh mơ hồ" |
-| **C. Bằng chứng** (thẻ từ lần chạy 1) | Quyết định: "Thùng câu #1: tài liệu 0 token" · "Câu trả lời #1 nhắc Điều 47, thùng không có điều nào" | (theo luật ô C) | Không liên quan: "Câu #1 tốn 740 token" · "Ca bẫy đạt 2/2" |
+| **C. Bằng chứng** (thẻ từ lượt đã ghi, tức lần chạy 1; sửa 2026-10-08) | Quyết định: "Thùng câu #1: tài liệu 0 token" · "Câu trả lời #1 nhắc Điều 47, thùng không có điều nào" | (theo luật ô C) | Không liên quan: "Câu #1 tốn 740 token" · "Ca bẫy đạt 2/2" |
 | **D. Sửa** (chọn nhiều) | Có **cả** "Gắn Vòm Sao (`vector_search`)" **và** "Bật tem (`cite_ids`)", không chọn "Đổi Bộ Óc lớn hơn" hay "Móc kéo lên 10" | Chỉ có "Gắn Vòm Sao" | Không có truy xuất, hoặc chỉ "Đổi Bộ Óc lớn hơn" |
 | **E. Giới hạn** | "Khi kho không có câu trả lời: lúc đó trợ lý phải biết nói 'không có'" **hoặc** "Khi Vòm Sao lấy sai đoạn, đoạn đúng không vào thùng" | — | "Không bao giờ, có truy xuất là hết bịa" · "Khi câu hỏi bằng tiếng Anh" |
 
@@ -71,19 +71,19 @@ Bống hỏi: "Em chỉnh lược 128 cho gọn mà sao hỏng ạ? Lần sau em
 
 | Tiêu chí | 2 điểm | 1 điểm | 0 điểm |
 |---|---|---|---|
-| **B. Cơ chế** (câu của Hà) | "Cắt 128 làm khoản 3 (ngoại lệ) rơi sang đoạn khác, và đoạn đó không được kéo về" | "Đoạn quá nhỏ" · "top_k quá thấp" (đúng một phần) | "Model không đọc kỹ" |
-| **C. Bằng chứng** | Quyết định: "Điều 12 ở 128/0: khoản 2 ở đoạn {a}, khoản 3 ở đoạn {b}; đoạn {b} hạng {r} > K" | (theo luật ô C) | Không liên quan: "Thùng câu #1: 1.100/3.000 token" · "Câu #2 tốn ít token nhất" · "Ca bẫy có giấy 2019" (đúng nhưng là lỗi khác) |
+| **B. Cơ chế** (câu của Hà và câu #2) | ~~"Cắt 128 làm khoản 3 (ngoại lệ) rơi sang đoạn khác, và đoạn đó không được kéo về"~~ "Cắt 128 xẻ một ý ra nhiều mảnh: câu đáp án dài bị cắt ngang ở ranh giới đoạn, khoản 3 (ngoại lệ) đứng tách khỏi khoản 2, nên mỗi đoạn chỉ mang nửa ý" | "Đoạn quá nhỏ" (đúng thành phần, chưa nói vì sao hỏng) · "top_k quá thấp nên khoản 3 không được kéo về" (chỉ đúng khi Móc kéo ít hơn số mảnh, như `top_k` 1; ở bản ghi 128/0 cả hai khoản đều được kéo về) | "Model không đọc kỹ" |
+| **C. Bằng chứng** | Quyết định (sửa 2026-10-08, rà soát vòng 6: chỉ dùng điều bản ghi cho thấy được): "Điều 68 ở 128/0: câu đáp án của câu #2 bị cắt ngang giữa đoạn {a} và đoạn {b}" (`ret.boundary_split` của `lib-l2-v02`, tất định) · "Điều 12 ở 128/0: khoản 2 ở đoạn {a}, khoản 3 ở đoạn {b}" (hai mảnh của một ý, tất định). ~~"…; đoạn {b} hạng {r} > K"~~ Thẻ "khoản 3 ở đoạn {b}, hạng {r} > K" chỉ sinh từ một lượt thật của người chơi mà v01 có `ret.gold_missing` (ví dụ `top_k` 1) | (theo luật ô C) | Không liên quan: "Thùng câu #1: 1.100/3.000 token" · "Câu #3 tốn ít token nhất" · "Ca bẫy có giấy 2019" (đúng nhưng là lỗi khác) |
 | **D. Sửa** (cấu trúc: strategy, size, overlap, top_k, lọc) | (`theo_dieu`, size ≥ 256) **hoặc** (`co_dinh`, size ≥ 512, overlap ≥ 10); **và** top_k ≤ 5; **và** bật lọc hiệu lực | Sửa đúng phần chunk nhưng top_k ≥ 8 hoặc không bật lọc | Chỉ tăng top_k lên 10 |
 | **E. Hiểu lầm top-k:** "Nếu chỉ kéo Móc kéo lên 10 thì…" | "Thùng đầy, đoạn thừa đẩy đoạn đúng ra ngoài và kéo cả bản 2019 vào; token tăng" | "Tốn token hơn, đúng hay không còn tuỳ" | "Chắc chắn hơn vì lấy được nhiều hơn" · "Không đổi gì" |
 
 **Bài mạnh (8/8):**
-- B: "Cắt 128 làm khoản 3 rơi sang đoạn khác…" → **2**.
-- C: thẻ "khoản 3 ở đoạn 8, hạng 11 > K = 3" → **2**.
+- B: "Cắt 128 xẻ một ý ra nhiều mảnh…" → **2**.
+- C: thẻ "Điều 68 ở 128/0: câu đáp án của câu #2 bị cắt ngang giữa đoạn 41 và đoạn 42" (từ lượt đã ghi) → **2**.
 - D: `theo_dieu`, 512, 10%, top_k 3, bật lọc → **2**.
 - E: "Thùng đầy, đoạn thừa đẩy đoạn đúng ra…" → **2**.
 
 **Bài yếu (2/8):**
-- B: "top_k quá thấp" → **1**.
+- B: "top_k quá thấp nên khoản 3 không được kéo về" → **1**.
 - C: chọn "Thùng câu #1: 1.100/3.000 token" → **0**.
 - D: giữ `co_dinh` 128/0, top_k 10, không lọc → **0**.
 - E: "Tốn token hơn, đúng hay không còn tuỳ" → **1**.

@@ -1,4 +1,5 @@
 > **Trạng thái:** Đề xuất, chờ chủ dự án duyệt. Nếu được duyệt, bàn thợ đồ chơi thay node editor tự do làm giao diện chính.
+> **Sửa 2026-10-08:** §5 từng ghi "temperature 0" cho các lượt chạy kiểm chứng. Lời khuyên này đã lỗi thời: engine không gửi temperature; trên Gemini 3, Google khuyên giữ mặc định 1,0; và temperature 0 cũng không làm output tất định. Thất bại dự định được kiểm bằng cổng hiệu chỉnh chạy model thật nhiều lần (Phần 3 §3.9). Xem [đặc tả §8.4](../specs/2026-10-07-v-game-design.md#84-llm) và [bản đồ phủ §3](../content/course-coverage.md#3-cập-nhật-2026-không-sửa-slide). Các mục cắt "9 mini-game tay" và "khởi động tay ≤ 60 giây" vẫn đứng; bài vi mô 1–3 phút là thẻ tuỳ chọn, không chặn đường vào level ([roadmap-v0.4](roadmap-v0.4.md) X18).
 > **Lưu ý:** đề xuất này còn lệch Phần 3 ở một số điểm (tên khối, mã level, guard, chọn model...); xem [bảng đối chiếu trong đặc tả](../specs/2026-10-07-v-game-design.md#132-điểm-lệch-giữa-đề-xuất-gameplay-và-phần-3). "Phần đề xuất prototype" nhắc ở dòng cuối chưa được đưa vào tài liệu này.
 
 # Xưởng Đồ Chơi Trực Ca
@@ -82,7 +83,7 @@ Người chơi không nối node. Họ nghịch vài món đồ chơi vật lý 
 - 6 đồ chơi lõi dùng lại: Thùng Context (cả 3 khu), Ghi ray, Máy Ép, Vòm Sao (cả 3 level Thư viện), Tường Thành (cả 3 level Tháp), Con Dấu.
 - Mỗi khái niệm chỉ một ẩn dụ: token là thể tích; chi phí là xu; câu có nguồn là gạch, không nguồn là bong bóng; bị chiếm lái là yêu tinh giấy; rò rỉ là bong bóng tin đồn.
 - 30–40 NPC, đường đi waypoint đặt tay.
-- Mỗi level được chạy kiểm chứng trước để thất bại dự định xảy ra thật; temperature 0.
+- Mỗi level được chạy kiểm chứng trước để thất bại dự định xảy ra thật; ~~temperature 0~~ (sửa 2026-10-08: không gửi temperature, xem ghi chú đầu file).
 - Làm vertical slice Thư viện trước.
 
 **Cắt khỏi MVP:**

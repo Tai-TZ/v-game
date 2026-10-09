@@ -14,7 +14,7 @@
 | Điều kiện vào | Không có (D1). Đây là level đầu tiên của game. L1 tự giới thiệu Thùng Context ở mức tối thiểu: thùng có cỡ cố định, thể tích là token |
 | Kho | `qcdt-2024` (Quy chế đào tạo trình độ đại học, Trường Đại học Sao Mai, còn hiệu lực). Không có bản 2019 |
 | Ca test | Nguồn sự thật: [`library-l1.json`](../golden/library-l1.json) (brief §4.2). 10 ca: `lib-l1-v01`–`v03` (thấy được), 5 ca ẩn `h01`–`h05`, `lib-l1-t01`, `lib-l1-t02` (bẫy, ẩn). Thêm 4 ca ôn `lib-l1-r01`–`r04` cho ca trực |
-| Thời lượng | lần chạy thật đầu tiên ở khoảng phút 1:30 (luôn trước phút 3); cả level 6–9 phút, thêm 60 giây kiểm tra cuối |
+| Thời lượng | ~~lần chạy thật đầu tiên ở khoảng phút 1:30 (luôn trước phút 3)~~ **Sửa 2026-10-08 (X11, N4):** cú vấp đầu tiên đến từ lượt đã ghi ở khoảng phút 1:30 (luôn trước phút 3); lượt thật đầu tiên là lượt Thử 3 câu mẫu ở khoảng phút 4:15. Cả level 6–9 phút thời gian chơi, thêm 60 giây kiểm tra cuối; ở quỹ P = 13 mỗi ngày, đủ 3 sao có thể trải qua vài ngày (mục 4) |
 
 ## 2. Mục tiêu học
 
@@ -43,33 +43,39 @@
 **Nhãn trung thực:** cảnh Tua lại ở nhịp 2 là ca đêm qua.
 - Nếu cổng phát hành ghi được một lần chạy thật của cấu hình khởi đầu ra đúng câu trên, cảnh đóng tem "kết quả đã lưu".
 - Nếu không, cảnh đóng tem "dựng lại để minh hoạ" (xem Câu hỏi mở 1).
+- **Tem theo danh sách cố định (sửa 2026-10-08, [frontend architecture §8.4](../../design/frontend-architecture.md#84-tem-nguồn-và-trung-thực-số-liệu)):** trên màn, "kết quả đã lưu" của một lượt đã ghi phát lại (ở mục này, L2, L3 và [dạy lại](teach-back.md)) hiện bằng tem "Lượt chạy đã ghi"; ca trúng cache giữa một lượt chạy thật thì không (mục 8); "dựng lại để minh hoạ" hiện bằng tem "Minh hoạ". Hai cụm cũ chỉ còn là chữ mô tả trong tài liệu.
 
-Lần chạy 1 của người chơi luôn là lần chạy thật, kể cả khi trúng cache phát lại.
+~~Lần chạy 1 của người chơi luôn là lần chạy thật, kể cả khi trúng cache phát lại.~~ **Sửa 2026-10-08 ([roadmap-v0.4](../../design/roadmap-v0.4.md) X11, N4):** lần chạy 1 là lượt đã ghi của cấu hình khởi đầu, phát lại cả 10 ca với tem "Lượt chạy đã ghi", 0 lời gọi. Lượt thật đầu tiên của người chơi là lượt Thử 3 câu mẫu, sau khi họ đã sửa (mục 4).
 
 ## 4. Beat sheet
 
 Lời thoại của cô Lan dùng nguyên văn. Mỗi lượt thoại tối đa 2 câu, hiện ở khung thoại DOM và có thể bỏ qua bằng Enter hoặc chạm.
+
+**Sửa 2026-10-08 ([roadmap-v0.4](../../design/roadmap-v0.4.md) X11, X26, N2, N4, N19; quỹ là chốt tạm, Q9).** Bảng dưới đã sửa tại chỗ ở nhịp 4, 5, 8, 9, 11 và hai dòng đường nhanh, đường chậm:
+- **Nhịp 2 và 5 là lượt đã ghi** của cấu hình khởi đầu (N4). Nhịp 2 phát câu của Minh; nhịp 5 phát cả 10 ca, tem "Lượt chạy đã ghi", 0 lời gọi, và che khoảng một phút Render thức dậy.
+- **Mỗi lần chạy thật là hai bước.** Trước hết là **Thử 3 câu mẫu** (`scope=mau`, 3 lời gọi, không tính sao, có phiếu mẫu ở mục 7). Run chấm sao chỉ mở khi cả 3 câu mẫu đạt, và tốn 7 lời gọi nếu cấu hình y hệt lượt mẫu (3 câu mẫu là kết quả đã lưu), 10 nếu đã đổi ([ca trực §3.1](daily-shift.md#31-luật)).
+- **Quỹ một ngày P = 13** đủ cho lượt mẫu, run sao và thêm một lượt mẫu. Đường thường: lượt mẫu 1 trượt vì thiếu nguồn (nhịp 9), người chơi bật tem và sửa Lăng kính, lượt mẫu 2 đạt, rồi run sao (nhịp 11): 3 + 3 + 7 = 13, đủ sao 1 trong buổi. Bẫy chỉ chạy trong run sao, nên trượt sao 3 thì run sao kế tiếp chờ quỹ hồi lúc 07:00. Vì vậy **đủ 3 sao ở L1 có thể trải qua vài ngày**. Thời điểm trong bảng là thời gian chơi, không tính lúc chờ quỹ hay chờ bảng xoay của lớp ([giáo án](../lesson-plan-library.md)).
 
 | # | Thời điểm | Trên màn hình | Người chơi làm | Cô Lan nói |
 |---|---|---|---|---|
 | 1 | 0:00–0:20 | Hiện trường Bảng Tin (mục 3) | Click hoặc chạm tờ áp phích (nút DOM "Xem áp phích") | (im 8 giây đầu) "Sáng nay bảng tin có thêm mười hai tờ y hệt nhau. Cái Điều 47 này nổi tiếng nhanh hơn cả lịch thi." |
 | 2 | 0:20–0:50 | Tua lại: câu của Minh đi vào bàn thợ. Thùng Context hiện "Tài liệu: 0 token". Bộ Óc nhả câu trả lời, tem đỏ "Không có nguồn trong thùng" | Xem; nút "Bỏ qua" | "Đây là ca đêm qua. Thùng trống trơn, vậy mà nó trả lời không chớp mắt." · rồi: "Điều 47 thì có thật, nhưng nói chuyện khác hẳn. Còn cái quy định 'chỉ cần gửi email' kia thì không điều nào có cả." |
 | 3 | 0:50–1:10 | Bàn thợ cấu hình khởi đầu (mục 5). Thẻ nhiệm vụ một dòng: "10 câu tối nay · ≥6/8 câu thường đúng và có nguồn · 2 câu bẫy phải nói 'không có'" | Đọc | "Tối nay có mười câu hỏi. Mình cần ít nhất sáu trên tám câu thường đúng và có nguồn, còn hai câu bẫy thì nó phải biết nói 'không có'." |
-| 4 | 1:10–1:30 | Phiếu đoán 1 (mục 7) | Chọn 1 đáp án; nút **Mở ca** chỉ sáng sau khi chọn | "Cứ chạy nguyên trạng một lần đã. Muốn chữa thì phải thấy nó ốm thế nào." |
-| 5 | 1:30–2:15 | **Lần chạy thật 1.** Camera bám câu của Minh (`lib-l1-v01`), 9 ca còn lại thu thành bộ đếm | Xem; giữ Space để tua nhanh | Nhánh A (có áp phích mới): "Thêm {n} tờ nữa. Chú Bảy chắc đang rất vui." · Nhánh B (trả lời chung chung): "Ít ra lần này nó không bịa. Nhưng 'hỏi phòng đào tạo đi' thì Minh tự nghĩ ra được." |
+| 4 | 1:10–1:30 | Phiếu đoán 1 (mục 7) | Chọn 1 đáp án hoặc bấm Bỏ qua (X4), rồi bấm **Xem lượt đã ghi** (~~nút **Mở ca** chỉ sáng sau khi chọn~~, sửa 2026-10-08) | ~~"Cứ chạy nguyên trạng một lần đã. Muốn chữa thì phải thấy nó ốm thế nào."~~ "Xem lại cả ca đêm qua đã. Muốn chữa thì phải thấy nó ốm thế nào." |
+| 5 | 1:30–2:15 | ~~**Lần chạy thật 1.**~~ **Lượt đã ghi** của cấu hình khởi đầu (sửa 2026-10-08, N4), tem "Lượt chạy đã ghi", 0 lời gọi. Camera bám câu của Minh (`lib-l1-v01`), 9 ca còn lại thu thành bộ đếm | Xem; giữ Space để tua nhanh | Nhánh A (có áp phích mới): "Thêm {n} tờ nữa. Chú Bảy chắc đang rất vui." · Nhánh B (trả lời chung chung): "Ít ra lần này nó không bịa. Nhưng 'hỏi phòng đào tạo đi' thì Minh tự nghĩ ra được." |
 | 6 | 2:15–2:45 | Phiếu đoán được chấm. Menu "Vì sao câu #1 sai?" (mục 11) | Chọn lý do, rồi xem chẩn đoán | "Không phải nó dốt đâu, nó chưa được mở sách." |
 | 7 | 2:45–4:00 | Vòm Sao hạ xuống khe Truy xuất. Đèn pin chỉ chiếu được 3 câu mẫu (v01–v03). Sao sáng kèm hạng và cosine thật | Gắn Vòm Sao, xoay Móc kéo K, chiếu thử từng câu mẫu | "Vòm Sao là cả cuốn quy chế, mỗi ngôi sao là một đoạn. Chiếu đèn vào câu hỏi xem sao nào sáng." · (khi chiếu lần đầu) "Số bên cạnh là độ gần nghĩa, không phải điểm đúng sai." |
-| 8 | 4:00–4:15 | Phiếu đoán 2 | Chọn | "Đoán trước rồi hẵng mở ca. Đoán sai cũng được, miễn là có đoán." |
-| 9 | 4:15–5:00 | Lần chạy 2 | Xem | Nếu nội dung đúng mà thiếu nguồn: "Nội dung đúng rồi đấy, nhưng Minh hỏi 'ghi ở đâu' thì nó chịu. Câu trả lời không có nguồn thì không ai kiểm được." |
+| 8 | 4:00–4:15 | ~~Phiếu đoán 2~~ Phiếu mẫu: đoán từng câu mẫu đạt hay trượt, đánh dấu Chắc hoặc Đoán (mục 7, sửa 2026-10-08) | Chọn | "Đoán trước rồi hẵng mở ca. Đoán sai cũng được, miễn là có đoán." |
+| 9 | 4:15–5:00 | ~~Lần chạy 2~~ **Thử 3 câu mẫu** (3 lời gọi, sửa 2026-10-08, N2). Cả 3 câu mẫu đạt thì run chấm sao mở ngay (7 lời gọi; xem đường nhanh) | Xem | Nếu nội dung đúng mà thiếu nguồn: "Nội dung đúng rồi đấy, nhưng Minh hỏi 'ghi ở đâu' thì nó chịu. Câu trả lời không có nguồn thì không ai kiểm được." |
 | 10 | 5:00–5:45 | Hậu kiểm 2: menu "Vì sao", chẩn đoán. Máy đóng tem và khay Lăng kính phát sáng trong truy vết, vì đây là bước sau run, không phải gợi ý trước run | Bật tem, thay thẻ Lăng kính, chiếu thử lại | Tem: "Máy đóng tem in mã lên từng đoạn trước khi bỏ vào thùng. Có mã thì nó mới trích được." · Lăng kính: "Lăng kính là mấy dòng dặn trước khi nó trả lời. Dặn khéo thôi, dặn thừa cũng tốn chữ." |
-| 11 | 5:45–6:30 | Lần chạy 3 | Xem | Nếu bẫy trượt: "Có câu hỏi về một điều không hề có, mà nó vẫn kể vanh vách. Quy chế này dừng ở Điều {max_dieu} cơ mà." |
+| 11 | 5:45–6:30 | ~~Lần chạy 3~~ Phiếu mẫu, **Thử 3 câu mẫu** lần nữa (3 lời gọi), rồi phiếu 2 và 3+ (mục 7) và **run chấm sao** khi cả 3 câu mẫu đạt (7 lời gọi). Sửa 2026-10-08 | Xem | Nếu bẫy trượt: "Có câu hỏi về một điều không hề có, mà nó vẫn kể vanh vách. Quy chế này dừng ở Điều {max_dieu} cơ mà." |
 | 12 | 6:30–7:30 | Truy vết sau run: sao vàng (đoạn đáp án) và hạng thật của nó ở từng ca. Báo Tường hiện số sao. Đạt sao 1 thì chú Bảy gỡ áp phích | Mở từng ca nếu muốn | Sao 1: "Bảng tin sạch rồi. Chú Bảy dặn lần sau in ít thôi." · Sao 3: "Biết nói 'không có' đúng lúc, đó là kỹ năng mình quý nhất ở một thủ thư." |
 | 13 | 7:30–8:30 | Lật mặt sau (mục 12) | Xem JSON, đồ thị, prompt thật; tải về nếu muốn | "Muốn xem nó thật sự trông thế nào không? Lật cái bàn lên là thấy." |
 | 14 | 8:30–9:30 | Kiểm tra 60 giây ([teach-back.md](teach-back.md) mục 5) | Phân loại 3 câu trả lời mới | "Ba câu nhanh thôi, không tính sao." |
 | — | sau level | Lời mời dạy lại Bống (tuỳ chọn) | | "Bống, học việc của mình, có vài câu muốn hỏi bạn. Giải thích được cho Bống mới là hiểu thật." |
 
-**Đường nhanh:** người chơi gắn đủ Vòm Sao, tem và thẻ đúng ngay ở lần 2 thì bỏ qua nhịp 10–11 và xong trong khoảng 6 phút.
-**Đường chậm:** sau mỗi lần trượt mở thêm một gợi ý (mục 11). Mục tiêu không hạ.
+**Đường nhanh:** người chơi gắn đủ Vòm Sao, tem và thẻ đúng ngay ở ~~lần 2~~ lượt mẫu đầu (nhịp 9) thì run chấm sao chạy ngay sau đó (3 + 7 lời gọi, sửa 2026-10-08), bỏ qua nhịp 10–11 và xong trong khoảng 6 phút.
+**Đường chậm:** ~~sau mỗi lần trượt mở thêm một gợi ý (mục 11).~~ **Sửa 2026-10-08 (X15, N16):** sau lần trượt đầu, gợi ý mở theo yêu cầu; nấc sau mở bằng một thao tác nhìn miễn phí, không bằng lượt chạy (mục 11). Mục tiêu không hạ. Hết quỹ trong ngày thì người chơi vẫn xem lượt đã ghi, chiếu thử và đọc trace miễn phí.
 
 ## 5. Đồ chơi và khối Phần 3
 
@@ -143,9 +149,17 @@ Cổng phát hành phải chạy đủ N1–N5 trên model thật và ghi lại 
 
 ## 7. Bước đoán (1 click, trước Mở ca)
 
+**Sửa 2026-10-08 ([roadmap-v0.4](../../design/roadmap-v0.4.md) N1, N19, X4, X22).** Phiếu nào được hỏi tuỳ lượt sắp chạy, vì một phiếu chỉ chấm được trên ca mà lượt đó chạy:
+- phiếu 1 trước lượt đã ghi (nhịp 4), chấm trên lượt đã ghi;
+- **phiếu mẫu** trước mỗi lượt Thử 3 câu mẫu, chấm trên 3 câu mẫu;
+- phiếu 2 và 3+ chỉ trước run chấm sao, vì chúng chấm trên 8 ca thường và ca bẫy `t01`, mà lượt mẫu không chạy các ca này.
+
+Mọi phiếu bỏ qua được (X4) và có thêm cờ **Chắc / Đoán**, mặc định Đoán, thêm đúng một click.
+
 | Lần | Câu hỏi | Lựa chọn | Chấm |
 |---|---|---|---|
-| 1 | "Trợ lý vẫn chưa được đưa tài liệu nào. Với câu của Minh, bạn đoán nó sẽ…" | Trả lời đúng quy chế · Bịa ra một điều khoản · Nói là không biết | Theo `case.graded` của v01: đạt → lựa chọn 1; có `llm.cite_unknown` hoặc nhắc "Điều N" không có trong thùng → lựa chọn 2; còn lại → lựa chọn 3. Ba lựa chọn này trùng với demo trang chủ để người đã chơi demo nhận ra |
+| Mẫu (trước mỗi lượt Thử 3 câu mẫu; N19) | "Lượt mẫu này: mỗi câu mẫu sẽ đạt hay trượt?" (câu hỏi của `v01`–`v03` hiện đủ, vì là ca thấy được) | Đạt · Trượt, cho từng câu | Theo `case.graded` của từng câu mẫu; phiếu đúng khi cả 3 dự đoán khớp. "Chắc" mà sai thì hiện thẻ Bất ngờ kèm bằng chứng (B1) |
+| 1 | "Trợ lý vẫn chưa được đưa tài liệu nào. Với câu của Minh, bạn đoán nó sẽ…" | Trả lời đúng quy chế · Bịa ra một điều khoản · Nói là không biết | Theo `case.graded` của v01 trong lượt đã ghi (sửa 2026-10-08): đạt → lựa chọn 1; có `llm.cite_unknown` hoặc nhắc "Điều N" không có trong thùng → lựa chọn 2; còn lại → lựa chọn 3. Ba lựa chọn này trùng với demo trang chủ để người đã chơi demo nhận ra |
 | 2 | "Với cấu hình này, bao nhiêu trong 8 câu thường sẽ đúng và có nguồn?" | 0–2 · 3–5 · 6–7 · 8 | Theo số ca thường đạt đủ 4 tiêu chí (mục 10) |
 | 3+ | "Nếu có ai hỏi về một điều không có trong quy chế, trợ lý của bạn sẽ…" | Nói là không có · Trích một điều gần giống · Bịa ra nội dung | Theo `lib-l1-t01`: đạt → lựa chọn 1 (kể cả khi vừa từ chối vừa trích một đoạn có thật, mục 9); không từ chối mà trả lời bằng một đoạn có thật trong thùng → 2; có `llm.cite_unknown` → 3 |
 
@@ -153,13 +167,15 @@ Câu hỏi của ca ẩn và ca bẫy không bao giờ hiện cho người chơi
 
 Phiếu đoán chỉ được chấm sau `run.finished` và không ảnh hưởng sao. Độ chính xác của phiếu qua các lần chạy là một số đo hiểu (telemetry).
 
+**Hoàn lượt dựa trên phiếu mẫu** (sửa 2026-10-08, X22, X26; luật đầy đủ ở [ca trực §3.1](daily-shift.md#31-luật)). Chỉ xét phiếu mẫu của lượt Thử 3 câu mẫu **đầu tiên** sau lần đầu xem lượt đã ghi: một lần mỗi level, không theo ngày, và xem lại lượt đã ghi không mở thêm lần hoàn (sửa 2026-10-08, rà soát vòng 5). Máy chủ tự kiểm phần còn lại ([ca trực §3.3](daily-shift.md#33-ánh-xạ-sang-engine)). Phiếu đánh dấu Chắc, cả 3 dự đoán đúng và cả 3 câu mẫu đạt (tức phiếu chắc đoán 3/3 đạt, và đúng) thì số lời gọi mới của lượt đó được hoàn, tối đa 3, từ quỹ dự phòng chung R. Run chấm sao không bao giờ được hoàn. Lời hoàn nêu năng lực: "Hoàn 3 lời gọi: bạn đoán chắc cả ba câu mẫu và sửa đạt ngay lượt đầu."
+
 ## 8. Biên đạo lần chạy
 
 Luật trung thực (gameplay-direction §4):
 - Không phát hậu quả nào trước `case.graded` của ca đó và không đảo thứ tự event.
 - Mỗi hoạt cảnh giữ 0,3–0,5 giây, tối đa 3 làn trên màn hình.
 - Vị trí sao là "hình chiếu" và có nhãn; luôn in hạng và cosine thật.
-- Kết quả trúng cache phát lại đóng tem "kết quả đã lưu".
+- Ca trúng cache phát lại mang dòng chữ "Kết quả đã lưu" cạnh ca, đúng chữ `summary` của engine. Đó là chữ mô tả, không phải tem nguồn: lượt vẫn là lượt chạy thật, và hình vẫn mang tem "Đo từ lượt của bạn" (sửa 2026-10-08, rà soát vòng 3; [frontend architecture §8.4](../../design/frontend-architecture.md#84-tem-nguồn-và-trung-thực-số-liệu)).
 - **Gold (đoạn đáp án và hạng của nó) chỉ hiện sau `run.finished`** (D4). Trong lúc chạy, `case.graded` chỉ mang đạt/trượt theo từng tiêu chí, cộng các nhãn không cần gold (`cite_unknown`, `cite_missing`, `abstained`, `skipped_budget`); xem Câu hỏi mở 2.
 
 | Event | Hình ảnh (camera bám `lib-l1-v01`) | Bản chữ (DOM, aria-live) |
@@ -169,7 +185,7 @@ Luật trung thực (gameplay-direction §4):
 | `step.finished` (vector_search, `detail{chunk_ids, scores}`) | K sao sáng, mỗi sao in "#hạng · cosine"; Móc kéo thả K khối xuống thùng | "Lấy {K} đoạn: Điều 12 (0,83), Điều 13 (0,71)…" (dùng `summary` ≤ 140 ký tự của engine) |
 | `step.finished` (context_packer, `pack.included`, `pack.dropped`, `pack.tokens`) | Khối xếp vào thùng, chiều cao bằng token. Nếu tem bật, mỗi khối có mã. Khối bị cắt rơi xuống sàn kèm nhãn "bị cắt" | "Thùng: 1.420/3.000 token. Bị cắt: 0 đoạn." |
 | `step.finished` (llm, tokens, `cited_ids`) | Bộ Óc nhả thẻ trả lời. Câu có mã thành viên gạch nối chỉ về khối nguồn; câu không có mã thành bong bóng. Chưa phán đúng sai | "Trợ lý trả lời ({in} vào, {out} ra token)." kèm nguyên văn câu trả lời |
-| `case.graded` | **ĐẠT:** Minh gật đầu ghi sổ. **TRƯỢT + `cite_unknown`:** áp phích mới ghim lên Bảng Tin; ca thấy được in nguyên câu trả lời, ca ẩn chỉ in "Điều {N} ma · ca ẩn". **TRƯỢT vì thiếu nguồn:** bong bóng vỡ, chữ "không có nguồn". **TRƯỢT vì thiếu ý:** thẻ trả lời chuyển xám. **Bẫy từ chối đúng:** cô Lan đóng dấu "Đúng là không có" | "Câu 1: Trượt, không có nguồn." |
+| `case.graded` | **ĐẠT:** Minh gật đầu ghi sổ. **TRƯỢT + `cite_unknown`:** áp phích mới ghim lên Bảng Tin; ca thấy được in nguyên câu trả lời, ca ẩn chỉ in "Điều {N} ma · ca ẩn" (ở lượt đã ghi, {N} lấy từ trường `cite_unknown` của file tĩnh, [roadmap-v0.4](../../design/roadmap-v0.4.md) B0; thêm 2026-10-08, rà soát vòng 6). **TRƯỢT vì thiếu nguồn:** bong bóng vỡ, chữ "không có nguồn". **TRƯỢT vì thiếu ý:** thẻ trả lời chuyển xám. **Bẫy từ chối đúng:** cô Lan đóng dấu "Đúng là không có" | "Câu 1: Trượt, không có nguồn." |
 | `step.finished` (status ≠ ok) | timeout: đồng hồ cát đổ. budget: khối mờ "bỏ qua vì hết ngân sách" | Ghi rõ status |
 | `run.scored` | Báo Tường dán lên tường: số sao, "6/8 · 2/2 bẫy · 19,4k token" | Đọc nguyên Báo Tường |
 | `run.finished` | Mở màn Truy vết: mỗi ca có một sao vàng (đoạn đáp án), hạng thật của nó, và việc nó có vào thùng không | "Truy vết đã mở." |
@@ -230,7 +246,15 @@ Lời giải mẫu phải đạt 3 sao ở 3/3 lần chạy thật (Phần 3 §3
 | `budget.exceeded` | "Run này tốn {tokens} token, ngân sách là {budget}. Trung bình mỗi câu kéo {avg_docs} đoạn vào thùng." |
 
 **Ba gợi ý tăng dần** (Hades/God Mode: thêm bằng chứng, không hạ mục tiêu).
-- Gợi ý *n* mở sau lần trượt thứ *n*, hoặc khi người chơi bấm "Gợi ý" sau một lần trượt.
+- ~~Gợi ý *n* mở sau lần trượt thứ *n*, hoặc khi người chơi bấm "Gợi ý" sau một lần trượt.~~ **Sửa 2026-10-08 ([roadmap-v0.4](../../design/roadmap-v0.4.md) X15, N16):** sau lần trượt đầu, gợi ý mở theo yêu cầu; gợi ý *n*+1 chỉ mở khi người chơi đã làm một thao tác nhìn miễn phí kể từ gợi ý *n* (đổi một đồ chơi, chiếu đèn, hoặc mở trace của câu trượt). Không phải tiêu lượt chạy để được giúp. Mỗi gợi ý nêu một số câu (#n) và chỉ vào một thứ đang hiện trên màn; gợi ý 1 nên là câu hỏi có/không người chơi tự trả lời bằng trace ("Đoạn đúng của câu #1 đã vào thùng chưa?").
+- **Gợi ý 3 là lời giải, nên có cổng riêng (sửa 2026-10-08, N16, [roadmap-v0.4](../../design/roadmap-v0.4.md) X28; chốt tạm, roadmap Q9).** Gợi ý 3 chỉ mở khi đủ cả ba điều:
+  1. đã mở gợi ý 2 và đã làm một thao tác nhìn miễn phí kể từ đó (một mình thao tác nhìn không mở gợi ý 3);
+  2. đã có ít nhất một lượt chấm trượt ở sao đó: một run chấm sao trượt, hoặc, ~~riêng sao 1~~ ở sao thấp nhất chưa đạt (trước khi có sao 1 là sao 1; sửa 2026-10-08, rà soát vòng 6), một lượt Thử 3 câu mẫu có câu mẫu trượt (~~Lượt "Thử 3 câu mẫu" không phải lượt chấm~~, sửa 2026-10-08, rà soát vòng 5). Lượt hỏng vì `DailyCap` cạn không tính ([ca trực §3.3](daily-shift.md#33-ánh-xạ-sang-engine));
+  3. hoặc đã trượt lượt chấm thứ ba ở sao đó, đếm cả các ngày trước, hoặc quỹ học viên còn lại không đủ cho thêm một lượt chấm (run chấm sao L1 tối đa 10 lời gọi, L2 và L3 tối đa 13; khi lượt trượt gần nhất là lượt mẫu thì so với giá lượt mẫu, 3, với "gần nhất" là lượt trượt được tính gần nhất ở chính sao đó (sửa 2026-10-08, rà soát vòng 6); giá từng lượt ở [ca trực §3.1](daily-shift.md#31-luật)).
+
+  Chỉ đếm lượt trượt trên các cấu hình khác nhau: chạy lại y hệt một cấu hình đã trượt là kết quả đã lưu, 0 lời gọi, nên không đếm thêm. **Người kẹt ở câu mẫu** (sửa 2026-10-08, rà soát vòng 5, [roadmap-v0.4](../../design/roadmap-v0.4.md) X28; chốt tạm, Q9): run chấm sao chỉ mở khi cả 3 câu mẫu đạt (N2), nên nếu lượt mẫu không bao giờ tính thì người trượt mãi ở câu mẫu, ví dụ ở `lib-l1-v01` (ca bắt buộc của sao 1), không bao giờ có lượt chấm trượt và chỉ được gợi ý 1, 2, kể cả qua nhiều ngày. Vì vậy lượt mẫu có câu trượt tính là lượt chấm trượt ở sao 1: câu mẫu là ca thường của sao 1, và chúng chặn đường tới mọi run chấm sao. Cũng vì lý do thứ hai, nó tính cho sao thấp nhất chưa đạt (sửa 2026-10-08, rà soát vòng 6): người đã có sao 1 mà làm vỡ câu mẫu khi sửa cho sao 2 hay 3 cũng kẹt như vậy. Ở P = 13, người kẹt ở câu mẫu tới được gợi ý 3 ngay trong ngày: sau lượt mẫu trượt thứ ba trên ba cấu hình khác nhau (9 lời gọi), hoặc khi quỹ còn dưới 3. Lượt mẫu đạt cả 3 câu không tính gì.
+
+  Gợi ý 3 trình bày như **ví dụ mẫu**. Ngay sau đó người chơi nhận một câu biến thể và phải tự sửa không gợi ý: một ca ôn `lib-l1-rNN` chưa gặp, thuộc thẻ khái niệm của sao đang trượt (cột "Câu biến thể sau gợi ý 3" ở [ca trực §2](daily-shift.md#2-chọn-sự-cố-móc-fsrs-chỉ-mô-tả): sao 1 là `grounding.citation`, sao 3 là `grounding.abstention`). Sao 2 của L1 không có câu biến thể: nó là ngân sách token của cả run, một ca lẻ không đo được, nên gợi ý 3 của sao 2 chỉ nêu hướng (bảng dưới) và bài tự sửa là run chấm sao kế tiếp; không gọi `scope=bien_the`, không trừ R (sửa 2026-10-08, rà soát vòng 3). Lượt một câu này chạy bằng `POST /api/runs?scope=bien_the&case=…` (B0), tốn 1 lời gọi lấy từ quỹ dự phòng chung R, không trừ quỹ học viên; R hết thì câu biến thể chờ lượt đầu tiên sau khi quỹ hồi. Ca đã dùng được đánh dấu là đã gặp, để ca trực không dùng lại ngay. Sao vẫn tính trên run đầy đủ như thường.
 - Gợi ý nhắm vào tiêu chí sao thấp nhất chưa đạt.
 - Không gợi ý nào đổi ngưỡng.
 
@@ -276,7 +300,7 @@ system = ("Chỉ trả lời bằng thông tin trong các đoạn dưới đây,
 
 Bống hỏi: **"Hôm qua trợ lý nói về Điều 47, ca sáng hỏi em vì sao. Anh chị giải thích giúp em với?"**
 
-Khuôn nhập và rubric ở [teach-back.md](teach-back.md) mục 3.1. Bằng chứng người chơi chọn lấy từ vết chạy thật của chính họ (lần chạy 1).
+Khuôn nhập và rubric ở [teach-back.md](teach-back.md) mục 3.1. Bằng chứng người chơi chọn lấy từ ~~vết chạy thật của chính họ (lần chạy 1)~~ vết của lần chạy 1, nay là lượt đã ghi (sửa 2026-10-08, N4), hoặc từ các lượt thật của chính họ.
 
 ## 14. Biến thể ôn cho ca trực
 
@@ -311,8 +335,10 @@ Câu hỏi và tiêu chí chấm của từng ca nằm ở file golden; bảng n
 
 `lvl.open` → `hientruong.view` → `hientruong.click` → `goal.view` → `predict.submit{run:1, choice}` → `run.start{run:1}` → `run.end{run, stars, pass_normal, pass_trap, tokens, cache_hit}` → `diag.menu.answer{case, choice, correct}` → `toy.first_touch{toy}` → `preview.spotlight{case, k}` → `hint.open{n, target_star}` → `run.start{run:n}` … → `flipside.open{tab}` → `export.click{kind}` → `check60.submit{score}` → `teachback.open` → `teachback.submit{score}` → `lvl.complete{stars, runs, minutes}`; nếu rời giữa chừng thì `lvl.leave{last_step}`.
 
+**Sửa 2026-10-08 (N4, N2, N19):** `run:1` là lượt đã ghi, không tốn lời gọi; `predict.submit` thêm `confident` (Chắc/Đoán) và `kind` (`1`, `mau`, `2`, `3`); `run.start` thêm `scope` (`da_ghi`, `mau`, `sao`); thêm `quota.refund{calls}`.
+
 **KPI cần theo dõi:**
-- p50 thời điểm `run.start{run:1}` ≤ 3 phút;
+- p50 thời điểm `run.start{run:1}` (lượt đã ghi) ≤ 3 phút;
 - p50 thời lượng level 5–10 phút;
 - tỉ lệ đạt sao 1;
 - tỉ lệ đúng của phiếu đoán tăng từ lần 1 đến lần cuối;
@@ -320,11 +346,11 @@ Câu hỏi và tiêu chí chấm của từng ca nằm ở file golden; bảng n
 
 ## 17. Câu hỏi mở
 
-1. **Câu bịa của Hiện trường.** Câu nguyên văn trong brief có thể không phải là đầu ra thật của Opus 5.5 ở cấu hình khởi đầu. Đề xuất: cổng hiệu chỉnh ghi lại đầu ra thật. Nếu khác, Tua lại đóng tem "dựng lại để minh hoạ" và lần chạy 1 cho thấy câu thật. Cần leader xác nhận.
+1. **Câu bịa của Hiện trường.** Câu nguyên văn trong brief có thể không phải là đầu ra thật của ~~Opus 5.5~~ model chính (`gemini-3.5-flash-lite`; sửa 2026-10-08, engine chạy Gemini theo [đặc tả §8.4](../../specs/2026-10-07-v-game-design.md#84-llm)) ở cấu hình khởi đầu. Đề xuất: cổng hiệu chỉnh ghi lại đầu ra thật. Nếu khác, Tua lại đóng tem "dựng lại để minh hoạ" và lần chạy 1 cho thấy câu thật. Cần leader xác nhận.
 2. **Nhãn trong `case.graded`.** Phần 3 §3.8 nói `case.graded` chỉ mang đạt/trượt; gameplay-direction thêm `labels` và `extracted`. Kịch bản này chỉ cho dùng **nhãn không cần gold** trong lúc chạy và để mọi thứ cần gold tới sau `run.finished` (D4). Cần chủ Phần 4 chốt.
-3. **Xem trước trước khi chạy.** Phần 3 nguyên tắc 5 ("không gợi ý gì trước khi chạy") lệch với phần xem trước tất định của gameplay-direction. Kịch bản cho chiếu đèn ở **3 câu mẫu**: hiện hạng, cosine và chữ của đoạn, không đánh dấu đoạn đáp án, không đo độ phủ. Cần chủ dự án duyệt điểm lệch này.
+3. **Xem trước trước khi chạy.** Phần 3 nguyên tắc 5 ("không gợi ý gì trước khi chạy") lệch với phần xem trước tất định của gameplay-direction. Kịch bản cho chiếu đèn ở **3 câu mẫu**: hiện hạng, cosine và chữ của đoạn, không đánh dấu đoạn đáp án, không đo độ phủ. **Đã chốt 2026-10-08 ([roadmap-v0.4](../../design/roadmap-v0.4.md) X11):** duyệt như trên, cộng một điều: màn mở bằng lượt đã ghi của cấu hình khởi đầu, nên cú vấp đầu tiên đến trước mọi phần xem trước; đáp án chỉ lộ sau `run.finished`.
 4. **Đã đóng.** Câu hub (brief §4, câu 1) đã sửa thành "…còn gán cho Điều 47 một quy định không hề có." Nó khớp kho, vì Điều 47 có thật và nói về đề nghị xem xét lại điểm đánh giá quá trình. Câu thoại nhịp 2 nối tiếp câu hub: Điều 47 có thật, còn quy định "chỉ cần gửi email" thì không điều nào có.
-5. **Đèn pin.** gameplay-direction cho đèn pin xoay theo embedding thật của câu gõ vào; Phần 3 §3.7 chỉ embed lúc chạy ở W3, và brief loại embedding lúc chạy. Kịch bản chỉ cho chiếu các câu có sẵn.
+5. **Đèn pin.** gameplay-direction cho đèn pin xoay theo embedding thật của câu gõ vào; Phần 3 §3.7 chỉ embed lúc chạy ở W3, và brief loại embedding lúc chạy. Kịch bản chỉ cho chiếu các câu có sẵn. **Đã chốt 2026-10-08 ([roadmap-v0.4](../../design/roadmap-v0.4.md) X16):** không gõ tự do; ngoài 3 câu mẫu, đèn pin chiếu được khoảng 20 cụm thăm dò tính sẵn, chọn tay để không cụm nào trúng đoạn đáp án của câu ẩn hay câu bẫy.
 6. **Profile khoá `can_bang` ở cả khu Thư viện,** vì Thư viện mở trước Chợ (D1). Ngân sách sao 2 hiệu chỉnh theo profile này.
 7. **Phần 3 §3.7 gọi kho là "Bộ luật Thị trấn",** trong khi D6 đổi thành quy chế của Trường Đại học Sao Mai. Cần sửa Phần 3 khi chỉnh lại (kịch bản không sửa).
 8. **Tạm chốt (brief §4.2).** `llm.cite_unknown` tính cả câu "theo Điều N" / "Điều N quy định" không kèm mã khi N không có trong thùng. Câu từ chối không bị tính, và được trích đoạn có thật trong thùng; chỉ trích bịa mới trượt (mục 9). Chủ Phần 4 xác nhận khi viết evaluator.
