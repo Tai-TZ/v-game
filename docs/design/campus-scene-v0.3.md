@@ -9,6 +9,7 @@
 - **Sửa sau QA (2026-10-08):** `routeTo` tìm đường thật bằng đồ thị tầm nhìn, bỏ 3 điểm chờ cố định (§2.5); `LAKE_BLOCKS` khớp lại theo bờ hồ mới (§2.2); sân khấu ngoài trời thành 3 bậc đặc (§6.1 S8); số tam giác đo lại (§8). Mỗi chỗ có ghi chú "Sửa sau QA".
 - **Sửa sau QA vòng 3 (2026-10-08):** click lấy điểm trên bề mặt đầu tiên được vẽ dưới con trỏ (`clickGoal`), không lấy mặt đất nữa (§2.5 bước 2); `step()` đặt người chơi đúng vào điểm đích khi tới trong 0,08 (§2.5, §3). Mỗi chỗ có ghi chú "Sửa sau QA vòng 3".
 - **Sửa sau QA vòng 4 (2026-10-08):** click vào toà khu vực nhận ra toà theo mesh bị chạm (`userData.site`), nên mái hiên của Chợ cũng dẫn tới cửa (§2.5 bước 2). Vật cản đài phun là 5 hộp nội tiếp vòng giậu thay cho một hình vuông (§2.3). Click vào chỗ lát đá trống mà chỉ bị chặn vì bán kính người chơi thì đứng ở điểm trống gần nhất (§2.5 bước 2). `step()` bỏ đích bị chặn ngay ở bức tường đầu tiên, không trượt dọc tường nữa (§3). Nhãn khu và dấu "!" bấm được (§2.6). Dời một cây mép tây để mở ô bị bịt cạnh Thư viện (§2.4). Mỗi chỗ có ghi chú "Sửa sau QA vòng 4".
+- **N8 và N9 (2026-10-08):** ánh sáng nướng theo preset (ngày, hoàng hôn), bóng nắng, rim, bọt sóng, và cửa sổ khu mở sáng khi đã có sao. Chi tiết, số đo và API tiến độ ở §13; quyết định art ở art-direction §12.
 - **Đã kiểm bằng blockout** `scratchpad/v03/final/blockout_v03.py` (không nằm trong repo). Script dựng lại mặt trước như code đang chạy, cộng toàn bộ bảng của file này. Nó mô phỏng `step()` cho 56 cặp điểm tương tác phía trước, 180 đường đi trước ↔ sau và 72 đường đi giữa các điểm phía sau, rồi vẽ 1280×800 và 375×812 cho cả hai theme. Ảnh và `metrics_<theme>.json` nằm cùng thư mục. Số tam giác ở §8 là số đếm theo công thức primitive của three.js; coder đo lại bằng `sceneBudget()`.
 
 ---
@@ -527,3 +528,156 @@ Dùng helper chụp của phiên (`shots-v02.mjs`, tham số `outDir port`) trê
 - **Khối lượng code:** khoảng 150 dòng hình học trong `campus.ts`, khoảng 90 dòng định tuyến (sau QA), 10 dòng store và frame loop, 1 hàng HUD, cộng test. `movement.ts` đổi kiểu bounds, và từ QA vòng 3 đặt người chơi đúng vào đích khi tới (1 dòng).
 
 **Chủ dự án chốt (2026-10-08), theo mặc định của tài liệu:** giữ màu đường chạy như hiện tại; click vào mái thư viện A phía sau tháp cho người chơi đứng trước cánh E là chấp nhận được; giữ bố cục phía sau đã xếp gọn (toà H và sân vận động không dời về toạ độ thật). Bản công khai dùng theme town, nên các chi tiết riêng của theme campus chỉ thấy ở bản nội bộ.
+
+---
+
+## 13. N8 và N9 (2026-10-08): ánh sáng nướng và hậu quả trên campus
+
+Nguồn: báo cáo "Insight edtech nâng cấp V-Game", hàng N8 và N9 của bảng "Làm ngay". Quyết định art (giờ mặc định, ngoại lệ QA, luật cửa sổ) ở art-direction §12. Mục này thay v0.2 §4.3 (ánh sáng) và bổ sung §8 (ngân sách).
+
+### 13.1 Preset ánh sáng (dữ liệu theme)
+
+- `campus.lights = { default: "day" | "dusk", day: Preset, dusk: Preset }` trong `manifest.json`, kiểm bằng `schema.ts`. `Preset = { sky, ground, hemisphere, sun, sunIntensity, sunDirection, rim }`: đúng tham số của `HemisphereLight` và `DirectionalLight`, cộng hệ số rim.
+- `palette(campus, time)` đổi preset ra hệ số linear, `shade(n, light)` trả màu theo kênh (art §2.3). `part(geometry, style, light)` nướng; `light = null` giữ màu trơn cho Lambert (người, cây). `CampusScene` đặt hai đèn theo đúng preset, nên Lambert và hình nướng cùng tông.
+- Hai theme hiện dùng cùng giá trị:
+
+| Preset | `sky` | `ground` | `hemisphere` | `sun` | `sunIntensity` | `sunDirection` | `rim` |
+|---|---|---|---|---|---|---|---|
+| `day` (QA vòng 2) | `#d0e5ff` | `#bfb5a9` | 3.054 | `#ffd059` | 1.561 | `[-0.35, 1, 0.75]` | 0.25 |
+| `dusk` | `#9dccff` | `#f4d9f2` | 1.262 | `#ffb736` | 2.661 | `[-0.62, 0.55, 0.6]` | 0.6 |
+
+- Các số được giải ngược từ mục tiêu theo mặt (trên, trái `+z`, phải `+x`), rồi làm tròn về hex. Preset ngày giữ mặt trên ở `(1, 1, 1)` sau khi cắt, kể cả sai số làm tròn hex.
+- Sửa sau QA vòng 2 (2026-10-08): preset ngày giải lại cho mặt bên ấm và lạnh rõ hơn: trái `(0.860, 0.795, 0.709)`, phải `(0.560, 0.605, 0.679)`, độ sáng vẫn 0.80 / 0.60 (art §2.3). Bản vòng 1 là `#eff5ff` / `#c6c5c2` / 2.572 / `#fff0d0` / 1.197, mặt bên chỉ lệch v0.3 khoảng 2 mức. Bộ giải: `scratchpad/n8/tune-r2.mjs` (ngoài repo), chạy lại với đích vòng 1 thì ra đúng preset vòng 1.
+- Trời: `--vg-scene-dusk` trong `theme.css` (`#e7cfc3` cả hai theme), token `bg-scene-dusk` trong `app.css`. Khung chứa canvas tô màu này ở hoàng hôn.
+- Giờ đang dùng: `hubStore.time ?? campus.lights.default`. `time` là `null` cho tới khi người chơi bấm nút "Hoàng hôn" (art §8.4); chỉ giữ trong phiên.
+- Đổi giờ thì `pal` đổi, mọi nhóm dựng lại một lần, các geometry cũ được `dispose()`. Riêng phần dựng hình, đo trong Node trên máy dev: 26–34 ms (campus), 19–23 ms (town). Sửa sau QA vòng 1, đo trong trang (bản build, SwiftShader headless, 1280×800): mỗi lần bấm là một long task 51–57 ms trên luồng chính, tức khoảng 55 ms; CPU chậm 4× thì 90–528 ms, lần bấm đầu nặng nhất (vinuni 528 ms, town 210 ms), tức tới khoảng 0,5 s. Chưa đo trên GPU tích hợp. Mỗi lần bấm vẽ vài khung rồi đứng yên (3, đo lại ở QA vòng 3, xem dưới); sau 7 lần bấm số bộ đệm GL vẫn 34, không rò. Không sửa code: chỉ là một lần bấm.
+- Sửa sau QA vòng 2 (2026-10-08): `CampusScene` đọc giờ qua `useDeferredValue`, nên cú bấm vẽ nút đã bấm trước rồi mới dựng lại ở lượt render nền. Event Timing của cú bấm (bản build, SwiftShader, 1280×800, 4 lần mỗi theme, `scratchpad/n8/inp-r2.mjs`): trước 24–48 ms (CPU 1×) và 112–272 ms (4×), sau 16 ms và 16–40 ms. Long task dựng lại vẫn còn, sau khung đã vẽ: 107–210 ms ở 4×. Không giữ sẵn geometry hai preset (art §12 mục 7).
+- Sửa sau QA vòng 3 (2026-10-09), chỉ sửa tài liệu: mỗi lần bấm, bằng chuột hay bằng phím, vẽ 3 khung chứ không phải 1 (`scratchpad/n8/frames-r5.mjs`, bản build, hai theme, 4 lần bấm mỗi theme: lần nào cũng 3). Theo QA, khung đầu là lượt render khẩn cấp vẽ lại hình cũ trước lượt dựng lại đã hoãn, nên trung bình tam giác mỗi khung lệch về hình cũ. QA đo long task dựng lại ở CPU 1× (SwiftShader, 1280×800): vòng 3 là 97–146 ms, vòng 4 thấp nhất 88 ms, vòng 5 (2026-10-09) là 124, 94 và 82 ms; ở vòng 5 có một lần bấm ở theme town (chuyển động đầy đủ) không sinh long task nào từ 50 ms trở lên. Tóm lại khoảng 80–150 ms ở 1× SwiftShader, đổi theo từng lần chạy, cao hơn mức 51–57 ms đo ở vòng 1. INP vẫn ổn nhờ `useDeferredValue`. Không sửa code: các khung thừa chỉ có lúc bấm, sau đó cảnh lại đứng yên.
+
+### 13.2 Bóng nắng (`buildShadows` trong `campus.ts`)
+
+- Mỗi khối lồi là danh sách điểm 3D. `block(x0, x1, z0, z1, top)` cho hộp, còn mái chóp là các góc chân mái cộng đỉnh. Mỗi điểm chiếu xuống đất theo `p − p.y·L/L.y`. Bóng là bao lồi của các điểm chiếu (monotone chain), cắt theo `BASE` (Sutherland-Hodgman), rồi chia quạt.
+- Sửa sau QA vòng 1 (2026-10-08): bóng không còn nằm trong `G-terrain`. `buildShadows(pal, archetype)` (QA vòng 2: thêm `colonnades`) trả một geometry riêng (`useCampusGeometry().shadow`), mọi đỉnh mang màu `~shadow`, là hệ số nhân `½(sky + ground) / shade(+y)` (art §2.2). `SHADOW_Y = 0.014`, trên lớp đất cao nhất (0,0135). `CampusScene` vẽ nó ngoài nhóm `statics` (không phải đích bấm) bằng `MeshBasicMaterial` với `MultiplyBlending`, `premultipliedAlpha`, `transparent`, `depthWrite: false`, cộng stencil (`stencilRef 1`, `NotEqualStencilFunc`, `ReplaceStencilOp`) và `gl.stencil: true` trên `<Canvas>`. Kết quả: cỏ dưới bóng ra đúng màu cũ (±2 do làm tròn 8 bit khi trộn), còn đường, đường chạy và mặt hồ cũng tối theo. Chỗ hai bao lồi chồng nhau chỉ tối một lần: đếm pixel trên ảnh hoàng hôn 1280×800 không thấy màu tối hai lần.
+- Bản đầu tô bóng đục ở `y = 0.007` dưới lớp đường, nên đường đi cắt qua bóng thành vệt sáng. QA vòng 1 thấy rõ ở ảnh 2× hoàng hôn: lối từ cửa Thư viện tới người chơi, đường phía đông Tháp canh.
+- Khe 0,2 u giữa lưng Tháp canh và chòi đông của nhà chính đã lấp: khối tháp kéo từ `z = −5.8` tới `−6.0`, chạm khối chòi. Trước đó khe để lọt một vạch nắng 1–2 px qua bóng lúc hoàng hôn. Vạch đúng hình học nhưng đọc như vết nứt render.
+- Các khối:
+  - Nhà chính: cánh `(−9.7, 9.7, −9.7, −6.2)` cao 2.5; khối đế tháp cao 3.02; 4 chòi cao 3.48.
+  - Thư viện: một hộp cao 2.1.
+  - Tháp canh: sảnh cao 1.53 và 5 tầng tới 6.19.
+  - Chợ: tấm mái cao 1.95 và khối mái giữa cao 2.42.
+  - Toà phía sau: A, G, H, B (thân cao 1.58 và mái vòm cao 2.7), chiller, khán đài.
+  - Tháp theo archetype. `spire-hall`: tầng 2, 3, 4, đèn lồng (8.3) và kim (10.1, rộng 0.12). `clock-tower`: mái hông (chóp 4.3), thân tháp (5.9) và mái tháp (8.1).
+  - Cổng trước (QA vòng 2), theo `colonnades`. Cổng ba vòm: khối giữa (2.8), attic (3.0), hai cánh (1.78). Cổng trụ: hai trụ (1.4) và dầm treo từ 1.4 tới 1.58 (`lintel`), nên nắng lọt qua lối đi dưới dầm.
+  - Tán cây (QA vòng 2): `crownCasters()` lấy mọi đỉnh của tán tròn hoặc tán bách (cùng hàm `roundCrown` / `cypressCrown` mà `buildRoundTree` / `buildCypress` dùng), nhân `treeMatrix(tree)`, rồi chiếu như mọi khối. Thân cây không đổ bóng; đĩa tiếp đất vẫn ở chân cây.
+- Không đổ bóng, chấp nhận: hai hàng cột cong (bao lồi của cung lấp kín lòng cung), đèn, tượng, hàng rào, người (art §2.4 mục 4).
+- Không nhận bóng, chấp nhận (art §2.4 mục 4 ghi từ đầu; QA vòng 3 nêu lại, 2026-10-09): lớp bóng là mặt phẳng ở `SHADOW_Y` có kiểm depth, nên mặt phẳng nào cao hơn nó cũng vẫn sáng trong bóng: luống hoa (0,14), bậc trước và bậc hiên, các tầng quảng trường, đế các toà, vườn mái, mái nhà. Thấy rõ nhất ở vườn hoa hồng lúc hoàng hôn: bóng cây chỉ hiện ở rãnh sỏi và dừng ở mép từng luống (`scratchpad/qa-scene-r4/z-roses-day-dusk.png`); ban ngày cũng có. Cách sửa nếu cần: chiếu lại phần bóng rơi trên mỗi mặt nâng phẳng ở đúng độ cao của mặt đó (bao lồi tịnh tiến `h·L/L.y`, cắt theo hình chữ nhật của mặt) trong cùng lưới bóng, nên không thêm draw call. Luống hoa chỉ nhận bóng tán cây, mà tán nằm hẳn trên 0,14, nên phép tịnh tiến là đúng. Chưa làm vì đây là chi tiết của một giờ tuỳ chọn. Cách QA đề xuất (nướng `~shadow` vào màu đỉnh) bị loại: một mặt lớn chỉ có 4 đỉnh, nên mép bóng sẽ thành dải chuyển màu.
+- Cây trong bóng toà nhà (QA vòng 3, 2026-10-09): `treesInShade(pal, archetype, colonnades)` chọn các cây có tâm tán nằm trong bóng của một khối toà nhà. Cách tính: lấy phần khối cao hơn tâm tán, chiếu theo nắng xuống mặt phẳng ngang qua tâm tán, rồi kiểm tâm tán có nằm trong bao lồi không. `CampusScene` nhân màu instance của các cây này với `~shadow`, dùng đúng `instanceColor` đang có cho độ sáng từng cây, nên không thêm draw call hay tam giác. Tán cây khác không làm tối cây. Hiện chỉ có ba cây: lúc hoàng hôn là `(11.4, −9)` và `(13.75, −7.4)` sau chòi đông nhà chính, ban ngày là cây công viên `(−2, −17.3)`. Hai cây phía đông Tháp canh trong ảnh QA, `(13.75, −4.4)` và `(13.75, −1.6)`, có chân nằm ngoài mọi bóng; cỏ tối cạnh chúng là bóng của sảnh Tháp canh và của các tán, nên chúng sáng là đúng. Ba cây có chân trong bóng toà nhà nhưng tán vẫn trong nắng lúc hoàng hôn: `(12.8, 1.3)`, `(4.3, 8.9)`, `(−12.8, −17.3)`. Người chơi và cô Lan vẫn không tối trong bóng, vì họ di chuyển nên phải kiểm lại mỗi khung (art §2.4 mục 4).
+- Hình bóng không đổi theo trạng thái khu (giàn giáo và đèn lối vào không đổ bóng), nên lưới bóng chỉ dựng lại khi đổi giờ, archetype hoặc `colonnades`.
+- Danh sách khối là bản chép tay, giản lược từ các hộp trong hàm dựng. `shadowCasters(archetype, colonnades)` xuất danh sách này (nhà và cổng; tán cây thì lấy từ chính hình cây nên không cần chép), và một test buộc nó vào hình thật: mỗi góc khối nằm trong 0,25 (x, z) của một đỉnh thật, và đỉnh khối nằm trong 0,05 của một đỉnh thật trong phạm vi khối. Dời hay đổi cỡ một toà mà quên khối bóng thì test đỏ (đã thử: dời khối Thư viện 1 u, nâng khán đài lên 1.5).
+
+### 13.3 Bọt sóng
+
+`lakeBand(pal, 1, −FOAM, 1, 0, 0.008, ~foam)` với `FOAM = 0.22`: 16 tứ giác ngay trong bờ hồ. Quạt nước giờ chỉ tới mép trong của vành bọt, nên bọt nằm cạnh nước ở cùng độ cao chứ không đè lên nước. Bản đầu đặt bọt đè lên nước ở 0,0085; ảnh 1× trên SwiftShader có răng cưa z-fighting dọc bờ.
+
+### 13.4 Ngân sách đo được
+
+Sau QA vòng 2 (2026-10-08):
+
+| Trạng thái | campus ngày | campus hoàng hôn | town ngày | town hoàng hôn |
+|---|---|---|---|---|
+| Thư viện `open`, hai khu sắp mở (trạng thái test) | 20 097 | 20 010 | 17 020 | 16 932 |
+| Thư viện `lit` (mặc định khi `STARS_SAVED = false`) | 20 185 | 20 098 | 17 108 | 17 020 |
+| Cả ba khu `lit` | 20 301 | 20 214 | 17 224 | 17 136 |
+
+- So với QA vòng 1 (19 300 / 19 388 / 19 268 ở campus ngày): đèn lối vào +88 mỗi khu mở (2 đèn × 44); đèn lồng Chợ +60; lưới bóng 108 → 817 (campus ngày), 97 → 802 (town ngày), 730 / 714 lúc hoàng hôn, do tán cây và cổng. QA vòng 3 không đổi số tam giác: đèn Thư viện chỉ dời chỗ, cây trong bóng chỉ đổi màu instance.
+- Draw call: 14 theo `sceneBudget()`, vì lớp bóng nắng là một lưới riêng (+1). Trên trình duyệt thật (bọc lệnh vẽ WebGL2, bản build, 1280×800; QA vòng 3 đo lại) là 13 lệnh vẽ mỗi khung, vì vòng tương tác đang ẩn.
+- Tam giác mỗi khung ở trạng thái mặc định (Thư viện `lit`, hàng hai của bảng), QA vòng 3 đo trên trình duyệt: campus 20 105 (ngày) / 20 018 (hoàng hôn), town 17 028 / 16 940 (QA vòng 4 đo lại town hoàng hôn hai lần). Đúng bằng `sceneBudget()` trừ 80 tam giác của vòng.
+- So với v0.3 (19 248 / 16 186, cùng trạng thái test ở hàng một): +849 / +834. Gồm: gáy sách và thanh kệ Thư viện chờ sao −88; bọt sóng +32; hai đèn lối vào Thư viện +88; lưới bóng +817 / +802.
+- Lưới bóng 817 tam giác (campus ngày) gấp khoảng 2,7 lần ước tính ~300 của báo cáo nghiên cứu, chủ yếu do tán cây: mỗi tán là một bao lồi nhiều đỉnh. Vẫn 1 draw call.
+- Trần trong `scene.test.ts` giữ 16 draw call và 23 000 tam giác, chạy cho mỗi theme ở cả hai giờ. Không cần nâng trần.
+- Chunk `/play`: 269,1 kB gzip sau QA vòng 3 (vòng 2: 268,9; vòng 1: 268,6; bản đầu N8/N9: 268,3; v0.3: 266,4), trần 300.
+- `frameloop="demand"`, không shadow map, không postprocessing, không vòng lặp mới. Vật liệu bóng là thêm một biến thể `MeshBasicMaterial`.
+
+### 13.5 Hậu quả trên campus (N9) và module tiến độ
+
+**Trạng thái (QA vòng 5, 2026-10-09): N9 đã dựng nhưng đang tắt.** `STARS_SAVED = false`, và chưa có chỗ nào trong `frontend/app` gọi `recordStars`. Vì vậy mọi khu mở đều vẽ `lit`, storage có gì cũng vậy: ở `scratchpad/wt-scene-shots-r2/`, mỗi cặp ảnh có sao và không sao giống nhau từng byte (ví dụ `vinuni_1280x800_day.png` và `_day_star.png`, cùng 272 058 B); ở QA vòng 5 (`scratchpad/qa-scene-r6/shots/`) cũng vậy (`vinuni_day_2x.png` và `vinuni_day_star_2x.png`, cùng 593 826 B). Bàn giao ("Việc mở" ở dưới) chưa gửi: người điều phối gửi cho nhóm bàn thợ ở checkout chính, còn worktree cảnh không sửa phần bàn thợ. N9 chỉ thấy được khi bàn thợ gọi `recordStars(zone.id, level.id, score.stars)` lúc `run.scored` và đổi `STARS_SAVED = true` trong cùng thay đổi (việc mở ở dưới).
+
+**Luật hình** (`siteLook` trong `sites.ts`):
+
+| Trạng thái API | Có sao ở khu (≥ 1 sao ở bất kỳ màn nào) | Hình (`SiteLook`) |
+|---|---|---|
+| `coming_soon` | bất kỳ | `coming_soon`: nhạt màu, giàn giáo, cửa sổ kính tối |
+| `open` | không | `open`: màu đầy đủ, không giàn giáo, hai đèn lối vào sáng (QA vòng 2), cửa chính sáng (Thư viện), cửa sổ kính tối, không gáy sách |
+| `open` | có | `lit`: như `open`, cộng cửa sổ sáng `~lit` (cờ E), gáy sách và thanh kệ của Thư viện, khe sáng đỉnh Tháp canh, 5 đèn lồng dưới mép mái hiên Chợ (QA vòng 2) |
+
+`useCampusGeometry(campus, time, library, watchtower, market)` nhận `SiteLook` của từng toà. Toà nào đổi hình thì chỉ toà đó dựng lại.
+
+Sửa sau QA vòng 2 (2026-10-08):
+- **Đèn lối vào.** `entranceLamps(pal, id, look)` đặt hai đèn (hàm `lamp` của địa hình, 44 tam giác) cách cửa 0,6 hai bên, vuông góc với hướng toà, ở mọi khu không còn `coming_soon`. Cửa Tháp canh và Chợ quay về phía tây nên camera không thấy (art §1.2 nguyên tắc 7); đèn thì thấy, nên luật "khu mở có lối vào ấm" đứng cho cả ba khu. Trước đó Tháp canh mở không có gì sáng, Chợ `lit` và `open` ra cùng một hình (đổi sao thì dựng lại vô ích).
+- **Đèn lồng Chợ** khi `lit`: 3 hộp 0,16 dưới mép mái hiên nam (trên ba quầy) và 2 dưới mép mái hiên đông, cờ E. Bên trong nhà chợ bị mái che khỏi camera, nên đèn treo ở mép ngoài.
+- **`STARS_SAVED`** (`progress.ts`, hiện `false`): `siteLooks(sites, progress, starsSaved = STARS_SAVED)` coi mọi khu mở là đã có sao khi chưa có gì ghi sao, nên cảnh giống v0.3. Luật N9 ở trên vẫn chạy khi `true` và có test.
+- **Sửa sau QA vòng 3 (2026-10-09), đèn Thư viện.** `entranceLampSpots(id)` trả chỗ đứng của hai đèn. Thư viện đặt chúng xa cửa 2,8 dọc lối vào, qua chỗ cô Lan: `(−5.4, −2.2)` và `(−5.4, −3.4)`. Tháp canh và Chợ giữ 0,6 cạnh cửa. Trước đó, ở 0,6 cạnh lối, đèn gần đứng sát mép phải của cửa sáng trên màn hình (cách 0,9 px ở 1280×800), cùng màu `~lit` nên đọc như một phần cửa; còn đèn xa nằm sau dấu "!". Dời 1,0 dọc mặt tiền như QA gợi ý thì đèn gần lại đè lên nửa dưới cửa, vì trục z chạy chéo xuống bên trái màn hình. Test chiếu đèn, cửa và dấu "!" (28 px) ra màn hình 1280×800 overview và đòi mỗi đèn cách cửa và dấu ít nhất 8 px; hiện đèn gần cách cửa 54 px, cách dấu 9 px.
+- **Sửa sau QA vòng 5 (2026-10-09), màu sáng lúc hoàng hôn.** `~lit` không nướng, nên trước đây giữ `lerpW(lm.accent, 0.2)` ở cả hai giờ. Lúc hoàng hôn, tường `+z` hứng nắng nướng ra gần đúng màu đó: trên ảnh QA (`scratchpad/qa-scene-r6/crops/vinuni_tower_slot_zoom.png`), khe sáng đỉnh Tháp canh ở mặt `+z` là `(221,186,139)` trên tường `(221,181,158)`, tương phản 1,03:1, không thấy; đèn lồng Chợ chỉ 1,44–1,83:1 với sàn và cột, đọc như hộp nhạt (`vinuni_market_lanterns_zoom.png`). Nay hoàng hôn dùng `full(lerp(lm.accent, dusk.sun, 0.5))` (`full` chia cho kênh lớn nhất): campus `#ffbc49`, town `#ffa930`, màu hổ phách đậm của đèn lúc chiều. Ban ngày giữ nguyên `#ddba8b` / `#c9937d`. Đo bằng ΔE (CIE76) với mặt nướng phía sau: tường `+z` lúc hoàng hôn từ 10–12 lên 48–57, sàn Chợ từ 9–20 lên 55–56; ban ngày vẫn 23–33. Độ sáng thì không tách được trên tường `+z` lúc hoàng hôn: ngay cả màu trắng cũng chỉ đạt khoảng 1,9:1, nên test đo khác màu chứ không đo tỉ lệ độ sáng. Test mới (`scene.test.ts`, đỏ trước khi sửa: 11,8 và 10,2 ở tường `+z` Thư viện): mỗi theme, cả hai giờ, `~lit` cách tường `+z`, `+x` của ba toà và sàn Chợ ít nhất ΔE 20. Cửa Thư viện, đèn lối vào và cửa sổ cũng đổi theo lúc hoàng hôn. Không dời khe Tháp canh sang riêng mặt `+x`: khi đó ban ngày mất một khe vẫn đọc được. Chưa chụp lại ảnh (RAM máy đang vượt ngân sách khi sửa); vòng QA sau cần chụp lại `allopen` lúc hoàng hôn. Câu hỏi mở về màu cỏ, nước và trời lúc hoàng hôn (art §12 mục 9) vẫn để chủ dự án quyết.
+- **Việc mở, ghi 2026-10-08 (bàn giao cho nhóm bàn thợ):** chưa có gì gọi `recordStars`. Khi một lượt được chấm (`run.scored`, `run.ts` / `Results.tsx` đã tính `run.score.stars`), gọi `recordStars(zone.id, level.id, score.stars)` trong `try/catch` (hàm ném lỗi khi id không phải slug), và trong cùng thay đổi đổi `STARS_SAVED` thành `true`; hai e2e "re-bakes the campus at dusk and back, with a starred library, then rests" và "survives stored progress keyed by an inherited name" tự đổi kỳ vọng theo cờ. Cổng của thay đổi đó (QA vòng 4): đổi cờ, chạy lại hai e2e này, chụp lại ảnh có sao và không sao, hai ảnh phải khác nhau. Mọi id khu và màn trong `zones.json` đều khớp mẫu id của `progress.ts`, giống `SLUG_PATTERN` của backend. Chưa xong việc này thì N9 không có tác dụng thấy được (art §12 mục 6).
+  - **Điều kiện thêm (QA vòng 5, 2026-10-09): sau `recordStars`, campus phải mount lại hoặc đọc lại tiến độ.** `Campus` đọc tiến độ một lần khi mount (`useState(readProgress)` trong `CampusScene.tsx`). Hôm nay vậy là đủ vì `play` và `play/:zoneId` là hai route anh em (`app/routes.ts`), nên quay về `/play` là mount lại. Nếu bàn thợ hiện đè lên `/play` đang mount (sheet, lớp phủ hay route con), sao mới chỉ thấy sau khi tải lại trang. Khi đó, thêm một số phiên bản tiến độ vào hub store, tăng nó sau `recordStars`, và cho `Campus` đọc lại theo số đó thay cho `useState(readProgress)`. Thay đổi cũng cần một e2e mới: chấm một lượt được ít nhất 1 sao, quay về `/play` không tải lại trang, rồi kiểm `data-looks` có `library:lit`. Hai e2e ở trên gọi `page.reload()`, nên không bắt được lỗi này.
+
+**Module `frontend/app/features/progress/progress.ts`** là nơi duy nhất đọc và ghi sao. Bàn thợ ghi vào đây khi một lượt chấm xong (việc mở ở trên).
+
+```ts
+export const PROGRESS_KEY = "vg-progress-v1";
+export type Stars = 0 | 1 | 2 | 3;
+export type Progress = Readonly<Record<string, Readonly<Record<string, Stars>>>>; // zoneId → levelId → sao
+
+readProgress(): Progress                                   // {} khi chưa có, storage bị chặn, hay dữ liệu hỏng
+recordStars(zoneId, levelId, stars): Progress              // chỉ lưu khi tốt hơn; ném lỗi nếu id không phải slug nội dung
+levelStars(progress, zoneId, levelId): Stars               // 0 khi chưa có
+hasStar(progress, zoneId): boolean                         // có màn nào của khu đạt ≥ 1 sao
+```
+
+- `zoneId` và `levelId` là id trong `zones.json` (ví dụ `library` / `grounded-citation`).
+- Lưu ở `localStorage["vg-progress-v1"]`, JSON `{ "library": { "grounded-citation": 2 } }`.
+- Mọi lần đọc và ghi đều bọc `try/catch`. Ghi hỏng thì bỏ qua, vì ghi là best effort.
+- Đọc thì bỏ từng mục sai (id không phải slug, sao ngoài 0–3, kiểu sai) chứ không xoá cả bản ghi.
+- Sửa sau QA vòng 1 (2026-10-08): chỉ đọc và ghi khoá riêng. `constructor` khớp quy tắc slug, mà `{}.constructor` là hàm `Object`, nên bản đầu ghi `{"constructor": {"keys": 1}}` thẳng lên `Object` (`Object.keys` thành số 1, cảnh 3D sập ở mọi lần vào cho tới khi xoá storage). Nay `clean()` dựng map bằng `Object.create(null)`, còn `levelStars`, `hasStar`, `recordStars` đọc qua `Object.hasOwn`. Vùng hay màn tên `constructor` lưu và đọc như mọi id khác.
+- Đổi cấu trúc thì dùng khoá mới `vg-progress-v2`, không sửa tại chỗ.
+- Module không gọi server. Hai route chỉ chia trạng thái qua `localStorage`, đúng như N9.
+- `CampusScene` đọc một lần khi mount (`useState(readProgress)`) rồi gọi `siteLooks(sites, progress)` (`sites.ts`, xem `STARS_SAVED` ở trên), hàm thuần đổi trạng thái API và sao theo id khu ra `SiteLook` của từng toà. Quay về `/play` từ bàn thợ là mount lại, nên thấy ngay sao mới (chỉ khi hai route còn là anh em, xem điều kiện thêm ở việc mở). Không nghe sự kiện `storage` giữa các tab; thêm khi cần.
+- Với `?debug=frames`, cảnh ghi `data-looks` lên `<html>` (ví dụ `library:lit watchtower:coming_soon market:coming_soon`) để e2e kiểm đường dây từ storage tới hình.
+
+### 13.6 HUD
+
+Nút "Hoàng hôn" ở cụm trên bên trái (art §8.4). `HUD_CORNER.width` từ 320 thành 344, vì cụm trái giờ kết thúc ở `x ≈ 337` px. Test "góc HUD" (vitest và e2e) vẫn xanh: hai góc vẫn là trời.
+
+Sửa sau QA vòng 1 (2026-10-08):
+- Nút chỉ icon dưới `md` (`max-md:w-11 max-md:px-0`, nhãn `sr-only md:not-sr-only`). Trước là `sm`: ở 640 px với theme vinuni cụm trái kết thúc ở x = 329 còn "Các khu" bắt đầu ở 333, nên bốn nút trông như một thanh. Nay ở 640 px khoảng cách là 106 px (vinuni) và 191 px (town).
+- Nút chỉ hiện khi cảnh đã chạy. `hubStore.sceneUp` bật khi `useHubFrame` gắn `wake` (cảnh mount) và tắt khi gỡ (`setWake(null)`), nên cảnh lỗi (không WebGL, chunk lỗi, dữ liệu hỏng) thì không còn nút bấm mà không có tác dụng.
+
+### 13.7 Test
+
+- `progress.test.ts`: rỗng lúc đầu; giữ kết quả tốt nhất; 0 sao không làm sáng; bỏ từng mục hỏng; JSON hỏng đọc ra rỗng; khoá `constructor` không ghi lên `Object` và đọc, ghi như id thường (QA vòng 1, đỏ trước khi sửa); storage bị chặn vẫn chạy; id sai thì ném lỗi.
+- `store.test.ts`: `sceneUp` theo `setWake` (QA vòng 1).
+- `scene.test.ts`:
+  - Mỗi theme: ngày mặt trên `(1, 1, 1)`, trái 0.80 ấm (`r − b > 0.1`), phải 0.60 lạnh (`b − r > 0.08`; QA vòng 2, đỏ trước khi đổi preset); hoàng hôn tối và ấm; bỏ rim thì bằng công thức hai đèn viết lại trong test (kiểm công thức tự nhất quán, không chạy đường Lambert của three.js, art §2.3; tên test sửa cho khớp ở QA vòng 2); rim chỉ ở mặt nhìn nghiêng hướng nắng.
+  - `siteLook`; `siteLooks` đọc sao theo id khu (không theo vị trí) và không làm sáng khu sắp mở dù có sao (QA vòng 1); khi chưa ghi sao (`starsSaved = false`) mọi khu mở là `lit` (QA vòng 2, đỏ trước khi sửa).
+  - Hai đèn Thư viện cách cửa sáng và dấu "!" ít nhất 8 px ở 1280×800 (QA vòng 3, đỏ trước khi dời: 0,9 px).
+  - Cây tối trong bóng toà nhà, ở cả hai giờ (QA vòng 3, đỏ trước khi thêm: cây `(13.75, −7.4)` lúc hoàng hôn). Đối chứng là tia bắn vào campus đã dựng, hướng về mặt trời, từ tâm tán và từ 4 điểm cách tâm 0,3. Năm tia đều chạm toà thì cây phải tối; không tia nào chạm thì cây phải sáng; cây có tia chạm, tia không là cây ở mép bóng, bỏ qua.
+  - `~lit` cách tường `+z`, `+x` của ba toà và sàn Chợ ít nhất ΔE 20 (CIE76), mỗi theme, cả hai giờ (QA vòng 5, đỏ trước khi đổi màu hoàng hôn: 11,8 / 10,2).
+  - Số đỉnh `~lit` của cả ba toà ở ba hình và hai giờ: `coming_soon` 0; `open` 102 (Thư viện: cửa + hai đèn) hoặc 72 (hai đèn); `lit` nhiều hơn `open`, Thư viện hơn 100 (QA vòng 2, đỏ trước khi thêm đèn).
+  - Bóng phủ đúng chỗ sau tâm tán mọi cây và sau cổng, ở cả hai giờ (QA vòng 2, đỏ trước khi thêm khối); mọi mặt đất phẳng dưới 0.03 nằm dưới `SHADOW_Y`, trừ bậc 0,02 của sân khấu (QA vòng 2; hạ `SHADOW_Y` xuống 0,013 thì đỏ).
+  - Ngân sách mỗi theme ở cả hai giờ.
+  - Bóng nằm trong `BASE`; tới quá `x = 12` ban ngày và chạm mép đế lúc hoàng hôn.
+  - Mỗi khối bóng khớp hình thật (góc trong 0,25, đỉnh trong 0,05; QA vòng 1).
+  - Khu mở thì bỏ giàn giáo (kiểm theo vị trí giàn giáo, vì đèn lối vào làm số tam giác tăng); đổi giờ thì dựng lại mọi nhóm.
+- `e2e/play.spec.ts`:
+  - Chưa có sao: `data-looks` là `library:open …` khi `STARS_SAVED`, `library:lit …` khi cờ còn tắt. Ghi sao vào storage rồi tải lại: `library:lit …` (QA vòng 3). Khi cờ còn tắt, cặp kiểm này không bắt được lỗi trên đường storage → `siteLooks`; bật cờ thì bắt được cả hai chiều. Đã thử: bật cờ, build lại thì test qua; bật cờ và cho `CampusScene` bỏ qua storage thì test đỏ (`library:open`).
+  - Có sao Thư viện: `data-looks` là `library:lit …`; canvas có bộ đệm stencil (`getContextAttributes().stencil`, QA vòng 2); bấm "Hoàng hôn" thì `aria-pressed` đổi, khung canvas có `bg-scene-dusk`, cảnh vẽ thêm khung rồi đứng yên; bấm lại về ngày và mất `bg-scene-dusk`; không lỗi console.
+  - Storage `{"constructor": {"keys": 1}}`: cảnh chạy, Thư viện `open` (hoặc `lit` khi `STARS_SAVED = false`), không lỗi console (QA vòng 1).
+  - Không có WebGL: hiện thông báo dự phòng, "Các khu" vẫn dùng được, không có nút "Hoàng hôn" (QA vòng 1).
+  - Nút nằm trong `HUD_CORNER`; ở 640 px nút chỉ icon và cách "Các khu" ≥ 48 px (QA vòng 1).
+- `playwright.config.ts` (QA vòng 2): cổng đọc từ `E2E_PORT` (mặc định 4173) và không bao giờ dùng lại server đang chạy. Trước đó hai checkout cùng cổng 4173 với `reuseExistingServer`, nên một lần chạy ở worktree có thể lặng lẽ test bản build của checkout chính (không có nút "Hoàng hôn", không có `data-looks`): nghi là nguyên nhân 20 lỗi một lần ở `play.spec.ts`. Nay cổng bị chiếm thì lần chạy dừng với lỗi "is already used" (đã thử). Chạy đủ bộ e2e với `E2E_PORT=4374 --workers=1`: 55 qua, 3 bỏ qua (chỉ chạy ở desktop); chạy lại sau QA vòng 3, vẫn 55 qua và 3 bỏ qua. Một worker theo luật RAM của máy (không chạy hai trình duyệt headless cùng lúc).
+
+### 13.8 Ảnh
+
+Nằm ngoài repo: `scratchpad/wt-scene-shots/` (bản đầu), `scratchpad/wt-scene-shots-r1/` (sau QA vòng 1, bóng phủ nhân) và `scratchpad/wt-scene-shots-r2/` (sau QA vòng 2: preset ngày ấm hơn, bóng cây và cổng, đèn lối vào; thêm `allopen_<giờ>_<market|tower>.png` khi cả ba khu mở, chụp bằng `n8/shots-r2-open.mjs`), chụp bằng `scratchpad/n8/shots-n8.mjs` trên bản build (`serve-build --port 4371`). Ảnh cận so sánh khe sau Tháp canh: `scratchpad/n8/r1-gap-old.png`, `r1-gap-new.png`. So sánh vòng 1 / vòng 2 quanh cổng: `scratchpad/n8/r2-gate-day.png`, `r2-gate-dusk.png` (trái vòng 1, phải vòng 2). Sau QA vòng 3: `scratchpad/wt-scene-shots-r3/` (đèn Thư viện dời ra lối vào, cây trong bóng toà nhà tối; ảnh 1280×800, 375×812 và ảnh cận 2×); so sánh cây vòng 2 / vòng 3 lúc hoàng hôn: `scratchpad/n8/r5-trees-vinuni-dusk.png`, `r5-trees-town-dusk.png` (trái vòng 2, phải vòng 3).
+- Mỗi theme × giờ có ảnh 1280×800 và 375×812 (Thư viện chưa sao; ở vòng 2 vẫn sáng vì `STARS_SAVED = false`), 1280×800 khi Thư viện có 1 sao, và các ảnh cận 2× của Thư viện, Tháp canh, kim tháp.
+- Tên file: `<theme>_<w>x<h>_<giờ>[_star][_2x_crop_<chỗ>].png`.

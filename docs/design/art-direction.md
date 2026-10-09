@@ -5,6 +5,7 @@
 - **Phạm vi:** cảnh 3D của `/play`, lớp HUD/DOM đè lên cảnh, trang `/play/:zoneId`. Không có engine, bàn thợ, đồ chơi.
 - **Đã kiểm chứng bằng blockout:** mọi số trong mục 3–6 đã được dựng thử bằng three 0.186 (bản dựng nháp ở scratchpad, không nằm trong repo) và chụp ở 1280×800, 375×812, cả hai theme. Số draw call và tam giác ở mục 6 là số đo được, không phải ước lượng.
 - **Cập nhật v0.2:** cảnh hub dựng theo [campus-scene-v0.2.md](campus-scene-v0.2.md); file đó thay thế §5.1–§5.7, §6.1, §6.4 của tài liệu này.
+- **Cập nhật 2026-10-08 (đề xuất N8 và N9 của báo cáo "Insight edtech nâng cấp V-Game"):** ánh sáng nướng theo preset giờ trong ngày (ngày, hoàng hôn), bóng nắng chiếu xuống nền, rim và hơi ấm trong công thức tô bóng, bọt sóng tĩnh quanh hồ; cửa sổ khu mở chỉ sáng khi người chơi đã có sao ở khu đó (tạm tắt tới khi bàn thợ ghi sao, §12 mục 6; sửa sau QA vòng 2). Các mục bị sửa có ghi chú "Sửa 2026-10-08". Quyết định ở §12; số đo và API tiến độ ở [campus-scene-v0.3.md](campus-scene-v0.3.md) §13.
 - **Quy ước tên:** "theme campus" là theme pack mặc định lấy cảm hứng từ trường thật (`public/themes/<campus>/`), "theme town" là `public/themes/town/`. Tài liệu này không ghi tên thương hiệu.
 
 ---
@@ -20,9 +21,9 @@ Theme campus gợi lại khuôn viên tham chiếu bằng ba hình dễ nhận r
 ### 1.2 Nguyên tắc (7)
 
 1. **Maquette, không phải đồ chơi.** Đế trắng, lớp đất dày 0.6, người là tượng đơn sắc (đầu màu `plaza`, không mặt, không da). Không mắt to, không nảy tưng.
-2. **Màu thật ở mặt trên.** Mặt hướng lên luôn hiện đúng mã hex của manifest. Bóng đổ chỉ làm tối mặt đứng theo một quy tắc cố định (mục 2.3), nên đổi theme là đổi màu, không đổi ánh sáng.
-3. **Một điểm nhấn.** Tháp nhọn của landmark là thứ cao nhất và là thứ duy nhất có kim loại vàng ở đỉnh. Trong các khu, chỉ khu đang mở có cửa sổ sáng ấm, nên mắt tự đi về Thư viện.
-4. **Hình nói trạng thái, không chỉ màu.** Mở: cửa sổ sáng, màu đầy đủ. Sắp mở: giảm bão hoà **và** có giàn giáo gỗ (tín hiệu không dựa vào màu). Tương tác được: vòng sáng dưới đất và huy hiệu "!" ở DOM.
+2. **Màu thật ở mặt trên.** Mặt hướng lên luôn hiện đúng mã hex của manifest. Bóng đổ chỉ làm tối mặt đứng theo một quy tắc cố định (mục 2.3), nên đổi theme là đổi màu, không đổi ánh sáng. **Sửa 2026-10-08:** luật này áp cho preset ngày (mặc định). Preset hoàng hôn là ngoại lệ duy nhất: mặt trên tối và ấm đi theo công thức, QA so với bảng §2.3 thay cho hex manifest (§10).
+3. **Một điểm nhấn.** Tháp nhọn của landmark là thứ cao nhất và là thứ duy nhất có kim loại vàng ở đỉnh. Trong các khu, chỉ khu đang mở có cửa chính sáng ấm, nên mắt tự đi về Thư viện. **Sửa 2026-10-08 (N9):** cửa sổ của khu mở chỉ sáng khi người chơi đã có ít nhất 1 sao ở một màn của khu đó; khi đó Thư viện hiện thêm gáy sách sau cửa sổ. Ánh sáng ấm là phần thưởng, không phải trang trí. **Sửa sau QA vòng 2 (2026-10-08):** (a) chưa có gì ghi sao (bàn thợ chưa gọi `recordStars`), nên khoá `STARS_SAVED = false` giữ cửa sổ và gáy sách sáng ở mọi khu mở như v0.3 cho tới khi có đường ghi (§12 mục 6); (b) mỗi khu mở có thêm hai đèn lối vào sáng hai bên cửa, vì cửa Tháp canh và Chợ quay về phía tây, camera không thấy (nguyên tắc 7).
+4. **Hình nói trạng thái, không chỉ màu.** Mở: hai đèn lối vào sáng (Thư viện thêm cửa chính sáng), màu đầy đủ, không giàn giáo. Đã có sao: thêm cửa sổ sáng (Chợ: đèn lồng dưới mép mái hiên). Sắp mở: giảm bão hoà **và** có giàn giáo gỗ (tín hiệu không dựa vào màu). Tương tác được: vòng sáng dưới đất và huy hiệu "!" ở DOM.
 5. **Chữ ở DOM, hình ở 3D.** Không có chữ nào dựng trong WebGL. Nhãn công trình, "!", lời thoại, thẻ khu đều là DOM dùng token Tailwind.
 6. **Đứng yên là im lặng.** Không vòng lặp idle. Mọi chuyển động trả lời một thao tác và tự dừng (mục 7). Không ai làm gì thì không có khung hình mới.
 7. **Chỉ dựng phần camera thấy.** Camera không xoay (azimuth cố định), nên cửa sổ, cửa, giàn giáo chỉ dựng trên mặt `+x` và `+z`. Mặt `−x`, `−z` để trơn.
@@ -69,8 +70,10 @@ Ký hiệu khoá dùng trong toàn bộ mục 5: `lm.*` = `campus.landmark.*`, `
 | Landmark: tường / gờ, bệ / mái, kim tháp / đỉnh | `lm.wall` / `lm.trim` / `lm.roof` / `lm.accent` |
 | Thư viện, Tháp canh, Chợ model: tường / gờ, bệ / mái | `<site>.wall` / `<site>.trim` / `<site>.roof` |
 | Đầu hồi tam giác của mái hai dốc | `<site>.wall` (qua quy tắc `{top, side}`) |
-| Cửa sổ khu chưa mở, cửa sổ landmark | `~glass` |
-| Cửa sổ, cửa, ô tròn khu đang mở; chụp đèn | `~lit` (cờ E) |
+| Cửa sổ khu chưa mở, cửa sổ khu mở chưa có sao, cửa sổ landmark | `~glass` |
+| Cửa chính khu đang mở; cửa sổ khu đã có sao; chụp đèn | `~lit` (cờ E) |
+| Bóng nắng trên đất (2026-10-08) | `~shadow`: hệ số nhân, lớp phủ riêng (§2.4 mục 4) |
+| Bọt sóng quanh bờ hồ (2026-10-08) | `~foam` |
 | Gáy sách trong cửa sổ Thư viện | lần lượt `lib.roof`, `lm.accent`, `mk.roof`, `wt.roof`, `lib.trim` |
 | Giàn giáo, quầy chợ | `trunk` |
 | Thân cây / tán tròn / tán bách | `trunk` / `foliage` / `~cypress` |
@@ -94,49 +97,73 @@ Mọi phép tính làm trên `THREE.Color` trong không gian **linear** (`new Co
 | `~skirt` | `mul(ground, 0.70)` | `#9eb788` | `#aabc96` |
 | `~contact` | `mul(ground, 0.80)` | `#a7c391` | `#b5c79f` |
 | `~glass` | `mul(water, 0.45)` | `#6288a1` | `#6c9097` |
-| `~lit` | `lerpW(lm.accent, 0.20)` | `#d5b985` | `#c9937d` |
+| `~lit` (hoàng hôn sửa 2026-10-09, sau QA vòng 5) | Ngày: `lerpW(lm.accent, 0.20)`. Hoàng hôn: `full(lerp(lm.accent, dusk.sun, 0.5))`, với `full` chia cho kênh lớn nhất, vì tường `+z` hứng nắng chiều nướng ra gần đúng màu ngày (§12 mục 10) | ngày `#ddba8b`, hoàng hôn `#ffbc49` | ngày `#c9937d`, hoàng hôn `#ffa930` |
 | `~waterHi` | `lerpW(water, 0.35)` | `#c0daef` | `#c6e1e7` |
 | `~dark` | `mul(trunk, 0.35)` | `#4a3522` | `#4e3924` |
 | `~lanSkirt` | `mul(npc, 0.45)` | `#915f12` | `#804009` |
 | `~pants` | `mul(player, 0.45)` | `#0a3360` | `#114942` |
 | `~xray` | `lerpW(player, 0.45)` | `#b3baca` | `#b4c1be` |
 | `~cypress` | `mul(foliage, 0.82)` | `#48833e` | `#548d4a` |
+| `~shadow` (2026-10-08, sửa sau QA vòng 1) | Hệ số nhân `½(sky + ground) / shade(+y)` của preset (§2.3), từng kênh, cắt ở 1: đưa mặt đất từ ánh sáng của mặt trên về ánh sáng của một mặt tường quay lưng với nắng. Hai cột bên là màu cỏ nhận được, vẫn bằng `ground × ½(sky + ground)` như trước | ngày `#839d6a`, hoàng hôn `#576a53` | ngày `#9daf8f`, hoàng hôn `#6a7871` |
+| `~foam` (2026-10-08) | `lerpW(water, 0.60)`, rồi nướng như mặt trên | ngày `#dbe6ed` | ngày `#deedf0` |
 
 **Trạng thái "Sắp mở"** (áp cho mọi màu của nhóm khu đó, trước khi tô bóng):
 `desat(c) = mul(c.lerp(gray(Y), 0.70), 0.97)`, với `Y = 0.2126 r + 0.7152 g + 0.0722 b` (linear). Kết quả mẫu: mái Tháp canh `#222936` / `#283032`, mái Chợ `#8b5758` / `#8d6f64`, giàn giáo `#685d56` / `#6d635b` (campus / town).
 
-### 2.3 Tô bóng nướng sẵn vào vertex colour (cố định)
+### 2.3 Tô bóng nướng sẵn vào vertex colour (sửa 2026-10-08: theo preset, có rim và hơi ấm)
 
-Hình tĩnh dùng `MeshBasicMaterial({ vertexColors: true })`; ánh sáng được nướng vào màu đỉnh theo pháp tuyến **của từng mặt** (geometry non-indexed, `computeVertexNormals()` cho pháp tuyến phẳng):
+Hình tĩnh dùng `MeshBasicMaterial({ vertexColors: true })`; ánh sáng được nướng vào màu đỉnh theo pháp tuyến **của từng mặt** (geometry non-indexed, `computeVertexNormals()` cho pháp tuyến phẳng).
+
+**Bản cũ (đến 2026-10-07):** `shade(n) = min(1, 0.466 + 0.268·(0.5 + 0.5·n.y) + 0.346·max(0, n·L))`, một số cho cả ba kênh: trên 1.00, `+z` 0.80, `+x` 0.60. Đó chính là Lambert với hai đèn của §3.
+
+**Bản mới:** mỗi theme khai báo preset ánh sáng trong manifest (`campus.lights.day`, `campus.lights.dusk`, mỗi preset là đúng tham số của hai đèn three.js, §3). Code đổi preset ra hệ số linear `S = sky·I_h/π`, `G = ground·I_h/π`, `U = sun·I_s/π` (mỗi kênh một số), rồi:
 
 ```ts
-const L = new Vector3(-0.35, 1, 0.75).normalize(); // (-0.2696, 0.7704, 0.5778), hướng tới mặt trời
-const shade = (n: Vector3) =>
-  Math.min(1, 0.466 + 0.268 * (0.5 + 0.5 * n.y) + 0.346 * Math.max(0, n.dot(L)));
+const V = new Vector3(1, 1, 1).normalize(); // hướng về camera: cố định vì camera không xoay (§4.1)
+const shade = (n: Vector3) => {                       // trả về màu (r, g, b), mỗi kênh ≤ 1
+  const sun = Math.max(0, n.dot(L));
+  const direct = sun * (1 + rim * (1 - Math.max(0, n.dot(V))) ** 2); // rim: nắng viền mặt nhìn nghiêng
+  return G + (S − G)·(0.5 + 0.5·n.y) + U·direct;      // từng kênh, cắt ở 1
+};
 ```
 
-| Mặt | Pháp tuyến | Hệ số (linear) | Tường trắng campus `#f7f6f2` thành |
+- **Hơi ấm:** `U` ngả vàng, `S` ngả xanh, nên mặt hứng nắng ấm lên và mặt khuất nắng lạnh đi; độ sáng giữ thứ bậc 1.0 / 0.8 / 0.6. **Sửa sau QA vòng 2 (2026-10-08):** ban ngày ấm và lạnh rõ hơn (mặt trái `r − b` từ 0.04 lên 0.15, mặt phải `b − r` từ 0.05 lên 0.12), vì QA vòng 1 đo mặt bên chỉ lệch v0.3 khoảng 2 mức. Mặt trên vẫn đúng `(1, 1, 1)`, độ sáng vẫn 0.80 / 0.60. Nắng ngày giờ vàng hơn (`#ffd059`), trời xanh hơn (`#d0e5ff`), nên bóng ngày cũng ngả xanh.
+- **Rim:** số hạng thêm nắng cho mặt gần như nhìn nghiêng mà vẫn hướng về mặt trời (viền trái của cột, cầu, nón). Mặt hộp có `n·V = 0.577` nên chỉ đổi rất ít. Rim chỉ có ở hình nướng; người và cây (Lambert) không có, chấp nhận vì chúng nhỏ.
+- **Đúng với Lambert:** bỏ rim thì công thức trùng Lambert với hai đèn của preset, nên người và cây cùng tông với hình nướng ở mọi preset. Sửa sau QA vòng 1: test chỉ so `shade()` với cùng công thức viết lại từ cùng hệ số, tức kiểm công thức nhất quán chứ không chạy đường Lambert thật của three.js (màu × cường độ / π, sRGB sang linear). Phần khớp với three.js dựa trên quy ước đó và được xác nhận bằng mắt trên ảnh chụp, chưa có test pixel.
+
+| Preset | Hướng tới mặt trời `L` | rim | Trên `+y` | Trái `+z` | Phải `+x` |
+|---|---|---|---|---|---|
+| Ngày (mặc định, QA vòng 2) | `(−0.35, 1, 0.75)` chuẩn hoá | 0.25 | `(1, 1, 1)` sau khi cắt | `(0.860, 0.795, 0.709)`, độ sáng 0.80 | `(0.560, 0.605, 0.679)`, độ sáng 0.60 |
+| Hoàng hôn | `(−0.62, 0.55, 0.6)` chuẩn hoá | 0.60 | `(0.640, 0.481, 0.420)` | `(0.799, 0.521, 0.399)` | `(0.249, 0.261, 0.379)` |
+
+Tường landmark (campus `#f6f3ee`, town `#e9e2d3`) thành:
+
+| Preset | Trên | Trái | Phải |
 |---|---|---|---|
-| Trên | `+y` | 1.00 | `#f7f6f2` |
-| Trái màn hình | `+z` | 0.80 | `#e0dfdb` |
-| Phải màn hình | `+x` | 0.60 | `#c5c4c1` |
-| Dưới | `−y` | 0.466 | (không thấy) |
+| Ngày, campus | `#f6f3ee` | `#e6dccc` (vòng 1: `#e1ddd5`) | `#bec3c8` (vòng 1: `#c2c2c2`) |
+| Ngày, town | `#e9e2d3` | `#daccb5` (vòng 1: `#d5cdbc`) | `#b4b5b1` (vòng 1: `#b7b4ac`) |
+| Hoàng hôn, campus | `#caafa2` | `#dfb69e` | `#84859a` |
+| Hoàng hôn, town | `#bfa38f` | `#d3a98c` | `#7c7b88` |
 
-Mặt nghiêng (mái, nón, cầu) tự nhận giá trị trung gian từ cùng công thức. Unit test: `shade(+y)=1.000`, `shade(+z)=0.800`, `shade(+x)=0.600` (±0.002).
+Unit test (`scene.test.ts`, mỗi theme): ngày `shade(+y)` đúng bằng `(1, 1, 1)` (luật màu thật ở mặt trên); độ sáng `+z` 0.80 và `+x` 0.60 (±0.005), `+z` có `r − b > 0.1`, `+x` có `b − r > 0.08` (QA vòng 2; đỏ trước khi đổi preset); hoàng hôn mặt trên tối hơn 0.9 và ấm, `+x` tối hơn 0.5; bỏ rim thì bằng công thức hai đèn viết lại trong test (không chạy shader three.js; tên test sửa ở QA vòng 2 cho khớp); rim chỉ thêm ở mặt nhìn nghiêng hướng nắng.
 
-**Màu cuối của một đỉnh** = `màuKhoá × shade(n) × ao`, trừ phần có cờ **E** (emissive: cửa sổ sáng, chụp đèn, mặt đồng hồ, kim đồng hồ, gáy sách) dùng `shade = 1`, `ao = 1`.
+**Màu cuối của một đỉnh** = `màuKhoá × shade(n) × ao` (nhân từng kênh), trừ phần có cờ **E** (emissive: cửa chính khu mở, cửa sổ khu đã có sao, chụp đèn, mặt đồng hồ, kim đồng hồ, gáy sách) dùng `shade = 1`, `ao = 1`. Vì vậy ở hoàng hôn cửa sổ sáng giữ đúng độ sáng đầy đủ trong khi mọi thứ khác tối đi: cửa sổ tự "phát sáng" mà không cần bloom. Phần "mù xa" của toà phía sau (v0.3 §5.2) giờ pha về màu mặt trên của preset thay cho trắng (ngày vẫn là trắng).
 
-### 2.4 AO giả (không tốn draw call)
+### 2.4 AO giả (không tốn draw call; riêng bóng nắng ở mục 4 tốn 1, sửa 2026-10-08)
 
 1. **AO dọc:** với phần có cờ **AO** ở bảng mục 5, mọi đỉnh của mặt đứng (`|n.y| < 0.5`) nằm ở đáy của phần đó (`y ≤ bbox.min.y + 0.001`) nhân `0.82`; đỉnh trên giữ `1.0`. Nội suy theo chiều cao tạo vệt tối nhẹ dần lên.
 2. **Viền chân công trình (skirt):** quanh 4 footprint (`LANDMARK.footprint` và 3 `SITES[*].footprint`), một khung phẳng rộng `0.45` ở `y = 0.006`, 4 hình thang (8 tam giác). Đỉnh trong màu `~skirt`, đỉnh ngoài màu `ground` (hoà vào cỏ). Đường đi nằm trên (`y = 0.012`) nên che skirt ở chỗ giao, chấp nhận.
 3. **Vệt tiếp đất dưới cây:** đĩa phẳng `circle(r, 12)` ở `y = 0.006`, màu `~contact`, `r = 0.62·s` (cây tròn) hoặc `0.40·s` (cây bách), `s` là scale của cây đó (mục 5.6). Đục, không trong suốt, nằm trong nhóm địa hình.
+4. **Bóng nắng (2026-10-08, N8; sửa sau QA vòng 1 cùng ngày):** mỗi khối của nhà chính, tháp theo archetype, ba toà khu và toà phía sau được chiếu theo `−L` xuống mặt đất (`p − p.y·L/L.y`), lấy bao lồi, cắt theo mép đế. Các bao lồi gộp thành một lưới riêng `G-shadow` ở `y = 0.014`, trên mọi lớp đất (cao nhất là cát và vạch đường chạy, 0.0135), tô hệ số `~shadow` và vẽ bằng `MeshBasicMaterial` trộn kiểu nhân (`MultiplyBlending`, không ghi depth). Vì vậy cỏ, đường, mặt hồ và đường chạy dưới bóng đều tối đi đúng tỉ lệ, không còn vệt đường sáng cắt ngang bóng như bản đục ở `y = 0.007`. Stencil (`stencil: true` trên canvas; ghi 1, chỉ vẽ nơi chưa bằng 1) giữ cho chỗ hai bóng chồng nhau chỉ tối một lần. Giá: +1 draw call (14 theo `sceneBudget()`, trần test 16), số tam giác như cũ (92–108). Vật cao hơn 0.014 (quảng trường, luống hoa, bậc) che lớp bóng nên vẫn sáng, chấp nhận (QA vòng 3 nêu lại, vẫn giữ; cách sửa ở campus-scene v0.3 §13.2). Hoàng hôn có nắng thấp nên bóng dài, chạm mép đế thì bị cắt. Danh sách khối ở campus-scene v0.3 §13.2. **Sửa sau QA vòng 2 (2026-10-08):** thêm cổng trước, theo kiểu cổng (cổng ba vòm: khối giữa, attic, hai cánh; cổng trụ: hai trụ và dầm treo, nên nắng lọt qua lối đi), và tán của mọi cây (đúng các đỉnh của tán, đặt như mesh instanced đặt cây). Trước đó nửa trái campus không có bóng nào lúc hoàng hôn, cạnh Chợ và Tháp canh bóng dài. Giá: lưới bóng từ 108 lên 817 tam giác (campus ngày; town 802), vẫn 1 draw call. Chấp nhận không đổ bóng: hai hàng cột cong (bao lồi của cung sẽ lấp kín lòng cung), đèn, tượng, hàng rào, thân cây (đã có đĩa tiếp đất), và người: người chơi và cô Lan vẫn sáng khi đứng trong bóng toà nhà, vì Lambert không nhận bóng. **Sửa sau QA vòng 3 (2026-10-09):** cây có tâm tán trong bóng toà nhà nhân màu instance với `~shadow` (`treesInShade`), 0 draw call, 0 tam giác; người thì vẫn không, vì họ di chuyển. Test: mọi mặt đất phẳng dưới `y 0.03` nằm dưới `SHADOW_Y`, trừ bậc thấp nhất của sân khấu (khối đặc, như quảng trường); e2e kiểm canvas có bộ đệm stencil.
+5. **Bọt sóng tĩnh (2026-10-08, N8):** một vành `~foam` rộng 0.22 ngay trong bờ hồ, 32 tam giác. Mặt nước dừng ở mép trong của vành, nên bọt nằm cạnh nước ở cùng `y = 0.008`, không đè lên nhau. Không chuyển động.
 
 ### 2.5 Bầu trời, sương mù, trường hợp thêm trường manifest
 
 - **Bầu trời:** một màu phẳng lấy từ biến đã có `--vg-scene-sky` trong cả hai `theme.css` (`#dfeaf5` / `#e3efec`). Canvas trong suốt (`alpha: true`, không đặt `scene.background`); khung chứa canvas tô `bg-scene`. Coder thêm một token vào `app/app.css`: `--color-scene: var(--vg-scene-sky);` trong `@theme inline`, và fallback `--vg-scene-sky: #eef2f5` trong `:root` của `@layer base`. Poster chờ tải dùng cùng token nên không có nháy màu khi canvas hiện.
+- **Trời hoàng hôn (2026-10-08):** cũng là một màu phẳng, `--vg-scene-dusk` trong `theme.css` (cả hai theme `#e7cfc3`, hồng đào nhạt). Token `bg-scene-dusk`; khung chứa canvas tô màu này khi preset là hoàng hôn, nên trang vẫn giữ `bg-scene` cho poster. Vẫn cấm gradient.
 - **Sương mù:** không. Đế mô hình nổi trên nền trời phẳng; cạnh đế là đường viền rõ ràng.
 - **Manifest additions: không có.** Đã cân nhắc `sky`, `signal`, `skin`, `glass` và bỏ cả bốn: trời đã có trong `theme.css`; vòng tương tác dùng `player`, huy hiệu "!" dùng token CSS `accent`; tượng người không có da; kính và đèn phái sinh được. Vì vậy D8 không kích hoạt: coder **không** sửa `schema.ts` hay hai `manifest.json` cho art.
+- **Sửa 2026-10-08, D8 kích hoạt một lần:** thêm `campus.lights = { default, day, dusk }`. Mỗi preset gồm `sky`, `ground`, `hemisphere`, `sun`, `sunIntensity`, `sunDirection`, `rim`, tức tham số của hai đèn three.js cộng hệ số rim. Preset là dữ liệu theme vì đó là chỗ một theme chọn giờ mặc định và chỉnh tông; công thức vẫn ở code và có test. Hai theme hiện dùng cùng giá trị, `default: "day"`.
 
 ---
 
@@ -144,10 +171,10 @@ Mặt nghiêng (mái, nón, cầu) tự nhận giá trị trung gian từ cùng 
 
 | Thứ | Giá trị chính xác |
 |---|---|
-| Renderer | `<Canvas orthographic flat frameloop="demand" shadows={false} gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }} dpr={[1, cap]}>`; `flat` = `NoToneMapping` (bắt buộc, nếu không ACES làm lệch màu manifest); output sRGB mặc định |
+| Renderer | `<Canvas orthographic flat frameloop="demand" shadows={false} gl={{ antialias: true, alpha: true, stencil: true, powerPreference: "high-performance" }} dpr={[1, cap]}>`; `flat` = `NoToneMapping` (bắt buộc, nếu không ACES làm lệch màu manifest); output sRGB mặc định |
 | `cap` DPR | 2 trên desktop; 1.5 khi `(pointer: coarse)` hoặc chiều rộng < 768; `PerformanceMonitor` hạ về 1 khi FPS tụt (brief §5) |
-| `HemisphereLight` | sky `#ffffff`, ground `#d1d1d1`, intensity `2.306` (vị trí mặc định `(0,1,0)`) |
-| `DirectionalLight` | màu `#ffffff`, intensity `1.087`, `position = L × 30` (L ở mục 2.3), target gốc toạ độ, `castShadow = false` |
+| `HemisphereLight` | Sửa 2026-10-08: lấy từ preset đang dùng, `args = [sky, ground, hemisphere]`. Ngày (QA vòng 2): `#d0e5ff`, `#bfb5a9`, `3.054`. Hoàng hôn: `#9dccff`, `#f4d9f2`, `1.262`. (Cũ: `#ffffff`, `#d1d1d1`, `2.306`.) |
+| `DirectionalLight` | Sửa 2026-10-08: `args = [sun, sunIntensity]`, `position = L × 30` của preset, target gốc toạ độ, `castShadow = false`. Ngày (QA vòng 2): `#ffd059`, `1.561`. Hoàng hôn: `#ffb736`, `2.661`. (Cũ: `#ffffff`, `1.087`.) |
 | Shadow map | Không có. Không postprocessing. |
 | Hình tĩnh (5 nhóm gộp) | `MeshBasicMaterial({ vertexColors: true })`, ánh sáng nướng sẵn (mục 2.3). Rẻ nhất về fragment trên GPU tích hợp, màu tất định, test được bằng vitest. |
 | Người, cây (động hoặc instanced) | `MeshLambertMaterial({ vertexColors: true, flatShading: true })`. Hai đèn trên được hiệu chỉnh để Lambert cho đúng 1.00/0.80/0.60 như hình nướng (đã đo pixel: trắng → 255/231/204). Cây dùng `instanceColor` nhân thêm độ sáng. |
@@ -586,7 +613,7 @@ Khi nói chuyện: bottom sheet thay chỗ gợi ý; insetBottom = chiều cao s
 
 ### 8.4 Thành phần
 
-**Cụm nút trên.** Trái: link về `/`, `buttonClass("secondary")` + icon chevron SVG; từ `sm` trở lên có chữ, dưới `sm` chỉ icon `size-11` với `aria-label`. Phải: nút mở danh sách khu (`secondary`, `aria-expanded`, `aria-controls`) và `ThemeToggle`. Vị trí `absolute top-4 left-4 / right-4`, `lg:top-6 lg:left-6 lg:right-6`.
+**Cụm nút trên.** Trái: link về `/`, `buttonClass("secondary")` + icon chevron SVG; từ `sm` trở lên có chữ, dưới `sm` chỉ icon `size-11` với `aria-label`. **Thêm 2026-10-08:** ngay sau link là nút bật tắt "Hoàng hôn" (`<button aria-pressed>`, cùng kiểu `secondary`, icon mặt trời lặn; nhấn xuống là hoàng hôn, nhả ra là ngày; khi nhấn có viền `brand` và nền `brand-tint`). Từ `md` có chữ, dưới `md` chỉ icon `size-11`, tên vẫn đọc được bằng trình đọc màn hình (sửa sau QA vòng 1: trước là `sm`, nên ở 640–700 px hai cụm chỉ cách nhau 4 px và trông như một thanh công cụ). Nút chỉ hiện khi cảnh 3D đã chạy (`hubStore.sceneUp`); máy không có WebGL hay cảnh lỗi thì không có nút, vì bấm cũng không làm gì. Cụm trái kết thúc ở `x ≈ 337` px nên `HUD_CORNER.width` thành 344. Lựa chọn chỉ giữ trong phiên (store của hub), không lưu. Phải: nút mở danh sách khu (`secondary`, `aria-expanded`, `aria-controls`) và `ThemeToggle`. Vị trí `absolute top-4 left-4 / right-4`, `lg:top-6 lg:left-6 lg:right-6`.
 
 **Gợi ý tương tác** (khi `nearestWithin` trả về đích):
 - Khu mở và cô Lan: là `<button>`, `fixed bottom-4 inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 lg:bottom-6`, `min-h-12 max-w-xl rounded-md border border-line-strong bg-surface px-4 text-sm font-semibold text-fg inline-flex items-center gap-3`. Bên trái có `<kbd>` "E": `inline-grid size-7 place-items-center rounded-sm border border-line-strong bg-subtle text-xs font-bold`, ẩn khi `(pointer: coarse)`. Bấm/chạm = nhấn E.
@@ -704,12 +731,14 @@ Chụp ở **1280×800** và **375×812**, mỗi kích thước cho **cả hai t
 - [ ] Thư viện phía trên bên trái: mái `lib.roof`, mặt tiền 4 cột + đầu hồi trắng có ô tròn sáng, 4 cửa sổ vòm sáng ấm có gáy sách màu.
 - [ ] Tháp canh phía dưới bên phải và Chợ phía dưới bên trái: nhạt màu rõ rệt so với Thư viện, mỗi toà có giàn giáo gỗ, cửa sổ không sáng.
 - [ ] 39 cây, cây bách chỉ ở dải giữa (`|x| ≤ 5.5`); không cây nào đâm vào Chợ hay chìa ra ngoài mép đế.
-- [ ] Mặt trên đúng hex manifest (lấy mẫu pixel cỏ: campus `#b9d7a0`, town `#c8dcb0`); mặt trái/phải tường trắng campus `#e0dfdb` / `#c5c4c1` (±2).
+- [ ] Preset ngày: mặt trên đúng hex manifest (lấy mẫu pixel cỏ: campus `#a7c584`, town `#c8dcb0`); mặt trái/phải tường landmark theo bảng §2.3 (campus `#e1ddd5` / `#c2c2c2`, ±2). **Ngoại lệ 2026-10-08:** preset hoàng hôn không so mặt trên với hex manifest; so với bảng §2.3 (tường campus trên `#caafa2`, cỏ `#888e58`, ±2).
+- [ ] (2026-10-08) Bóng nắng: bên phải Tháp canh, Chợ, hội trường B có mảng tối; đường đi, đường chạy và mặt hồ nằm trong bóng cũng tối theo, không có vệt sáng cắt ngang; chỗ hai bóng chồng nhau không tối hơn; không có vạch sáng sau lưng Tháp canh lúc hoàng hôn; không bóng nào chìa ra ngoài mép đế; hoàng hôn bóng dài hơn. Bọt sóng là vành sáng mảnh trong bờ hồ.
+- [ ] (2026-10-08) Thư viện chưa có sao: cửa chính sáng, cửa sổ kính tối, không gáy sách. Có 1 sao (`vg-progress-v1`): cửa sổ sáng và có gáy sách. Hoàng hôn: cửa sổ sáng nổi rõ trên tường tối.
 - [ ] Nhãn 3 khu đúng chữ và trạng thái; "!" đỏ (campus) hoặc cam (town) trên đầu cô Lan; cụm nút nằm ở hai góc trời trống, không che công trình.
 - [ ] Đứng cạnh cô Lan: vòng tương tác màu `player` dưới chân cô, gợi ý ở giữa đáy đúng chữ §4.
 - [ ] Hội thoại mở ở panel phải, cô Lan vẫn thấy được bên trái; có lớp phủ nhẹ; hai nút đúng thứ tự.
 - [ ] Đi tới cửa Chợ `(0, 5.3)`: bóng x-ray nhạt của người chơi hiện qua mái.
-- [ ] `renderer.info.render.calls ≤ 13`, `triangles ≤ 9 000`; đứng yên 3 s thì bộ đếm frame không tăng.
+- [ ] `renderer.info.render.calls ≤ 13` (sửa 2026-10-08: đo được 13 lệnh vẽ mỗi khung khi vòng tương tác ẩn, đã gồm lớp bóng nắng), tam giác theo campus-scene v0.3 §13.4; đứng yên 3 s thì bộ đếm frame không tăng.
 
 **Hub `/play`, 375×812:**
 - [ ] Follow mode, zoom ≈ 29.8: người chơi cao ≈ 31 px, nằm trong dead-zone giữa màn; không cuộn ngang trang.
@@ -717,6 +746,7 @@ Chụp ở **1280×800** và **375×812**, mỗi kích thước cho **cả hai t
 - [ ] Mở hội thoại: bottom sheet ≤ 70% chiều cao, camera dời để cô Lan nằm giữa phần còn thấy; nút xếp dọc, "Vào Thư viện" ở trên.
 - [ ] Danh sách khu mở full-width dưới cụm nút, cuộn được, mọi hành động bấm được bằng bàn phím.
 - [ ] Bật reduced motion: không nhún, không nhịp vòng, camera nhảy thẳng, cô Lan quay ngay.
+- [ ] (2026-10-08) Nút "Hoàng hôn" chỉ icon dưới `md`, 44 px, không chồng "Các khu"; bấm thì cảnh đổi ngay (không chuyển cảnh động) rồi đứng yên. Ở 640 px hai cụm nút cách nhau rõ (e2e kiểm ≥ 48 px).
 
 **Trang khu, cả hai kích thước:**
 - [ ] `/play/library`: thanh màu `brand`, đúng 3 màn theo thứ tự, màn 3 có huy hiệu Sự cố chữ `ink`, mọi nút "Đang xây" bị disabled; 1280 nút nằm cột phải, 375 nút full-width dưới thẻ.
@@ -732,3 +762,29 @@ Chụp ở **1280×800** và **375×812**, mỗi kích thước cho **cả hai t
 3. **Token `bg-scene`** (mục 2.5) là thay đổi `app.css` duy nhất art yêu cầu; không đổi manifest.
 4. **Phát hiện ngoài phạm vi art:** nhãn "Sự cố" `text-accent` trên nền trắng ở trang chủ chỉ đạt 4.48:1 với theme town (dưới 4.5). `ThemeToggle` cao 40 px, dưới mức 44 px của HUD.
 5. Gợn nước động, cây lay, NPC idle cố ý để ngoài v0.1. Nếu thêm sau, phải là hiệu ứng trong shader của nhóm đã có (không thêm draw call) và tôn trọng `frameloop="demand"`.
+
+---
+
+## 12. Quyết định 2026-10-08: N8 (ánh sáng nướng) và N9 (hậu quả trên campus)
+
+Nguồn: báo cáo "Insight edtech nâng cấp V-Game", mục "Đẹp hơn với 0 draw call", hàng N8 và N9 của bảng "Làm ngay", và bảng xung đột ("Art bible §1.3 và §7 … làm phần nướng (N8) trước … giữ nguyên lệnh cấm idle"). Chủ dự án yêu cầu áp dụng các đề xuất làm ngay. Ảnh chụp ở campus-scene v0.3 §13.8.
+
+1. **Ngày là mặc định, hoàng hôn là lựa chọn.** Đã chụp cả hai preset ở 1280×800 và 375×812, hai theme. Hoàng hôn đọc tốt: tường hứng nắng ấm, mặt khuất xanh tím, bóng dài, cửa sổ Thư viện có sao sáng nổi. Nhưng nó làm lệch màu thương hiệu ở mặt trên, trái nguyên tắc 2 và §1.1 ("ánh sáng trung tính để màu thương hiệu lên đúng"). Vì vậy ngày giữ mặc định, hoàng hôn có nút "Hoàng hôn" (§8.4). Preset và giờ mặc định là dữ liệu theme (`campus.lights`, §2.5).
+2. **Ngoại lệ QA màu thật ở mặt trên cho hoàng hôn** (nguyên tắc 2, §10). Preset ngày vẫn phải cho mặt trên đúng `(1, 1, 1)`; unit test kiểm `shade(+y)` cho mọi theme (kiểm công thức, không kiểm pixel, xem §2.3).
+3. **Rim và hơi ấm nằm trong công thức nướng** (§2.3), 0 draw call, 0 tam giác. Không dùng shader patch (`onBeforeCompile`), để còn dùng được nếu sau này đổi renderer.
+4. **Bóng nắng là lớp phủ nhân riêng, nằm trên mọi lớp đất** (§2.4 mục 4). Không shadow map. Sửa sau QA vòng 1: bản đầu nướng bóng đục vào `G-terrain` dưới lớp đường để giữ 0 draw call, nhưng đường đi cắt qua bóng thành vệt sáng (rõ ở hoàng hôn, trên lối từ cửa Thư viện và đường phía đông Tháp canh). Nay là một lưới trộn kiểu nhân có stencil, +1 draw call (13 thành 14, trần 16). Khe 0,2 giữa khối Tháp canh và chòi đông nhà chính cũng được lấp (khối tháp kéo tới `z = −6.0`): vạch nắng 1–2 px qua khe đúng hình học nhưng đọc như vết nứt render.
+5. **Bọt sóng tĩnh** (§2.4 mục 5). Nước vẫn không gợn, cây vẫn không lay: lệnh cấm vòng lặp idle (§1.2 nguyên tắc 6, §7) và bầu trời gradient (§1.3) giữ nguyên. Viền khi rê chuột và chùm hạt khi đạt (D8 của báo cáo) chưa làm, vẫn cần chủ dự án duyệt riêng.
+6. **N9: cửa sổ sáng là phần thưởng.** Khu mở có cửa chính sáng và không giàn giáo (theo trạng thái API, như cũ). Cửa sổ của khu đó, và gáy sách của Thư viện, chỉ sáng khi người chơi có ít nhất 1 sao ở một màn của khu (đọc từ `localStorage` qua module tiến độ, campus-scene v0.3 §13.5). Thư viện vẫn là khu duy nhất có ánh sáng ấm lúc mới vào, nên nguyên tắc 3 vẫn đứng.
+   - **Việc mở, ghi 2026-10-08 (QA vòng 2):** chưa có gì gọi `recordStars`, ở cả hai checkout. Bàn thợ tính `run.score.stars` (`run.ts`, `Results.tsx`) nhưng không lưu, nên không người chơi nào tới được hình `lit`, còn N9 chỉ lấy mất cửa sổ ấm và gáy sách v0.3. Bàn giao cho nhóm bàn thợ: khi một lượt được chấm (`run.scored`), gọi `recordStars(zone.id, level.id, score.stars)` trong `try/catch` (hàm ném lỗi khi id không phải slug), và trong cùng thay đổi đổi `STARS_SAVED` ở `progress.ts` thành `true`. Tới lúc đó `siteLooks` coi mọi khu mở là đã có sao, nên cảnh như v0.3, không ai mất gì. Luật N9 vẫn có test (`siteLooks(…, true)`).
+7. **Không vòng lặp mới.** Đổi preset hay có sao mới chỉ dựng lại hình một lần, rồi cảnh lại đứng yên với `frameloop="demand"`. Đo trong trang (bản build, SwiftShader headless, 1280×800): một long task mỗi lần bấm, QA vòng 1 đo khoảng 55 ms, QA vòng 3 tới 5 đo lại ở CPU 1× được khoảng 80–150 ms, đổi theo từng lần chạy (campus-scene §13.1); CPU chậm 4× thì tới khoảng 0,5 s, lần bấm đầu nặng nhất. Chưa đo trên GPU tích hợp. Mỗi lần bấm vẽ vài khung (QA vòng 3 đo được 3: khung đầu vẽ lại hình cũ trước lượt dựng lại đã hoãn), không rò bộ đệm GL. Không có chuyển cảnh động, nên không cần nhánh giảm chuyển động riêng.
+   - **Sửa sau QA vòng 2 (2026-10-08):** QA đo lại 72–109 ms ở CPU 1× và 256–522 ms ở 4× từ lúc bấm tới khung kế, tức INP "cần cải thiện" tới "kém" trên máy yếu. `CampusScene` giờ đọc giờ qua `useDeferredValue`: lần bấm vẽ nút đã bấm trước, rồi mới dựng lại ở một lượt render nền. Đo Event Timing của cú bấm trên bản build (SwiftShader, 1280×800, 4 lần bấm mỗi theme): không hoãn 24–48 ms (1×), 112–272 ms (4×); có hoãn 16 ms (1×), 16–40 ms (4×). Long task dựng lại vẫn còn nhưng nằm sau khung đã vẽ (107–210 ms ở 4×). Không giữ sẵn geometry của cả hai preset: thêm một bộ bộ đệm tĩnh khoảng 20k tam giác cho một nút ít bấm.
+8. **Ban ngày, N8 chỉ là thay đổi nhỏ** (QA vòng 1; đã xử lý ở QA vòng 2, xem cuối mục). Đo được: mặt trên 1.0; trái `0.815/0.802/0.775` (v0.3 là 0.80 xám); phải `0.585/0.602/0.630` (v0.3 là 0.60). Mẫu pixel trên tường Tháp canh lệch v0.3 khoảng 2 mức; rim gần như không đổi mặt hộp; bọt sóng gần như không thấy ở 1×. Cái thấy rõ ban ngày là bóng ngắn cạnh Tháp canh và hội trường B, giờ phủ cả đường đi. N9 còn tắt cửa sổ ấm và gáy sách của Thư viện chưa có sao, nên toà mà người chơi mới cần nhìn tới chỉ còn cửa chính sáng dưới mái hiên, cộng dấu "!" và nhãn. Tóm lại: "đẹp hơn rõ (ấm, có chiều sâu)" đúng ở hoàng hôn (tuỳ chọn), còn ban ngày chỉ nhỉnh hơn. Ba cách rẻ, giữ luật mặt trên: (a) đẩy hơi ấm mặt bên ban ngày mạnh hơn (chỉ mặt trên bị ràng buộc); (b) cho lối vào Thư viện mở mà chưa có sao nổi hơn (ô kính trên cửa hoặc đèn hiên sáng, vài tam giác cờ E); (c) làm vành bọt rộng hơn hoặc tương phản hơn.
+   - **Quyết định sau QA vòng 2 (2026-10-08), theo khuyến nghị của QA:** làm (a) và (b), không làm (c). (a): preset ngày mới (§2.3), mặt trái kem ấm, mặt phải xám xanh, bóng ngày ngả xanh. (b): hai đèn lối vào sáng hai bên cửa mọi khu mở (`entranceLamps`, 44 tam giác mỗi đèn); Thư viện giữ cửa chính sáng. Ô kính trên cửa bị bỏ vì mái hiên che gần hết cửa khỏi camera. Thêm bóng cây và bóng cổng (§2.4 mục 4), thay đổi thấy rõ nhất ban ngày. Cùng lúc `STARS_SAVED = false` trả lại cửa sổ và gáy sách Thư viện như v0.3 cho tới khi bàn thợ ghi sao (mục 6), nên toà người chơi mới cần tìm lại sáng như cũ. Ảnh ở campus-scene v0.3 §13.8. Đánh giá trên ảnh: ban ngày giờ khác v0.3 rõ (bóng cây lệch phải màn hình, bóng cổng, hai tông mặt bên), hoàng hôn vẫn là preset đổi nhiều nhất. Chủ dự án vẫn có thể quyết khác.
+9. **Sau QA vòng 3 (2026-10-09).**
+   - Đèn lối vào Thư viện dời ra 2,8 dọc lối, qua chỗ cô Lan. Ở 0,6, đèn gần dính vào mép cửa sáng trên màn hình, cùng màu, nên cửa (dấu hiệu chính của khu mở) bị lẫn (campus-scene v0.3 §13.5).
+   - Cây có tâm tán trong bóng toà nhà tối theo `~shadow`, qua màu instance (§2.4 mục 4).
+   - Mặt nâng phẳng (luống hoa, bậc, tầng quảng trường, mái) vẫn sáng trong bóng: giữ chấp nhận, cách sửa ghi ở campus-scene v0.3 §13.2.
+   - Màu hoàng hôn chưa chỉnh. QA thấy cỏ ngả ô liu và kaki (campus `#a7c584` → `#888e58`, town `#c8dcb0` → `#a49f76`), mặt hồ xám (`#74858c`), cả cảnh ngả sepia và ít tương phản trên trời hồng đào phẳng `#e7cfc3`. Cảnh vẫn đọc được: nhãn là DOM, cửa sổ, cửa Thư viện và mặt đồng hồ vẫn nổi. Lý do chưa chỉnh: đây là lựa chọn thẩm mỹ của một preset tuỳ chọn; hướng QA gợi ý (nắng bớt cam, đất ngả xanh) làm nhạt ý "hoàng hôn ấm" ở mục 1; và mỗi lần chỉnh phải sửa bảng §2.3, test và ảnh. **Câu hỏi mở cho chủ dự án:** giữ hoàng hôn ấm như hiện tại, hay giải lại preset với đích màu cho cỏ và nước (thêm đích sắc độ vào bộ giải `scratchpad/n8/tune-r2.mjs`); và có cho mỗi theme một `--vg-scene-dusk` riêng không.
+10. **Sau QA vòng 5 (2026-10-09).**
+   - `~lit` có màu riêng lúc hoàng hôn (§2.2): `full(lerp(lm.accent, dusk.sun, 0.5))`, hổ phách đậm. Màu ngày cũ trùng với tường `+z` hứng nắng chiều (tương phản 1,03:1), nên khe sáng đỉnh Tháp canh biến mất và đèn lồng Chợ đọc như hộp nhạt; khi bật `STARS_SAVED`, `lit` và `open` của Tháp canh sẽ chỉ khác nhau một vòm nhỏ. Ban ngày giữ nguyên. Một unit test buộc `~lit` cách tường `+z`, `+x` của ba toà và sàn Chợ ít nhất ΔE 20 ở mọi theme và giờ (campus-scene v0.3 §13.5). Câu hỏi mở ở mục 9 (cỏ, nước, trời lúc hoàng hôn) không đổi.
+   - Bàn giao N9 (mục 6) vẫn chưa gửi, và có thêm một điều kiện: sau `recordStars`, campus phải mount lại hoặc đọc lại tiến độ, kèm một e2e quay về `/play` không tải lại trang (campus-scene v0.3 §13.5).

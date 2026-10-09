@@ -24,6 +24,7 @@ npm run build        # build, bundle budget check, CSP headers
 npm run preview      # serve the production build
 npx playwright install chromium
 npm run test:e2e     # Playwright on the production build, API mocked per test
+E2E_PORT=4180 npm run test:e2e   # a second checkout or worktree needs its own port (default 4173)
 ```
 
 Run the backend for `npm run dev`:
