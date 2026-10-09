@@ -11,7 +11,7 @@ import { BASE, LAKE } from "../layout";
 import { palette, shade } from "./palette";
 import { triangleCount } from "./primitives";
 import type { PropsJson } from "./props";
-import { buildDressing, fetchProps, PROPS_URL } from "./useDressing";
+import { buildDressing, fetchProps, PROPS_URL, tryBuildDressing } from "./useDressing";
 
 const readJson = (...parts: string[]): unknown =>
   JSON.parse(readFileSync(path.resolve(process.cwd(), "public", ...parts), "utf8"));
@@ -113,4 +113,20 @@ it("re-bakes, never repositions, across themes", () => {
   const b = buildDressing(json, palette(second.campus, "dusk"));
   expect(b.getAttribute("position").array).toEqual(a.getAttribute("position").array);
   expect(b.getAttribute("color").array).not.toEqual(a.getAttribute("color").array);
+});
+
+it("gives no props, never a throw, when props.json does not match the placements", () => {
+  // Deploy or cache skew: a schema-valid file without a placed prop, or with a renamed material.
+  // A throw would reach SceneBoundary and fail the whole campus for the session.
+  const [first] = manifests;
+  const bench = json.props.bench;
+  if (!first || !bench) throw new Error("Need a theme and the bench.");
+  const pal = palette(first.campus, "day");
+  const rest = Object.fromEntries(Object.entries(json.props).filter(([id]) => id !== "gazebo"));
+  expect(tryBuildDressing({ ...json, props: rest }, pal)).toBeNull();
+  const renamed = { ...json.props, bench: { ...bench, mats: ["Timber"] } };
+  expect(tryBuildDressing({ ...json, props: renamed }, pal)).toBeNull();
+  const geometry = tryBuildDressing(json, pal);
+  expect(geometry && triangleCount(geometry)).toBe(PLANNED);
+  geometry?.dispose();
 });

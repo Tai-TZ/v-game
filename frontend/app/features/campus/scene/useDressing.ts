@@ -79,6 +79,20 @@ export function buildDressing(props: PropsJson, pal: Palette): BufferGeometry {
 }
 
 /**
+ * buildDressing, or null when props.json does not match DRESSING (a prop missing, a material
+ * renamed: deploy or cache skew, /models/ has no hashed names). A decoration must never throw
+ * into SceneBoundary, which would fail the whole campus for the session.
+ */
+export function tryBuildDressing(props: PropsJson, pal: Palette): BufferGeometry | null {
+  try {
+    return buildDressing(props, pal);
+  } catch (error) {
+    console.warn("Campus props skipped: props.json does not match the placements.", error);
+    return null;
+  }
+}
+
+/**
  * The dressing mesh: undefined until props.json is settled, then null if it could not be had.
  * Fetched only once the loader is done (the first campus frame is on screen), so the props
  * never hold up the first frame; they arrive during the loader's fade.
@@ -96,7 +110,7 @@ export function useDressing(pal: Palette): BufferGeometry | null | undefined {
       live = false;
     };
   }, [done]);
-  const geometry = useMemo(() => props && buildDressing(props, pal), [props, pal]);
+  const geometry = useMemo(() => props && tryBuildDressing(props, pal), [props, pal]);
   useEffect(() => () => geometry?.dispose(), [geometry]);
   return geometry;
 }
