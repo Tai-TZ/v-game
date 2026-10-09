@@ -50,8 +50,9 @@ describe.each(manifests.map((m) => [m.id, m] as const))("dressing mesh, theme %s
   it.each(["day", "dusk"] as const)("bakes one position + colour geometry at %s", (time) => {
     const pal = palette(m.campus, time);
     const geometry = buildDressing(json, pal);
-    // 7,914 planned triangles (§3) + 288 back faces of the three parasols.
-    expect(PLANNED).toBe(8202);
+    // 7,914 planned triangles (§3) - the 384 of the dropped wall rocks + 288 back faces of the
+    // three parasols.
+    expect(PLANNED).toBe(7818);
     expect(triangleCount(geometry)).toBe(PLANNED);
     expect(Object.keys(geometry.attributes).sort()).toEqual(["color", "position"]);
     const color = geometry.getAttribute("color");
@@ -79,7 +80,7 @@ describe.each(manifests.map((m) => [m.id, m] as const))("dressing mesh, theme %s
     geometry.dispose();
   });
 
-  it("keeps every vertex inside the slab corners' orbit ellipse, the wall rocks on the walls", () => {
+  it("keeps every vertex inside the slab corners' orbit ellipse and above the ground", () => {
     const geometry = buildDressing(json, palette(m.campus, "day"));
     const position = geometry.getAttribute("position");
     const zc = (BASE.minZ + BASE.maxZ) / 2;
@@ -89,16 +90,10 @@ describe.each(manifests.map((m) => [m.id, m] as const))("dressing mesh, theme %s
     for (let i = 0; i < position.count; i += 1) {
       const [x, y, z] = [position.getX(i), position.getY(i), position.getZ(i)];
       worst = Math.min(worst, reach - (Math.hypot(x, z - zc) + Math.SQRT2 * Math.max(0, y)));
-      if (y < -0.01) {
-        below += 1;
-        // Only the wall rocks go below the ground, standing on the plate and jutting at most 0.13.
-        expect(y).toBeGreaterThanOrEqual(-0.6 - 1e-4);
-        const out = Math.max(x - BASE.maxX, BASE.minX - x, z - BASE.maxZ, BASE.minZ - z);
-        expect(out).toBeLessThanOrEqual(0.13);
-      }
+      if (y < -0.01) below += 1;
     }
     expect(worst).toBeGreaterThan(0);
-    expect(below).toBeGreaterThan(0);
+    expect(below).toBe(0);
     geometry.dispose();
   });
 });

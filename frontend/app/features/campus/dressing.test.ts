@@ -100,8 +100,7 @@ const placed: Placed[] = [
     row: lampRow,
   })),
 ];
-const onGround = placed.filter((p) => p.kind !== "wall");
-const land = onGround.filter((p) => p.kind !== "water" && p.kind !== "pier");
+const land = placed.filter((p) => p.kind !== "water" && p.kind !== "pier");
 
 const d = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.z - b.z);
 const inLake = (x: number, z: number, grow = 0) =>
@@ -137,10 +136,14 @@ const STANDING: Vec2[] = [
 const existing = OBSTACLES.filter((box) => !DRESSING_BLOCKS.includes(box));
 
 describe("dressing data", () => {
-  it("places every baked prop and names a theme colour slot for each of its materials", () => {
-    expect(new Set(DRESSING.map((row) => row.prop))).toEqual(new Set(Object.keys(json.props)));
-    for (const [id, data] of Object.entries(json.props)) {
-      expect(Object.keys(PROP_COLOURS[id] ?? {}).sort(), id).toEqual([...data.mats].sort());
+  it("places every baked prop but the cliff and names a theme colour slot for each material", () => {
+    // The wall rocks (cliff) read as concrete kerbs and are no longer placed (review r1).
+    const placedIds = new Set(DRESSING.map((row) => row.prop));
+    expect(Object.keys(json.props).filter((id) => !placedIds.has(id))).toEqual(["cliff"]);
+    expect([...placedIds].filter((id) => !json.props[id])).toEqual([]);
+    for (const id of placedIds) {
+      const mats = json.props[id]?.mats ?? [];
+      expect(Object.keys(PROP_COLOURS[id] ?? {}).sort(), id).toEqual([...mats].sort());
     }
   });
 
@@ -174,7 +177,7 @@ describe("dressing placement (placement plan §1)", () => {
         bad.push(`${p.name}: on the fence or gate`);
       if (p.kind !== "shore" && inLake(p.x, p.z, 0.14 + p.r)) bad.push(`${p.name}: in the lake`);
     }
-    for (const p of onGround.filter((q) => q.kind === "water")) {
+    for (const p of placed.filter((q) => q.kind === "water")) {
       const rim = [
         [0, 0],
         [p.r, 0],
@@ -221,7 +224,7 @@ describe("dressing placement (placement plan §1)", () => {
 
   it("keeps clear of the doors, the people, SPAWN and the back-of-campus spot", () => {
     const bad: string[] = [];
-    for (const p of onGround) {
+    for (const p of placed) {
       for (const s of SITES) if (d(p, s.door) < 1.2) bad.push(`${p.name}: by the ${s.id} door`);
       for (const n of NPCS) if (d(p, n) < 0.6 + p.r) bad.push(`${p.name}: on an NPC spot`);
       for (const n of TALKS) if (d(p, n) < 0.45 + p.r) bad.push(`${p.name}: on a talk spot`);
@@ -233,8 +236,8 @@ describe("dressing placement (placement plan §1)", () => {
 
   it("lets no two props stand in each other (stacked ones share their base's spot)", () => {
     const bad: string[] = [];
-    onGround.forEach((a, i) => {
-      for (const b of onGround.slice(i + 1)) {
+    placed.forEach((a, i) => {
+      for (const b of placed.slice(i + 1)) {
         if (a.row === b.row || a.kind === "stacked" || b.kind === "stacked") continue;
         const afloat = (p: Placed) => p.kind === "water" || p.kind === "pier";
         const water = afloat(a) && afloat(b); // the boat is moored along the pier
@@ -255,29 +258,6 @@ describe("dressing placement (placement plan §1)", () => {
       ...placed.map((p) => reach - (d(p, centre) + p.r + Math.SQRT2 * Math.max(0, p.h))),
     );
     expect(worst).toBeGreaterThan(0);
-    // The wall rocks stay 3.8 off the slab corners.
-    const corners = [BASE.minX, BASE.maxX].flatMap((x) =>
-      [BASE.minZ, BASE.maxZ].map((z) => ({ x, z })),
-    );
-    for (const p of placed.filter((q) => q.kind === "wall"))
-      for (const c of corners) expect(d(p, c), p.name).toBeGreaterThanOrEqual(3.8);
-  });
-
-  it("stands the wall rocks on the soil walls, below the ground and above the plate", () => {
-    for (const row of DRESSING.filter((r) => r.kind === "wall")) {
-      const { h } = extent(row);
-      expect(row.y).toBe(-0.6);
-      expect(h).toBeLessThan(0);
-      for (const [x, z, yaw = 0] of row.at) {
-        const edge = {
-          0: BASE.maxZ - z,
-          90: BASE.maxX - x,
-          180: z - BASE.minZ,
-          [-90]: x - BASE.minX,
-        }[yaw];
-        expect(edge, `${x}, ${z}`).toBeCloseTo(0.1305, 4);
-      }
-    }
   });
 
   it("hides no person and no door in the home view", () => {
@@ -285,7 +265,7 @@ describe("dressing placement (placement plan §1)", () => {
     const bad: string[] = [];
     for (const t of [...NPCS, ...SITES.map((s) => s.door)])
       for (const y0 of [0.3, 0.9])
-        for (const p of onGround) {
+        for (const p of placed) {
           if (p.h < 0.3) continue;
           // The ray from (t, y0) to the camera runs along (1, 1)/√2 on the ground.
           const s = (p.x - t.x + (p.z - t.z)) / Math.SQRT2;
@@ -300,7 +280,7 @@ describe("dressing placement (placement plan §1)", () => {
     const bad: string[] = [];
     for (const [id, [lx, ly, lz]] of Object.entries(LABEL_ANCHORS)) {
       const label = toScreen(lx, ly, lz);
-      for (const p of onGround) {
+      for (const p of placed) {
         // Centred on its anchor and standing on it: about 5.8 × 1.0 world units.
         const foot = toScreen(p.x, 0, p.z);
         const top = foot.sy + Math.sqrt(2 / 3) * p.h;

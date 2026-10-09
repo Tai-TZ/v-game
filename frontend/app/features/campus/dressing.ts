@@ -41,7 +41,6 @@ export const PROP_COLOURS: Readonly<Record<string, Readonly<Record<string, Colou
   greens: { grass: "foliage" },
   palm: { leafsGreen: "foliage", woodBark: "trunk" },
   "palm-short": { leafsGreen: "foliage", woodBark: "trunk" },
-  cliff: { stone: "band" },
   "parasol-table": {
     "colormap:339c75": "mk.roof",
     "colormap:20896b": "mk.roof",
@@ -79,15 +78,13 @@ export interface Dressing {
   /**
    * What the placement checks hold it to: `ground` clear of everything; `stacked` on another
    * prop's spot; `fence` in the strip inside the front fence; `shore` on the lake's rim; `water`
-   * wholly in the lake; `pier` from the shore into it; `wall` on a soil wall of the slab.
+   * wholly in the lake; `pier` from the shore into it.
    */
-  kind: "ground" | "stacked" | "fence" | "shore" | "water" | "pier" | "wall";
+  kind: "ground" | "stacked" | "fence" | "shore" | "water" | "pier";
   at: readonly At[];
 }
 
 const row = (z: number, xs: readonly number[]): At[] => xs.map((x) => [x, z]);
-/** Wall rocks: origin 0.1305 inside the wall, so the rock's middle stands 0.015 out and it juts 0.12. */
-const WALL_ROCK = { prop: "cliff", scale: [1.6, 0.55, 0.5], y: -0.6, kind: "wall" } as const;
 
 export const DRESSING: readonly Dressing[] = [
   // A: front left by the gate, the rose garden and the lawn beside the plaza.
@@ -257,11 +254,6 @@ export const DRESSING: readonly Dressing[] = [
       [10.3, -9.8],
     ],
   },
-  // E: rocks on the four soil walls, 3.8 or more from the corners.
-  { ...WALL_ROCK, at: [-10.5, -5.5, 4.8].map((x): At => [x, 12.4695, 0]) },
-  { ...WALL_ROCK, at: [2, -7.5, -15.5].map((z): At => [14.6695, z, 90]) },
-  { ...WALL_ROCK, at: [9, 0.5, -9].map((x): At => [x, -21.3695, 180]) },
-  { ...WALL_ROCK, at: [4, -6, -15.5].map((z): At => [-14.6695, z, -90]) },
 ];
 
 /** One box per copy of a blocking prop; layout.ts adds them to OBSTACLES. */
