@@ -25,6 +25,8 @@ interface LanDialogProps {
   library: SiteInfo;
   /** "Dạy trợ lý tra sách": straight to the first Library level. */
   onTeach: () => void;
+  /** That level is loading (a sleeping API can take half a minute): the dialog says so. */
+  opening: boolean;
   onEnter: () => void;
   onClose: () => void;
   /** The zone list failed to load: show the error notice instead of `zoneCard`. */
@@ -43,6 +45,7 @@ export function LanDialog({
   lines,
   library,
   onTeach,
+  opening,
   onEnter,
   onClose,
   zonesFailed,
@@ -146,9 +149,19 @@ export function LanDialog({
           ))}
         </div>
         <div className="mt-5 flex flex-col gap-2">
-          <button ref={teachRef} type="button" onClick={onTeach} className={buttonClass("primary")}>
-            Dạy trợ lý tra sách
+          <button
+            ref={teachRef}
+            type="button"
+            // Not disabled: that would drop focus to <body> until the level opens.
+            onClick={opening ? undefined : onTeach}
+            aria-busy={opening}
+            className={buttonClass("primary")}
+          >
+            {opening ? "Đang mở màn…" : "Dạy trợ lý tra sách"}
           </button>
+          <p role="status" className="sr-only">
+            {opening ? "Đang mở màn…" : ""}
+          </p>
           <button type="button" onClick={onEnter} className={buttonClass("secondary")}>
             Vào {library.name}
           </button>

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo } from "react";
-import { useNavigate, useRevalidator } from "react-router";
+import { useNavigate, useNavigation, useRevalidator } from "react-router";
 
 import { arrivalPose, parseArrival, SPAWN, SPAWN_HEADING } from "~/features/campus/layout";
 import { HubTopBar } from "~/features/campus/hud/HubTopBar";
@@ -45,6 +45,7 @@ export default function Play({ loaderData }: Route.ComponentProps) {
   const sites = useMemo(() => siteInfo(zones?.ok ? zones.zones : null), [zones]);
   const dialog = useHub((state) => state.dialog);
   const navigate = useNavigate();
+  const opening = useNavigation().state === "loading";
   const revalidator = useRevalidator();
   const showCardSkeleton = useDelayedFlag(zones === undefined, 300);
 
@@ -110,10 +111,13 @@ export default function Play({ loaderData }: Route.ComponentProps) {
         <LanDialog
           lines={dialog}
           library={library}
-          onTeach={() => {
-            hubStore.getState().closeDialog();
-            void navigate(`/play/${library.zoneId}/${FIRST_LIBRARY_LEVEL}`);
-          }}
+          // The dialog stays open, saying the level is opening, until the level has loaded.
+          onTeach={() =>
+            void Promise.resolve(navigate(`/play/${library.zoneId}/${FIRST_LIBRARY_LEVEL}`)).then(
+              () => hubStore.getState().closeDialog(),
+            )
+          }
+          opening={opening}
           onEnter={() => enterZone(library.zoneId)}
           onClose={() => hubStore.getState().closeDialog()}
           zonesFailed={zones?.ok === false}
