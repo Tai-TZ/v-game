@@ -49,7 +49,9 @@ export function useSkyClock(place: Pick<Place, "lat" | "lon">) {
           later(WEATHER_EVERY_MS);
         },
         () => {
-          if (!request.signal.aborted) later(WEATHER_RETRY_MS);
+          if (request.signal.aborted) return;
+          store.setWeather(null);
+          later(WEATHER_RETRY_MS);
         },
       );
     }

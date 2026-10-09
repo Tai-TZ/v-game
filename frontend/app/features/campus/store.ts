@@ -73,6 +73,8 @@ export interface HubSky {
   phase: Phase;
   /** The last good /api/weather body; null until one arrives. */
   weather: Weather | null;
+  /** No weather yet and the last fetch failed: the chip says so instead of "loading". */
+  failed: boolean;
   display: Display;
   /** Replaced only when (display, phase, weather group) changes: the scene re-bakes on it. */
   look: SceneLook;
@@ -112,7 +114,8 @@ export interface HubState {
   walkTo: (goal: Vec2) => void;
   setSheetInset: (px: number) => void;
   setPhase: (phase: Phase) => void;
-  setWeather: (weather: Weather) => void;
+  /** A fetched body, or null for a failed fetch (the last good body stays). */
+  setWeather: (weather: Weather | null) => void;
   setDisplay: (display: Display) => void;
   /** Turn to the next diagonal, clockwise for +1; 0 goes back to HOME_YAW. */
   rotateView: (dir: -1 | 0 | 1) => void;
@@ -134,7 +137,12 @@ export function createHubStore() {
     const setSky = (change: Partial<Omit<HubSky, "look">>) => {
       const sky = get().sky;
       const next = { ...sky, ...change };
-      if (next.phase === sky.phase && next.weather === sky.weather && next.display === sky.display)
+      if (
+        next.phase === sky.phase &&
+        next.weather === sky.weather &&
+        next.display === sky.display &&
+        next.failed === sky.failed
+      )
         return;
       const look = sceneLook(next.display, next.phase, next.weather?.condition ?? null);
       const same = (Object.keys(look) as (keyof SceneLook)[]).every((k) => look[k] === sky.look[k]);
@@ -147,7 +155,13 @@ export function createHubStore() {
       dialog: null,
       met: {},
       sheetInset: 0,
-      sky: { phase: "day", weather: null, display: "live", look: sceneLook("live", "day", null) },
+      sky: {
+        phase: "day",
+        weather: null,
+        failed: false,
+        display: "live",
+        look: sceneLook("live", "day", null),
+      },
       motion: {
         position: { ...SPAWN },
         heading: SPAWN_HEADING,
@@ -216,11 +230,15 @@ export function createHubStore() {
       setPhase: (phase) => setSky({ phase }),
       setWeather: (weather) => {
         const old = get().sky.weather;
+        if (!weather) {
+          if (!old) setSky({ failed: true });
+          return;
+        }
         const same =
           old?.condition === weather.condition &&
           old.temperature_c === weather.temperature_c &&
           old.updated_at === weather.updated_at;
-        if (!same) setSky({ weather });
+        if (!same) setSky({ weather, failed: false });
       },
       setDisplay: (display) => setSky({ display }),
       rotateView: (dir) => {

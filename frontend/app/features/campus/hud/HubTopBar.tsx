@@ -12,6 +12,7 @@ import { useDelayedFlag } from "~/lib/useSettled";
 
 import { BACK_SPOT, BACK_Z, NPCS, SPAWN, type Speaker } from "../layout";
 import { hubStore } from "../store";
+import { WeatherChip } from "./WeatherChip";
 
 const PANEL_ID = "hub-zone-list";
 
@@ -35,7 +36,8 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const showSkeleton = useDelayedFlag(zones === undefined, 300);
-  const { npcs } = useActiveTheme().campus;
+  const { campus, place } = useActiveTheme();
+  const { npcs } = campus;
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +75,7 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
           <ChevronLeftIcon />
           <span className="sr-only sm:not-sr-only">Về trang chủ</span>
         </Link>
+        <WeatherChip place={place} />
       </div>
 
       <div className="on-scene absolute top-4 right-4 z-20 flex gap-2 lg:top-6 lg:right-6">

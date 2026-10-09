@@ -45,7 +45,7 @@ describe("useSkyClock", () => {
     expect(hubStore.getState().sky.display).toBe("day");
     await settle();
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(hubStore.getState().sky.weather).toBeNull();
+    expect(hubStore.getState().sky).toMatchObject({ weather: null, failed: true });
 
     fetch.mockImplementation(() => reply(200));
     await act(() => vi.advanceTimersByTimeAsync(WEATHER_RETRY_MS - 1000));
@@ -53,7 +53,7 @@ describe("useSkyClock", () => {
     await act(() => vi.advanceTimersByTimeAsync(1000));
     await settle();
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(hubStore.getState().sky.weather).toEqual(body);
+    expect(hubStore.getState().sky).toMatchObject({ weather: body, failed: false });
 
     await act(() => vi.advanceTimersByTimeAsync(WEATHER_EVERY_MS - 1000));
     expect(fetch).toHaveBeenCalledTimes(2);
