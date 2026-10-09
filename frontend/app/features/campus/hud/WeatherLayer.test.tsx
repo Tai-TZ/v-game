@@ -55,8 +55,13 @@ describe.each(
     path.resolve(process.cwd(), "public", "themes", id, "theme.css"),
     "utf8",
   );
+  // First declaration of each token; a literal pattern (semgrep forbids RegExp from a variable).
+  const tokens = new Map<string, string>();
+  for (const [, name = "", hex = ""] of css.matchAll(/--vg-([\w-]+):\s*(#[0-9a-f]{6})/gi)) {
+    if (!tokens.has(name)) tokens.set(name, hex);
+  }
   const token = (name: string) => {
-    const hex = new RegExp(`--vg-${name}:\\s*(#[0-9a-f]{6})`, "i").exec(css)?.[1];
+    const hex = tokens.get(name);
     if (!hex) throw new Error(`${id}: --vg-${name} missing`);
     return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   };
