@@ -66,7 +66,7 @@ describe("stage signals", () => {
     expect(sceneLoad.getState()).toMatchObject({ run: 1, failed: true });
   });
 
-  it("finish 2.5 s after onCreated without a frame, only for the same entry", () => {
+  it("finish 2.5 s after the scene graph without a frame, only for the same entry", () => {
     vi.useFakeTimers();
     beginScene();
     advanceScene(STAGE.paint);
