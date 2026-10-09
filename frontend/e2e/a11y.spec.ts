@@ -23,6 +23,9 @@ for (const viewport of VIEWPORTS) {
     test.use({ viewport });
 
     test("campus hub HUD, with and without the dialogs", async ({ page }) => {
+      // Four axe scans and two walks (to cô Lan, then to the guard at the gate): on the
+      // software-WebGL CI runner this sits at the 30 s default, like the other walking tests.
+      test.slow();
       await mockApi(page);
       await page.goto("/play");
       await expect(page.locator("canvas")).toBeVisible();
