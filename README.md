@@ -412,6 +412,7 @@ v-game/
 | [ADR](docs/adr/) | Quyết định về frontend stack, theme pack, backend stack |
 | [backend/README.md](backend/README.md) | Endpoint, mã lỗi, biến môi trường, Docker |
 | [frontend/README.md](frontend/README.md) | Route, lệnh, quy tắc frontend |
+| [CREDITS.md](CREDITS.md) | Model 3D miễn phí (CC0) của Kenney và Quaternius, nguồn tải, cách nướng lại |
 
 <details>
 <summary><b>Ảnh minh hoạ trong README được tạo thế nào</b></summary>

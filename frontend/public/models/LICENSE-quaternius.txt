@@ -1,0 +1,14 @@
+Props by Quaternius (https://quaternius.com), single models published by the author on Poly Pizza.
+Each model page states the licence: Creative Commons Zero (CC0 1.0), public domain dedication.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Models used (baked into props.json):
+- bench          https://poly.pizza/m/7uSlZo3n9Y
+- food-stall     https://poly.pizza/m/hts7l0NZxW
+- dock           https://poly.pizza/m/XViKoBh2UN
+- boat           https://poly.pizza/m/5UEl54KsuC
+- gazebo         https://poly.pizza/m/xYZB1TmGMv
+- notice-board   https://poly.pizza/m/4MSsNFk5fc
+- arrow-sign     https://poly.pizza/m/dwmvPHHCdq
+
+Poly Pizza ships no licence file with a single-model download, so this notice stands in for one.

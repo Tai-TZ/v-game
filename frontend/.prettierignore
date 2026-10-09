@@ -5,3 +5,5 @@ playwright-report/
 test-results/
 public/themes/*/fonts/
 package-lock.json
+# Baked model data: canonical minified output of tools/*/bake-*.mjs
+public/models/*.json
