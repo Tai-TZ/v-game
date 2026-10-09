@@ -47,6 +47,7 @@ từ dấu vết của chính lượt chạy, không phải đáp án mẫu.
 - **Chạy thật, không mô phỏng.** Backend biên dịch khối thành đồ thị LangGraph, gọi Gemini và phát từng bước qua SSE.
 - **Chấm theo bằng chứng.** Chẩn đoán chỉ ra bước gây lỗi từ dấu vết của lượt chạy; bộ câu hỏi có câu ẩn và câu bẫy, đáp án chỉ hiện khi lượt chạy kết thúc.
 - **Một sa bàn đi bộ được.** Cổng ở mép trước, ba khu chơi quanh quảng trường, khuôn viên phía sau nhà chính có hội trường mái vòm, sân tennis và sân vận động. Nhấp vào đâu, nhân vật tự tìm đường ngắn nhất tới đó.
+- **Giờ thật và thời tiết hôm nay.** Sa bàn sáng, chiều, tối theo mặt trời ở Hà Nội (tính ngay trong trình duyệt) và đổi theo thời tiết thật (mưa, sương, dông) lấy từ Open-Meteo qua API. Chip trên góc trái có chế độ "Cố định ban ngày" cho máy chiếu.
 - **Nhẹ.** Cả cảnh hub chỉ 13 draw call; three.js chỉ tải ở `/play`.
 
 > [!NOTE]
@@ -273,7 +274,7 @@ test thất bại khi bị vượt.
 |---|---|---|---|
 | Draw call trong cảnh hub | ≤ 40 | **13** | `scene.test.ts`, thất bại nếu > 16 |
 | Tam giác trong cảnh hub | ≤ 60.000 | **16.186** (theme town) · **19.248** (theme campus) | `scene.test.ts`, thất bại nếu > 23.000 |
-| Chunk riêng của route `/play` (three, r3f, scene) ¹ | ≤ 300 kB gzip | **266,4 kB** | `scripts/check-bundle.mjs` trong `npm run build` |
+| Chunk riêng của route `/play` (three, r3f, scene) ¹ | ≤ 300 kB gzip | **292,8 kB** | `scripts/check-bundle.mjs` trong `npm run build` |
 | three.js trên trang chủ | 0 chunk | **0** | `check-bundle.mjs` và `e2e/landing.spec.ts` |
 | Khung hình khi đứng yên | 0 | **0** (`frameloop="demand"`) | `e2e/play.spec.ts` với `?debug=frames` |
 
@@ -297,6 +298,7 @@ Theme pack chỉ là dữ liệu trong `frontend/public/themes/<id>/` (manifest,
 - `VITE_DEFAULT_THEME` chọn theme mặc định; không đặt thì lấy theme đầu tiên.
 - Khi bản build có từ hai theme, nút trên thanh trên cùng cho đổi theme mà không tải lại trang; lựa chọn được nhớ trong `localStorage` (`vg-theme`).
 - Thêm theme: thêm một thư mục và một dòng trong `index.json`. Bỏ theme: xoá cả hai. Không cần sửa code.
+- Mỗi manifest có `place` (tên, toạ độ, múi giờ) và bốn preset ánh sáng (`dawn`, `day`, `dusk`, `night`); `theme.css` khai màu trời của từng pha và trời mây. `place` phải trùng `WEATHER_LATITUDE/LONGITUDE` của backend (test kiểm). Không bao giờ dùng vị trí người xem.
 - Code app và backend không nhắc tên thương hiệu; job Brand isolation của CI kiểm tra điều này.
 
 ### Deploy

@@ -14,18 +14,18 @@
 
 ### 1.1 Tinh thần
 
-Một **sa bàn kiến trúc (maquette)** của khuôn viên đặt trên đế trắng, nhìn isometric. Yên tĩnh, sáng, chính xác như mô hình trưng bày ở sảnh trường, không phải đồ chơi hoạt hình. Công trình trắng, mái mang màu nhận diện, cỏ xanh nhạt, người là tượng nhỏ đơn sắc như tượng người trong mô hình kiến trúc. Giờ trong cảnh là 16:30, trước giờ cô Lan vào ca tối (đồng hồ toà thị chính của theme town chỉ 4:30). Ánh sáng trung tính để màu thương hiệu lên đúng.
+Một **sa bàn kiến trúc (maquette)** của khuôn viên đặt trên đế trắng, nhìn isometric. Yên tĩnh, sáng, chính xác như mô hình trưng bày ở sảnh trường, không phải đồ chơi hoạt hình. Công trình trắng, mái mang màu nhận diện, cỏ xanh nhạt, người là tượng nhỏ đơn sắc như tượng người trong mô hình kiến trúc. Giờ trong cảnh là 16:30, trước giờ cô Lan vào ca tối (đồng hồ toà thị chính của theme town chỉ 4:30). Ánh sáng trung tính để màu thương hiệu lên đúng. **Sửa 2026-10-09 (giờ thật và thời tiết, §14):** cảnh theo giờ và thời tiết thật của nơi theme đặt (`place`, bản công khai: Hà Nội); "Cố định ban ngày" giữ ánh sáng trung tính cũ. Kim đồng hồ town vẫn 4:30 (chi tiết sa bàn).
 
 Theme campus gợi lại khuôn viên tham chiếu bằng ba hình dễ nhận ra: toà trung tâm trắng nhiều tầng giật cấp với tháp nhọn và đỉnh vàng, quảng trường đài phun nước hai tầng, hai hàng cột bán nguyệt ôm quảng trường. Mọi thứ còn lại tiết chế.
 
 ### 1.2 Nguyên tắc (7)
 
 1. **Maquette, không phải đồ chơi.** Đế trắng, lớp đất dày 0.6, người là tượng đơn sắc (đầu màu `plaza`, không mặt, không da). Không mắt to, không nảy tưng.
-2. **Màu thật ở mặt trên.** Mặt hướng lên luôn hiện đúng mã hex của manifest. Bóng đổ chỉ làm tối mặt đứng theo một quy tắc cố định (mục 2.3), nên đổi theme là đổi màu, không đổi ánh sáng. **Sửa 2026-10-08:** luật này áp cho preset ngày (mặc định). Preset hoàng hôn là ngoại lệ duy nhất: mặt trên tối và ấm đi theo công thức, QA so với bảng §2.3 thay cho hex manifest (§10).
+2. **Màu thật ở mặt trên.** Mặt hướng lên luôn hiện đúng mã hex của manifest. Bóng đổ chỉ làm tối mặt đứng theo một quy tắc cố định (mục 2.3), nên đổi theme là đổi màu, không đổi ánh sáng. **Sửa 2026-10-08:** luật này áp cho preset ngày (mặc định). Preset hoàng hôn là ngoại lệ duy nhất: mặt trên tối và ấm đi theo công thức, QA so với bảng §2.3 thay cho hex manifest (§10). **Sửa 2026-10-09 (§14):** màu đúng hex chỉ ở `day` + `clear` (và "Cố định ban ngày"); bình minh, hoàng hôn, đêm và mọi lớp thời tiết là preset có kiểm thử.
 3. **Một điểm nhấn.** Tháp nhọn của landmark là thứ cao nhất và là thứ duy nhất có kim loại vàng ở đỉnh. Trong các khu, chỉ khu đang mở có cửa chính sáng ấm, nên mắt tự đi về Thư viện. **Sửa 2026-10-08 (N9):** cửa sổ của khu mở chỉ sáng khi người chơi đã có ít nhất 1 sao ở một màn của khu đó; khi đó Thư viện hiện thêm gáy sách sau cửa sổ. Ánh sáng ấm là phần thưởng, không phải trang trí. **Sửa sau QA vòng 2 (2026-10-08):** (a) chưa có gì ghi sao (bàn thợ chưa gọi `recordStars`), nên khoá `STARS_SAVED = false` giữ cửa sổ và gáy sách sáng ở mọi khu mở như v0.3 cho tới khi có đường ghi (§12 mục 6); (b) mỗi khu mở có thêm hai đèn lối vào sáng hai bên cửa, vì cửa Tháp canh và Chợ quay về phía tây, camera không thấy (nguyên tắc 7).
 4. **Hình nói trạng thái, không chỉ màu.** Mở: hai đèn lối vào sáng (Thư viện, và từ 2026-10-09 cả Tháp canh, thêm cửa chính sáng), màu đầy đủ, không giàn giáo. Đã có sao: thêm cửa sổ sáng (Chợ: đèn lồng dưới mép mái hiên). Sắp mở: giảm bão hoà **và** có giàn giáo gỗ (tín hiệu không dựa vào màu). Tương tác được: vòng sáng dưới đất và huy hiệu "!" ở DOM.
 5. **Chữ ở DOM, hình ở 3D.** Không có chữ nào dựng trong WebGL. Nhãn công trình, "!", lời thoại, thẻ khu đều là DOM dùng token Tailwind.
-6. **Đứng yên là im lặng.** Không vòng lặp idle. Mọi chuyển động trả lời một thao tác và tự dừng (mục 7). Không ai làm gì thì không có khung hình mới.
+6. **Đứng yên là im lặng.** Không vòng lặp idle. Mọi chuyển động trả lời một thao tác và tự dừng (mục 7). Không ai làm gì thì không có khung hình mới. **Sửa 2026-10-09 (§14):** WebGL không bao giờ có vòng lặp idle. Ngoại lệ duy nhất là lớp phủ thời tiết CSS (mưa, chớp) chạy trên compositor, tắt được: giảm chuyển động làm mưa đứng yên và bỏ chớp, "Cố định ban ngày" bỏ cả lớp.
 7. **Dựng đủ bốn mặt** (sửa 2026-10-09, thay "chỉ dựng phần camera thấy"; `orbit-camera.md` §5). Từ v0.4 camera xoay quanh trục đứng, nên mọi toà có cửa sổ, cửa, giàn giáo trên cả bốn mặt đứng, trừ phần bị khối khác che hẳn (lưng chòi cánh dưới mái cánh, chân lưng khối đế tháp sau toà A). Chi tiết ở mặt `−x`, `−z` dựng bằng cùng helper với mặt `"-x"`, `"-z"` (bảng `TURN` của `onFace`: phép quay, không soi gương, nên vòm vẫn cong lên và đồng hồ mặt sau vẫn chỉ 4:30), cùng màu và cờ (`lit`, `look`) như mặt trước. Cửa thật của Tháp canh (mặt `−x`, nhìn ra quảng trường) sáng khi khu mở, như cửa Thư viện. Giàn giáo "Sắp mở" dựng trên hai mặt đối nhau, nên mọi góc trừ đúng 90° và 270° đều thấy ít nhất một giàn. Toà mới cũng theo luật này. Test `scene.test.ts` ("four dressed sides"): kính ở `−x`, `−z` ít nhất bằng nửa kính ở `+x`, `+z` cho landmark, Thư viện, Tháp canh và các toà phía sau; mặt đồng hồ, lưng cổng, mái hiên bắc của Chợ; giàn giáo vượt ra ngoài cả hai mặt tường đối nhau. Chi phí: khoảng +1,3k tam giác, 0 draw call.
 
 ### 1.3 Danh sách chống "AI slop" (cấm)
@@ -37,6 +37,7 @@ Theme campus gợi lại khuôn viên tham chiếu bằng ba hình dễ nhận r
 - Panel kính mờ (`backdrop-filter`), bóng đổ dày dưới panel, nút gradient, emoji làm icon, viên thuốc pastel quanh metadata tĩnh.
 - Chữ 3D, biển hiệu 3D, mũi tên khổng lồ lơ lửng.
 - Hiệu ứng vào cảnh kiểu bay camera vòng quanh. Cảnh hiện ngay ở góc cố định.
+- **Ngoại lệ 2026-10-09 (§14), chỉ hai:** màn sương tĩnh khi `fog` (gradient dọc duy nhất, phía xa trên màn hình đặc hơn), và vũng sáng phẳng dưới chân người khi trời tối (không halo, không bloom). Vẫn cấm: trời gradient, bloom, lens flare, mây trôi, hạt lấp lánh. Không có vũng sáng đèn đường (`G-glow`), không vũng nước.
 
 ### 1.4 Theme town khác gì (cùng một đường code)
 
@@ -166,6 +167,7 @@ Unit test (`scene.test.ts`, mỗi theme): ngày `shade(+y)` đúng bằng `(1, 1
 - **Sương mù:** không. Đế mô hình nổi trên nền trời phẳng; cạnh đế là đường viền rõ ràng.
 - **Manifest additions: không có.** Đã cân nhắc `sky`, `signal`, `skin`, `glass` và bỏ cả bốn: trời đã có trong `theme.css`; vòng tương tác dùng `player`, huy hiệu "!" dùng token CSS `accent`; tượng người không có da; kính và đèn phái sinh được. Vì vậy D8 không kích hoạt: coder **không** sửa `schema.ts` hay hai `manifest.json` cho art.
 - **Sửa 2026-10-08, D8 kích hoạt một lần:** thêm `campus.lights = { default, day, dusk }`. Mỗi preset gồm `sky`, `ground`, `hemisphere`, `sun`, `sunIntensity`, `sunDirection`, `rim`, tức tham số của hai đèn three.js cộng hệ số rim. Preset là dữ liệu theme vì đó là chỗ một theme chọn giờ mặc định và chỉnh tông; công thức vẫn ở code và có test. Hai theme hiện dùng cùng giá trị, `default: "day"`.
+- **Sửa 2026-10-09 (§14), D8 lần hai:** `campus.lights` có đủ bốn preset `dawn`, `day`, `dusk`, `night`, bỏ `default` (pha đến từ mặt trời, không còn nút chọn); manifest thêm `place = { name, lat, lon, timeZone }`. Trời theo pha × mây: `theme.css` khai `--vg-scene-dawn`, `--vg-scene-night`, `--vg-scene-cloud`, `--vg-scene-cloud-night` (cùng `--vg-scene-sky`, `--vg-scene-dusk`); `<main data-sky data-clouds>` đặt `--vg-sky`, `--color-scene: var(--vg-sky, var(--vg-scene-sky))`. Token `bg-scene-dusk` bỏ.
 
 ---
 
@@ -491,7 +493,7 @@ Gốc ở chân, mặt hướng `+z` cục bộ (`rotation.y = heading` của `m
 | Thứ | Spec |
 |---|---|
 | Vòng tương tác (`D-ring`) | `RingGeometry(0.55, 0.66, 40)` nằm ngang, `y = 0.052`, `MeshBasicMaterial({ color: player })` đục. Đặt tại điểm tương tác gần nhất (`NPC_SPOT` hoặc `site.door`) khi người chơi trong `INTERACT_RADIUS`; ẩn khi không có. |
-| Huy hiệu "!" (DOM) | neo thế giới `(NPC_SPOT.x, 1.85, NPC_SPOT.z)`. Hộp `28×28`, `grid size-7 place-items-center rounded-sm bg-accent text-on-brand text-lg font-bold leading-none`. Chỉ hiện khi chưa gặp cô Lan trong phiên. Không nhảy, không nhấp nháy. |
+| Huy hiệu "!" (DOM) | neo thế giới `(NPC_SPOT.x, 1.85, NPC_SPOT.z)`. Hộp `28×28`, `grid size-7 place-items-center rounded-sm border-2 border-surface bg-accent text-on-brand text-lg font-bold leading-none` (viền `surface` từ 2026-10-09, luôn có: `accent` trên đường ban đêm chỉ 1.1:1). Chỉ hiện khi chưa gặp cô Lan trong phiên. Không nhảy, không nhấp nháy. |
 | Nhãn khu (DOM) | neo: Thư viện `(−8.5, 4.1, 2.0)`, Tháp canh `(8.8, 6.95, 1.7)`, Chợ `(0, 3.6, 7.6)`. Chữ: `zone.name` (API; nếu chưa có thì dùng tên trong §4) + `" · "` + `"Đang mở"` (`text-success font-semibold`) hoặc `"Sắp mở"` (`text-fg-muted font-medium`). Hộp `rounded-sm border border-line bg-surface px-2 py-1 text-xs font-semibold text-fg whitespace-nowrap`. Landmark không có nhãn (không tương tác). |
 | Lớp DOM thế giới | một `div` `pointer-events-none absolute inset-0 z-10`, `aria-hidden="true"`. Mỗi phần tử đặt bằng `el.style.transform = translate3d(px, py, 0) translate(−50%, −100%)` qua ref (CSSOM, hợp CSP), chỉ cập nhật trong frame đã có render (khi camera đổi). Ở follow mode, ẩn phần tử có neo nằm ngoài màn hình quá 24 px. |
 
@@ -585,7 +587,7 @@ Vòng lặp duy nhất được phép là khối logo đang chờ trong màn ch�
 | Độ nổi | viền, không bóng: panel trên cảnh dùng `bg-surface border border-line-strong`; thẻ trong trang dùng `border-line` |
 | Nền panel | `bg-surface` đặc. Không trong suốt, không blur. Chữ trên panel đạt ≥ 4.5:1 bất kể cảnh phía sau |
 | Lớp phủ modal | `bg-ink/20` (token có alpha), click vào thì đóng |
-| Focus | luật toàn cục `:focus-visible` (2 px `brand`, offset 2 px) đã có. `brand` trên trời: 7.0:1 / 5.35:1 |
+| Focus | luật toàn cục `:focus-visible` (2 px `brand`, offset 2 px) đã có. `brand` trên trời: 7.0:1 / 5.35:1. Sửa 2026-10-09 (§14): điều khiển nằm trên cảnh (`.on-scene` và con trực tiếp: cụm nút trên, la bàn, khung cảnh) dùng vòng `surface` khi `data-sky="night"` |
 | Vùng chạm | mọi nút `h-11` (44 px) và `min-w-11`; gợi ý tương tác `h-12`; dòng trong danh sách khu `min-h-12` |
 | z-index | canvas `z-0` → nhãn thế giới `z-10` → cụm nút `z-20` → gợi ý, panel `z-30` → lớp phủ + hội thoại `z-40` → danh sách khu `z-50` |
 
@@ -820,3 +822,33 @@ Chủ dự án thấy xung quanh các toà còn trống và duyệt dùng props 
 3. **Nướng như phần tĩnh.** Tô bóng theo pháp tuyến thế giới và preset giờ (§2.3), không đèn, không Lambert; tán dù hở được nướng thêm mặt sau. Một mesh, một draw call, không chuyển động idle (§1.2 nguyên tắc 6). Gazebo, quầy hàng ăn, bảng tin, dừa và dù đổ bóng nắng trong lớp bóng có sẵn (§2.2), như cây.
 4. **Không làm:** xe máy (khoảng 3 000 tam giác, quá ngân sách 8k), xe đạp, rổ bóng, nhà chờ xe buýt (không có bản CC0 dùng được). Đèn thêm dùng lại `lamp()` có sẵn, không thêm kiểu đèn thứ hai.
 5. **Không đặt đá vách đế.** Bản đầu có 12 mỏm đá trên bốn vách đất; chúng đọc như tấm bê tông xếp đều, thêm một nhịp nhân tạo cho sa bàn, nên đã bỏ (review vòng 1). Nếu muốn lại: tỉ lệ x không đều, không thẳng hàng với bó vỉa phía trước, ô `dark` hoặc `trunk`.
+
+## 14. Quyết định 2026-10-09: giờ thật và thời tiết hôm nay (campus v0.4)
+
+Nguồn: `campus-v0.4-plan.md` mục "Thời tiết và giờ thật" (W0 chốt 1–13), `weather-time-visuals.md`, `weather-data.md` §7. Code ở `features/campus/sky.ts`, `useSkyClock.ts`, `scene/palette.ts`, `hud/WeatherChip.tsx`, `hud/WeatherLayer.tsx`.
+
+1. **Pha từ mặt trời, ở trình duyệt.** Độ cao mặt trời tại `place` của theme và `Date.now()`: ≥ 6° là `day`, < −6° là `night`, giữa là `dawn` khi mặt trời đang lên, ngược lại `dusk`. Không hỏi vị trí người xem, không cần API, đúng cả khi Render ngủ. Chữ buổi (Bình minh, Sáng, Trưa, Chiều, Hoàng hôn, Tối, Đêm) tính theo `place.timeZone`.
+2. **Bốn preset.** `day`, `dusk` giữ giá trị §2.3. `dawn`: `#e6e8ff` / `#cbc3cf` / 1.72, nắng `#ffc2a6` 1.55 từ `[0.7, 0.55, 0.3]`, rim 0.5. `night`: `#8ea3d6` / `#606b8a` / 0.95, trăng `#c9d6ff` 0.42 từ `[-0.35, 1, 0.75]`, rim 0.1. Đất ban đêm sáng hơn bản thiết kế (`#3b4258`) và trăng nằm ngang hơn (`[-0.2, 1, 0.55]`) để hai tường thấy được từ mọi góc chéo vẫn chênh ≥ 0.08 × mặt trên (orbit §6.2). Mặt trên: ngày 1.000 > bình minh 0.645 > hoàng hôn 0.511 > đêm 0.182.
+3. **Thời tiết biến đổi preset, không thêm preset.** Bảy nhóm gom thành năm lớp nướng (mưa ↔ dông, mây ↔ sương không dựng lại):
+
+   | Lớp nướng | Nhóm | nắng × | trời × | xám hoá | ướt | bóng N8 |
+   |---|---|---|---|---|---|---|
+   | `clear` | trời quang | 1 | 1 | 0 | 0 | có |
+   | `partly` | ít mây | 0.9 | 0.95 | 0.15 | 0 | có |
+   | `overcast` | nhiều mây, sương | 0.9 | 0.88 | 0.55 | 0 | không |
+   | `damp` | mưa phùn | 0.9 | 0.84 | 0.55 | 0.5 | không |
+   | `wet` | mưa, dông | 0.9 | 0.8 | 0.6 | 1 | không |
+
+   Bản thiết kế muốn nắng 0.75 / 0.30 / 0.30 / 0.20 và trời sáng hơn. Test tường orbit chạy trên cả 20 look (W0.7) cho thấy ban ngày chỉ nắng phân biệt được hai tường (lề ngày quang 0.089), nên núm "nắng tối thiểu" lên 0.9 và mây làm tối bằng cách giảm ánh trời. Mặt trên ban ngày: quang 1.000, u ám 0.898, mưa 0.839. U ám vẫn rõ nhờ trời xám, mất bóng nắng, đèn khử màu, đường ướt và lớp phủ.
+4. **Ướt:** màu lát (`path`, `plaza`, `band` và các màu phái sinh từ chúng, `court`, `track`) × `1 − 0.22w`, cỏ × `1 − 0.10w`. Mái, tường, nước giữ màu.
+5. **Một đại lượng `darkness`** = `clamp((0.7 − lum(shade(+y))) / 0.5, 0, 1)`: 0 ban ngày, 1 ban đêm. Theo nó:
+   - Cửa sổ landmark và toà phía sau: `0.33 × darkness` số ô kính (hash theo chỉ số ô và một hạt riêng mỗi nhóm, nên ô sáng lúc hoàng hôn vẫn sáng lúc đêm) đổi sang `~litDim = ~lit × 0.62`, cờ E. Cửa sổ khu chơi giữ luật N9 (khu có sao sáng nhất).
+   - Khi `darkness ≥ 0.5`: đĩa nướng dưới chân năm người nói chuyện thành vũng sáng (nền đã nướng + `~lit × 0.45 × darkness`, rộng × 2.2, cờ E); vết bóng người chơi thành vũng sáng cộng màu (`AdditiveBlending`, màu `~lit × 0.45 × darkness`, opacity 1, scale 2.2; chỉ đổi trạng thái blend, cùng program); vòng tương tác `lerpW(player, 0.55)`.
+   - Vật liệu nhân vật `color = 1 + 0.6 × darkness` (giữ sắc áo, không tạo tương phản). Cây có vật liệu `tree` riêng, cùng tham số nên cùng program, để không bị nhân sáng.
+   - Đo bằng test (mọi theme, đêm quang và đêm mưa): người chơi và cô Lan so với vũng sáng ≥ 3:1, `~lit`/`~litDim` ≥ 1.4, `~litDim`/kính đêm ≥ 2.5.
+6. **Dựng lại:** nhóm tĩnh theo `(theme, pha, lớp nướng, look từng khu)`, khoảng 6 lần mỗi ngày; nhân vật, x-ray, NPC, cây chỉ theo theme (không giật tư thế). Đèn three lấy preset đã áp thời tiết. Đổi look đi qua `wake()` của store, nên `?debug=frames` báo bận tới khi khung mới vẽ xong.
+7. **Trời và lớp phủ là CSS.** Trời phẳng theo pha × mây (ít mây: 30% `cloud`; kín: 100% ngày và đêm, 60% lúc bình minh và hoàng hôn; đêm dùng `cloud-night`). Mưa là ô mask 160 px (`app/assets/rain.svg`, dưới 1 kB, nhúng `data:`) dịch đúng một ô mỗi chu kỳ; dông thêm lớp mưa thứ hai, màn `ink` 10% và chớp trắng tối đa α 0.08, hai nhịp mỗi chu kỳ 23 s (dưới ngưỡng flash WCAG 2.3.1). Lớp nằm `z-5`, giữa canvas và nhãn, dưới HUD. Giảm chuyển động: mưa đứng yên, không chớp. `forced-colors`: không lớp phủ.
+8. **Chip thời tiết** thay nút "Hoàng hôn" ở cụm trên-trái: icon + "27°C" từ `sm`, chỉ icon 44 px dưới `sm` (cụm trái ≈ 266 px, `HUD_CORNER` giữ 344). Popover native: giờ và buổi, nhiệt độ, nhóm, giờ cập nhật, lựa chọn "Theo thời gian thực / Cố định ban ngày" (lưu theo thiết bị) và dòng nguồn Open-Meteo (CC BY 4.0) ngay cạnh dữ liệu. Chín icon nét 1.5 px, không emoji.
+9. **Ngân sách:** +0 draw call, +0 program, +0 tam giác (u ám bớt tam giác bóng); `scene.test.ts` chạy trần 18 draw call / 34 500 tam giác trên cả 20 look. Không frame WebGL khi đứng yên, kể cả đêm dông (e2e).
+10. **QA thêm (§10):** đêm: khu có sao sáng nhất, landmark lác đác cửa sổ ấm mờ hơn, người đứng trong vũng sáng, nhận ra màu áo; mưa: đường tối hơn, không bóng nắng, vệt mưa thấy được trên cỏ và tường nhưng không che nhãn; sương: phía xa mờ hơn, tháp vẫn nhận ra; "Cố định ban ngày" giống hệt cảnh ngày cũ.
+11. **Bỏ qua (thêm khi cần):** vũng nước và vũng sáng đèn đường (`G-glow`) khi ảnh QA ban đêm hay lúc mưa trông chưa đủ; chuyển mờ giữa các pha; mưa xiên; sấm; bảng giờ mọc trong manifest; đồng hồ phút trong chip.

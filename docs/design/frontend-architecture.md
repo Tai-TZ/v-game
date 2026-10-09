@@ -19,15 +19,23 @@ app/
 │  │  ├─ movement.ts      step, isBlocked, nearestWithin, phím → hướng
 │  │  ├─ camera.ts        toán camera isometric (zoom §4.3, dead-zone, inset)
 │  │  ├─ sites.ts         DEFAULT_STATUS, tên dự phòng, INTERACT_POINTS, chữ gợi ý §4
-│  │  ├─ store.ts         zustand: nearby, dialog, metLan, sheetInset + `motion` (mutable)
+│  │  ├─ store.ts         zustand: nearby, dialog, metLan, sheetInset, sky + `motion` (mutable)
+│  │  ├─ sky.ts           thuần, không three: độ cao mặt trời, pha (±6°), buổi theo múi giờ
+│  │  │                   của `place`, 7 nhóm thời tiết → 5 lớp nướng, WeatherSchema,
+│  │  │                   sceneLook, chế độ hiển thị (`vg-hub-display`)
+│  │  ├─ useSkyClock.ts   gọi một lần ở route: pha mỗi 60 s, /api/weather 30 phút/lần
+│  │  │                   (2 phút sau lỗi) khi tab hiện; ghi store khi đổi
 │  │  ├─ hud/             HubTopBar (+ danh sách "Các khu"), InteractHint, LanDialog,
-│  │  │                   SceneLoader + sceneLoad + blueprint (màn chờ), SceneBoundary
+│  │  │                   SceneLoader + sceneLoad + blueprint (màn chờ), SceneBoundary,
+│  │  │                   WeatherChip (chip + popover), WeatherLayer (mưa, sương, chớp CSS)
 │  │  └─ scene/           chunk lazy: three + r3f
-│  │     ├─ palette.ts    màu manifest + màu phái sinh §2.2, shade §2.3
+│  │     ├─ palette.ts    màu manifest + màu phái sinh §2.2, shade §2.3; palette(campus,
+│  │     │                pha, lớp nướng), weatherPreset, darkness (art §14)
 │  │     ├─ primitives.ts box/cyl/quad/prismX/arcSlab… + part() nướng sáng vào vertex colour
 │  │     ├─ campus.ts     builder từng nhóm (§5): terrain, landmark, library, watchtower,
 │  │     │                market, player, lan, cây
-│  │     ├─ useCampusGeometry.ts  memo theo theme/status + dispose; sceneBudget()
+│  │     ├─ useCampusGeometry.ts  memo nhóm tĩnh theo theme/pha/lớp nướng/status, người và
+│  │     │                        cây chỉ theo theme; dispose; sceneBudget()
 │  │     ├─ useHubFrame.ts        vòng frame + input (phím, click/chạm); castFigures
 │  │     ├─ cast.ts       giải mã public/models/cast.json (nướng sẵn, không GLTFLoader):
 │  │     │                parseCast, buildFigure, paintFigure, clip và mixer (chỉ import three)
@@ -51,6 +59,13 @@ app/
 - **Mỗi frame:** `useHubFrame` đọc `hubStore.getState().motion` (vị trí, phím, đích click) và sửa
   trực tiếp; chỉ ghi `nearby`/`dialog` khi đổi (React render lại HUD). Không có state React theo
   frame. Nhãn DOM được đặt `style.transform` qua ref trong frame đã render.
+- **Trời và thời tiết (campus v0.4, art §14):** `useSkyClock(theme.place)` ở route tính pha từ
+  mặt trời tại `place` (không mạng, đúng khi API ngủ) và gọi `getJson("/api/weather")` không
+  await; mọi lỗi im lặng (thời tiết là trang trí), chip ghi "Chưa có thời tiết". Store giữ
+  `sky = { phase, weather, failed, display, look }`, chỉ ghi khi đổi; `look` chỉ thay khi
+  (hiển thị, pha, nhóm thời tiết) đổi và lúc đó gọi `wake()`. Route đặt
+  `<main data-sky data-clouds>` (CSS ra `--vg-sky`) và truyền `look` cho `CampusScene`, cảnh
+  dựng lại qua `useDeferredValue`. Chip đọc phần còn lại; đồng hồ trong popover chỉ đọc khi mở.
 - **Tương tác:** phím E, nút gợi ý, click/chạm cô Lan, mục "Nói chuyện với cô Lan" đều đi qua
   `onInteract`/`talkToLan` của route.
 
@@ -59,9 +74,10 @@ app/
 | Ngân sách | Thực tế | Ép bằng |
 |---|---|---|
 | Trang chủ không có three | 0 chunk | `scripts/check-bundle.mjs` (manifest + dò chuỗi `THREE.WebGLRenderer`) và `e2e/landing.spec.ts` (danh sách chunk từ `build/bundle-report.json`) |
-| `/play` ≤ 300 kB gzip ¹ | 268,9 kB (sau N8/N9 và QA vòng 2, campus-scene v0.3 §13.4) | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
+| `/play` ≤ 300 kB gzip ¹ | 292,8 kB (2026-10-09, sau giờ thật và thời tiết: +3,8 kB cho `sky.ts`, chip, lớp phủ, 9 icon; trước đó khoảng 289 kB) | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
 | ≤ 40 draw call, ≤ 60k tam giác | v0.4: 14 khi còn tượng, 17 khi bộ nhân vật Kenney đã tải (6 SkinnedMesh + x-ray người chơi); ban ngày 22 177 / 19 032 (tượng) và 26 112 (campus) / 22 967 (town) (bộ nhân vật), đo bằng `sceneBudget()` | `scene.test.ts` (fail nếu > 20 hoặc > 28 000; trước v0.4 là 16 và 23 000). Xoay 360° (v0.4) không thêm draw call hay tam giác; `scene.test.ts` còn kiểm khung `ORBIT_FRAME` và góc HUD ở mọi yaw |
-| `frameloop="demand"` | không frame khi đứng yên | `e2e/play.spec.ts` với `?debug=frames` |
+| `frameloop="demand"` | không frame khi đứng yên, kể cả lúc mưa dông ban đêm (mưa và chớp là CSS) | `e2e/play.spec.ts`, `e2e/weather.spec.ts` với `?debug=frames` |
+| Thời tiết | +0 draw call, +0 program, +0 tam giác trên cả 20 look; dựng lại khoảng 6 lần/ngày; 1 GET cùng origin khi vào hub rồi 30 phút/lần khi tab hiện; `rain.svg` < 1 kB nhúng `data:` | `scene.test.ts` (trần 18 draw call / 34 500 tam giác, tường orbit trên mọi look), `useSkyClock.test.ts`, `weather.spec.ts` |
 | Không shadow map / postprocessing | — | `scene.test.ts` grep `app/features/campus` |
 | DPR | `dpr={[1, 2]}`, `[1, 1.5]` khi `(pointer: coarse)` hoặc < 768 px | xem dưới |
 | Dispose khi đổi theme | — | `scene.test.ts` |
@@ -88,8 +104,9 @@ cần sort) thì hạ một bậc 2 → 1,5 → 1. (Brief §5 ghi drei; lệch c
 ## 5. Thêm một theme
 
 Chỉ là dữ liệu: thư mục `public/themes/<id>/` (manifest.json đúng `schema.ts`, kể cả
-`campus.lights` với hai preset ngày và hoàng hôn; theme.css có `--vg-scene-sky`,
-`--vg-scene-dusk`, font) và một dòng trong `public/themes/index.json`. Không sửa code;
+`place` và `campus.lights` với bốn preset `dawn`, `day`, `dusk`, `night`; theme.css có
+`--vg-scene-sky`, `--vg-scene-dawn`, `--vg-scene-dusk`, `--vg-scene-night`, `--vg-scene-cloud`,
+`--vg-scene-cloud-night`, font) và một dòng trong `public/themes/index.json`. Không sửa code;
 `scene.test.ts` tự kiểm tra mọi theme trong index (parse, ngân sách, dispose). Muốn trường
 manifest mới: theo D8.
 
