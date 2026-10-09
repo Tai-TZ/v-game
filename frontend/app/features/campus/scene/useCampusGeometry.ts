@@ -7,6 +7,7 @@ import type { SiteLook } from "../sites";
 import type { Bake, Phase } from "../sky";
 import {
   BLOB_SEGMENTS,
+  buildAo,
   buildCypress,
   buildLan,
   buildLandmark,
@@ -40,6 +41,8 @@ export interface CampusGeometry {
   market: BufferGeometry;
   /** Sun-shadow overlay (N8): one draw call, multiplied over the ground; not a click target. */
   shadow: BufferGeometry;
+  /** Contact darkening (art §2.4): one draw call, multiplied over the ground; not a click target. */
+  ao: BufferGeometry;
   /** Trees standing in a building's shadow, darkened per instance (QA r3). */
   shadedTrees: ReadonlySet<TreeInstance>;
   /** Instanced (one draw call per kind). */
@@ -84,6 +87,7 @@ export function useCampusGeometry(
     shadow: useDisposable(
       useMemo(() => buildShadows(pal, archetype, colonnades), [pal, archetype, colonnades]),
     ),
+    ao: useDisposable(useMemo(() => buildAo(pal, colonnades), [pal, colonnades])),
     shadedTrees: useMemo(
       () => treesInShade(pal, archetype, colonnades),
       [pal, archetype, colonnades],
@@ -115,17 +119,17 @@ export const castTriangles = (cast: CastJson) =>
 
 /**
  * Draw calls and triangles of the hub scene as CampusScene renders it: 5 static groups, the
- * sun-shadow overlay, 2 instanced tree meshes, the people, the player's ground blob and the
- * interaction ring; and the props (useDressing) once they have arrived. The people are the
- * statues (player + x-ray, librarian, the four NPCs merged) until `cast` arrives, then one
- * skinned mesh each plus the player's x-ray.
+ * sun-shadow and contact overlays, 2 instanced tree meshes, the people, the player's ground
+ * blob and the interaction ring; and the props (useDressing) once they have arrived. The people
+ * are the statues (player + x-ray, librarian, the four NPCs merged) until `cast` arrives, then
+ * one skinned mesh each plus the player's x-ray.
  */
 export function sceneBudget(
   g: CampusGeometry,
   cast: CastJson | null = null,
   dressing: BufferGeometry | null = null,
 ): { drawCalls: number; triangles: number } {
-  const statics = [g.terrain, g.landmark, g.library, g.watchtower, g.market, g.shadow];
+  const statics = [g.terrain, g.landmark, g.library, g.watchtower, g.market, g.shadow, g.ao];
   if (dressing) statics.push(dressing);
   const people = cast
     ? { drawCalls: CAST_ROLES.length + 1, triangles: castTriangles(cast) }

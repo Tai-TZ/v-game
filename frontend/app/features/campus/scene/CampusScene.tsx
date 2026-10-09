@@ -52,6 +52,14 @@ const ROUND = TREE_INSTANCES.filter((tree) => tree.kind === "round");
 const CYPRESS = TREE_INSTANCES.filter((tree) => tree.kind === "cypress");
 const FLAT = -Math.PI / 2;
 const BLACK = new Color(0, 0, 0);
+/** A multiply overlay's blend state: its vertex colours scale the ground under it. */
+const MULTIPLY = {
+  vertexColors: true,
+  blending: MultiplyBlending,
+  premultipliedAlpha: true,
+  transparent: true,
+  depthWrite: false,
+} as const;
 
 /**
  * The 3D hub (lazy-loaded so the HUD renders first). Canvas renders on demand only; every
@@ -190,16 +198,14 @@ function Campus({ campus, look, sites, options }: CampusProps) {
       ring: new MeshBasicMaterial(),
       // Multiplies the ground under it (N8); the stencil lets each pixel darken only once.
       shadow: new MeshBasicMaterial({
-        vertexColors: true,
-        blending: MultiplyBlending,
-        premultipliedAlpha: true,
-        transparent: true,
-        depthWrite: false,
+        ...MULTIPLY,
         stencilWrite: true,
         stencilRef: 1,
         stencilFunc: NotEqualStencilFunc,
         stencilZPass: ReplaceStencilOp,
       }),
+      // Contact darkening (art §2.4): the same program, no stencil, so it adds to the sun shade.
+      ao: new MeshBasicMaterial(MULTIPLY),
     }),
     [],
   );
@@ -305,6 +311,7 @@ function Campus({ campus, look, sites, options }: CampusProps) {
         <Trees geometry={g.cypress} material={materials.tree} trees={CYPRESS} g={g} />
       </group>
       <mesh geometry={g.shadow} material={materials.shadow} />
+      <mesh geometry={g.ao} material={materials.ao} />
 
       {/* The people: statues until the baked cast arrives (kept if it fails). */}
       <group ref={player}>

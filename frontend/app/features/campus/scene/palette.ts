@@ -170,6 +170,8 @@ export function palette(campus: CampusTheme, phase: Phase = "day", bake: Bake = 
   const band = mul(lm.trim, 0.5 * paving);
   const path = mul(c(campus.path), paving);
   const sunlight = light(preset);
+  const shadow = shadowFactor(sunlight);
+  const soil = mul(ground, 0.45);
   /** How dark the look is (§1.3): 0 by day, 1 at night; lamps and pools of light follow it. */
   const darkness = Math.min(1, Math.max(0, (0.7 - luminance(shade(UP, sunlight))) / 0.5));
   // Lit from inside, never baked. At dusk the sunlit +z walls bake to the day tan (QA r6: the
@@ -198,9 +200,15 @@ export function palette(campus: CampusTheme, phase: Phase = "day", bake: Bake = 
     lib: building(campus.buildings.library),
     wt,
     mk,
-    soil: mul(ground, 0.45),
-    skirt: mul(ground, 0.7),
-    contact: mul(ground, 0.8),
+    soil,
+    /** Lower band of the slab's cut side (art §5.1 T1). */
+    subsoil: lerp(soil, trunk, 0.35),
+    /** Darker lawn strip (mowing stripes); the light strip is the slab top itself. */
+    mow: mul(ground, 0.955),
+    /** Edge under every paved rect: a light stone kerb, darker when wet. */
+    kerb: mul(lm.trim, 0.92 * paving),
+    /** Lake centre and the water in the slab's cut side; the shore keeps the manifest hex. */
+    deep: mul(water, 0.78),
     glass: mul(water, 0.45),
     lit,
     /** Landmark and back-campus windows lit after dark (§1.3); the zones keep N9. */
@@ -233,7 +241,12 @@ export function palette(campus: CampusTheme, phase: Phase = "day", bake: Bake = 
     // Baked sun (N8): the shadow overlay multiplies whatever ground it lies on from the light of
     // a top face down to that of a wall turned from the sun (art §2.3); static foam round the
     // lake.
-    shadow: shadowFactor(sunlight),
+    shadow,
+    /**
+     * Contact darkening (art §2.4): the AO overlay's darkest factor, the sun shade's hue at 65 %
+     * of its strength, fading to white (no change) at each blob's rim.
+     */
+    ao: lerpW(shadow, 0.35),
     foam: lerpW(water, 0.6),
   };
 }
