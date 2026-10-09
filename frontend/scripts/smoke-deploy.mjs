@@ -65,7 +65,9 @@ for (const { id } of index.themes) {
 }
 
 let health = { status: 0 };
-for (let attempt = 0; attempt < 24; attempt += 1) {
+// Up to 6 minutes: a cold free instance at 0.1 CPU can take several minutes to answer.
+const healthDeadline = Date.now() + 6 * 60_000;
+while (Date.now() < healthDeadline) {
   health = await get("/api/health");
   if (health.status === 200) break;
   await sleep(10_000);
