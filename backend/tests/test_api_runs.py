@@ -297,10 +297,9 @@ def test_concurrent_run_cap_answers_429(
     assert post_run(client, reference()).status_code == 202
     busy = post_run(client, reference())
     assert busy.status_code == 429
-    assert busy.json() == {
-        "detail": "Máy chủ miễn phí chạy một lượt mỗi lúc và đang bận. "
-        "Bạn thử lại sau khoảng 1 phút nhé."
-    }
+    # The run in progress ends by RUN_DEADLINE_S at the latest; the client words the wait.
+    assert busy.headers["retry-after"] == "90"
+    assert busy.json() == {"detail": "Máy chủ miễn phí chạy một lượt mỗi lúc và đang bận."}
 
 
 def test_cancel_ends_the_run_with_run_failed(

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import math
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from functools import partial
@@ -17,7 +18,7 @@ from vgame.content.models import SLUG_PATTERN
 from vgame.engine.blocks import EngineDeps
 from vgame.engine.budget import RunBudget
 from vgame.engine.compiler import compile_graph
-from vgame.engine.constants import MAX_PAYLOAD_BYTES
+from vgame.engine.constants import MAX_PAYLOAD_BYTES, RUN_DEADLINE_S
 from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import graph_hash
 from vgame.engine.index import IndexNotBuiltError, IndexStaleError
@@ -53,8 +54,13 @@ async def _read_capped(request: Request) -> bytes:
     return bytes(body)
 
 
-def _error(status_code: int, message_vi: str, **extra: object) -> JSONResponse:
-    return JSONResponse({"detail": message_vi, **extra}, status_code=status_code)
+def _error(
+    status_code: int,
+    message_vi: str,
+    headers: dict[str, str] | None = None,
+    **extra: object,
+) -> JSONResponse:
+    return JSONResponse({"detail": message_vi, **extra}, status_code=status_code, headers=headers)
 
 
 @router.post(
@@ -116,7 +122,9 @@ async def create_run(
     except IdempotencyConflictError as exc:
         return _error(status.HTTP_409_CONFLICT, exc.message_vi)
     except RunBusyError as exc:
-        return _error(status.HTTP_429_TOO_MANY_REQUESTS, exc.message_vi)
+        # The run in progress ends by its deadline at the latest; the client words the wait.
+        retry = {"Retry-After": str(math.ceil(RUN_DEADLINE_S))}
+        return _error(status.HTTP_429_TOO_MANY_REQUESTS, exc.message_vi, retry)
     if is_new:
         evaluator = LevelEvaluator(spec, spec_level.rules, engine.store)
         task = asyncio.create_task(
