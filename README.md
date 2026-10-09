@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/favicon.svg" width="72" height="72" alt="Biểu tượng V-Game: chữ V trắng trên nền xanh đậm">
+  <img src="frontend/public/favicon.svg" width="72" height="72" alt="Biểu tượng V-Game: năm khối lập phương xếp thành chữ V, khối cam ở mũi">
 </p>
 
 <h1 align="center">V-Game</h1>
@@ -17,6 +17,7 @@
   <a href="https://github.com/Tai-TZ/v-game/actions/workflows/ci.yml"><img src="https://github.com/Tai-TZ/v-game/actions/workflows/ci.yml/badge.svg?branch=main" alt="Trạng thái workflow CI"></a>
   <a href="https://github.com/Tai-TZ/v-game/actions/workflows/security.yml"><img src="https://github.com/Tai-TZ/v-game/actions/workflows/security.yml/badge.svg?branch=main" alt="Trạng thái workflow Security"></a>
   <a href="https://vgame.ai20k.cloud"><img src="https://img.shields.io/badge/production-vgame.ai20k.cloud-0b2a4d?style=flat-square&logo=vercel&logoColor=white" alt="Bản production trên Vercel"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey?style=flat-square" alt="Giấy phép: bảo lưu mọi quyền"></a>
 </p>
 
 <p align="center">
@@ -222,4 +223,4 @@ npm run dev             # http://localhost:5173/play, /api proxy sang :8000
 
 <sub>Model 3D: Kenney và Quaternius, CC0 1.0. Dữ liệu thời tiết: <a href="https://open-meteo.com/">Open-Meteo</a>, CC BY 4.0. Chi tiết ở <a href="CREDITS.md">CREDITS.md</a>.</sub>
 
-<p align="center"><sub>Thực hiện bởi Tai Thanh Nguyen</sub></p>
+<p align="center"><sub>Thực hiện bởi Tai Thanh Nguyen · © 2026, bảo lưu mọi quyền (<a href="LICENSE">LICENSE</a>)</sub></p>
