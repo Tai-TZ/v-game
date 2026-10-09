@@ -479,9 +479,16 @@ function backCampus(pal: Palette): Parts {
   ).translate(0, 0, -13.6);
   /** Carport roof height: 0.36 at its middle, tilted 0.043 rad so the west end is higher. */
   const carportY = (x: number) => 0.36 - Math.tan(0.043) * (x + 13.1);
+  /** Building H's bays on all four walls (D19). */
   const hallBays = [
-    ...range(6).map((k) => ["+z", -13.3, -14.1 + 0.7 * k] as const),
-    ...range(4).map((k) => ["+x", -10.3, -15.65 + 0.7 * k] as const),
+    ...range(6).flatMap((k) => [
+      ["+z", -13.3, -14.1 + 0.7 * k] as const,
+      ["-z", -16.0, -14.1 + 0.7 * k] as const,
+    ]),
+    ...range(4).flatMap((k) => [
+      ["+x", -10.3, -15.65 + 0.7 * k] as const,
+      ["-x", -14.5, -15.65 + 0.7 * k] as const,
+    ]),
   ];
   const steps = [
     { x0: 14.2, y1: 0.25 },
@@ -498,6 +505,11 @@ function backCampus(pal: Palette): Parts {
       P(box(x - 0.27, x + 0.27, 1.36, 1.66, -13.1, -9.95), pal.water),
       P(box(x - 0.3, x + 0.3, 1.66, 1.7, -13.1, -9.95), trim, h),
     ]),
+    // Annex A had no window on any wall: from behind it read as a white box (D17).
+    ...range(12).map((k) => P(quad("-z", -11.8, -3.3 + 0.6 * k, 0.7, 0.26, 0.32), g, h)),
+    ...grid(SIDES, [-11.4, -10.55], (s, z) =>
+      P(quad(s > 0 ? "+x" : "-x", s * 3.8, z, 0.7, 0.26, 0.32), g, h),
+    ),
     // GS1-GS4: building G with a solar roof and a skylight box.
     P(box(-2.6, 2.6, 0, 1.8, -16.6, -13.1), wall, ha),
     P(box(-2.66, 2.66, 1.8, 1.86, -16.66, -13.04), trim, h),
@@ -510,12 +522,15 @@ function backCampus(pal: Palette): Parts {
       }),
     ]),
     P(box(-0.4, 0.4, 1.86, 2.14, -15.8, -13.9), roof, h),
-    ...grid([0.45, 1.05, 1.5], range(9), (y, k) =>
-      P(quad("+z", -13.1, -2.2 + 0.55 * k, y, 0.26, 0.32), g, h),
-    ),
-    ...grid([0.45, 1.05, 1.5], range(5), (y, k) =>
-      P(quad("+x", 2.6, -16.1 + 0.65 * k, y, 0.26, 0.32), g, h),
-    ),
+    // Windows on all four walls (D18).
+    ...SIDES.flatMap((s) => [
+      ...grid([0.45, 1.05, 1.5], range(9), (y, k) =>
+        P(quad(s > 0 ? "+z" : "-z", s > 0 ? -13.1 : -16.6, -2.2 + 0.55 * k, y, 0.26, 0.32), g, h),
+      ),
+      ...grid([0.45, 1.05, 1.5], range(5), (y, k) =>
+        P(quad(s > 0 ? "+x" : "-x", s * 2.6, -16.1 + 0.65 * k, y, 0.26, 0.32), g, h),
+      ),
+    ]),
     // H1, H2: building H, ten bays of a tall arched window over a short one.
     P(box(-14.5, -10.3, 0, 1.5, -16.0, -13.3), wall, ha),
     P(box(-14.56, -10.24, 1.5, 1.57, -16.06, -13.24), trim, h),
@@ -545,9 +560,16 @@ function backCampus(pal: Palette): Parts {
       P(box(x - 0.3, x + 0.3, 1.95, 2.25, -13.68, -13.22), wall, h),
       P(box(x - 0.46, x + 0.46, 1.95, 2.0, -13.84, -13.06), trim, h),
     ]),
-    ...range(5).flatMap((k) => [
-      P(quad("+x", 9.0, -17.0 + 0.72 * k, 0.62, 0.3, 0.55), g, h),
-      P(arch("+x", 9.0, -17.0 + 0.72 * k, 0.9, 0.15), g, h),
+    // Arched windows east, west and at the back (D20); the portico is the front.
+    ...[
+      ...range(5).flatMap((k) => [
+        ["+x", 9.0, -17.0 + 0.72 * k] as const,
+        ["-x", 4.2, -17.0 + 0.72 * k] as const,
+      ]),
+      ...range(6).map((k) => ["-z", -17.6, 4.6 + 0.8 * k] as const),
+    ].flatMap(([face, plane, u]) => [
+      P(quad(face, plane, u, 0.62, 0.3, 0.55), g, h),
+      P(arch(face, plane, u, 0.9, 0.15), g, h),
     ]),
     // C1: chiller plant with six fans.
     P(box(-6.9, -4.0, 0, 0.62, -18.6, -17.0), trim, h),
@@ -858,7 +880,18 @@ function mainBuilding(pal: Palette): Parts {
     ...baseWindows.map(({ x, y }) =>
       P(quad("+z", Math.abs(x) >= 2.5 ? -5.24 : -5.3, x, y, 0.2, 0.36), g),
     ),
-    ...range(6).map((k) => P(quad("+x", 3.0, -9.6 + 0.4 * k, 2.57, 0.2, 0.36), g)),
+    // The strip over each wing roof (D3: west too), and the back above annex A, which hides it
+    // up to y 1.36 (D3).
+    ...SIDES.flatMap((s) =>
+      range(6).map((k) =>
+        P(quad(s > 0 ? "+x" : "-x", s * 3.0, -9.6 + 0.4 * k, 2.57, 0.2, 0.36), g),
+      ),
+    ),
+    ...grid(
+      range(14).map((k) => -2.6 + 0.4 * k),
+      [1.92, 2.57],
+      (x, y) => P(quad("-z", -9.9, x, y, 0.2, 0.36), g),
+    ),
   ];
   for (const s of SIDES) {
     const [x0, x1] = s < 0 ? [-9.7, -3.0] : [3.0, 9.7];
@@ -867,21 +900,29 @@ function mainBuilding(pal: Palette): Parts {
       P(box(x0 - 0.05, x1 + 0.05, 2.25, 2.37, -9.75, -6.15), trim),
       P(rect(x0 + 0.12, x1 - 0.12, -9.63, -6.27, 2.372), roof),
       P(box(x0 - 0.05, x1 + 0.05, 2.37, 2.5, -6.27, -6.15), wall),
-      ...[0.92, 1.57].map((y) => P(box(x0, x1, y, y + 0.04, -6.2, -6.16), trim)),
+      // Front and back alike (D1): string courses and nine bays.
+      ...[0.92, 1.57].flatMap((y) => [
+        P(box(x0, x1, y, y + 0.04, -6.2, -6.16), trim),
+        P(box(x0, x1, y, y + 0.04, -9.74, -9.7), trim),
+      ]),
       ...range(9).flatMap((i) => {
         const x = s * (4.6 + 0.42 * i);
-        return [
-          P(quad("+z", -6.2, x, 1.27, 0.16, 0.4), g),
-          P(quad("+z", -6.2, x, 1.92, 0.16, 0.4), g),
-          P(quad("+z", -6.2, x, 0.55, 0.16, 0.34), g),
-          P(arch("+z", -6.2, x, 0.72, 0.08), g),
-        ];
+        return (
+          [
+            ["+z", -6.2],
+            ["-z", -9.7],
+          ] as const
+        ).flatMap(([face, plane]) => [
+          P(quad(face, plane, x, 1.27, 0.16, 0.4), g),
+          P(quad(face, plane, x, 1.92, 0.16, 0.4), g),
+          P(quad(face, plane, x, 0.55, 0.16, 0.34), g),
+          P(arch(face, plane, x, 0.72, 0.08), g),
+        ]);
       }),
-      ...(s > 0
-        ? grid(range(5), [0.62, 1.27, 1.92], (i, y) =>
-            P(quad("+x", 9.7, -9.4 + 0.42 * i, y, 0.16, 0.4), g),
-          )
-        : []),
+      // The gable end of each wing: east, and west (D2).
+      ...grid(range(5), [0.62, 1.27, 1.92], (i, y) =>
+        P(quad(s > 0 ? "+x" : "-x", s * 9.7, -9.4 + 0.42 * i, y, 0.16, 0.4), g),
+      ),
     );
   }
   for (const c of [-9.05, -3.7, 3.7, 9.05]) {
@@ -892,14 +933,25 @@ function mainBuilding(pal: Palette): Parts {
       P(box(c - 0.5, c + 0.5, 3.03, 3.13, -7.2, -6.2), wall),
       P(box(c - 0.26, c + 0.26, 3.13, 3.42, -6.96, -6.44), wall),
       P(box(c - 0.31, c + 0.31, 3.42, 3.48, -7.01, -6.39), trim),
-      P(quad("+z", -6.44, c, 3.25, 0.14, 0.2), g),
-      P(arch("+z", -6.44, c, 3.35, 0.07), g),
-      P(quad("+x", c + 0.26, -6.7, 3.25, 0.14, 0.2), g),
-      P(arch("+x", c + 0.26, -6.7, 3.35, 0.07), g),
+      // The kiosk's window on all four sides (D6).
+      ...(
+        [
+          ["+z", -6.44, c],
+          ["-z", -6.96, c],
+          ["+x", c + 0.26, -6.7],
+          ["-x", c - 0.26, -6.7],
+        ] as const
+      ).flatMap(([face, plane, u]) => [
+        P(quad(face, plane, u, 3.25, 0.14, 0.2), g),
+        P(arch(face, plane, u, 3.35, 0.07), g),
+      ]),
       ...grid([c - 0.28, c + 0.28], floors, (x, y) => P(quad("+z", -6.0, x, y, 0.18, 0.38), g)),
-      ...(c > 0
-        ? grid([-7.0, -6.4], floors, (z, y) => P(quad("+x", c + 0.7, z, y, 0.18, 0.38), g))
-        : []),
+      // The back shows only above the wing roof (D5).
+      ...[c - 0.28, c + 0.28].map((x) => P(quad("-z", -7.4, x, 2.61, 0.18, 0.38), g)),
+      // The outer side: east on the east wing, west on the west wing (D4).
+      ...grid([-7.0, -6.4], floors, (z, y) =>
+        P(quad(c > 0 ? "+x" : "-x", c + Math.sign(c) * 0.7, z, y, 0.18, 0.38), g),
+      ),
     );
   }
   return parts;
@@ -918,20 +970,30 @@ function spireHall(pal: Palette): Parts {
   return [
     // Porch: four columns, wider middle bay.
     ...[-1.4, -0.6, 0.6, 1.4].map((x) => P(cyl(0.09, 0.1, 8, 0.3, 1.3, x, -4.4), wall)),
-    // Parterre round the tower base roof and a lawn on wing E (v0.3 §6.3).
+    // Parterre round the tower base roof, front and back, east and west (v0.3 §6.3, D8), and a
+    // lawn on wing E.
     ...[
       [-3.0, -1.9],
       [-1.6, -0.45],
       [0.45, 1.6],
       [1.9, 3.0],
-    ].map(([x0 = 0, x1 = 0]) => P(rect(x0, x1, -6.0, -5.3, 3.024), pal.ground)),
+    ].flatMap(([x0 = 0, x1 = 0]) => [
+      P(rect(x0, x1, -6.0, -5.3, 3.024), pal.ground),
+      P(rect(x0, x1, -9.9, -9.2, 3.024), pal.ground),
+    ]),
     ...[
       [-9.9, -8.1],
       [-7.1, -6.2],
-    ].map(([z0 = 0, z1 = 0]) => P(rect(2.05, 3.0, z0, z1, 3.024), pal.ground)),
+    ].flatMap(([z0 = 0, z1 = 0]) => [
+      P(rect(2.05, 3.0, z0, z1, 3.024), pal.ground),
+      P(rect(-3.0, -2.05, z0, z1, 3.024), pal.ground),
+    ]),
+    // Half rose beds on the middle of each strip, curving in from the roof edge.
     ...[
       { x: 0, z: -5.3, from: 0 },
       { x: 3.0, z: -7.6, from: PI / 2 },
+      { x: 0, z: -9.9, from: PI },
+      { x: -3.0, z: -7.6, from: -PI / 2 },
     ].map(({ x, z, from }) =>
       P(new CircleGeometry(0.42, 8, from, PI).rotateX(-PI / 2).translate(x, 3.026, z), pal.bloom),
     ),
@@ -941,20 +1003,28 @@ function spireHall(pal: Palette): Parts {
     ].map(([x0 = 0, x1 = 0]) => P(rect(x0, x1, -9.35, -6.5, 2.374), pal.ground)),
     P(box(-1.65, 1.65, 1.3, 1.46, -5.3, -4.22), trim),
     P(quad("+z", -5.3, 0, 0.75, 1.0, 0.9), g),
-    // Tier 2.
+    // Tier 2; tiers 2 to 4 have windows on all four sides (D7).
     P(box(-1.95, 1.95, 3.02, 3.8, -9.1, -6.1), wall),
     P(box(-2.03, 2.03, 3.8, 3.96, -9.18, -6.02), trim),
-    ...range(9).map((k) => P(quad("+z", -6.1, -1.6 + 0.4 * k, 3.41, 0.2, 0.4), g)),
-    ...range(7).map((k) => P(quad("+x", 1.95, -8.8 + 0.4 * k, 3.41, 0.2, 0.4), g)),
+    ...SIDES.flatMap((s) => [
+      ...range(9).map((k) =>
+        P(quad(s > 0 ? "+z" : "-z", s > 0 ? -6.1 : -9.1, -1.6 + 0.4 * k, 3.41, 0.2, 0.4), g),
+      ),
+      ...range(7).map((k) =>
+        P(quad(s > 0 ? "+x" : "-x", s * 1.95, -8.8 + 0.4 * k, 3.41, 0.2, 0.4), g),
+      ),
+    ]),
     // Tier 3, roof garden and corner kiosks.
     P(box(-1.83, 1.83, 3.96, 4.9, -9.0, -6.2), wall),
     P(box(-1.9, 1.9, 4.9, 5.0, -9.07, -6.13), trim),
-    ...grid(range(9), [4.2, 4.62], (k, y) =>
-      P(quad("+z", -6.2, -1.4 + 0.35 * k, y, 0.18, 0.28), g),
-    ),
-    ...grid(range(7), [4.2, 4.62], (k, y) =>
-      P(quad("+x", 1.83, -8.7 + 0.37 * k, y, 0.18, 0.28), g),
-    ),
+    ...SIDES.flatMap((s) => [
+      ...grid(range(9), [4.2, 4.62], (k, y) =>
+        P(quad(s > 0 ? "+z" : "-z", s > 0 ? -6.2 : -9.0, -1.4 + 0.35 * k, y, 0.18, 0.28), g),
+      ),
+      ...grid(range(7), [4.2, 4.62], (k, y) =>
+        P(quad(s > 0 ? "+x" : "-x", s * 1.83, -8.7 + 0.37 * k, y, 0.18, 0.28), g),
+      ),
+    ]),
     P(rect(-1.75, 1.75, -8.95, -6.25, 5.003), pal.lm.roof),
     P(rect(-1.75, 1.75, -6.5, -6.25, 5.004), pal.hedge),
     ...grid([-1.55, 1.55], [-8.75, -6.45], (kx, kz) => [
@@ -963,10 +1033,17 @@ function spireHall(pal: Palette): Parts {
     ]).flat(),
     // Tier 4 with tall arched openings.
     P(box(-0.81, 0.81, 5.0, 6.2, -8.41, -6.79), wall),
-    P(quad("+z", -6.79, 0, 5.5, 0.34, 0.62), g),
-    P(arch("+z", -6.79, 0, 5.81, 0.17), g),
-    P(quad("+x", 0.81, cz, 5.5, 0.34, 0.62), g),
-    P(arch("+x", 0.81, cz, 5.81, 0.17), g),
+    ...(
+      [
+        ["+z", -6.79, 0],
+        ["-z", -8.41, 0],
+        ["+x", 0.81, cz],
+        ["-x", -0.81, cz],
+      ] as const
+    ).flatMap(([face, plane, u]) => [
+      P(quad(face, plane, u, 5.5, 0.34, 0.62), g),
+      P(arch(face, plane, u, 5.81, 0.17), g),
+    ]),
     P(box(-0.88, 0.88, 6.2, 6.28, -8.48, -6.72), trim),
     // Lantern, cup, needle and star.
     P(cyl(0.56, 0.82, 8, 6.28, 6.55, 0, cz), wall),
@@ -1016,9 +1093,12 @@ function clockTower(pal: Palette): Parts {
     .scale(3.12 * Math.SQRT2, 1, 2.42 * Math.SQRT2)
     .translate(0, 3.02 + 0.64, -7.6);
   const v = 5.31;
+  // A dial on every side of the clock box (D9); each still reads 4:30 (orbit-camera §5.3).
   const faces = [
     ["+z", -4.9, 0],
     ["+x", 0.75, -5.65],
+    ["-z", -6.4, 0],
+    ["-x", -0.75, -5.65],
   ] as const;
   const windows = [
     [2.3, 0.6],
@@ -1042,6 +1122,7 @@ function clockTower(pal: Palette): Parts {
     ...windows.flatMap(([y, h]) => [
       P(quad("+z", -4.8, 0, y, 0.3, h), g),
       P(quad("+x", 0.85, -5.65, y, 0.3, h), g),
+      P(quad("-x", -0.85, -5.65, y, 0.3, h), g),
     ]),
   ];
 }
@@ -1109,6 +1190,11 @@ function archGate(pal: Palette): Parts {
     P(arch("+z", fz, 0, 1.26, 0.645), iron),
     P(quad("+z", fz, 0, 2.1, 3.08, 0.08), accent),
     P(box(-0.14, 0.14, 1.93, 2.2, fz, fz + 0.05), accent),
+    // The arches and the gold band seen from the campus side (D10): from 135° to 225° the gate
+    // read as a solid wall.
+    P(quad("-z", 11.5, 0, 0.63, 1.29, 1.26), iron),
+    P(arch("-z", 11.5, 0, 1.26, 0.645), iron),
+    P(quad("-z", 11.5, 0, 2.1, 3.08, 0.08), accent),
     ...[-1.28, -0.86, 0.86, 1.28].flatMap((x) => [
       P(box(x - 0.12, x + 0.12, 0, 0.3, fz, BASE.maxZ), trim),
       P(box(x - 0.125, x + 0.125, 0.22, 0.27, fz, BASE.maxZ + 0.005), accent),
@@ -1123,6 +1209,8 @@ function archGate(pal: Palette): Parts {
         P(box(c0, c1, 1.66, 1.78, 11.55, fz), trim),
         P(quad("+z", 12.36, s * 2.1, 0.405, 0.67, 0.81), iron),
         P(arch("+z", 12.36, s * 2.1, 0.81, 0.335), iron),
+        P(quad("-z", 11.6, s * 2.1, 0.405, 0.67, 0.81), iron),
+        P(arch("-z", 11.6, s * 2.1, 0.81, 0.335), iron),
       ];
     }),
     ...fenceRuns.flatMap(([x0 = 0, x1 = 0]) => [
@@ -1206,6 +1294,12 @@ export function entranceLampSpots(id: ZoneLocation): Vec2[] {
   }));
 }
 
+/** The library's front and back walls, which carry the tall windows. */
+const TALL_FACES = [
+  ["+z", -0.8],
+  ["-z", -5.8],
+] as const;
+
 /**
  * Two-storey hall: gold-banded portico, arched windows, roof garden (§5.6). Open: the door is
  * lit. Lit (a level has a star, N9): the windows light up and show the shelves of books.
@@ -1234,15 +1328,22 @@ export function buildLibrary(pal: Palette, look: SiteLook) {
     P(quad("+x", -9.4, -2.8, 0.7, 0.6, 0.9), door, { emissive: open }),
     P(arch("+x", -9.4, -2.8, 1.15, 0.3), door, { emissive: open }),
     P(box(-9.4, -8.6, 1.42, 1.48, -3.4, -2.2), c.roof),
-    ...[-4.8, -4.0, -1.6].flatMap((z) => [
-      P(quad("+x", -9.4, z, 0.65, 0.3, 0.55), c.window, lit),
-      P(quad("+x", -9.4, z, 1.4, 0.3, 0.45), c.window, lit),
-      P(arch("+x", -9.4, z, 1.625, 0.15), c.window, lit),
+    // East bays beside the door; the west wall has a bay where the door would be (D11).
+    ...[
+      ...[-4.8, -4.0, -1.6].map((z) => ["+x", -9.4, z] as const),
+      ...[-4.8, -4.0, -2.8, -1.6].map((z) => ["-x", -12.2, z] as const),
+    ].flatMap(([face, plane, z]) => [
+      P(quad(face, plane, z, 0.65, 0.3, 0.55), c.window, lit),
+      P(quad(face, plane, z, 1.4, 0.3, 0.45), c.window, lit),
+      P(arch(face, plane, z, 1.625, 0.15), c.window, lit),
     ]),
-    ...tall.flatMap((x) => [
-      P(quad("+z", -0.8, x, 0.95, 0.44, 1.25), c.window, lit),
-      P(arch("+z", -0.8, x, 1.575, 0.22), c.window, lit),
-    ]),
+    // Tall windows on the front and the back (D11).
+    ...TALL_FACES.flatMap(([face, plane]) =>
+      tall.flatMap((x) => [
+        P(quad(face, plane, x, 0.95, 0.44, 1.25), c.window, lit),
+        P(arch(face, plane, x, 1.575, 0.22), c.window, lit),
+      ]),
+    ),
     ...entranceLamps(pal, "library", look),
   ];
   if (look === "lit") {
@@ -1252,28 +1353,35 @@ export function buildLibrary(pal: Palette, look: SiteLook) {
       { base: 0.42, heights: [0.5, 0.44, 0.55, 0.46, 0.52] },
       { base: 1.0, heights: [0.42, 0.46, 0.39, 0.48, 0.44] },
     ];
-    for (const x of tall) {
-      rows.forEach((row, r) => {
-        row.heights.forEach((h, k) => {
-          const spine = new PlaneGeometry(0.07, h).translate(
-            x - 0.164 + 0.082 * k,
-            row.base + h / 2,
-            -0.788,
-          );
-          parts.push(P(spine, spines[(k + 2 * r) % 5] ?? pal.lib.roof, { emissive: true }));
+    // Just past the glass (0.002 and 0.003), on whichever side of the wall is out.
+    for (const [face, plane] of TALL_FACES) {
+      for (const x of tall) {
+        rows.forEach((row, r) => {
+          row.heights.forEach((h, k) => {
+            const spine = new PlaneGeometry(0.07, h).translate(0, 0, 0.002);
+            onFace(spine, face, plane, x - 0.164 + 0.082 * k, row.base + h / 2);
+            parts.push(P(spine, spines[(k + 2 * r) % 5] ?? pal.lib.roof, { emissive: true }));
+          });
         });
-      });
-      const shelf = new PlaneGeometry(0.44, 0.03).translate(x, 0.99, -0.787);
-      parts.push(P(shelf, pal.lib.trim, { emissive: true }));
+        const shelf = new PlaneGeometry(0.44, 0.03).translate(0, 0, 0.003);
+        parts.push(P(onFace(shelf, face, plane, x, 0.99), pal.lib.trim, { emissive: true }));
+      }
     }
   }
   if (!open) {
-    parts.push(
-      ...[-11.9, -10.8, -9.7].map((x) =>
-        P(box(x - 0.035, x + 0.035, 0.25, 2.15, -0.715, -0.645), c.trunk),
-      ),
-      ...[0.85, 1.55].map((y) => P(box(-12.2, -9.4, y, y + 0.06, -0.75, -0.5), c.trunk)),
-    );
+    // Scaffolding on the front and, mirrored through the hall, the back (D12): every view but
+    // exactly 90 and 270 degrees then shows one (art §1.2 rule 4).
+    for (const [p0, p1, b0, b1] of [
+      [-0.715, -0.645, -0.75, -0.5],
+      [-5.955, -5.885, -6.1, -5.85],
+    ] as const) {
+      parts.push(
+        ...[-11.9, -10.8, -9.7].map((x) =>
+          P(box(x - 0.035, x + 0.035, 0.25, 2.15, p0, p1), c.trunk),
+        ),
+        ...[0.85, 1.55].map((y) => P(box(-12.2, -9.4, y, y + 0.06, b0, b1), c.trunk)),
+      );
+    }
   }
   return merge(parts);
 }
@@ -1297,27 +1405,50 @@ export function buildWatchtower(pal: Palette, look: SiteLook) {
     P(box(10.0, 11.2, 4.75, 4.82, -5.4, -4.2), c.trim),
     P(box(10.3, 10.9, 4.82, 5.5, -5.1, -4.5), c.wall),
     P(box(10.24, 10.96, 5.5, 5.58, -5.16, -4.44), c.trim),
-    P(quad("+z", -4.5, 10.6, 5.08, 0.16, 0.34), c.window, slot),
-    P(arch("+z", -4.5, 10.6, 5.25, 0.08), c.window, slot),
-    P(quad("+x", 10.9, -4.8, 5.08, 0.16, 0.34), c.window, slot),
-    P(arch("+x", 10.9, -4.8, 5.25, 0.08), c.window, slot),
+    // The lamp slot under the cap, on all four sides (D13).
+    ...(
+      [
+        ["+z", -4.5, 10.6],
+        ["-z", -5.1, 10.6],
+        ["+x", 10.9, -4.8],
+        ["-x", 10.3, -4.8],
+      ] as const
+    ).flatMap(([face, plane, u]) => [
+      P(quad(face, plane, u, 5.08, 0.16, 0.34), c.window, slot),
+      P(arch(face, plane, u, 5.25, 0.08), c.window, slot),
+    ]),
     P(cone(0.42, 4, 5.58, 6.05, 10.6, -4.8, true), c.roof),
     P(ico(0.07, 0, 10.6, 6.12, -4.8), c.accent),
     ...grid([10.2, 11.0], [1.95, 2.75], (x, y) => P(quad("+z", -3.8, x, y, 0.2, 0.42), c.glass)),
-    ...grid([-5.2, -4.4], [0.65, 1.45, 2.25, 3.05], (z, y) =>
-      P(quad("+x", 11.6, z, y, 0.2, 0.42), c.glass),
+    // Tower windows on the east and, mirrored, the west and the back (D13).
+    ...SIDES.flatMap((s) =>
+      grid([-5.2, -4.4], [0.65, 1.45, 2.25, 3.05], (z, y) =>
+        P(quad(s > 0 ? "+x" : "-x", s > 0 ? 11.6 : 9.6, z, y, 0.2, 0.42), c.glass),
+      ),
+    ),
+    ...grid([10.2, 11.0], [0.65, 1.45, 2.25, 3.05], (x, y) =>
+      P(quad("-z", -5.8, x, y, 0.2, 0.42), c.glass),
     ),
     ...[9.6, 10.4, 11.2].map((x) => P(quad("+z", -1.2, x, 0.75, 0.3, 0.5), c.glass)),
     ...[-3.2, -2.4, -1.6].map((z) => P(quad("+x", 11.8, z, 0.75, 0.3, 0.5), c.glass)),
+    // The real entrance faces the plaza (D13): lit while the zone is open, like the library's.
+    P(quad("-x", 9.0, -2.8, 0.7, 0.6, 0.9), open ? pal.lit : c.glass, { emissive: open }),
+    ...[-3.45, -2.15].map((z) => P(quad("-x", 9.0, z, 0.75, 0.3, 0.5), c.glass)),
     ...entranceLamps(pal, "watchtower", look),
+    // Scaffolding on the tower's front and, mirrored through it (z -4.8), its back (D14).
     ...(open
       ? []
-      : [
+      : (
+          [
+            [-3.715, -3.645, -3.75, -3.5],
+            [-5.955, -5.885, -6.1, -5.85],
+          ] as const
+        ).flatMap(([p0, p1, b0, b1]) => [
           ...[9.7, 10.6, 11.5].map((x) =>
-            P(box(x - 0.035, x + 0.035, 1.53, 3.55, -3.715, -3.645), c.trunk),
+            P(box(x - 0.035, x + 0.035, 1.53, 3.55, p0, p1), c.trunk),
           ),
-          ...[2.1, 2.9].map((y) => P(box(9.6, 11.6, y, y + 0.06, -3.75, -3.5), c.trunk)),
-        ]),
+          ...[2.1, 2.9].map((y) => P(box(9.6, 11.6, y, y + 0.06, b0, b1), c.trunk)),
+        ])),
   ]);
 }
 
@@ -1343,6 +1474,8 @@ export function buildMarket(pal: Palette, look: SiteLook) {
     P(box(7.6, 10.4, 1.95, 2.35, 3.05, 4.75), c.wall),
     P(box(7.55, 10.45, 2.35, 2.42, 3.0, 4.8), c.trim),
     P(new PlaneGeometry(3.9, 0.646).rotateX(-PI / 2 + tilt).translate(9.0, 1.5, 5.55), c.roof),
+    // North awning, the south one turned round (D15): seen from behind, the fair keeps its red.
+    P(new PlaneGeometry(3.9, 0.646).rotateX(-PI / 2 - tilt).translate(9.0, 1.5, 2.25), c.roof),
     P(
       new PlaneGeometry(0.646, 2.5)
         .rotateX(-PI / 2)
@@ -1367,14 +1500,19 @@ export function buildMarket(pal: Palette, look: SiteLook) {
           ...[3.3, 4.5].map((z) => box(11.55, 11.71, 1.12, 1.28, z - 0.08, z + 0.08)),
         ].map((lantern) => P(lantern, pal.lit, { emissive: true }))
       : []),
+    // Scaffolding on the east and, mirrored through the hall (x 9.0), across the west entrance
+    // (D16): "not open yet", though not an obstacle.
     ...(look !== "coming_soon"
       ? []
-      : [
-          ...[2.8, 3.9, 5.0].map((z) =>
-            P(box(11.06, 11.13, 0, 2.3, z - 0.035, z + 0.035), c.trunk),
-          ),
-          ...[0.9, 1.9].map((y) => P(box(11.05, 11.3, y, y + 0.06, 2.7, 5.1), c.trunk)),
-        ]),
+      : (
+          [
+            [11.06, 11.13, 11.05, 11.3],
+            [6.87, 6.94, 6.7, 6.95],
+          ] as const
+        ).flatMap(([p0, p1, b0, b1]) => [
+          ...[2.8, 3.9, 5.0].map((z) => P(box(p0, p1, 0, 2.3, z - 0.035, z + 0.035), c.trunk)),
+          ...[0.9, 1.9].map((y) => P(box(b0, b1, y, y + 0.06, 2.7, 5.1), c.trunk)),
+        ])),
   ]);
 }
 

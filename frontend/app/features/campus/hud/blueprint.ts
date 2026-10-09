@@ -159,8 +159,13 @@ export const MIRROR = {
     m("trim", 6.95, 11.05, 1.75, 1.95, 2.55, 5.25),
     m("wall", 7.55, 10.45, 1.95, 2.42, 3.0, 4.8),
   ],
-  /** Awnings: south (x 7.05–10.95) and east (z 2.65–5.15), sloping 0.38 rad outwards. */
-  awnings: { y: [1.62, 1.38], south: [7.05, 10.95, 5.25, 5.85], east: [11.05, 11.65, 2.65, 5.15] },
+  /** Awnings: north and south (x 7.05–10.95), east (z 2.65–5.15), sloping 0.38 rad outwards. */
+  awnings: {
+    y: [1.62, 1.38],
+    north: [7.05, 10.95, 1.95, 2.55],
+    south: [7.05, 10.95, 5.25, 5.85],
+    east: [11.05, 11.65, 2.65, 5.15],
+  },
   /** backCampus() roof heights over the BACK footprints; the domed hall's vault as a box. */
   back: [
     [BACK.annex, 1.36],
@@ -357,6 +362,19 @@ export function buildingStacks(landmark: CampusTheme["landmark"]): Stack[] {
   ];
 }
 
+/** The north awning hangs behind the hall, so it is painted before the hall's masses. */
+function northAwning(): Shape {
+  const { y, north } = MIRROR.awnings;
+  const [yIn, yOut] = y;
+  const [x0, x1, z0, z1] = north;
+  return poly("f-top bp-mk", [
+    [x0, yOut, z0],
+    [x1, yOut, z0],
+    [x1, yIn, z1],
+    [x0, yIn, z1],
+  ]);
+}
+
 function awningShapes(): Shape[] {
   const { y, south, east } = MIRROR.awnings;
   const [yIn, yOut] = y;
@@ -497,7 +515,12 @@ export function blueprintPieces(landmark: CampusTheme["landmark"], player: Vec2)
 
   for (const { at, masses, awnings } of buildingStacks(landmark)) {
     const shapes = masses.flatMap(massShapes);
-    add("bldg", at, awnings ? [...shapes, ...awningShapes()] : shapes, footprint(masses));
+    add(
+      "bldg",
+      at,
+      awnings ? [northAwning(), ...shapes, ...awningShapes()] : shapes,
+      footprint(masses),
+    );
   }
 
   const spot = (p: Vec2) => [p.x - 0.3, p.x + 0.3, p.z - 0.3, p.z + 0.3] as const;
