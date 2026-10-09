@@ -1247,6 +1247,11 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       // Soft but there: no channel goes black, the darkest factor reads as contact, not shade.
       for (const k of [pal.ao.r, pal.ao.g, pal.ao.b]) expect(k).toBeGreaterThan(0);
       expect(luminance(pal.ao)).toBeLessThanOrEqual(0.85);
+      // Strong enough to see at 1280 px (review r1: 0.35 to white read as nothing), and half-way
+      // to grey: contact blocks sky light, so a dusk blob on a warm path never turns lavender.
+      const spread = (k: Color) => Math.max(k.r, k.g, k.b) - Math.min(k.r, k.g, k.b);
+      expect(luminance(pal.ao)).toBeCloseTo(0.2 + 0.8 * luminance(pal.shadow), 5);
+      expect(spread(pal.ao)).toBeLessThanOrEqual(0.4 * spread(pal.shadow) + 1e-6);
       // Over every ground layer, under the speakers' discs: a night pool is never darkened.
       const ground = flatHeights(terrain).filter((y) => y !== f32(SPEAKER_DISC_Y));
       expect(Math.max(...ground)).toBeLessThan(AO_Y);
@@ -1397,7 +1402,7 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       unmount();
     });
 
-    it("mows the lawn in stripes: light strips at the manifest hex, dark ones × 0.955", () => {
+    it("mows the lawn in stripes: light strips at the manifest hex, dark ones × 0.925", () => {
       const { result, unmount } = build(manifest);
       const { terrain } = result.current;
       const position = terrain.getAttribute("position");
@@ -1409,7 +1414,7 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
         const v = [t, t + 1, t + 2].map((i) => vertex(terrain, i));
         const c = new Color().fromBufferAttribute(colour, t);
         if (v.every((p) => p.y === f32(MOW_Y))) {
-          expect(sameColour(c, ground.clone().multiplyScalar(0.955))).toBe(true);
+          expect(sameColour(c, ground.clone().multiplyScalar(0.925))).toBe(true);
           const inside = v.every(
             (p) =>
               p.x >= f32(BASE.minX) &&

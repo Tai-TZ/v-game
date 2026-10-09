@@ -17,6 +17,8 @@ const lerp = (a: Color, b: Color, t: number) => a.clone().lerp(b, t);
 /** Scaled so its brightest channel is 1. */
 const full = (c: Color) => c.multiplyScalar(1 / Math.max(c.r, c.g, c.b));
 const luminance = (c: Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+/** The grey of a colour's own luminance. */
+const grey = (c: Color) => new Color(luminance(c), luminance(c), luminance(c));
 const UP = new Vector3(0, 1, 0);
 
 /** "Coming soon" look (art §2.2): pull towards grey of the same luminance, then darken a touch. */
@@ -204,7 +206,7 @@ export function palette(campus: CampusTheme, phase: Phase = "day", bake: Bake = 
     /** Lower band of the slab's cut side (art §5.1 T1). */
     subsoil: lerp(soil, trunk, 0.35),
     /** Darker lawn strip (mowing stripes); the light strip is the slab top itself. */
-    mow: mul(ground, 0.955),
+    mow: mul(ground, 0.925),
     /** Edge under every paved rect: a light stone kerb, darker when wet. */
     kerb: mul(lm.trim, 0.92 * paving),
     /** Lake centre and the water in the slab's cut side; the shore keeps the manifest hex. */
@@ -243,10 +245,11 @@ export function palette(campus: CampusTheme, phase: Phase = "day", bake: Bake = 
     // lake.
     shadow,
     /**
-     * Contact darkening (art §2.4): the AO overlay's darkest factor, the sun shade's hue at 65 %
-     * of its strength, fading to white (no change) at each blob's rim.
+     * Contact darkening (art §2.4): the AO overlay's darkest factor, fading to white (no change)
+     * at each blob's rim. The sun shade half-way to its own grey, at 80 % of its strength:
+     * contact blocks the blue sky light too, so a dusk blob on a warm path stays a warm grey.
      */
-    ao: lerpW(shadow, 0.35),
+    ao: lerpW(lerp(shadow, grey(shadow), 0.5), 0.2),
     foam: lerpW(water, 0.6),
   };
 }
