@@ -549,10 +549,30 @@ def test_l2_gold_rank_falls_back_to_gold_missing_template(store: IndexStore) -> 
     assert message.endswith(", dừng ở 1.")
 
 
-def test_regression_trap_wraps_the_underlying_flag(store: IndexStore) -> None:
+def test_regression_trap_names_the_underlying_flag_in_words(store: IndexStore) -> None:
+    ev = LevelEvaluator(L3, rules(), store)
     t = trace(L3, "lib-l3-t02", "Không rõ.")
-    _, diag, _ = run_report(LevelEvaluator(L3, rules(), store), [t], {})
-    assert diag["lib-l3-t02"] == ("regression", "Ca của Hà trượt: ret.gold_missing.")
+    report = ev.report([t], [ev.grade_case(t)], {})
+    # The machine key goes in `cause` (the client's "Xem ở" target), never in the sentence.
+    assert report["diagnosis"] == [
+        {
+            "case": "lib-l3-t02",
+            "flag": "regression",
+            "cause": "ret.gold_missing",
+            "message_vi": "Ca của Hà trượt: đoạn đáp án không vào tới thùng.",
+        }
+    ]
+
+
+def test_fallback_template_names_the_flag_in_words(store: IndexStore) -> None:
+    """A level without a line for the flag (L3 has no llm.cite_unknown) never prints the key."""
+    gold = gold_chunk(store, L1, "lib-l1-v01")
+    t = trace(L1, "lib-l1-v01", "Theo Điều 99 thì gửi phòng đào tạo.", included=[gold])
+    _, diag, _ = run_report(LevelEvaluator(L1, rules(diagnosis={}), store), [t], {})
+    assert diag["lib-l1-v01"] == (
+        "llm.cite_unknown",
+        "Câu #1 chưa đạt: trích nguồn không có trong thùng.",
+    )
 
 
 def test_budget_exceeded_is_a_run_level_diagnosis(store: IndexStore) -> None:
