@@ -4,20 +4,28 @@ import { HOME_YAW, wrapAngle } from "./camera";
 import {
   BACK_SPOT,
   INTERACT_RADIUS,
+  NPC_SPOT,
   NPC_TALK_SPOT,
+  NPCS,
   routeTo,
   SITES,
   SPAWN,
   towardFor,
 } from "./layout";
 import { nearestWithin } from "./movement";
-import { hintFor, INTERACT_POINTS, siteInfo } from "./sites";
+import { hintFor, INTERACT_POINTS, isSpeaker, siteInfo } from "./sites";
 import { createHubStore } from "./store";
 
 describe("nearest interaction point", () => {
   it("picks the librarian from her talk spot and nothing from the spawn", () => {
     expect(nearestWithin(NPC_TALK_SPOT, INTERACT_POINTS, INTERACT_RADIUS)?.id).toBe("lan");
     expect(nearestWithin(SPAWN, INTERACT_POINTS, INTERACT_RADIUS)).toBeNull();
+  });
+
+  it("picks each NPC from their talk spot", () => {
+    for (const npc of NPCS) {
+      expect(nearestWithin(npc.talk, INTERACT_POINTS, INTERACT_RADIUS)?.id).toBe(npc.id);
+    }
   });
 
   it("picks a building from in front of its door", () => {
@@ -30,16 +38,33 @@ describe("nearest interaction point", () => {
 describe("hub store", () => {
   it("opens the dialog with two lines first, one line afterwards", () => {
     const store = createHubStore();
-    store.getState().openDialog();
-    expect(store.getState().dialog).toBe("first");
-    expect(store.getState().metLan).toBe(false);
+    const wake = vi.fn();
+    store.getState().setWake(wake);
+    store.getState().openDialog("lan");
+    expect(store.getState().dialog).toEqual({ who: "lan", lines: "first" });
+    expect(store.getState().met).toEqual({});
+    // The camera and the speaker's talk run in the scene's frames.
+    expect(wake).toHaveBeenCalledOnce();
 
     store.getState().closeDialog();
     expect(store.getState().dialog).toBeNull();
-    expect(store.getState().metLan).toBe(true);
+    expect(store.getState().met).toEqual({ lan: 1 });
 
-    store.getState().openDialog();
-    expect(store.getState().dialog).toBe("again");
+    store.getState().openDialog("lan");
+    expect(store.getState().dialog).toEqual({ who: "lan", lines: "again" });
+  });
+
+  it("counts the closed dialogs per speaker, and opens only one at a time", () => {
+    const store = createHubStore();
+    store.getState().openDialog("guard");
+    store.getState().openDialog("lan");
+    expect(store.getState().dialog).toEqual({ who: "guard", lines: "first" });
+    store.getState().closeDialog();
+    store.getState().closeDialog();
+    store.getState().openDialog("guard");
+    expect(store.getState().dialog?.lines).toBe("again");
+    store.getState().closeDialog();
+    expect(store.getState().met).toEqual({ guard: 2 });
   });
 
   it("only notifies listeners when the nearby target really changes", () => {
@@ -67,21 +92,39 @@ describe("hub store", () => {
     store.getState().setWake(wake);
     store.getState().motion.target = { x: 9, z: 9 };
 
-    store.getState().talkToLan();
+    store.getState().talkTo("lan");
 
     const { motion, nearby, dialog } = store.getState();
     expect(motion.position).toEqual(NPC_TALK_SPOT);
+    expect(motion.heading).toBeCloseTo(
+      Math.atan2(NPC_SPOT.x - NPC_TALK_SPOT.x, NPC_SPOT.z - NPC_TALK_SPOT.z),
+    );
     expect(motion.target).toBeNull();
     expect(nearby).toBe("lan");
-    expect(dialog).toBe("first");
+    expect(dialog).toEqual({ who: "lan", lines: "first" });
     expect(wake).toHaveBeenCalled();
   });
+
+  it.each(NPCS.map((npc) => [npc.id, npc] as const))(
+    "places the player at %s's talk spot, facing them, and opens their dialog",
+    (id, npc) => {
+      const store = createHubStore();
+      store.getState().talkTo(id);
+      const { motion, nearby, dialog } = store.getState();
+      expect(motion.position).toEqual(npc.talk);
+      expect(motion.heading).toBeCloseTo(
+        Math.atan2(npc.spot.x - npc.talk.x, npc.spot.z - npc.talk.z),
+      );
+      expect(nearby).toBe(id);
+      expect(dialog).toEqual({ who: id, lines: "first" });
+    },
+  );
 
   it("walks to the back of campus along the route, and placing the player drops the route", () => {
     const store = createHubStore();
     const wake = vi.fn();
     store.getState().setWake(wake);
-    store.getState().motion.talkOnArrival = true;
+    store.getState().motion.talkOnArrival = "guard";
 
     store.getState().walkTo(BACK_SPOT);
 
@@ -89,7 +132,7 @@ describe("hub store", () => {
     expect([motion.target, ...motion.route]).toEqual(routeTo(SPAWN, BACK_SPOT));
     expect(motion.route.length).toBeGreaterThan(0);
     expect(motion.route.at(-1)).toEqual(BACK_SPOT);
-    expect(motion.talkOnArrival).toBe(false);
+    expect(motion.talkOnArrival).toBeNull();
     expect(wake).toHaveBeenCalled();
 
     store.getState().placePlayer(SPAWN, 0);
@@ -175,18 +218,37 @@ describe("view yaw (orbit-camera §2, §3)", () => {
   });
 });
 
+/** Placeholder names: the real ones are theme data (npcs.test.ts keeps them out of app/). */
+const NAMES = {
+  guard: { name: "role guard" },
+  registrar: { name: "role registrar" },
+  operator: { name: "role operator" },
+  examiner: { name: "role examiner" },
+};
+
 describe("hints (brief §4)", () => {
   it("uses the verbatim copy, with API names when present", () => {
     const fallback = siteInfo(null);
-    expect(hintFor("lan", fallback)).toEqual({
+    expect(hintFor("lan", fallback, NAMES)).toEqual({
       text: "Nhấn E hoặc chạm để nói chuyện với cô Lan",
       actionable: true,
     });
-    expect(hintFor("library", fallback).text).toBe("Nhấn E để vào Thư viện");
-    expect(hintFor("watchtower", fallback)).toEqual({
+    expect(hintFor("library", fallback, NAMES).text).toBe("Nhấn E để vào Thư viện");
+    expect(hintFor("watchtower", fallback, NAMES)).toEqual({
       text: "Tháp canh · Sắp mở",
       actionable: false,
     });
-    expect(hintFor("market", fallback).text).toBe("Chợ model · Sắp mở");
+    expect(hintFor("market", fallback, NAMES).text).toBe("Chợ model · Sắp mở");
+  });
+
+  it("names each NPC from the theme (npc-cast v0.4 §7.1)", () => {
+    for (const npc of NPCS) {
+      expect(isSpeaker(npc.id)).toBe(true);
+      expect(hintFor(npc.id, siteInfo(null), NAMES)).toEqual({
+        text: `Nhấn E hoặc chạm để nói chuyện với role ${npc.id}`,
+        actionable: true,
+      });
+    }
+    expect(isSpeaker("library")).toBe(false);
   });
 });

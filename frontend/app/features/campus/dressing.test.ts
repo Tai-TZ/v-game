@@ -18,8 +18,6 @@ import {
   BASE,
   CYPRESS_TREES,
   LAKE,
-  NPC_SPOT,
-  NPC_TALK_SPOT,
   OBSTACLES,
   PARK_TREES,
   PATHS,
@@ -28,6 +26,7 @@ import {
   routeTo,
   SITES,
   SPAWN,
+  SPEAKERS,
   WORLD_BOUNDS,
   type Box,
   type Vec2,
@@ -113,10 +112,9 @@ const d = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.z - b.z);
 const inLake = (x: number, z: number, grow = 0) =>
   ((x - LAKE.x) / (LAKE.rx + grow)) ** 2 + ((z - LAKE.z) / (LAKE.rz + grow)) ** 2 < 1;
 
-/** The v0.4 cast's spots and talk spots (npc-cast v0.4 §4), with the librarian's. */
-const v = (x: number, z: number): Vec2 => ({ x, z });
-const NPCS = [NPC_SPOT, v(1.25, -3.0), v(3.4, 10.85), v(8.0, -12.4), v(-5.45, -15.95)];
-const TALKS = [NPC_TALK_SPOT, v(1.25, -2.2), v(2.6, 10.85), v(8.0, -11.6), v(-5.45, -15.15)];
+/** Everyone's spot and talk spot (layout SPEAKERS: the librarian and the v0.4 cast). */
+const NPCS = SPEAKERS.map((s) => s.spot);
+const TALKS = SPEAKERS.map((s) => s.talk);
 /** Paved ground: layout's PATHS plus the domed hall's asphalt and the park path (backGrounds). */
 const PAVED = [
   ...PATHS.front,
@@ -399,9 +397,9 @@ describe("walking round the dressing", () => {
     for (const goal of [...SITES.map((s) => s.door), ...TALKS, BACK_SPOT]) {
       const route = routeTo(SPAWN, goal);
       expect(route.at(-1), `${goal.x}, ${goal.z}`).toEqual(goal);
-      // Every leg is walkable: no waypoint inside a blocking prop.
+      // Every leg is walkable: no waypoint inside a blocking prop, building or person.
       for (const w of route)
-        expect(isBlocked(w, DRESSING_BLOCKS, WORLD_BOUNDS), `${w.x}, ${w.z}`).toBe(false);
+        expect(isBlocked(w, OBSTACLES, WORLD_BOUNDS), `${w.x}, ${w.z}`).toBe(false);
     }
   });
 });

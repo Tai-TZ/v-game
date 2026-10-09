@@ -14,6 +14,7 @@ import {
   LAKE,
   NPC_SPOT,
   NPC_TALK_SPOT,
+  NPCS,
   OBSTACLES,
   PARK_TREES,
   parseArrival,
@@ -23,6 +24,8 @@ import {
   SITES,
   SPAWN,
   SPAWN_HEADING,
+  speakerSpot,
+  talkSpot,
   towardFor,
   TREES,
   WORLD_BOUNDS,
@@ -194,14 +197,68 @@ function pointsJoinedToSpawn(): { joined: Vec2[]; walkable: number } {
 }
 
 /** Every leg of `routeTo` must arrive within 0.08, as the frame loop moves on only then. */
-function expectRouteArrives(from: Vec2, to: Vec2) {
+function expectRouteArrives(from: Vec2, to: Vec2, toward = HOME_TOWARD) {
   let position = from;
-  for (const waypoint of routeTo(from, to)) {
+  for (const waypoint of routeTo(from, to, toward)) {
     position = walk(position, waypoint);
     const miss = Math.hypot(position.x - waypoint.x, position.z - waypoint.z);
     expect(miss, `${label(from, to)} via (${waypoint.x}, ${waypoint.z})`).toBeLessThanOrEqual(0.08);
   }
 }
+
+describe("hub NPCs (npc-cast v0.4 §4)", () => {
+  const box = (spot: Vec2): Box => ({ ...spot, halfX: 0.3, halfZ: 0.3 });
+  const overlap = (a: Box, b: Box) =>
+    Math.abs(a.x - b.x) < a.halfX + b.halfX && Math.abs(a.z - b.z) < a.halfZ + b.halfZ;
+
+  it("each blocks a 0.6 box clear of every other obstacle, talk spot 0.8 away and walkable", () => {
+    for (const npc of NPCS) {
+      const own = box(npc.spot);
+      expect(
+        OBSTACLES.filter((o) => overlap(o, own)),
+        npc.id,
+      ).toHaveLength(1);
+      expect(isBlocked(npc.talk, OBSTACLES, WORLD_BOUNDS), npc.id).toBe(false);
+      const reach = Math.hypot(npc.talk.x - npc.spot.x, npc.talk.z - npc.spot.z);
+      expect(reach).toBeCloseTo(0.8, 9);
+      expect(reach).toBeLessThan(INTERACT_RADIUS);
+      expect(speakerSpot(npc.id)).toBe(npc.spot);
+      expect(talkSpot(npc.id)).toBe(npc.talk);
+      // Out of the strip the spire hides from the home view (v0.3 §4.5).
+      expect(npc.spot.x - npc.spot.z <= 5.5 || npc.spot.x - npc.spot.z >= 9.7, npc.id).toBe(true);
+    }
+    expect(speakerSpot("lan")).toBe(NPC_SPOT);
+    expect(talkSpot("lan")).toBe(NPC_TALK_SPOT);
+  });
+
+  it("keeps their interaction rings apart from each other, the librarian's and every door", () => {
+    const points = [NPC_SPOT, ...SITES.map((site) => site.door), ...NPCS.map((n) => n.spot)];
+    for (const npc of NPCS) {
+      for (const p of points) {
+        if (p === npc.spot) continue;
+        expect(Math.hypot(p.x - npc.spot.x, p.z - npc.spot.z)).toBeGreaterThan(2 * INTERACT_RADIUS);
+      }
+    }
+    // The spawn shows no hint yet: the librarian stays the first goal.
+    for (const npc of NPCS) {
+      expect(Math.hypot(SPAWN.x - npc.spot.x, SPAWN.z - npc.spot.z)).toBeGreaterThan(
+        INTERACT_RADIUS,
+      );
+    }
+  });
+
+  it.each([0, 45, 90, 135, 180, 225, 270, 315])(
+    "walks from the spawn and the back to every door and talk spot, viewed from %i°",
+    (yaw) => {
+      const toward = towardFor(deg(yaw));
+      const goals = [...SITES.map((site) => site.door), NPC_TALK_SPOT, ...NPCS.map((n) => n.talk)];
+      for (const from of [SPAWN, BACK_SPOT]) {
+        for (const to of goals) expectRouteArrives(from, to, toward);
+      }
+    },
+    60_000,
+  );
+});
 
 describe("click-to-move (campus-scene v0.2 §1.6, v0.3 §2.5)", () => {
   it("walks between every pair of front interaction points about as straight as v0.2 did", () => {

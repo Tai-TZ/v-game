@@ -1,7 +1,7 @@
 import { hasStar, STARS_SAVED, type Progress } from "~/features/progress/progress";
 import type { ZoneLocation, ZoneStatus, ZoneSummary } from "~/features/zones/schema";
 
-import { NPC_SPOT, SITES, type Vec2 } from "./layout";
+import { SITES, SPEAKERS, type NpcId, type Speaker, type Vec2 } from "./layout";
 
 /**
  * Status and name of each building before (or without) the zones API. The scene never waits
@@ -77,12 +77,18 @@ export function siteLooks(
 }
 
 /** Things the player can stand next to and use. */
-export type InteractTarget = "lan" | ZoneLocation;
+export type InteractTarget = Speaker | ZoneLocation;
 
 export const INTERACT_POINTS: readonly { id: InteractTarget; door: Vec2 }[] = [
-  { id: "lan", door: NPC_SPOT },
+  ...SPEAKERS.map(({ id, spot }) => ({ id, door: spot })),
   ...SITES.map((site) => ({ id: site.id, door: site.door })),
 ];
+
+export const isSpeaker = (target: InteractTarget): target is Speaker =>
+  SPEAKERS.some(({ id }) => id === target);
+
+/** Display names of the NPCs, from the theme (`campus.npcs`). */
+export type NpcNames = Readonly<Record<NpcId, { name: string }>>;
 
 export interface Hint {
   text: string;
@@ -90,10 +96,11 @@ export interface Hint {
   actionable: boolean;
 }
 
-/** Interaction hint copy, verbatim from the build brief §4. */
-export function hintFor(target: InteractTarget, sites: SiteInfoMap): Hint {
-  if (target === "lan") {
-    return { text: "Nhấn E hoặc chạm để nói chuyện với cô Lan", actionable: true };
+/** Interaction hint copy, verbatim from the build brief §4 and npc-cast v0.4 §7.1. */
+export function hintFor(target: InteractTarget, sites: SiteInfoMap, npcs: NpcNames): Hint {
+  if (isSpeaker(target)) {
+    const name = target === "lan" ? "cô Lan" : npcs[target].name;
+    return { text: `Nhấn E hoặc chạm để nói chuyện với ${name}`, actionable: true };
   }
   const site = sites[target];
   return site.status === "open"

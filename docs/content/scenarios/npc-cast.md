@@ -96,9 +96,38 @@
 - **Câu mẫu:** "Máy không sập vì đông người. Máy sập vì ai cũng bấm lại cùng một lúc." · "Chậm mà trả lời còn hơn nhanh mà im." · "Trung bình đẹp không cứu được người chờ lâu nhất."
 - **Không nói:** đổ lỗi cho người dùng; "cứ thử lại là được".
 
+## Khuôn viên (hub `/play`, thêm 2026-10-09)
+
+Bốn người đứng trong khuôn viên, nói được ngay cả khi khu của họ chưa mở. Code chỉ dùng mã vai; tên hiển thị và màu áo nằm trong `campus.npcs` của manifest theme (cả hai gói dùng cùng bộ tên hư cấu dưới đây). Lời thoại nguyên văn ở `frontend/app/features/campus/npcs.ts`: lần đầu hai lượt chào, các lần sau một lượt theo trạng thái khu.
+
+### Chú bảo vệ (`guard`): bảo vệ cổng chính, ca ngày
+
+- **Vai:** gác cổng ba vòm, 18:00 bàn giao cho anh Quân bên Tháp canh; dẫn vào Tháp canh. Không có tên riêng.
+- **Giọng:** ít lời, chậm, ấm. Xưng "chú", gọi "cháu". Không nói "cấm"; nói "ghi sổ", "để người duyệt".
+- **Áo:** sơ mi trắng, quần đen, mũ lưỡi trai tối màu.
+
+### Chị Diệp (`registrar`): phụ trách văn phòng một cửa
+
+- **Vai:** nhận mọi giấy tờ vào khuôn viên; structured output và tool (ô không biết thì để trống). Đứng ở chân bậc thềm nhà chính.
+- **Giọng:** nhanh, chỉn chu, đếm ô trống trên phiếu. Xưng "chị", gọi "em".
+- **Áo:** vest đỏ, quần tối.
+
+### Cô Thục (`operator`): trực trạm vận hành
+
+- **Vai:** trực trạm chiller sau nhà chính; chi phí, độ trễ theo phân vị, báo động, che PII trong log.
+- **Giọng:** điềm tĩnh, nói bằng xác suất và phân vị, không thích chữ "trung bình". Xưng "cô", gọi "em".
+- **Áo:** áo khoác mỏng xanh xô thơm, quần tối.
+
+### Thầy Khải (`examiner`): trông phòng chấm
+
+- **Vai:** sân trước hội trường mái vòm B; đo lường: đọc lỗi trước khi đếm, giám khảo cũng phải qua kiểm tra.
+- **Giọng:** chậm rãi, hài hước khô, nghiêm về cách đo. Xưng "thầy", gọi "em".
+- **Áo:** sơ mi xanh xám nhạt, quần xám tối. Không kính.
+
 ## Kiểm tra tên
 
 - Tên dùng chung kiểu Việt phổ biến, không trùng tên giảng viên hay nhân vật có thật được nêu trong slide của chương trình.
 - Đã đối chiếu với slide hiện có (2026-10-07): sinh viên L3 đổi từ "Tuấn" thành "Khang" vì trùng tên một giảng viên.
 - Đối chiếu 2026-10-08: "Nhi" và "Tùng" không xuất hiện trong bản trích slide của 15 ngày.
+- Đối chiếu 2026-10-08: "Diệp", "Thục", "Khải" không có trong slide của khoá và không trùng dàn nhân vật ở trên.
 - Trước mỗi lần phát hành, QA grep danh sách tên giảng viên trong slide để chắc không trùng.

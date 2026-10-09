@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { test as base, expect, type Page, type Request } from "@playwright/test";
 
+import type { NpcId } from "../app/features/campus/layout";
 import { blocksJson, publicLevelJson, readText } from "../app/features/workbench/test-fixtures";
 
 /** The content seed the backend serves; mocks answer with the same data. */
@@ -125,6 +126,25 @@ export async function waitForIdleScene(page: Page, timeout = 15_000) {
   await expect(page.locator("html[data-scene-busy]")).toHaveCount(0, { timeout });
   return () => page.evaluate(() => Number(document.documentElement.dataset.frames));
 }
+
+type Names = Record<NpcId, { name: string }>;
+
+/** NPC names of the pack the page shows. */
+export async function npcNames(page: Page): Promise<Names> {
+  const theme = await page.locator("html").getAttribute("data-theme");
+  const file = path.resolve(
+    import.meta.dirname,
+    "..",
+    "public",
+    "themes",
+    `${theme}`,
+    "manifest.json",
+  );
+  return (JSON.parse(readFileSync(file, "utf8")) as { campus: { npcs: Names } }).campus.npcs;
+}
+
+/** The dialog heading: the name with a capital first letter. */
+export const titleOf = (name: string) => name.charAt(0).toLocaleUpperCase("vi") + name.slice(1);
 
 /** Captured SSE bodies (e2e/data); see e2e/data/README.md. */
 export const sse = {

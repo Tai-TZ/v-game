@@ -42,11 +42,13 @@ import {
   BASE,
   LANDMARK,
   NPC_SPOT,
+  NPCS,
   OBSTACLES,
   routeTo,
   siteFor,
   SITES,
   SPAWN,
+  SPEAKERS,
   towardFor,
   WORLD_BOUNDS,
   type Vec2,
@@ -63,9 +65,12 @@ import {
   entranceLampSpots,
   SHADOW_Y,
   shadowCasters,
+  SPEAKER_DISC_SEGMENTS,
+  SPEAKER_DISC_Y,
   TREE_INSTANCES,
   treeMatrix,
 } from "./campus";
+import { parseCast } from "./cast";
 import { LABEL_ANCHORS } from "./labels";
 import { desaturate, light, palette, shade, type Palette } from "./palette";
 import { triangleCount, type Face } from "./primitives";
@@ -75,6 +80,9 @@ import { buildDressing } from "./useDressing";
 import { clickGoal, pickNpc } from "./useHubFrame";
 
 const THEMES_DIR = path.resolve(process.cwd(), "public", "themes");
+const CAST = parseCast(
+  JSON.parse(readFileSync(path.resolve(process.cwd(), "public", "models", "cast.json"), "utf8")),
+);
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"));
 const themeIds = parseThemeIndex(readJson(path.join(THEMES_DIR, "index.json"))).map((t) => t.id);
 const manifests: ThemeManifest[] = themeIds.map((id) =>
@@ -92,11 +100,13 @@ const CASTING_PROPS = [
   "parasol-table",
 ];
 
-function build(manifest: ThemeManifest, time: TimeOfDay = "day") {
-  return renderHook(
-    ({ campus }) => useCampusGeometry(campus, time, "open", "coming_soon", "coming_soon"),
-    { initialProps: { campus: manifest.campus } },
-  );
+function build(manifest: ThemeManifest, time: TimeOfDay = "day", lit = false) {
+  const looks: [SiteLook, SiteLook, SiteLook] = lit
+    ? ["lit", "lit", "lit"]
+    : ["open", "coming_soon", "coming_soon"];
+  return renderHook(({ campus }) => useCampusGeometry(campus, time, ...looks), {
+    initialProps: { campus: manifest.campus },
+  });
 }
 
 const TIMES: readonly TimeOfDay[] = ["day", "dusk"];
@@ -328,6 +338,7 @@ const geometries = (g: CampusGeometry) => [
   g.roundTree,
   g.cypress,
   g.player,
+  g.npcs,
   g.lan,
 ];
 
@@ -708,23 +719,61 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     // Measured 14 draw calls (v0.3's 13 plus the sun-shadow overlay). Triangles with the looks
     // built here (open, coming soon, coming soon): 19,248 (spire-hall) / 16,186 (clock-tower) in
     // v0.3; N8/N9 drop the unstarred library's shelves (-88) and add foam and the sun-shadow
-    // overlay (campus-scene v0.3 §13.4 has the measured totals). The cap stays v0.3's (§8).
-    // v0.4 dresses all four sides (orbit-camera §5.2) inside the same groups: by day 20,097 ->
-    // 21,413 (spire-hall) and 17,020 -> 18,268 (clock-tower); 21,585 with every zone lit.
+    // overlay (campus-scene v0.3 §13.4 has the measured totals). v0.4 dresses all four sides
+    // (orbit-camera §5.2) inside the same groups: by day 20,097 -> 21,413 (spire-hall) and
+    // 17,020 -> 18,268 (clock-tower); 21,585 with every zone lit.
     // The CC0 props (dressing plan §3) add one draw call and 7,818 triangles (7,914 planned,
     // less the 384 of the dropped wall rocks, plus the parasols' 288 back faces), the six new
-    // lamps 264 in the terrain and their sun shade 56 in the overlay: by day 29,551
-    // (spire-hall) and 26,406 (clock-tower), 29,723 with every zone lit. Cap 31,500: that plus
-    // the v0.4 cast's ~1,020 (npc-cast v0.4 §11), about half the brief's 60k (art §6.1).
+    // lamps 264 in the terrain and their sun shade 56 in the overlay.
+    // v0.4 people (npc-cast v0.4, integration spec §6): five baked ground discs replace the
+    // librarian's blob (draw calls stay 14 with the statues: +1 merged NPC statues, -1 blob),
+    // then the baked cast swaps the four statue meshes for seven skinned ones (+3; the six
+    // figures are 5,235 triangles with the player's x-ray, cast.test.ts).
+    // Together, measured: 14 draw calls with the statues, 15 once the props arrive, 18 with the
+    // cast too (main's 15 + the cast's 3 extra meshes). Triangles with props and cast, both
+    // themes, both hours, every zone lit at most: 34,422 (spire-hall by day; clock-tower 31,277).
+    // The cast's 5,235 beat its ~1,020 estimate (npc-cast v0.4 §11), hence caps of 18 draw calls
+    // and 34,500 triangles (the measured peak rounded up): under 60% of the brief's 60k and far
+    // inside the 60 FPS rule's < 80 draw calls (art §6.1).
     it.each(TIMES)("stays well inside 40 draw calls and 60k triangles at %s", (time) => {
-      const { result, unmount } = build(manifest, time);
-      expect(sceneBudget(result.current).drawCalls).toBe(14); // until the props arrive
-      const dressing = buildDressing(props, result.current.palette);
-      const budget = sceneBudget(result.current, dressing);
-      expect(budget.drawCalls).toBeLessThanOrEqual(16);
-      expect(budget.drawCalls).toBe(15);
-      expect(budget.triangles).toBeLessThanOrEqual(31_500);
-      dressing.dispose();
+      if (!CAST) throw new Error("cast.json does not parse");
+      for (const lit of [false, true]) {
+        const { result, unmount } = build(manifest, time, lit);
+        const g = result.current;
+        expect(sceneBudget(g).drawCalls).toBe(14); // statues, until the props and the cast arrive
+        const dressing = buildDressing(props, g.palette);
+        const statues = sceneBudget(g, null, dressing);
+        const cast = sceneBudget(g, CAST, dressing);
+        expect(statues.drawCalls).toBe(15);
+        expect(sceneBudget(g, CAST).drawCalls).toBe(17);
+        expect(cast.drawCalls).toBe(18);
+        expect(statues.triangles).toBeLessThan(cast.triangles);
+        expect(cast.triangles).toBeLessThanOrEqual(34_500);
+        dressing.dispose();
+        unmount();
+      }
+    });
+
+    it("stands the four NPC statues at their spots, 1.36 tall, and bakes a disc under everyone", () => {
+      const { result, unmount } = build(manifest);
+      const { npcs, terrain } = result.current;
+      expect(triangleCount(npcs)).toBe(4 * (32 + 32 + 80 + 32));
+      npcs.computeBoundingBox();
+      expect(npcs.boundingBox?.max.y).toBeCloseTo(0.045 + 1.36, 6);
+      const position = terrain.getAttribute("position");
+      const discs = new Map<string, number>();
+      for (let i = 0; i + 2 < position.count; i += 3) {
+        const ys = [0, 1, 2].map((k) => position.getY(i + k));
+        if (ys.some((y) => Math.abs(y - SPEAKER_DISC_Y) > 1e-6)) continue;
+        const a = new Vector3().fromBufferAttribute(position, i);
+        const b = new Vector3().fromBufferAttribute(position, i + 1);
+        const c = new Vector3().fromBufferAttribute(position, i + 2);
+        expect(b.sub(a).cross(c.sub(a)).y).toBeGreaterThan(0);
+        const who = SPEAKERS.find(({ spot }) => Math.hypot(a.x - spot.x, a.z - spot.z) <= 0.4001);
+        if (!who) throw new Error(`disc vertex (${a.x}, ${a.z}) under nobody`);
+        discs.set(who.id, (discs.get(who.id) ?? 0) + 1);
+      }
+      expect(discs).toEqual(new Map(SPEAKERS.map(({ id }) => [id, SPEAKER_DISC_SEGMENTS])));
       unmount();
     });
 
@@ -922,7 +971,8 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     it("leaves both top HUD corners and the view buttons sky in overview at every yaw", () => {
       const { result, unmount } = build(manifest);
       const dressing = buildDressing(props, result.current.palette);
-      const points = framedPoints(result.current, [dressing]);
+      // The props and the four standing NPCs (their statues are as tall as the baked figures).
+      const points = framedPoints(result.current, [dressing, result.current.npcs]);
       dressing.dispose();
       const views = [
         [1280, 800],
@@ -951,7 +1001,7 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       }
       expect([...hits]).toEqual([]);
       unmount();
-      // A 1° sweep over every vertex, props included, for three viewports: slow but exhaustive.
+      // A 1° sweep over every vertex, props and NPCs included, for three viewports: slow but exhaustive.
     }, 20_000);
 
     // Composed for the home view only: from other angles the needle may stand before anything.
@@ -1048,6 +1098,25 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       // Her head counts too (the v0.3 plane at 0.7 missed it).
       aim(HOME_YAW, NPC_SPOT.x, 1.4, NPC_SPOT.z);
       expect(pickNpc(raycaster, group, speakers)).toBe("lan");
+      // Every NPC stands in clear view from home (npc-cast v0.4 §4), feet to head.
+      for (const { id, spot } of NPCS) {
+        for (const y of [0.2, 0.7, 1.3]) {
+          aim(HOME_YAW, spot.x, y, spot.z);
+          expect(pickNpc(raycaster, group, SPEAKERS), `${id} at ${y}`).toBe(id);
+        }
+      }
+      // A click just over the tallest head (statues 1.46, figures 1.31) is not theirs: aim
+      // over the box's far top corner, the highest point the box shows on screen.
+      const away = viewDirection(HOME_YAW);
+      for (const { id, spot } of SPEAKERS) {
+        const [x, z] = [spot.x + 0.35 * Math.sign(away.x), spot.z + 0.35 * Math.sign(away.z)];
+        aim(HOME_YAW, x, 1.55, z);
+        expect(pickNpc(raycaster, group, SPEAKERS), `over ${id}`).not.toBe(id);
+      }
+      // From behind the main building the registrar is hidden: the click is the building's.
+      const registrar = NPCS.find(({ id }) => id === "registrar")?.spot ?? SPAWN;
+      aim(deg(180), registrar.x, 0.7, registrar.z);
+      expect(pickNpc(raycaster, group, SPEAKERS)).toBeNull();
       material.dispose();
       unmount();
     });

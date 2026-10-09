@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
-import { expect, mockApi, mockWorkbenchApi, test } from "./fixtures";
+import { expect, mockApi, mockWorkbenchApi, npcNames, test, titleOf } from "./fixtures";
 
 const VIEWPORTS = [
   { width: 375, height: 812 },
@@ -22,7 +22,10 @@ for (const viewport of VIEWPORTS) {
   test.describe(`axe at ${viewport.width}×${viewport.height}`, () => {
     test.use({ viewport });
 
-    test("campus hub HUD, with and without the dialog", async ({ page }) => {
+    test("campus hub HUD, with and without the dialogs", async ({ page }) => {
+      // Four axe scans and two walks (to cô Lan, then to the guard at the gate): on the
+      // software-WebGL CI runner this sits at the 30 s default, like the other walking tests.
+      test.slow();
       await mockApi(page);
       await page.goto("/play");
       await expect(page.locator("canvas")).toBeVisible();
@@ -43,6 +46,13 @@ for (const viewport of VIEWPORTS) {
 
       await page.getByRole("button", { name: "Nói chuyện với cô Lan", exact: true }).click();
       await expect(page.getByRole("dialog", { name: "Cô Lan" })).toBeVisible();
+      expect(await seriousViolations(page)).toEqual([]);
+
+      // An NPC's dialog (npc-cast v0.4 §9), the guard's with its zone card.
+      await page.keyboard.press("Escape");
+      const { guard } = await npcNames(page);
+      await page.getByRole("button", { name: `Nói chuyện với ${guard.name}` }).click();
+      await expect(page.getByRole("dialog", { name: titleOf(guard.name) })).toBeVisible();
       expect(await seriousViolations(page)).toEqual([]);
     });
 

@@ -1,7 +1,7 @@
 import {
   type BufferGeometry,
   CircleGeometry,
-  type Color,
+  Color,
   ConeGeometry,
   CylinderGeometry,
   ExtrudeGeometry,
@@ -14,7 +14,7 @@ import {
   Vector3,
 } from "three";
 
-import type { LandmarkArchetype } from "~/features/theme/schema";
+import type { CampusTheme, LandmarkArchetype } from "~/features/theme/schema";
 import type { ZoneLocation } from "~/features/zones/schema";
 
 import {
@@ -28,6 +28,7 @@ import {
   GATE,
   LAKE,
   LANDMARK,
+  NPCS,
   PARK_TREES,
   PATHS,
   PLAZA,
@@ -36,6 +37,7 @@ import {
   ROUND_TREES,
   SITES,
   siteFor,
+  SPEAKERS,
   type Box,
   type Vec2,
 } from "../layout";
@@ -824,6 +826,29 @@ export function buildShadows(
   return groundTriangles(vertices, SHADOW_Y);
 }
 
+/** Height of the speakers' ground discs: over every path layer, under the shadow overlay. */
+export const SPEAKER_DISC_Y = 0.0135;
+export const SPEAKER_DISC_SEGMENTS = 16;
+
+/** A baked disc under each person (floor × 0.8, like `contact`), in place of a blob mesh. */
+function speakerDiscs(pal: Palette): Parts {
+  const floor = {
+    lan: pal.ground,
+    registrar: pal.path,
+    guard: pal.path,
+    examiner: pal.asphalt,
+    operator: pal.ground,
+  };
+  return SPEAKERS.map(({ id, spot }) => {
+    const r = id === "lan" ? 0.4 : 0.36;
+    const rim = range(SPEAKER_DISC_SEGMENTS + 1).map((i) => {
+      const a = (i / SPEAKER_DISC_SEGMENTS) * 2 * PI;
+      return { x: spot.x + Math.cos(a) * r, z: spot.z + Math.sin(a) * r };
+    });
+    return fan(pal, spot, rim, SPEAKER_DISC_Y, floor[id].clone().multiplyScalar(0.8));
+  });
+}
+
 export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry {
   const P = paint(pal);
   const { minX, maxX, minZ, maxZ } = BASE;
@@ -872,6 +897,7 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
       skirt(f, pal, 0.0105),
     ),
     ...TREE_INSTANCES.map((tree, i) => contactDisc(pal, tree, i < FRONT_TREES ? 0.006 : 0.0125)),
+    ...speakerDiscs(pal),
     ...backGrounds(pal),
     ...backCampus(pal),
   ]);
@@ -1566,6 +1592,26 @@ export function buildLan(pal: Palette) {
     L(ico(0.085, 0, 0, 1.37, -0.17), pal.dark),
     L(box(-0.11, 0.11, 1.2275, 1.2625, 0.135, 0.165), pal.dark),
   ]);
+}
+
+/**
+ * The four hub NPCs as plain statues in one draw call, facing their rest yaw: shown until the
+ * baked cast arrives, and kept if it fails. Outfits come from the theme (`campus.npcs`).
+ */
+export function buildNpcs(pal: Palette, looks: CampusTheme["npcs"]) {
+  return merge(
+    NPCS.flatMap(({ id, spot, yaw }) => {
+      const look = looks[id];
+      const at = (geometry: BufferGeometry) =>
+        geometry.rotateY(yaw).translate(spot.x, 0.045, spot.z);
+      return [
+        L(at(cyl(0.14, 0.13, 8, 0, 0.46)), new Color(look.bottom)),
+        L(at(cyl(0.19, 0.21, 8, 0.44, 1.02)), new Color(look.top)),
+        L(at(ico(0.16, 1, 0, 1.18, 0)), pal.plaza),
+        L(at(cyl(0.165, 0.165, 8, 1.26, 1.36)), new Color(look.accent)),
+      ];
+    }),
+  );
 }
 
 /** Crowns of the two tree kinds; each also casts its tree's sun shadow. */

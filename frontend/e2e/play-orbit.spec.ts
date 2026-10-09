@@ -132,12 +132,19 @@ test.describe("campus view, desktop", () => {
     await expectYaw(page, 135);
     const yaw = deg(135);
     const before = await playerOf(page);
+    const a = toScreen(before.x, 0, before.z, yaw);
+    // Hold the key until the walk has covered some ground, not for a fixed time: each frame
+    // advances at most 0.1 s, so on a slow software-WebGL runner 500 ms walks less far.
     await page.keyboard.down("ArrowUp");
-    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    await expect
+      .poll(async () => {
+        const p = await playerOf(page);
+        return toScreen(p.x, 0, p.z, yaw).sy - a.sy;
+      })
+      .toBeGreaterThan(0.5);
     await page.keyboard.up("ArrowUp");
     await waitForIdleScene(page);
     const after = await playerOf(page);
-    const a = toScreen(before.x, 0, before.z, yaw);
     const b = toScreen(after.x, 0, after.z, yaw);
     expect(b.sy - a.sy).toBeGreaterThan(0.5);
     expect(Math.abs(b.sx - a.sx)).toBeLessThan(0.1);
