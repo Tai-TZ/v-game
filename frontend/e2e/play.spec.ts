@@ -259,10 +259,12 @@ test.describe("campus hub", () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test("re-bakes the campus at dusk and back, with a starred library, then rests", async ({
+  test("re-bakes the campus for the night sky and back, with a starred library, then rests", async ({
     page,
     consoleErrors,
   }) => {
+    // 21:00 in Hanoi: night. The fixture pins "Cố định ban ngày"; the chip switches to live.
+    await page.clock.setFixedTime(new Date("2026-10-08T21:00:00+07:00"));
     await mockApi(page);
     await page.goto("/play?debug=frames");
     await waitForIdleScene(page);
@@ -290,21 +292,17 @@ test.describe("campus hub", () => {
       () => document.querySelector("canvas")?.getContext("webgl2")?.getContextAttributes()?.stencil,
     );
     expect(stencil).toBe(true);
-    const light = page.getByRole("button", { name: "Hoàng hôn" });
-    const duskSky = page.locator(".bg-scene-dusk");
-    await expect(light).toHaveAttribute("aria-pressed", "false");
-    await expect(duskSky).toHaveCount(0);
-
+    const main = page.locator("main");
+    await expect(main).toHaveAttribute("data-sky", "day");
+    await page.getByRole("button", { name: /°C/ }).click();
     const day = await frames();
-    await light.click();
-    await expect(light).toHaveAttribute("aria-pressed", "true");
-    await expect(duskSky).toHaveCount(1);
+    await page.getByRole("radio", { name: "Theo thời gian thực" }).check();
+    await expect(main).toHaveAttribute("data-sky", "night");
     await waitForIdleScene(page);
     expect(await frames()).toBeGreaterThan(day);
 
-    await light.click();
-    await expect(light).toHaveAttribute("aria-pressed", "false");
-    await expect(duskSky).toHaveCount(0);
+    await page.getByRole("radio", { name: "Cố định ban ngày" }).check();
+    await expect(main).toHaveAttribute("data-sky", "day");
     await waitForIdleScene(page);
     expect(consoleErrors).toEqual([]);
   });
@@ -324,7 +322,7 @@ test.describe("campus hub", () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test("hides the dusk toggle when the scene cannot start", async ({ page }) => {
+  test("keeps the weather chip when the scene cannot start", async ({ page }) => {
     await page.addInitScript(() => {
       // Test double: a device without WebGL.
       // eslint-disable-next-line @typescript-eslint/unbound-method -- re-bound with apply below
@@ -340,7 +338,8 @@ test.describe("campus hub", () => {
     await page.goto("/play");
     await expect(page.getByText("Trình duyệt chưa hiển thị được cảnh 3D.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Các khu" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Hoàng hôn" })).toHaveCount(0);
+    // Weather is information too: the chip and its display choice need no WebGL.
+    await expect(page.getByRole("button", { name: "30°C, Trời quang, Hà Nội" })).toBeVisible();
   });
 
   test("keeps the top HUD inside the corners the overview leaves clear", async ({
@@ -353,7 +352,7 @@ test.describe("campus hub", () => {
     const width = page.viewportSize()?.width ?? 0;
     const controls = [
       page.getByRole("link", { name: "Về trang chủ" }),
-      page.getByRole("button", { name: "Hoàng hôn" }),
+      page.getByRole("button", { name: /°C/ }),
       page.getByRole("button", { name: "Các khu" }),
       page.getByRole("button", { name: /Đổi giao diện/ }),
     ];
@@ -374,13 +373,14 @@ test.describe("campus hub", () => {
     await mockApi(page);
     await page.goto("/play?debug=frames");
     await waitForIdleScene(page);
-    const light = await page.getByRole("button", { name: "Hoàng hôn" }).boundingBox();
+    const chip = await page.getByRole("button", { name: /°C/ }).boundingBox();
     const zones = await page.getByRole("button", { name: "Các khu" }).boundingBox();
-    expect(light && zones).toBeTruthy();
-    if (!light || !zones) return;
-    // Icon only below md: the gap between the groups stays well over the 8 px inside a group.
-    expect(light.width).toBeLessThanOrEqual(44);
-    expect(zones.x - (light.x + light.width)).toBeGreaterThanOrEqual(48);
+    expect(chip && zones).toBeTruthy();
+    if (!chip || !zones) return;
+    // The compact chip (icon + "30°C", about 88 px): the gap between the groups stays well over
+    // the 8 px inside a group (campus v0.4 W0.3).
+    expect(chip.width).toBeLessThanOrEqual(96);
+    expect(zones.x - (chip.x + chip.width)).toBeGreaterThanOrEqual(48);
   });
 
   test("shows the watchtower and the market as coming soon, without a way in", async ({ page }) => {

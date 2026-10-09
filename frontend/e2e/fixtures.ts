@@ -80,11 +80,40 @@ export async function mockApi(
   });
 }
 
+/** What GET /api/weather answers unless a test routes it itself: a clear 30 °C. */
+export const WEATHER = {
+  condition: "clear",
+  temperature_c: 30,
+  updated_at: "2026-10-08T03:00:00Z",
+} as const;
+
 /**
  * Collects console errors, uncaught exceptions and CSP violations. Failed API responses that
  * a test mocks on purpose are expected and filtered out.
+ *
+ * Every test also gets /api/weather mocked (no backend runs in e2e; a 502 would be a console
+ * error) and the hub's display mode pinned to "Cố định ban ngày", so no test depends on the hour
+ * CI runs at (campus v0.4 W0.5). `hubDisplay: "live"` (test.use) follows the clock instead; the
+ * init script only fills an empty slot, so a choice made in the test survives a reload.
  */
-export const test = base.extend<{ consoleErrors: string[] }>({
+export const test = base.extend<{
+  consoleErrors: string[];
+  hubDisplay: "day" | "live";
+  hubSky: undefined;
+}>({
+  hubDisplay: ["day", { option: true }],
+  hubSky: [
+    async ({ page, hubDisplay }, provide) => {
+      await page.route("**/api/weather", (route) => route.fulfill({ json: WEATHER }));
+      await page.addInitScript((display) => {
+        if (localStorage.getItem("vg-hub-display") === null) {
+          localStorage.setItem("vg-hub-display", display);
+        }
+      }, hubDisplay);
+      await provide(undefined);
+    },
+    { auto: true },
+  ],
   consoleErrors: async ({ page }, provide) => {
     // The landing page pings /api/health to wake a sleeping API; no backend runs in e2e.
     await page.route("**/api/health", (route) => route.fulfill({ json: { status: "ok" } }));

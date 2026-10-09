@@ -252,3 +252,54 @@ describe("hints (brief §4)", () => {
     expect(isSpeaker("library")).toBe(false);
   });
 });
+
+describe("hub sky (campus v0.4 W3)", () => {
+  const rain = {
+    condition: "rain",
+    temperature_c: 24.6,
+    updated_at: "2026-10-08T03:00:00Z",
+  } as const;
+
+  it("keeps the look while a reload brings the same weather group, and wakes on a new one", () => {
+    const store = createHubStore();
+    const wake = vi.fn();
+    store.getState().setWake(wake);
+    const listener = vi.fn();
+    store.subscribe(listener);
+
+    store.getState().setWeather(rain);
+    const look = store.getState().sky.look;
+    expect(look).toMatchObject({ sky: "day", weather: "rain", bake: "wet", clouds: "full" });
+    expect(wake).toHaveBeenCalledTimes(1);
+
+    // Same body: no write at all. Newer reading, same group: the chip's data, the same look.
+    store.getState().setWeather({ ...rain });
+    expect(listener).toHaveBeenCalledTimes(1);
+    store
+      .getState()
+      .setWeather({ ...rain, temperature_c: 23.9, updated_at: "2026-10-08T03:15:00Z" });
+    expect(store.getState().sky.weather?.temperature_c).toBe(23.9);
+    expect(store.getState().sky.look).toBe(look);
+    expect(wake).toHaveBeenCalledTimes(1);
+
+    store.getState().setPhase("day");
+    expect(listener).toHaveBeenCalledTimes(2);
+    store.getState().setPhase("night");
+    expect(store.getState().sky.look).toMatchObject({ sky: "night", weather: "rain" });
+    expect(wake).toHaveBeenCalledTimes(2);
+  });
+
+  it("fixes the daytime look in day display, keeping the real weather for the chip", () => {
+    const store = createHubStore();
+    store.getState().setPhase("night");
+    store.getState().setWeather(rain);
+    store.getState().setDisplay("day");
+    expect(store.getState().sky.look).toEqual({
+      sky: "day",
+      weather: "clear",
+      bake: "clear",
+      clouds: "none",
+    });
+    expect(store.getState().sky.weather?.condition).toBe("rain");
+  });
+});

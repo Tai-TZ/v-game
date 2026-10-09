@@ -6,6 +6,7 @@
     "orgName": null,
     "disclaimer": null
   },
+  "place": { "name": "Hà Nội", "lat": 21.0285, "lon": 105.8542, "timeZone": "Asia/Ho_Chi_Minh" },
   "fonts": {
     "preload": [
       "fonts/be-vietnam-pro-latin-400-normal.woff2",
@@ -43,7 +44,15 @@
       "market": { "wall": "#f3e6d6", "trim": "#dccbb5", "roof": "#b85f12" }
     },
     "lights": {
-      "default": "day",
+      "dawn": {
+        "sky": "#e6e8ff",
+        "ground": "#cbc3cf",
+        "hemisphere": 1.72,
+        "sun": "#ffc2a6",
+        "sunIntensity": 1.55,
+        "sunDirection": [0.7, 0.55, 0.3],
+        "rim": 0.5
+      },
       "day": {
         "sky": "#d0e5ff",
         "ground": "#bfb5a9",
@@ -61,6 +70,15 @@
         "sunIntensity": 2.661,
         "sunDirection": [-0.62, 0.55, 0.6],
         "rim": 0.6
+      },
+      "night": {
+        "sky": "#8ea3d6",
+        "ground": "#606b8a",
+        "hemisphere": 0.95,
+        "sun": "#c9d6ff",
+        "sunIntensity": 0.42,
+        "sunDirection": [-0.35, 1, 0.75],
+        "rim": 0.1
       }
     },
     "npcs": {

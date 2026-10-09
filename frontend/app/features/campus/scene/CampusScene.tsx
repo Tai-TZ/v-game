@@ -1,11 +1,13 @@
 import { addAfterEffect, Canvas, useThree } from "@react-three/fiber";
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  AdditiveBlending,
   Color,
   GreaterDepth,
   MeshBasicMaterial,
   MeshLambertMaterial,
   MultiplyBlending,
+  NormalBlending,
   NotEqualStencilFunc,
   ReplaceStencilOp,
   type SkinnedMesh,
@@ -17,14 +19,15 @@ import {
 import { REDUCED_MOTION, useMediaQuery } from "~/lib/useMediaQuery";
 import { readProgress } from "~/features/progress/progress";
 import { useActiveTheme } from "~/features/theme/context";
-import type { CampusTheme, TimeOfDay } from "~/features/theme/schema";
+import type { CampusTheme } from "~/features/theme/schema";
 
 import { cameraOffset } from "../camera";
 import { advanceScene, sceneLoad, sceneMounted, STAGE, type SceneLoad } from "../hud/sceneLoad";
 import { ViewControls } from "../hud/ViewControls";
 import { NPC_SPOT, NPCS, SITES } from "../layout";
 import { siteLooks, type InteractTarget, type SiteInfoMap } from "../sites";
-import { hubStore, useHub } from "../store";
+import type { SceneLook } from "../sky";
+import { hubStore } from "../store";
 import {
   BLOB_SEGMENTS,
   RING_SEGMENTS,
@@ -41,27 +44,29 @@ import { WorldLabels } from "./WorldLabels";
 export interface CampusSceneProps {
   sites: SiteInfoMap;
   onInteract: (target: InteractTarget) => void;
+  /** The hub store's look (route): a new one re-bakes the static groups. */
+  look: SceneLook;
 }
 
 const ROUND = TREE_INSTANCES.filter((tree) => tree.kind === "round");
 const CYPRESS = TREE_INSTANCES.filter((tree) => tree.kind === "cypress");
 const FLAT = -Math.PI / 2;
+const BLACK = new Color(0, 0, 0);
 
 /**
  * The 3D hub (lazy-loaded so the HUD renders first). Canvas renders on demand only; every
  * shape is procedural and every colour comes from the active theme manifest.
  */
-export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
+export default function CampusScene({ sites, onInteract, look }: CampusSceneProps) {
   const { campus } = useActiveTheme();
   const reducedMotion = useMediaQuery(REDUCED_MOTION);
   const smallOrTouch = useMediaQuery("(pointer: coarse), (max-width: 767.98px)");
   const [countFrames] = useState(
     () => new URLSearchParams(window.location.search).get("debug") === "frames",
   );
-  // Deferred: the click paints the pressed button first, then the scene re-bakes every group in
-  // a background render, a long task on slow CPUs (QA r2; campus-scene v0.3 §13.1).
-  const picked = useHub((state) => state.time) ?? campus.lights.default;
-  const time = useDeferredValue(picked);
+  // Deferred: a new look (phase, weather, display mode) paints the sky and the chip first, then
+  // the scene re-bakes in a background render, a long task on slow CPUs (QA r2; v0.3 §13.1).
+  const baked = useDeferredValue(look);
   // Loader signal (hud/sceneLoad): the canvas is in the DOM. SceneReady sends the next two.
   useLayoutEffect(() => {
     sceneMounted(true);
@@ -71,13 +76,10 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
   return (
     <>
       {/*
-        Dusk paints its own flat sky over the page's day sky (art §2.5). One finger reaches the
+        Transparent over the page's flat sky (art §2.5, <main data-sky>). One finger reaches the
         drag that turns the view; two still pinch-zoom the page (orbit-camera §2.1).
       */}
-      <div
-        aria-hidden="true"
-        className={`absolute inset-0 z-0 touch-pinch-zoom select-none ${time === "dusk" ? "bg-scene-dusk" : ""}`}
-      >
+      <div aria-hidden="true" className="absolute inset-0 z-0 touch-pinch-zoom select-none">
         <Canvas
           orthographic
           flat
@@ -95,9 +97,9 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
         >
           <Campus
             campus={campus}
-            time={time}
+            look={baked}
             sites={sites}
-            options={{ reducedMotion, countFrames, rebaking: picked !== time, onInteract }}
+            options={{ reducedMotion, countFrames, rebaking: look !== baked, onInteract }}
           />
           <SceneReady />
         </Canvas>
@@ -131,7 +133,7 @@ function SceneReady() {
 
 interface CampusProps {
   campus: CampusTheme;
-  time: TimeOfDay;
+  look: SceneLook;
   sites: SiteInfoMap;
   options: Omit<Parameters<typeof useHubFrame>[0], "castPending" | "figures">;
 }
@@ -139,14 +141,21 @@ interface CampusProps {
 /** The first frame is on screen: the cast's download starts only then (integration spec §2). */
 const painted = (s: SceneLoad) => s.stage >= STAGE.done;
 
-function Campus({ campus, time, sites, options }: CampusProps) {
+function Campus({ campus, look, sites, options }: CampusProps) {
   // Read once per visit: the workbench saves stars on a sibling route, so going back remounts
   // this (N9). If /play ever stays mounted under the workbench, re-read on a progress version
   // from the hub store instead (campus-scene v0.3 §13.5).
   const [progress] = useState(readProgress);
   const looks = siteLooks(sites, progress);
-  const g = useCampusGeometry(campus, time, looks.library, looks.watchtower, looks.market);
-  const preset = campus.lights[time];
+  const g = useCampusGeometry(
+    campus,
+    look.sky,
+    look.bake,
+    looks.library,
+    looks.watchtower,
+    looks.market,
+  );
+  const { preset } = g.palette;
   const sunPosition = useMemo(() => g.palette.light.sun.clone().multiplyScalar(30), [g.palette]);
   const dressing = useDressing(g.palette);
   // undefined while cast.json loads, null if it failed: the statues stand in until (unless) then.
@@ -169,6 +178,8 @@ function Campus({ campus, time, sites, options }: CampusProps) {
     () => ({
       baked: new MeshBasicMaterial({ vertexColors: true }),
       figure: new MeshLambertMaterial({ vertexColors: true, flatShading: true }),
+      // The figure's parameters, so the same program; apart so the night lift skips the trees.
+      tree: new MeshLambertMaterial({ vertexColors: true, flatShading: true }),
       blob: new MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
@@ -213,18 +224,31 @@ function Campus({ campus, time, sites, options }: CampusProps) {
     // between the first frame and the props frame for idle.
     rebaking: options.rebaking || dressing === undefined,
   });
-  // A re-bake (time or theme) wakes the scene the way a walk does, so ?debug=frames flags it
-  // busy until the new geometry is drawn.
+  // A re-bake (look or theme) wakes the scene the way a walk does, so ?debug=frames flags it
+  // busy until the new geometry is drawn. After dark the player's blob turns into a pool of
+  // light (additive: a blend state, the same program; weather-time-visuals §1.4).
   useEffect(() => {
-    materials.xray.color.copy(g.palette.xray);
-    materials.ring.color.copy(g.palette.player);
+    const pal = g.palette;
+    const pool = pal.darkness >= 0.5;
+    materials.xray.color.copy(g.base.xray);
+    materials.ring.color.copy(pal.ring);
+    materials.figure.color.setScalar(pal.figureLift);
+    materials.blob.setValues({
+      blending: pool ? AdditiveBlending : NormalBlending,
+      color: pool ? pal.glow : BLACK,
+      opacity: pool ? 1 : 0.18,
+    });
+    playerBlob.current?.scale.setScalar(pool ? 2.2 : 1);
     wake();
-  }, [materials, g.palette, wake]);
+  }, [materials, g.palette, g.base, playerBlob, wake]);
+  // A look that keeps the bake (rain → storm, cloud → fog) rebuilds nothing; one frame still
+  // ends the busy flag its store change raised (?debug=frames).
+  useEffect(wake, [look, wake]);
   // Theme colours onto the figures (only colours change; integration spec §4), before the
   // frame that first shows them, so no figure is ever drawn unpainted.
   useLayoutEffect(() => {
     if (!figures || !cast) return;
-    const pal = g.palette;
+    const pal = g.base;
     const paint = (who: CastRole, mesh: SkinnedMesh, looks: Parameters<typeof paintFigure>[2]) =>
       paintFigure(mesh, cast.roles[who], looks);
     paint("player", figures.player.mesh, { top: pal.player, bottom: pal.pants });
@@ -238,7 +262,7 @@ function Campus({ campus, time, sites, options }: CampusProps) {
       });
     }
     wake();
-  }, [figures, cast, g.palette, campus.npcs, wake]);
+  }, [figures, cast, g.base, campus.npcs, wake]);
   // The cast settled: one frame shows it (or keeps the statues). ?debug=frames tells e2e.
   useEffect(() => {
     if (options.countFrames) {
@@ -263,8 +287,12 @@ function Campus({ campus, time, sites, options }: CampusProps) {
   return (
     <>
       {/* The lights shade the Lambert figures and trees exactly as the statics are baked. */}
-      <hemisphereLight args={[preset.sky, preset.ground, preset.hemisphere]} />
-      <directionalLight args={[preset.sun, preset.sunIntensity]} position={sunPosition} />
+      <hemisphereLight
+        color={preset.sky}
+        groundColor={preset.ground}
+        intensity={preset.hemisphere}
+      />
+      <directionalLight color={preset.sun} intensity={preset.sunIntensity} position={sunPosition} />
       {/* Everything a click can land on (clickGoal); the figures, blobs and ring stay out. */}
       <group ref={statics}>
         <mesh geometry={g.terrain} material={materials.baked} />
@@ -273,8 +301,8 @@ function Campus({ campus, time, sites, options }: CampusProps) {
         {SITES.map(({ id }) => (
           <mesh key={id} geometry={g[id]} material={materials.baked} userData={{ site: id }} />
         ))}
-        <Trees geometry={g.roundTree} material={materials.figure} trees={ROUND} g={g} />
-        <Trees geometry={g.cypress} material={materials.figure} trees={CYPRESS} g={g} />
+        <Trees geometry={g.roundTree} material={materials.tree} trees={ROUND} g={g} />
+        <Trees geometry={g.cypress} material={materials.tree} trees={CYPRESS} g={g} />
       </group>
       <mesh geometry={g.shadow} material={materials.shadow} />
 

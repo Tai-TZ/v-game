@@ -32,7 +32,7 @@ const register = (id: LabelId) => (element: HTMLElement | null) => {
 };
 
 const BADGE =
-  "pointer-events-auto grid size-7 cursor-pointer place-items-center rounded-sm bg-accent text-lg leading-none font-bold text-on-brand";
+  "pointer-events-auto grid size-7 cursor-pointer place-items-center rounded-sm border-2 border-surface bg-accent text-lg leading-none font-bold text-on-brand";
 
 /**
  * Building labels and the people's "!" badges as plain DOM (no text in WebGL). The librarian's

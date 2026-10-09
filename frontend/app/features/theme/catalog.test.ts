@@ -41,3 +41,46 @@ describe("theme manifests", () => {
     }
   });
 });
+
+describe("theme sky data (campus v0.4 W2)", () => {
+  const dir = path.resolve(process.cwd(), "public", "themes");
+  const ids = parseThemeIndex(JSON.parse(readFileSync(path.join(dir, "index.json"), "utf8"))).map(
+    (theme) => theme.id,
+  );
+  const SKY_TOKENS = [
+    "--vg-scene-sky",
+    "--vg-scene-dawn",
+    "--vg-scene-dusk",
+    "--vg-scene-night",
+    "--vg-scene-cloud",
+    "--vg-scene-cloud-night",
+  ];
+
+  it.each(ids)("declares every sky token in %s/theme.css", (id) => {
+    const css = readFileSync(path.join(dir, id, "theme.css"), "utf8");
+    for (const token of SKY_TOKENS) expect(css, token).toMatch(new RegExp(`${token}:\\s*#`));
+  });
+
+  it("stands every pack at the backend's weather place", () => {
+    const config = readFileSync(
+      path.resolve(process.cwd(), "..", "backend", "src", "vgame", "config.py"),
+      "utf8",
+    );
+    const lat = Number(/weather_latitude: float = Field\(default=([-\d.]+)/.exec(config)?.[1]);
+    const lon = Number(/weather_longitude: float = Field\(default=([-\d.]+)/.exec(config)?.[1]);
+    for (const id of ids) {
+      const { place } = parseThemeManifest(
+        JSON.parse(readFileSync(path.join(dir, id, "manifest.json"), "utf8")),
+      );
+      expect([place.lat, place.lon], id).toEqual([lat, lon]);
+    }
+  });
+
+  it("refuses a place with an unknown time zone", () => {
+    const manifest = JSON.parse(
+      readFileSync(path.join(dir, ids[0] ?? "town", "manifest.json"), "utf8"),
+    ) as { place: Record<string, unknown> };
+    manifest.place.timeZone = "Asia/Atlantis";
+    expect(() => parseThemeManifest(manifest)).toThrow(/time zone/);
+  });
+});

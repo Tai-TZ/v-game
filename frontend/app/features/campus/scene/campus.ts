@@ -43,7 +43,7 @@ import {
 } from "../layout";
 import { DRESSING, DRESSING_LAMPS } from "../dressing";
 import type { SiteLook } from "../sites";
-import { desaturate, type BuildingPalette, type Palette } from "./palette";
+import { desaturate, shade, type BuildingPalette, type Palette } from "./palette";
 import {
   arch,
   arcSlab,
@@ -73,12 +73,35 @@ import {
  * world units from layout.ts (D9).
  */
 
+/** Stable pseudo-random in [0, 1) for an index and a seed. */
+const hash = (i: number, k: number) => {
+  const s = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+};
+
 type Parts = BufferGeometry[];
-/** Part maker that bakes the palette's light preset; no colour keeps the vertex colours. */
-const paint =
-  (pal: Palette) =>
-  (geometry: BufferGeometry, color?: PartStyle["color"], flags: Omit<PartStyle, "color"> = {}) =>
-    part(geometry, { color, ...flags }, pal.light);
+/**
+ * Part maker that bakes the palette's light preset; no colour keeps the vertex colours. With a
+ * `windows` seed, after dark a share of the panes painted `pal.glass` (0.33 × darkness, picked by
+ * a hash of the pane's index, so a pane lit at dusk stays lit at night) glows `litDim` instead:
+ * the landmark and the back campus (weather-time-visuals §1.3). The zones keep N9.
+ */
+const paint = (pal: Palette, windows?: number) => {
+  let pane = 0;
+  return (
+    geometry: BufferGeometry,
+    color?: PartStyle["color"],
+    flags: Omit<PartStyle, "color"> = {},
+  ) => {
+    if (windows !== undefined && color === pal.glass) {
+      pane += 1;
+      if (hash(pane, windows) < 0.33 * pal.darkness) {
+        return part(geometry, { ...flags, color: pal.litDim, emissive: true }, pal.light);
+      }
+    }
+    return part(geometry, { color, ...flags }, pal.light);
+  };
+};
 
 const PI = Math.PI;
 const SIDES = [-1, 1] as const;
@@ -87,11 +110,6 @@ const grid = <T>(xs: readonly number[], ys: readonly number[], f: (x: number, y:
   xs.flatMap((x) => ys.map((y) => f(x, y)));
 
 // --- Trees (shared by the terrain contact discs and the instanced meshes) -------------------
-
-const hash = (i: number, k: number) => {
-  const s = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
-  return s - Math.floor(s);
-};
 
 export interface TreeInstance {
   x: number;
@@ -191,11 +209,18 @@ function contactDisc(pal: Palette, tree: TreeInstance, y: number) {
 }
 
 /** Flat fan from `centre` through consecutive `points` (n − 1 triangles), one colour. */
-function fan(pal: Palette, centre: Vec2, points: readonly Vec2[], y: number, color: Color) {
+function fan(
+  pal: Palette,
+  centre: Vec2,
+  points: readonly Vec2[],
+  y: number,
+  color: Color,
+  flags: Omit<PartStyle, "color"> = {},
+) {
   const vertices = points
     .slice(1)
     .flatMap((p, i) => [centre, points[i] ?? p, p].map((q) => ({ ...q, color })));
-  return paint(pal)(groundTriangles(vertices, y));
+  return paint(pal)(groundTriangles(vertices, y), undefined, flags);
 }
 
 /** Closed track outline: 13 points round (xc, za) bulging to +z, 13 round (xc, zb) to −z (v0.3 §6.0). */
@@ -467,7 +492,7 @@ const HAZE = 0.15;
 
 /** Annex A and its glass bridges, building G, H, the domed hall B, chiller, carports, stand (§6.4). */
 function backCampus(pal: Palette): Parts {
-  const P = paint(pal);
+  const P = paint(pal, 4);
   const { wall, trim, roof, accent } = pal.lm;
   const g = pal.glass;
   const h = { haze: HAZE };
@@ -773,6 +798,7 @@ export function treesInShade(
   colonnades: boolean,
 ): ReadonlySet<TreeInstance> {
   const { sun } = pal.light;
+  if (!pal.sunShade) return new Set();
   const casters = shadowCasters(archetype, colonnades);
   return new Set(
     TREE_INSTANCES.filter((tree) => {
@@ -808,6 +834,8 @@ export function buildShadows(
   colonnades: boolean,
 ): BufferGeometry {
   const { sun } = pal.light;
+  // Overcast: no sun, no shadow (the empty geometry draws nothing).
+  if (!pal.sunShade) return groundTriangles([], SHADOW_Y);
   const onGround = (p: Vector3): Vec2 => ({
     x: p.x - (sun.x / sun.y) * p.y,
     z: p.z - (sun.z / sun.y) * p.y,
@@ -830,8 +858,13 @@ export function buildShadows(
 export const SPEAKER_DISC_Y = 0.0135;
 export const SPEAKER_DISC_SEGMENTS = 16;
 
-/** A baked disc under each person (floor × 0.8, like `contact`), in place of a blob mesh. */
+/**
+ * A baked disc under each person (floor × 0.8, like `contact`), in place of a blob mesh. After
+ * dark it is a pool of warm light 2.2 times as wide, the person standing in it (§1.4).
+ */
 function speakerDiscs(pal: Palette): Parts {
+  const pool = pal.darkness >= 0.5;
+  const top = shade(new Vector3(0, 1, 0), pal.light);
   const floor = {
     lan: pal.ground,
     registrar: pal.path,
@@ -840,12 +873,16 @@ function speakerDiscs(pal: Palette): Parts {
     operator: pal.ground,
   };
   return SPEAKERS.map(({ id, spot }) => {
-    const r = id === "lan" ? 0.4 : 0.36;
+    const r = (id === "lan" ? 0.4 : 0.36) * (pool ? 2.2 : 1);
     const rim = range(SPEAKER_DISC_SEGMENTS + 1).map((i) => {
       const a = (i / SPEAKER_DISC_SEGMENTS) * 2 * PI;
       return { x: spot.x + Math.cos(a) * r, z: spot.z + Math.sin(a) * r };
     });
-    return fan(pal, spot, rim, SPEAKER_DISC_Y, floor[id].clone().multiplyScalar(0.8));
+    return pool
+      ? fan(pal, spot, rim, SPEAKER_DISC_Y, floor[id].clone().multiply(top).add(pal.glow), {
+          emissive: true,
+        })
+      : fan(pal, spot, rim, SPEAKER_DISC_Y, floor[id].clone().multiplyScalar(0.8));
   });
 }
 
@@ -907,7 +944,7 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
 
 /** Base, porch floor and steps; the stepped tower base; two wings; four pavilions (§5.2). */
 function mainBuilding(pal: Palette): Parts {
-  const P = paint(pal);
+  const P = paint(pal, 1);
   const { wall, trim, roof } = pal.lm;
   const g = pal.glass;
   const ao = { ao: true };
@@ -1009,7 +1046,7 @@ function mainBuilding(pal: Palette): Parts {
 
 /** Stepped tower with a lantern, cup, needle spire and sun star (§5.3). */
 function spireHall(pal: Palette): Parts {
-  const P = paint(pal);
+  const P = paint(pal, 2);
   const { wall, trim, accent } = pal.lm;
   const g = pal.glass;
   const cz = -7.6;
@@ -1134,7 +1171,7 @@ function hand(
 
 /** Town hall: hip roof on the shared tower base and a clock tower in front (§5.4). */
 function clockTower(pal: Palette): Parts {
-  const P = paint(pal);
+  const P = paint(pal, 3);
   const { wall, trim, roof, accent } = pal.lm;
   const g = pal.glass;
   const e = { emissive: true };

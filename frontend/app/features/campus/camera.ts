@@ -54,7 +54,7 @@ export const ORBIT_FRAME = { half: 22.94, top: 13.42, bottom: -13.9 } as const;
 /**
  * Pixels kept free of scenery at both top corners in overview: HubTopBar lg:top-6 + h-11 + 8
  * high; wide enough for "Các khu" plus the theme switch with the longest theme name (≈ 315 px),
- * and on the left for "Về trang chủ" plus the "Hoàng hôn" switch (≈ 337 px, N8 2026-10-08).
+ * and on the left for "Về trang chủ" plus the weather chip (≈ 266 px, campus v0.4 W0.3).
  */
 export const HUD_CORNER = { width: 344, height: 76 } as const;
 /**

@@ -6,6 +6,7 @@
     "orgName": "VinUniversity",
     "disclaimer": "Dự án học tập độc lập, lấy cảm hứng từ khuôn viên VinUniversity. Không phải sản phẩm chính thức của VinUniversity."
   },
+  "place": { "name": "Hà Nội", "lat": 21.0285, "lon": 105.8542, "timeZone": "Asia/Ho_Chi_Minh" },
   "fonts": {
     "preload": [
       "fonts/montserrat-latin-wght-normal.woff2",
@@ -47,7 +48,15 @@
       "market": { "wall": "#f6f3ee", "trim": "#ddd6ca", "roof": "#c72127" }
     },
     "lights": {
-      "default": "day",
+      "dawn": {
+        "sky": "#e6e8ff",
+        "ground": "#cbc3cf",
+        "hemisphere": 1.72,
+        "sun": "#ffc2a6",
+        "sunIntensity": 1.55,
+        "sunDirection": [0.7, 0.55, 0.3],
+        "rim": 0.5
+      },
       "day": {
         "sky": "#d0e5ff",
         "ground": "#bfb5a9",
@@ -65,6 +74,15 @@
         "sunIntensity": 2.661,
         "sunDirection": [-0.62, 0.55, 0.6],
         "rim": 0.6
+      },
+      "night": {
+        "sky": "#8ea3d6",
+        "ground": "#606b8a",
+        "hemisphere": 0.95,
+        "sun": "#c9d6ff",
+        "sunIntensity": 0.42,
+        "sunDirection": [-0.35, 1, 0.75],
+        "rim": 0.1
       }
     },
     "npcs": {
