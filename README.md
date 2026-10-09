@@ -47,7 +47,7 @@ từ dấu vết của chính lượt chạy, không phải đáp án mẫu.
 - **Chạy thật, không mô phỏng.** Backend biên dịch khối thành đồ thị LangGraph, gọi Gemini và phát từng bước qua SSE.
 - **Chấm theo bằng chứng.** Chẩn đoán chỉ ra bước gây lỗi từ dấu vết của lượt chạy; bộ câu hỏi có câu ẩn và câu bẫy, đáp án chỉ hiện khi lượt chạy kết thúc.
 - **Một sa bàn đi bộ được.** Cổng ở mép trước, ba khu chơi quanh quảng trường, khuôn viên phía sau nhà chính có hội trường mái vòm, sân tennis và sân vận động. Nhấp vào đâu, nhân vật tự tìm đường ngắn nhất tới đó.
-- **Giờ thật và thời tiết hôm nay.** Sa bàn sáng, chiều, tối theo mặt trời ở Hà Nội (tính ngay trong trình duyệt) và đổi theo thời tiết thật (mưa, sương, dông) lấy từ Open-Meteo qua API. Chip trên góc trái có chế độ "Cố định ban ngày" cho máy chiếu.
+- **Giờ thật và thời tiết hôm nay.** Sa bàn sáng, chiều, tối theo mặt trời ở Hà Nội (tính ngay trong trình duyệt) và đổi theo thời tiết thật (mưa, sương, dông) trình duyệt lấy thẳng từ Open-Meteo. Chip trên góc trái có chế độ "Cố định ban ngày" cho máy chiếu.
 - **Nhẹ.** Cả cảnh hub chỉ 13 draw call; three.js chỉ tải ở `/play`.
 
 > [!NOTE]
@@ -298,7 +298,7 @@ Theme pack chỉ là dữ liệu trong `frontend/public/themes/<id>/` (manifest,
 - `VITE_DEFAULT_THEME` chọn theme mặc định; không đặt thì lấy theme đầu tiên.
 - Khi bản build có từ hai theme, nút trên thanh trên cùng cho đổi theme mà không tải lại trang; lựa chọn được nhớ trong `localStorage` (`vg-theme`).
 - Thêm theme: thêm một thư mục và một dòng trong `index.json`. Bỏ theme: xoá cả hai. Không cần sửa code.
-- Mỗi manifest có `place` (tên, toạ độ, múi giờ) và bốn preset ánh sáng (`dawn`, `day`, `dusk`, `night`); `theme.css` khai màu trời của từng pha và trời mây. `place` phải trùng `WEATHER_LATITUDE/LONGITUDE` của backend (test kiểm). Không bao giờ dùng vị trí người xem.
+- Mỗi manifest có `place` (tên, toạ độ, múi giờ) và bốn preset ánh sáng (`dawn`, `day`, `dusk`, `night`); `theme.css` khai màu trời của từng pha và trời mây. Thời tiết lấy theo toạ độ `place`. Không bao giờ dùng vị trí người xem.
 - Code app và backend không nhắc tên thương hiệu; job Brand isolation của CI kiểm tra điều này.
 
 ### Deploy
@@ -352,8 +352,9 @@ Workflow Security chạy ở mỗi push lên main, mỗi PR và 03:23 UTC mỗi 
 - **CSP chặt.** Bản build tĩnh sinh header với `default-src 'self'`, `script-src 'self'` cộng hash của
   từng script inline, `style-src 'self'` (HTML pre-render không có thuộc tính `style`), kèm HSTS,
   `nosniff`, `Referrer-Policy` và `Permissions-Policy`. Backend gắn header bảo mật cho mọi phản hồi.
-- **Một origin.** Trên bản chạy thử, trình duyệt chỉ gọi `/api/*` của chính trang; Vercel chuyển tiếp
-  sang Render phía máy chủ, nên CSP giữ `connect-src 'self'` và backend không phải mở CORS.
+- **Một origin cho API.** Trên bản chạy thử, trình duyệt chỉ gọi `/api/*` của chính trang; Vercel chuyển
+  tiếp sang Render phía máy chủ, nên backend không phải mở CORS. `connect-src` chỉ thêm
+  `https://api.open-meteo.com` cho thời tiết khuôn viên.
 - **Đầu vào của người chơi là dữ liệu.** Không chạy code của người chơi; payload ≤ 64 KB, chuẩn hoá NFC,
   chặn NUL và ký tự bidi; khối phải nằm trong danh sách được mở; chữ không bao giờ đi qua `str.format`.
 - **Đáp án không rò.** Đáp án chỉ có trong `run.finished`; nội dung câu ẩn và câu bẫy không xuất hiện

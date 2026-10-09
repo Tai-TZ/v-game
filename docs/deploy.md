@@ -64,14 +64,14 @@ Việc của chủ dự án:
    dựng lại từ đầu 1–1,5 giờ), sinh lại seed nếu test `test_replay_seed.py` báo, rồi commit
    `backend/src/vgame/engine/data`. CI chặn nếu quên.
 
-Thời tiết trên bản đồ (`/api/weather`) lấy từ [Open-Meteo](https://open-meteo.com/): miễn phí, không
-cần key, chỉ dùng phi thương mại, dữ liệu theo giấy phép CC BY 4.0 nên HUD ghi nguồn kèm link trong
-popover thời tiết. API gọi Open-Meteo phía máy chủ (cache 15 phút, nên chỉ vài lần một giờ)
-cho toạ độ khuôn viên, mặc định Hà Nội; `WEATHER_LATITUDE`/`WEATHER_LONGITUDE` chỉ dùng khi đổi thành
-phố và phải đổi cùng `place` của theme. `render.yaml` không cần thêm gì. Open-Meteo lỗi thì API trả
-giá trị gần nhất (tối đa 3 giờ), không có thì 503; client im lặng giữ cảnh theo giờ, nên khi API ngủ
-hay lỗi thì bình minh, ban ngày, hoàng hôn, ban đêm vẫn đúng vì trình duyệt tự tính theo đồng hồ của
-mình.
+Thời tiết trên bản đồ lấy từ [Open-Meteo](https://open-meteo.com/): miễn phí, không cần key, chỉ dùng
+phi thương mại, dữ liệu theo giấy phép CC BY 4.0 nên HUD ghi nguồn kèm link trong popover thời tiết.
+Trình duyệt người xem gọi thẳng `api.open-meteo.com` (CSP `connect-src` có origin này) cho toạ độ
+`place` của theme, 30 phút một lần khi tab đang hiện; popover ghi rằng Open-Meteo thấy IP người xem.
+Backend không còn `/api/weather`: IP ra chung của Render free bị Open-Meteo trả 429 liên tục, còn mỗi
+người xem có hạn mức theo IP của mình. Open-Meteo lỗi thì client im lặng thử lại sau 2 phút và giữ
+cảnh theo giờ, nên bình minh, ban ngày, hoàng hôn, ban đêm vẫn đúng (trình duyệt tự tính theo đồng hồ
+của mình), kể cả khi Render ngủ.
 
 ### Giữ Render ở mức 0 đồng
 
