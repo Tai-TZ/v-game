@@ -181,6 +181,9 @@ test.describe("scene loader", () => {
         await mockApi(page);
         const release = await holdScene(page);
         await page.goto("/play");
+        // The pre-rendered shell has a board of its own (checked without JS below), which
+        // hydration replaces: wait for the route, whose live loader draws the board measured here.
+        await expect(page.locator("[data-campus-scene]")).toBeAttached();
         await expect(page.locator('[data-bp="board"]')).toBeAttached();
         expect(await loader(page).boundingBox()).toEqual(
           await page.locator("[data-campus-scene]").boundingBox(),
