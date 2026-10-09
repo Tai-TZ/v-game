@@ -72,12 +72,13 @@ import {
 } from "./campus";
 import { parseCast } from "./cast";
 import { LABEL_ANCHORS } from "./labels";
-import { desaturate, light, palette, shade, type Palette } from "./palette";
+import { desaturate, light, palette, shade, weatherPreset, type Palette } from "./palette";
 import { triangleCount, type Face } from "./primitives";
 import type { PropsJson } from "./props";
 import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
 import { buildDressing } from "./useDressing";
 import { clickGoal, pickNpc } from "./useHubFrame";
+import type { Bake } from "../sky";
 
 const THEMES_DIR = path.resolve(process.cwd(), "public", "themes");
 const CAST = parseCast(
@@ -100,14 +101,25 @@ const CASTING_PROPS = [
   "parasol-table",
 ];
 
-function build(manifest: ThemeManifest, time: TimeOfDay = "day", lit = false) {
+function build(
+  manifest: ThemeManifest,
+  time: TimeOfDay = "day",
+  lit = false,
+  bake: Bake = "clear",
+) {
   const looks: [SiteLook, SiteLook, SiteLook] = lit
     ? ["lit", "lit", "lit"]
     : ["open", "coming_soon", "coming_soon"];
-  return renderHook(({ campus }) => useCampusGeometry(campus, time, ...looks), {
+  return renderHook(({ campus }) => useCampusGeometry(campus, time, bake, ...looks), {
     initialProps: { campus: manifest.campus },
   });
 }
+
+const BAKES: readonly Bake[] = ["clear", "partly", "overcast", "damp", "wet"];
+/** Every look the scene bakes: four phases × five weather bakes (campus v0.4 W4). */
+const LOOKS = TimeOfDaySchema.options.flatMap((phase) =>
+  BAKES.map((bake) => [phase, bake] as const),
+);
 
 const TIMES: readonly TimeOfDay[] = ["day", "dusk"];
 /**
@@ -400,18 +412,18 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
 describe.each(manifests.map((m) => [m.id, m] as const))(
   "baked lighting from every side (orbit-camera §6.2), theme %s",
   (_id, manifest) => {
-    // Every preset the schema knows, so a new hour (dawn, night) joins the loop by itself.
-    it.each(TimeOfDaySchema.options)(
-      "keeps the two walls seen from each iso diagonal apart at %s",
-      (time) => {
-        const l = light(manifest.campus.lights[time]);
+    // Every look: each preset the schema knows under each weather bake (campus v0.4 W0.7).
+    it.each(LOOKS)(
+      "keeps the two walls seen from each iso diagonal apart at %s, %s",
+      (time, bake) => {
+        const l = palette(manifest.campus, time, bake).light;
         const top = luminance(shade(UP, l));
         for (const yaw of ISO_YAWS) {
           const seen = Object.values(WALLS).filter((n) => n.dot(towardCamera(yaw)) > 0);
           expect(seen).toHaveLength(2);
           const [a = 0, b = 0] = seen.map((n) => luminance(shade(n, l)));
           // Relative to the top face, so dark presets are not asked for daylight contrast.
-          expect(Math.abs(a - b), `${yaw}° at ${time}`).toBeGreaterThanOrEqual(0.08 * top);
+          expect(Math.abs(a - b), `${yaw}° at ${time}, ${bake}`).toBeGreaterThanOrEqual(0.08 * top);
         }
       },
     );
@@ -735,10 +747,11 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     // The cast's 5,235 beat its ~1,020 estimate (npc-cast v0.4 §11), hence caps of 18 draw calls
     // and 34,500 triangles (the measured peak rounded up): under 60% of the brief's 60k and far
     // inside the 60 FPS rule's < 80 draw calls (art §6.1).
-    it.each(TIMES)("stays well inside 40 draw calls and 60k triangles at %s", (time) => {
+    // Every look (campus v0.4 W4): weather adds no draw call; overcast drops the shadow overlay.
+    it.each(LOOKS)("stays well inside 40 draw calls and 60k triangles at %s, %s", (time, bake) => {
       if (!CAST) throw new Error("cast.json does not parse");
       for (const lit of [false, true]) {
-        const { result, unmount } = build(manifest, time, lit);
+        const { result, unmount } = build(manifest, time, lit, bake);
         const g = result.current;
         expect(sceneBudget(g).drawCalls).toBe(14); // statues, until the props and the cast arrive
         const dressing = buildDressing(props, g.palette);
@@ -1180,7 +1193,8 @@ describe("switching theme", () => {
   it("rebuilds only the building whose status changed", () => {
     if (!first) throw new Error("Need a theme.");
     const { result, rerender, unmount } = renderHook(
-      ({ market, time }) => useCampusGeometry(first.campus, time, "open", "coming_soon", market),
+      ({ market, time }) =>
+        useCampusGeometry(first.campus, time, "clear", "open", "coming_soon", market),
       { initialProps: { market: "coming_soon" as SiteLook, time: "day" as TimeOfDay } },
     );
     const before = result.current;
@@ -1206,6 +1220,123 @@ describe("switching theme", () => {
     unmount();
   });
 });
+
+describe.each(manifests.map((m) => [m.id, m] as const))(
+  "weather and time of day (campus v0.4 W4), theme %s",
+  (_id, manifest) => {
+    const { campus } = manifest;
+    const contrast = (a: Color, b: Color) => {
+      const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+      return (hi + 0.05) / (lo + 0.05);
+    };
+
+    it("bakes four presets, the top face brightest by day and darkest at night", () => {
+      expect(Object.keys(campus.lights).sort()).toEqual(["dawn", "day", "dusk", "night"]);
+      const top = (time: TimeOfDay) => luminance(shade(UP, palette(campus, time).light));
+      expect(top("day")).toBeGreaterThan(top("dawn"));
+      expect(top("dawn")).toBeGreaterThan(top("dusk"));
+      expect(top("dusk")).toBeGreaterThan(top("night"));
+      expect(palette(campus, "day").darkness).toBe(0);
+      expect(palette(campus, "night").darkness).toBe(1);
+    });
+
+    it("leaves a clear preset as it is and dims the rest without warming them", () => {
+      const day = campus.lights.day;
+      expect(weatherPreset(day, "clear")).toBe(day);
+      let previous = luminance(shade(UP, light(day)));
+      for (const bake of ["partly", "overcast", "wet"] as const) {
+        const top = luminance(shade(UP, light(weatherPreset(day, bake))));
+        expect(top, bake).toBeLessThan(previous);
+        previous = top;
+      }
+    });
+
+    it("darkens wet paving by 22 % and grass by 10 %, roofs and water unchanged", () => {
+      const dry = palette(campus, "day");
+      const wet = palette(campus, "day", "wet");
+      expect(wet.path.r / dry.path.r).toBeCloseTo(0.78, 6);
+      expect(wet.plaza.g / dry.plaza.g).toBeCloseTo(0.78, 6);
+      expect(wet.ground.b / dry.ground.b).toBeCloseTo(0.9, 6);
+      expect(palette(campus, "day", "damp").path.r / dry.path.r).toBeCloseTo(0.89, 6);
+      expect(wet.water.equals(dry.water)).toBe(true);
+      expect(wet.lm.roof.equals(dry.lm.roof)).toBe(true);
+    });
+
+    it.each(["overcast", "damp", "wet"] as const)("casts no sun shadow under %s", (bake) => {
+      const { result, unmount } = build(manifest, "day", false, bake);
+      expect(triangleCount(result.current.shadow)).toBe(0);
+      expect(result.current.shadedTrees.size).toBe(0);
+      unmount();
+    });
+
+    it("lights a share of the landmark's windows after dark, every dusk pane still lit at night", () => {
+      const lit = (time: TimeOfDay) => {
+        const pal = palette(campus, time);
+        const landmark = buildLandmark(pal, campus.landmark.archetype, campus.landmark.colonnades);
+        const panes = new Set(
+          triangles(landmark)
+            .filter((t) => sameColour(t.colour, pal.litDim))
+            .map((t) =>
+              t.centre
+                .toArray()
+                .map((n) => n.toFixed(3))
+                .join(),
+            ),
+        );
+        landmark.dispose();
+        return panes;
+      };
+      expect(lit("day").size).toBe(0);
+      const dusk = lit("dusk");
+      const night = lit("night");
+      expect(dusk.size).toBeGreaterThan(0);
+      expect(night.size).toBeGreaterThan(dusk.size);
+      for (const pane of dusk) expect(night.has(pane), pane).toBe(true);
+    });
+
+    it("keeps people, lamps and windows readable at night (§1.3, §1.4, §4.2)", () => {
+      for (const bake of ["clear", "wet"] as const) {
+        const pal = palette(campus, "night", bake);
+        const top = shade(UP, pal.light);
+        // The figure's sunlit side, lifted, over the pool of light on the path under it.
+        const pool = pal.path.clone().multiply(top).add(pal.glow);
+        const lambert = shade(LEFT, pal.light).multiplyScalar(pal.figureLift);
+        for (const [who, colour] of [
+          ["player", pal.player],
+          ["lan", pal.npc],
+        ] as const) {
+          const figure = colour.clone().multiply(lambert);
+          expect(contrast(figure, pool), `${who} at night, ${bake}`).toBeGreaterThanOrEqual(3);
+        }
+        expect(contrast(pal.lit, pal.litDim)).toBeGreaterThanOrEqual(1.4);
+        const glass = pal.glass.clone().multiply(shade(LEFT, pal.light));
+        expect(contrast(pal.litDim, glass)).toBeGreaterThanOrEqual(2.5);
+        expect(pal.figureLift).toBeGreaterThanOrEqual(1);
+        expect(pal.figureLift).toBeLessThanOrEqual(1.6);
+      }
+    });
+
+    it("re-bakes only on a new bake, and never rebuilds the people or the trees", () => {
+      const { result, rerender, unmount } = renderHook(
+        ({ time, bake }) => useCampusGeometry(campus, time, bake, "open", "open", "open"),
+        { initialProps: { time: "day" as TimeOfDay, bake: "wet" as Bake } },
+      );
+      const rain = result.current;
+      // Rain → thunderstorm and cloudy → fog share a bake: the same geometry, no rebuild.
+      rerender({ time: "day", bake: "wet" });
+      expect(result.current.terrain).toBe(rain.terrain);
+      rerender({ time: "night", bake: "overcast" });
+      const night = result.current;
+      expect(night.terrain).not.toBe(rain.terrain);
+      expect(night.landmark).not.toBe(rain.landmark);
+      for (const key of ["player", "lan", "npcs", "roundTree", "cypress"] as const) {
+        expect(night[key], key).toBe(rain[key]);
+      }
+      expect(night.base).toBe(rain.base);
+      unmount();
+    });
+  },
+);
 
 describe("render budget rules", () => {
   it("uses no shadow maps or post-processing anywhere in the campus feature", () => {

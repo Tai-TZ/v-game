@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from "react";
 import type { BufferGeometry } from "three";
 
-import type { CampusTheme, TimeOfDay } from "~/features/theme/schema";
+import type { CampusTheme } from "~/features/theme/schema";
 
 import type { SiteLook } from "../sites";
+import type { Bake, Phase } from "../sky";
 import {
   BLOB_SEGMENTS,
   buildCypress,
@@ -27,7 +28,10 @@ import { palette, type Palette } from "./palette";
 import { triangleCount } from "./primitives";
 
 export interface CampusGeometry {
+  /** The look's colours: the phase's preset under the weather, baked into the static groups. */
   palette: Palette;
+  /** The theme's own colours, for what rebuilds only with the theme (figures, trees). */
+  base: Palette;
   /** Static groups: one merged geometry, one draw call each. */
   terrain: BufferGeometry;
   landmark: BufferGeometry;
@@ -57,21 +61,25 @@ function useDisposable(geometry: BufferGeometry): BufferGeometry {
 }
 
 /**
- * Builds the campus for the active theme and time of day. Groups rebuild only when their inputs
- * change: theme or time for everything (the light is baked), a zone's look for its own building
- * (art §6.2).
+ * Builds the campus for the active theme, phase and baked weather. Groups rebuild only when their
+ * inputs change: the static groups with the theme, the phase or the weather's bake (the light is
+ * baked; rain ↔ storm and cloud ↔ fog share one bake), a zone's look for its own building (art
+ * §6.2); the figures and the trees with the theme only, so a walk never snaps (campus v0.4 W0.6).
  */
 export function useCampusGeometry(
   campus: CampusTheme,
-  time: TimeOfDay,
+  phase: Phase,
+  bake: Bake,
   library: SiteLook,
   watchtower: SiteLook,
   market: SiteLook,
 ): CampusGeometry {
-  const pal = useMemo(() => palette(campus, time), [campus, time]);
+  const pal = useMemo(() => palette(campus, phase, bake), [campus, phase, bake]);
+  const base = useMemo(() => palette(campus), [campus]);
   const { archetype, colonnades } = campus.landmark;
   return {
     palette: pal,
+    base,
     terrain: useDisposable(useMemo(() => buildTerrain(pal, colonnades), [pal, colonnades])),
     shadow: useDisposable(
       useMemo(() => buildShadows(pal, archetype, colonnades), [pal, archetype, colonnades]),
@@ -86,12 +94,12 @@ export function useCampusGeometry(
     library: useDisposable(useMemo(() => buildLibrary(pal, library), [pal, library])),
     watchtower: useDisposable(useMemo(() => buildWatchtower(pal, watchtower), [pal, watchtower])),
     market: useDisposable(useMemo(() => buildMarket(pal, market), [pal, market])),
-    roundTree: useDisposable(useMemo(() => buildRoundTree(pal), [pal])),
-    cypress: useDisposable(useMemo(() => buildCypress(pal), [pal])),
-    player: useDisposable(useMemo(() => buildPlayer(pal), [pal])),
-    lan: useDisposable(useMemo(() => buildLan(pal), [pal])),
-    // Plain colours, no baked light: a new hour keeps them.
-    npcs: useDisposable(useMemo(() => buildNpcs(palette(campus), campus.npcs), [campus])),
+    // Plain colours, no baked light: the three.js lights shade them, so a new look keeps them.
+    roundTree: useDisposable(useMemo(() => buildRoundTree(base), [base])),
+    cypress: useDisposable(useMemo(() => buildCypress(base), [base])),
+    player: useDisposable(useMemo(() => buildPlayer(base), [base])),
+    lan: useDisposable(useMemo(() => buildLan(base), [base])),
+    npcs: useDisposable(useMemo(() => buildNpcs(base, campus.npcs), [base, campus.npcs])),
   };
 }
 

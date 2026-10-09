@@ -17,6 +17,7 @@ import {
 } from "~/features/campus/sites";
 import { NPC_ROLES } from "~/features/campus/npcs";
 import { hubStore, useHub } from "~/features/campus/store";
+import { useSkyClock } from "~/features/campus/useSkyClock";
 import { useActiveTheme } from "~/features/theme/context";
 import { loadZoneList } from "~/features/zones/api";
 import { ZoneCard } from "~/features/zones/ZoneCard";
@@ -60,7 +61,10 @@ export default function Play({ loaderData }: Route.ComponentProps) {
   const sites = useMemo(() => siteInfo(zones?.ok ? zones.zones : null), [zones]);
   const dialog = useHub((state) => state.dialog);
   const visits = useHub((state) => (state.dialog ? (state.met[state.dialog.who] ?? 0) : 0));
-  const { npcs } = useActiveTheme().campus;
+  const theme = useActiveTheme();
+  const { npcs } = theme.campus;
+  useSkyClock(theme.place);
+  const look = useHub((state) => state.sky.look);
   const navigate = useNavigate();
   const opening = useNavigation().state === "loading";
   const revalidator = useRevalidator();
@@ -120,7 +124,7 @@ export default function Play({ loaderData }: Route.ComponentProps) {
         <SceneBoundary>
           {/* The loader below covers the wait, outside Suspense, until the first frame. */}
           <Suspense fallback={null}>
-            <CampusScene sites={sites} onInteract={onInteract} />
+            <CampusScene sites={sites} onInteract={onInteract} look={look} />
           </Suspense>
         </SceneBoundary>
       </div>
