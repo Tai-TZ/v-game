@@ -195,9 +195,39 @@ export const NPC_SPOT: Vec2 = { x: -6.6, z: -2.0 };
 export const NPC_TALK_SPOT: Vec2 = { x: -6.6, z: -2.8 };
 const NPC_BOX: Box = { ...NPC_SPOT, halfX: 0.3, halfZ: 0.3 };
 
+/** The four hub NPCs' roles (npc-cast v0.4 §1); names and outfits are theme data. */
+export type NpcId = "registrar" | "guard" | "examiner" | "operator";
+/** Who a hub dialog is with; here, not in store.ts, so layout.ts imports no store. */
+export type Speaker = "lan" | NpcId;
+export interface Npc {
+  id: NpcId;
+  spot: Vec2;
+  /** Where the player stands to talk: 0.8 from `spot` along an axis, inside INTERACT_RADIUS. */
+  talk: Vec2;
+  /** Rest heading (radians, around Y), towards the home view's camera or out of the gate. */
+  yaw: number;
+}
+
+/** Hub NPCs, nearest to SPAWN first (npc-cast v0.4 §4); each blocks like the librarian. */
+export const NPCS: readonly Npc[] = [
+  { id: "registrar", spot: v(1.25, -3.0), talk: v(1.25, -2.2), yaw: Math.PI / 4 },
+  { id: "guard", spot: v(3.4, 10.85), talk: v(2.6, 10.85), yaw: 0 },
+  { id: "examiner", spot: v(8.0, -12.4), talk: v(8.0, -11.6), yaw: Math.PI / 4 },
+  { id: "operator", spot: v(-5.45, -15.95), talk: v(-5.45, -15.15), yaw: Math.PI / 4 },
+];
+
+const LAN = { id: "lan", spot: NPC_SPOT, talk: NPC_TALK_SPOT } as const;
+/** Everyone the player can talk to, the librarian first. */
+export const SPEAKERS: readonly { id: Speaker; spot: Vec2; talk: Vec2 }[] = [LAN, ...NPCS];
+const speaker = (who: Speaker) => SPEAKERS.find((s) => s.id === who) ?? LAN;
+/** Where a speaker stands: the camera centres it while the dialog is open (orbit-camera §3). */
+export const speakerSpot = (who: Speaker): Vec2 => speaker(who).spot;
+/** Where the player stands to talk to `who`. */
+export const talkSpot = (who: Speaker): Vec2 => speaker(who).talk;
+
 /**
  * Everything the player cannot walk through: buildings, the fountain, round-tree trunks, the
- * lake and the librarian. Low or slender things (columns, lamps, statues, cypresses, hedges,
+ * lake and the people. Low or slender things (columns, lamps, statues, cypresses, hedges,
  * balustrades) do not block.
  */
 export const OBSTACLES: readonly Box[] = [
@@ -214,6 +244,7 @@ export const OBSTACLES: readonly Box[] = [
   ...LAKE_BLOCKS,
   ...Object.values(BACK),
   NPC_BOX,
+  ...NPCS.map(({ spot }) => ({ ...spot, halfX: 0.3, halfZ: 0.3 })),
 ];
 
 /** A smaller z is behind the main building (the player's centre cannot be between -10.25 and -9.9 there). */
