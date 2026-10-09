@@ -1,6 +1,6 @@
 import type { CampusTheme } from "~/features/theme/schema";
 
-import { cameraCentre, CONTENT, desiredCentre, toScreen, viewFor } from "../camera";
+import { cameraCentre, desiredCentre, ORBIT_FRAME, PIVOT, toScreen, viewFor } from "../camera";
 import {
   arrivalPose,
   BACK,
@@ -25,8 +25,9 @@ import {
 
 /*
  * The scene loader's diorama ("sa bàn", art §8.4): a pale isometric drawing of the campus in
- * SVG, one user unit per world unit, projected like the 3D camera (camera.ts), so the first 3D
- * frame lands exactly on it. Pure data, no three.js.
+ * SVG, one user unit per world unit, projected like the 3D camera (camera.ts) at HOME_YAW, so the
+ * first 3D frame lands exactly on it: every entry to /play starts the view at home (store
+ * resetView, routes/play clientLoader). Pure data, no three.js.
  */
 
 export type Role =
@@ -413,12 +414,13 @@ const tileRects = () =>
     return { x0, z0, xz: rect(x0 + 0.05, x0 + TILE_W - 0.05, z0 + 0.05, z0 + TILE_D - 0.05) };
   });
 
-/** The model's screen bbox (camera.ts CONTENT) as a viewBox, for the pre-rendered board. */
+/** The overview's frame (camera.ts ORBIT_FRAME round PIVOT) as a viewBox, for the pre-rendered board. */
+const PIVOT_SCREEN = toScreen(PIVOT.x, 0, PIVOT.z);
 export const SHELL_VIEWBOX = [
-  CONTENT.minX,
-  -CONTENT.maxY,
-  CONTENT.maxX - CONTENT.minX,
-  CONTENT.maxY - CONTENT.minY,
+  PIVOT_SCREEN.sx - ORBIT_FRAME.half,
+  -(PIVOT_SCREEN.sy + ORBIT_FRAME.top),
+  2 * ORBIT_FRAME.half,
+  ORBIT_FRAME.top - ORBIT_FRAME.bottom,
 ]
   .map(n3)
   .join(" ");

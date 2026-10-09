@@ -21,6 +21,7 @@ import {
   buildingStacks,
   entryFocus,
   MIRROR,
+  SHELL_VIEWBOX,
   type Mass,
   type Piece,
 } from "./blueprint";
@@ -88,18 +89,22 @@ describe("blueprintViewBox (alignment with the first 3D frame, spec §4.2)", () 
   const parse = (box: string) => box.split(" ").map(Number);
 
   it("matches the 1280×800 overview", () => {
-    // Overview: the width-limited fit of CONTENT, centred on it.
-    const zoom = (1280 - 48) / (26.03 + 19.73);
-    const [cx, cy] = [(26.03 - 19.73) / 2, (14.82 - 12.05) / 2];
+    // Overview: the width-limited fit of ORBIT_FRAME (45.88 wide), centred 0.24 below PIVOT.
+    const zoom = (1280 - 48) / 45.88;
+    const [cx, cy] = [4.45 / Math.SQRT2, 4.45 / Math.sqrt(6) - 0.24];
     const expected = [cx - 640 / zoom, -cy - 400 / zoom, 1280 / zoom, 800 / zoom];
     parse(blueprintViewBox(1280, 800, SPAWN)).forEach((n, i) =>
       expect(n).toBeCloseTo(expected[i] ?? 0, 3),
     );
-    expect(parse(blueprintViewBox(1280, 800, SPAWN))).toEqual([-20.621, -16.242, 47.543, 29.714]);
+    expect(parse(blueprintViewBox(1280, 800, SPAWN))).toEqual([-20.687, -16.473, 47.668, 29.792]);
   });
 
-  it("matches the 375×812 follow view, clamped at the model's top", () => {
-    expect(parse(blueprintViewBox(375, 812, SPAWN))).toEqual([-5.721, -15.174, 12.573, 27.224]);
+  it("matches the 375×812 follow view, clamped at the model's front edge", () => {
+    expect(parse(blueprintViewBox(375, 812, SPAWN))).toEqual([-5.721, -15.181, 12.573, 27.224]);
+  });
+
+  it("frames the pre-rendered board like the overview: ORBIT_FRAME round PIVOT", () => {
+    expect(parse(SHELL_VIEWBOX)).toEqual([-19.793, -15.237, 45.88, 27.32]);
   });
 
   it("centres on the door the player returns to", () => {

@@ -228,7 +228,7 @@
 
   /*
    * The pre-rendered empty board, framed like the first 3D frame without JS (camera.ts
-   * viewFor, at the spawn). Overview (fit 22–56): the model's bbox inside a 24 px pad.
+   * viewFor, at the spawn). Overview (fit 22–56): ORBIT_FRAME round PIVOT inside a 24 px pad.
    */
   .bp-shell {
     position: absolute;
@@ -239,20 +239,21 @@
   }
   /*
    * Follow mode: the zoom, the spawn at the centre (0.5657, 0.3266), the clamp to the model's
-   * bottom edge (−12.05) and the 72 px top inset, in calc(). The values mirror camera.ts
-   * CONTENT and layout.ts SPAWN; an e2e checks the board against the camera maths.
+   * bottom edge (−12.0433, contentAt(HOME_YAW)) and the 72 px top inset, in calc(), for the
+   * viewBox SHELL_VIEWBOX (top 15.2367, left 0.5657 + 19.7934). The values mirror camera.ts and
+   * layout.ts SPAWN; an e2e checks the board against the camera maths.
    * ponytail: very tall portrait tablets (height ≥ ~1150 px) centre the model instead; the live
    * diorama corrects the framing at hydration.
    */
-  @media (width < 1054.72px) or (height < 639.14px) {
+  @media (width < 1057.36px) or (height < 649.04px) {
     .bp-shell {
       --z: clamp(28px, min((100vw - 32px) / 11.5, (100dvh - 72px) / 8), 40px);
       top: calc(
-        50% + 36px - 14.82 * var(--z) + max(0.3266 * var(--z), 50% - 36px - 12.05 * var(--z))
+        50% + 36px - 15.2367 * var(--z) + max(0.3266 * var(--z), 50% - 36px - 12.0433 * var(--z))
       );
-      left: calc(50% - 20.2957 * var(--z));
-      width: calc(45.76 * var(--z));
-      height: calc(26.87 * var(--z));
+      left: calc(50% - 20.3591 * var(--z));
+      width: calc(45.88 * var(--z));
+      height: calc(27.32 * var(--z));
     }
   }
 
