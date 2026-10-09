@@ -143,6 +143,14 @@ describe("view yaw (orbit-camera §2, §3)", () => {
     expect(wrapAngle(view.to ?? 0)).toBeCloseTo(HOME_YAW);
   });
 
+  it("keeps turning counter-clockwise for quick presses, not back the short way", () => {
+    const store = createHubStore();
+    const { view } = store.getState();
+    for (let i = 0; i < 3; i += 1) store.getState().rotateView(-1);
+    expect(wrapAngle(view.to ?? 0)).toBeCloseTo(deg(135));
+    expect((view.to ?? 0) - view.from).toBeCloseTo((-3 * Math.PI) / 2);
+  });
+
   it("walks to the stand point on the side the view shows", () => {
     const store = createHubStore();
     const back = { x: 0, z: -9.8 };
