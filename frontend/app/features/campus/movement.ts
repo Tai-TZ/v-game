@@ -1,3 +1,4 @@
+import { HOME_YAW } from "./camera";
 import type { Box, Vec2 } from "./layout";
 
 export const PLAYER_RADIUS = 0.35;
@@ -5,37 +6,43 @@ export const WALK_SPEED = 4.2; // world units per second
 const ARRIVE_DISTANCE = 0.08;
 
 /**
- * Screen-relative directions for the isometric camera (looking from +x,+z towards the
- * origin): "up" on screen is world (-1, -1).
+ * Key directions along the screen axes (orbit-camera §2.5). At the home view "up" on screen is
+ * world (-1, -1)/√2; keyboardDirection turns them with the view.
  */
-const KEY_DIRECTIONS: Readonly<Record<string, Vec2>> = {
-  ArrowUp: { x: -1, z: -1 },
-  KeyW: { x: -1, z: -1 },
-  ArrowDown: { x: 1, z: 1 },
-  KeyS: { x: 1, z: 1 },
-  ArrowLeft: { x: -1, z: 1 },
-  KeyA: { x: -1, z: 1 },
-  ArrowRight: { x: 1, z: -1 },
-  KeyD: { x: 1, z: -1 },
+const KEY_DIRECTIONS: Readonly<Record<string, { right: number; up: number }>> = {
+  ArrowUp: { right: 0, up: 1 },
+  KeyW: { right: 0, up: 1 },
+  ArrowDown: { right: 0, up: -1 },
+  KeyS: { right: 0, up: -1 },
+  ArrowLeft: { right: -1, up: 0 },
+  KeyA: { right: -1, up: 0 },
+  ArrowRight: { right: 1, up: 0 },
+  KeyD: { right: 1, up: 0 },
 };
 
 export function isMovementKey(code: string): boolean {
   return code in KEY_DIRECTIONS;
 }
 
-/** Unit direction from the held keys, or null when they cancel out or none are held. */
-export function keyboardDirection(held: Iterable<string>): Vec2 | null {
-  let x = 0;
-  let z = 0;
+/**
+ * Unit ground direction from the held keys for a camera at `yaw`, or null when they cancel out
+ * or none are held: right·R(yaw) + up·(−h(yaw)), with R = (cos, −sin) and h = (sin, cos).
+ */
+export function keyboardDirection(held: Iterable<string>, yaw = HOME_YAW): Vec2 | null {
+  let right = 0;
+  let up = 0;
   for (const code of held) {
     const direction = KEY_DIRECTIONS[code];
     if (direction) {
-      x += direction.x;
-      z += direction.z;
+      right += direction.right;
+      up += direction.up;
     }
   }
-  const length = Math.hypot(x, z);
-  return length < 1e-6 ? null : { x: x / length, z: z / length };
+  const length = Math.hypot(right, up);
+  if (length < 1e-6) return null;
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return { x: (right * c - up * s) / length, z: (-right * s - up * c) / length };
 }
 
 export function overlapsBox(point: Vec2, box: Box, radius: number): boolean {
@@ -75,12 +82,13 @@ export interface StepResult {
  */
 export function step(
   position: Vec2,
-  input: { keys: Iterable<string>; target: Vec2 | null },
+  /** `yaw`: the view's azimuth the keys walk along (camera.ts), home when left out. */
+  input: { keys: Iterable<string>; target: Vec2 | null; yaw?: number },
   dt: number,
   obstacles: readonly Box[],
   bounds: Bounds,
 ): StepResult {
-  let direction = keyboardDirection(input.keys);
+  let direction = keyboardDirection(input.keys, input.yaw);
   let maxDistance = WALK_SPEED * dt;
   let blockedTarget = false;
 

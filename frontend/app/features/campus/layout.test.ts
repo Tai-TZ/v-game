@@ -9,6 +9,7 @@ import {
   CYPRESS_TREES,
   FOUNTAIN_RADIUS,
   GATE,
+  HOME_TOWARD,
   INTERACT_RADIUS,
   LAKE,
   NPC_SPOT,
@@ -22,12 +23,16 @@ import {
   SITES,
   SPAWN,
   SPAWN_HEADING,
+  towardFor,
   TREES,
   WORLD_BOUNDS,
   type Box,
   type Vec2,
 } from "./layout";
+import { HOME_YAW } from "./camera";
 import { isBlocked, PLAYER_RADIUS, step } from "./movement";
+
+const deg = (d: number) => (d * Math.PI) / 180;
 
 const FOOTPRINTS: readonly [string, Box][] = [
   ...SITES.map((site): [string, Box] => [site.id, site.footprint]),
@@ -265,40 +270,69 @@ describe("click-to-move (campus-scene v0.2 §1.6, v0.3 §2.5)", () => {
     }
   });
 
-  it("stops within 0.5 s of the stand point for every blocked click (QA r4)", () => {
-    let blocked = 0;
-    const slow: string[] = [];
-    for (let x = BASE.minX - 0.87; x <= BASE.maxX + 1; x += 0.5) {
-      for (let z = BASE.minZ - 0.93; z <= BASE.maxZ + 1; z += 0.5) {
-        const click = { x, z };
-        if (!isBlocked(click, OBSTACLES, WORLD_BOUNDS)) continue;
-        blocked += 1;
-        const route = routeTo(SPAWN, click);
-        const stand = route.at(-2);
-        if (!stand || route.at(-1) !== click) {
-          slow.push(`no stand point: ${label(SPAWN, click)}`);
-          continue;
+  it.each([45, 135, 225, 315])(
+    "stops within 0.5 s of the stand point for every blocked click, viewed from %i° (QA r4)",
+    (yaw) => {
+      const toward = towardFor(deg(yaw));
+      let blocked = 0;
+      const slow: string[] = [];
+      for (let x = BASE.minX - 0.87; x <= BASE.maxX + 1; x += 0.5) {
+        for (let z = BASE.minZ - 0.93; z <= BASE.maxZ + 1; z += 0.5) {
+          const click = { x, z };
+          if (!isBlocked(click, OBSTACLES, WORLD_BOUNDS)) continue;
+          blocked += 1;
+          const route = routeTo(SPAWN, click, toward);
+          const stand = route.at(-2);
+          if (!stand || route.at(-1) !== click) {
+            slow.push(`no stand point: ${label(SPAWN, click)}`);
+            continue;
+          }
+          // The last leg, from the stand point (where step() snapped the player) to the click.
+          let position = stand;
+          let frames = 0;
+          for (let done = false; !done && frames <= 30; frames += 1) {
+            const result = step(
+              position,
+              { keys: [], target: click },
+              1 / 60,
+              OBSTACLES,
+              WORLD_BOUNDS,
+            );
+            position = result.position;
+            done = result.targetDone;
+          }
+          if (frames > 30) slow.push(label(stand, click));
         }
-        // The last leg, from the stand point (where step() snapped the player) to the click.
-        let position = stand;
-        let frames = 0;
-        for (let done = false; !done && frames <= 30; frames += 1) {
-          const result = step(
-            position,
-            { keys: [], target: click },
-            1 / 60,
-            OBSTACLES,
-            WORLD_BOUNDS,
-          );
-          position = result.position;
-          done = result.targetDone;
-        }
-        if (frames > 30) slow.push(label(stand, click));
+      }
+      expect(blocked).toBeGreaterThan(2000);
+      expect(slow).toEqual([]);
+    },
+    60_000,
+  );
+
+  it("stands on the side the camera sees: behind the main building from 225° (orbit §2.5)", () => {
+    const back = { x: 0, z: -9.8 };
+    const route = routeTo(SPAWN, back, towardFor(deg(225)));
+    expect(route.at(-1)).toBe(back);
+    expect(route.at(-2)?.z).toBeLessThan(-10.25);
+    // From home the same click still stands in front of the building.
+    expect(routeTo(SPAWN, back).at(-2)?.z).toBeGreaterThan(-6);
+  });
+
+  it("keeps the home view's routes bit for bit (towardFor(HOME_YAW) is exactly (1, 1))", () => {
+    expect(towardFor(HOME_YAW)).toEqual(HOME_TOWARD);
+    expect(HOME_TOWARD).toEqual({ x: 1, z: 1 });
+    for (const from of FRONT_POINTS) {
+      for (const to of [...FRONT_POINTS, { x: 0, z: -7.6 }, { x: 10.4, z: -3.5 }]) {
+        if (from !== to) expect(routeTo(from, to, towardFor(HOME_YAW))).toEqual(routeTo(from, to));
       }
     }
-    expect(blocked).toBeGreaterThan(2000);
-    expect(slow).toEqual([]);
-  }, 60_000);
+    for (const d of [0, 90, 135, 180, 225, 270, 315]) {
+      const toward = towardFor(deg(d));
+      expect(Math.max(Math.abs(toward.x), Math.abs(toward.z)), `${d}°`).toBe(1);
+      expect(toward.x * Math.cos(deg(d)) - toward.z * Math.sin(deg(d)), `${d}°`).toBeCloseTo(0, 8);
+    }
+  });
 
   it("keeps the back spot walkable and the gate out of the player's way", () => {
     expect(isBlocked(BACK_SPOT, OBSTACLES, WORLD_BOUNDS)).toBe(false);
