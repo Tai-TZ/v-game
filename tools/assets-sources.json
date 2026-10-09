@@ -1,5 +1,5 @@
 {
-  "$comment": "Third-party models baked into frontend/public/models/. Raw downloads are not committed: fetch each file below, check its sha256, put it in the bake directory under `as`, then run the bake command. All CC0 1.0; see CREDITS.md.",
+  "$comment": "Third-party models baked into frontend/public/models/. Raw downloads are not committed: fetch each file below, check its sha256, put it in the bake directory under `as` (one directory per baker, holding every pack whose `bake` names that baker), then run the bake command. All CC0 1.0; see CREDITS.md.",
   "packs": [
     {
       "id": "kenney-mini-characters",
@@ -46,7 +46,7 @@
         },
         {
           "path": "Models/GLB format/Textures/colormap.png",
-          "as": "Textures/colormap.png",
+          "as": "mini-characters/colormap.png",
           "sha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e"
         }
       ]
@@ -151,7 +151,7 @@
         },
         {
           "path": "Models/GLB format/Textures/colormap.png",
-          "as": "Textures/colormap.png",
+          "as": "city-kit/colormap.png",
           "sha256": "191bec3889aaaca5018380038fecc129ebb5c2182879a099b7b538b3fa050b5d"
         }
       ]

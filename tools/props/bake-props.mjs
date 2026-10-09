@@ -7,13 +7,20 @@
 //
 //   node tools/props/bake-props.mjs <dir> [out.json] [--check]
 //
-// <dir> holds the prop files of tools/assets-sources.json under their `as` names (flat, plus
-// Textures/colormap.png of the City Kit); every file is sha256-checked.
+// <dir> holds the files of the three packs above under their `as` names in tools/assets-sources.json
+// (flat, plus city-kit/colormap.png); every file is sha256-checked. [out.json] defaults to
+// frontend/public/models/props.json of this checkout, from any directory.
+// A prop with a double-sided source material (open faces) gets `doubleSided: true`.
 // --check bakes twice and fails unless both runs and the committed file are byte-identical.
+import { fileURLToPath } from "node:url";
+
 import { emit, glb, hex, packIndex, png, Q, sourceReader } from "../bake-lib.mjs";
 
 const args = process.argv.slice(2);
-const [SRC, OUT = "frontend/public/models/props.json"] = args.filter((a) => !a.startsWith("--"));
+const [
+  SRC,
+  OUT = fileURLToPath(new URL("../../frontend/public/models/props.json", import.meta.url)),
+] = args.filter((a) => !a.startsWith("--"));
 if (!SRC) throw new Error("usage: bake-props.mjs <dir> [out.json] [--check]");
 const read = sourceReader(SRC, [
   "kenney-nature-kit",
@@ -82,8 +89,11 @@ function bakeProp(file, atlas) {
   const g = glb(read(file), file);
   const mats = [];
   const base = [];
+  let doubleSided = false;
   const matIndex = (name, rgb) => {
     const k = mats.indexOf(name);
+    if (k >= 0 && base[k] !== hex(rgb))
+      throw new Error(`${file}: material ${name} has two colours`);
     if (k >= 0) return k;
     base.push(hex(rgb));
     return mats.push(name) - 1;
@@ -100,6 +110,7 @@ function bakeProp(file, atlas) {
     for (const p of g.j.meshes[node.mesh].primitives) {
       if ((p.mode ?? 4) !== 4) throw new Error(`${file}: not triangles`);
       const mat = g.j.materials[p.material];
+      doubleSided ||= mat.doubleSided === true;
       const pbr = mat.pbrMetallicRoughness ?? {};
       const factor = (pbr.baseColorFactor ?? [1, 1, 1, 1]).slice(0, 3);
       const textured = pbr.baseColorTexture != null;
@@ -146,11 +157,12 @@ function bakeProp(file, atlas) {
     }),
     mat: keep.map((v) => verts[v][3]),
     index: packIndex(index.map((v) => map.get(v))),
+    ...(doubleSided && { doubleSided: true }),
   };
 }
 
 function bake() {
-  const atlas = png(read("Textures/colormap.png"));
+  const atlas = png(read("city-kit/colormap.png"));
   const props = Object.fromEntries(
     Object.entries(PROPS).map(([id, f]) => [id, bakeProp(f, atlas)]),
   );

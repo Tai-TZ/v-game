@@ -131,8 +131,9 @@ export function emit(bake, out, check) {
     return;
   }
   const again = JSON.stringify(bake());
-  const committed = existsSync(out) ? readFileSync(out, "utf8") : "";
   if (again !== text) throw new Error("bake is not deterministic: two runs differ");
+  if (!existsSync(out)) throw new Error(`committed file not found: ${out}`);
+  const committed = readFileSync(out, "utf8");
   if (committed !== text) {
     console.error(`${out} differs from a fresh bake; re-run without --check and commit it`);
     process.exit(1);

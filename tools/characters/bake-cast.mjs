@@ -6,13 +6,19 @@
 //   node tools/characters/bake-cast.mjs <dir> [out.json] [--report] [--check]
 //
 // <dir> holds the files of the "kenney-mini-characters" pack in tools/assets-sources.json under
-// their `as` names (character-*.glb, Textures/colormap.png); every file is sha256-checked.
+// their `as` names (character-*.glb, mini-characters/colormap.png); every file is sha256-checked.
+// [out.json] defaults to frontend/public/models/cast.json of this checkout, from any directory.
 // --report lists which slot each (joint, texel colour) fell into; read it after editing ROLES.
 // --check bakes twice and fails unless both runs and the committed file are byte-identical.
+import { fileURLToPath } from "node:url";
+
 import { emit, glb, hex, packIndex, png, Q, r4, sourceReader } from "../bake-lib.mjs";
 
 const args = process.argv.slice(2);
-const [SRC, OUT = "frontend/public/models/cast.json"] = args.filter((a) => !a.startsWith("--"));
+const [
+  SRC,
+  OUT = fileURLToPath(new URL("../../frontend/public/models/cast.json", import.meta.url)),
+] = args.filter((a) => !a.startsWith("--"));
 const REPORT = args.includes("--report");
 if (!SRC) throw new Error("usage: bake-cast.mjs <dir> [out.json] [--report] [--check]");
 const read = sourceReader(SRC, ["kenney-mini-characters"]);
@@ -239,7 +245,7 @@ function bakeClips() {
 }
 
 function bake() {
-  const texel = png(read("Textures/colormap.png"));
+  const texel = png(read("mini-characters/colormap.png"));
   const roles = Object.fromEntries(
     Object.entries(ROLES).map(([r, spec]) => [r, bakeRole(r, spec, texel)]),
   );
