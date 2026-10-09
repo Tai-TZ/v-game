@@ -28,6 +28,15 @@ for (const viewport of VIEWPORTS) {
       await expect(page.locator("canvas")).toBeVisible();
       // Mid-fade, the loader card's text is translucent and axe reads it as low contrast.
       await expect(page.locator("[data-scene-loader]")).toHaveCount(0);
+      // The view buttons (orbit-camera §2.3) are in the scan, the compass at rest and turned.
+      const views = page.getByRole("group", { name: "Góc nhìn" });
+      await expect(views.getByRole("button")).toHaveCount(3);
+      expect(await seriousViolations(page)).toEqual([]);
+      await views.getByRole("button", { name: "Xoay theo chiều kim đồng hồ" }).click();
+      await expect(views.getByRole("button", { name: "Về góc nhìn mặc định" })).toHaveAttribute(
+        "aria-disabled",
+        "false",
+      );
       await page.getByRole("button", { name: "Các khu" }).click();
       await expect(page.getByRole("link", { name: "Vào Thư viện" })).toBeVisible();
       expect(await seriousViolations(page)).toEqual([]);
