@@ -108,14 +108,17 @@ export const castTriangles = (cast: CastJson) =>
 /**
  * Draw calls and triangles of the hub scene as CampusScene renders it: 5 static groups, the
  * sun-shadow overlay, 2 instanced tree meshes, the people, the player's ground blob and the
- * interaction ring. The people are the statues (player + x-ray, librarian, the four NPCs
- * merged) until `cast` arrives, then one skinned mesh each plus the player's x-ray.
+ * interaction ring; and the props (useDressing) once they have arrived. The people are the
+ * statues (player + x-ray, librarian, the four NPCs merged) until `cast` arrives, then one
+ * skinned mesh each plus the player's x-ray.
  */
 export function sceneBudget(
   g: CampusGeometry,
   cast: CastJson | null = null,
+  dressing: BufferGeometry | null = null,
 ): { drawCalls: number; triangles: number } {
   const statics = [g.terrain, g.landmark, g.library, g.watchtower, g.market, g.shadow];
+  if (dressing) statics.push(dressing);
   const people = cast
     ? { drawCalls: CAST_ROLES.length + 1, triangles: castTriangles(cast) }
     : {

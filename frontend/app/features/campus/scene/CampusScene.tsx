@@ -34,6 +34,7 @@ import {
 } from "./campus";
 import { disposeFigure, loadCast, paintFigure, type CastJson, type CastRole } from "./cast";
 import { useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
+import { useDressing } from "./useDressing";
 import { castFigures, FIGURE_Y, useHubFrame } from "./useHubFrame";
 import { WorldLabels } from "./WorldLabels";
 
@@ -147,6 +148,7 @@ function Campus({ campus, time, sites, options }: CampusProps) {
   const g = useCampusGeometry(campus, time, looks.library, looks.watchtower, looks.market);
   const preset = campus.lights[time];
   const sunPosition = useMemo(() => g.palette.light.sun.clone().multiplyScalar(30), [g.palette]);
+  const dressing = useDressing(g.palette);
   // undefined while cast.json loads, null if it failed: the statues stand in until (unless) then.
   const [cast, setCast] = useState<CastJson | null | undefined>(undefined);
   useEffect(() => {
@@ -207,6 +209,9 @@ function Campus({ campus, time, sites, options }: CampusProps) {
     ...options,
     figures,
     castPending: cast === undefined,
+    // Until props.json is settled, ?debug=frames keeps the scene busy: e2e must not take the gap
+    // between the first frame and the props frame for idle.
+    rebaking: options.rebaking || dressing === undefined,
   });
   // A re-bake (time or theme) wakes the scene the way a walk does, so ?debug=frames flags it
   // busy until the new geometry is drawn.
@@ -242,6 +247,10 @@ function Campus({ campus, time, sites, options }: CampusProps) {
     }
     wake();
   }, [cast, options.countFrames, wake]);
+  // The props arrive after the first frame: one frame draws them (or, without them, ends busy).
+  useEffect(() => {
+    if (dressing !== undefined) wake();
+  }, [dressing, wake]);
 
   // `?debug=frames` also exposes the building looks, so e2e can check the stars reach the scene.
   const looksKey = Object.entries(looks)
@@ -260,6 +269,7 @@ function Campus({ campus, time, sites, options }: CampusProps) {
       <group ref={statics}>
         <mesh geometry={g.terrain} material={materials.baked} />
         <mesh geometry={g.landmark} material={materials.baked} />
+        {dressing && <mesh geometry={dressing} material={materials.baked} />}
         {SITES.map(({ id }) => (
           <mesh key={id} geometry={g[id]} material={materials.baked} userData={{ site: id }} />
         ))}

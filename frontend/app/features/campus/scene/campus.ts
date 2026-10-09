@@ -41,6 +41,7 @@ import {
   type Box,
   type Vec2,
 } from "../layout";
+import { DRESSING, DRESSING_LAMPS } from "../dressing";
 import type { SiteLook } from "../sites";
 import { desaturate, type BuildingPalette, type Palette } from "./palette";
 import {
@@ -739,6 +740,28 @@ function crownCasters(): Caster[] {
 }
 
 /**
+ * The bulky CC0 props' casters (dressing.ts `shade`): a box, or an octagon for a crown or canopy.
+ * Static like the trees': if props.json fails, the shade stays, like the collision boxes.
+ */
+function propCasters(): Caster[] {
+  return DRESSING.flatMap(({ shade, at }) =>
+    shade
+      ? at.map(([x, z]): Caster => {
+          const [hx, hz] = shade.half;
+          const [y0, y1] = shade.y;
+          if (!shade.round) return lintel(x - hx, x + hx, z - hz, z + hz, y0, y1);
+          return range(8).flatMap((i) =>
+            [y0, y1].map(
+              (y) =>
+                new Vector3(x + hx * Math.cos((i * PI) / 4), y, z + hz * Math.sin((i * PI) / 4)),
+            ),
+          );
+        })
+      : [],
+  );
+}
+
+/**
  * Trees whose crown centre a building hides from the sun (QA r3). Lambert trees take no shadow,
  * so CampusScene multiplies these by `pal.shadow`, the factor the ground under them gets. A
  * point at height h is in a caster's shadow when it lies inside the caster's part above h, cast
@@ -773,7 +796,7 @@ export function treesInShade(
 export const SHADOW_Y = 0.014;
 
 /**
- * Every caster's shadow (buildings, gate, tree crowns) cast along the sun onto the ground (hull
+ * Every caster's shadow (buildings, gate, tree crowns, bulky props) cast along the sun onto the ground (hull
  * of the projected points, clipped to the base), one colour: the multiply factor `pal.shadow`.
  * CampusScene draws it over all ground layers with multiply blending, so grass, paths, plaza and
  * lake all darken, and with a stencil test, so ground under two overlapping shadow polygons
@@ -789,7 +812,7 @@ export function buildShadows(
     x: p.x - (sun.x / sun.y) * p.y,
     z: p.z - (sun.z / sun.y) * p.y,
   });
-  const vertices = [...shadowCasters(archetype, colonnades), ...crownCasters()]
+  const vertices = [...shadowCasters(archetype, colonnades), ...crownCasters(), ...propCasters()]
     .map((caster) => clipToBase(hull(caster.map(onGround))))
     .filter((outline) => outline.length >= 3)
     .flatMap((outline) => {
@@ -840,6 +863,7 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
     ]),
     // Without colonnades the hedge arcs get lamps instead.
     ...(colonnades ? [] : SIDES.flatMap((s) => [0.37, 0.66].map((k) => arcPoint(s * k * PI, 3.4)))),
+    ...DRESSING_LAMPS,
   ];
   const statues = [
     ...grid([-3.05, 3.05], [-1.35, -0.45, 0.45, 1.35], (x, z) => ({ x, z })),

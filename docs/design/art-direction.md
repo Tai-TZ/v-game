@@ -519,6 +519,8 @@ Gốc ở chân, mặt hướng `+z` cục bộ (`rotation.y = heading` của `m
 
 **Sửa 2026-10-09 (v0.4, bộ nhân vật):** 14 draw call khi còn tượng (+1 tượng bốn NPC gộp, −1 blob cô Lan), 17 khi bộ nhân vật Kenney đã tải (6 `SkinnedMesh` + x-ray), cả hai tính vòng tương tác. Ban ngày 26 112 (campus) / 22 967 (town) tam giác. `scene.test.ts` chặn ở 20 draw call và 28 000 tam giác.
 
+**Sửa 2026-10-09 (gộp props CC0 + bộ nhân vật):** đo được 14 draw call khi còn tượng, 15 khi props đã tải, 18 khi có cả bộ nhân vật (15 của props + 3 mesh thêm của bộ nhân vật). Tam giác cao nhất (props + bộ nhân vật, mọi khu sáng, hai theme, hai giờ): 34 422 (campus, ban ngày) / 31 277 (town). `scene.test.ts` chặn ở 18 draw call và 34 500 tam giác (đỉnh đo được làm tròn lên), dưới 60% của 60k và xa ngưỡng < 80 draw call cho 60 FPS.
+
 Ngân sách brief: ≤ 40 draw call, ≤ 60k tam giác. Thực tế dùng 33% và 15%. Phần dư **không** dùng để thêm chi tiết ở v0.1; nó để dành cho NPC và hiệu ứng hậu quả của các bản sau.
 
 Bộ nhớ đỉnh khoảng 26k đỉnh × 24 byte ≈ 0.63 MB. Số program shader: 4 (Basic + vertexColors, Lambert + vertexColors, Lambert + instancing, Basic màu đơn).
@@ -808,3 +810,13 @@ Nguồn: báo cáo "Insight edtech nâng cấp V-Game", mục "Đẹp hơn với
 10. **Sau QA vòng 5 (2026-10-09).**
    - `~lit` có màu riêng lúc hoàng hôn (§2.2): `full(lerp(lm.accent, dusk.sun, 0.5))`, hổ phách đậm. Màu ngày cũ trùng với tường `+z` hứng nắng chiều (tương phản 1,03:1), nên khe sáng đỉnh Tháp canh biến mất và đèn lồng Chợ đọc như hộp nhạt; khi bật `STARS_SAVED`, `lit` và `open` của Tháp canh sẽ chỉ khác nhau một vòm nhỏ. Ban ngày giữ nguyên. Một unit test buộc `~lit` cách tường `+z`, `+x` của ba toà và sàn Chợ ít nhất ΔE 20 ở mọi theme và giờ (campus-scene v0.3 §13.5). Câu hỏi mở ở mục 9 (cỏ, nước, trời lúc hoàng hôn) không đổi.
    - Bàn giao N9 (mục 6) vẫn chưa gửi, và có thêm một điều kiện: sau `recordStars`, campus phải mount lại hoặc đọc lại tiến độ, kèm một e2e quay về `/play` không tải lại trang (campus-scene v0.3 §13.5).
+
+## 13. Quyết định 2026-10-09: props CC0 quanh sa bàn
+
+Chủ dự án thấy xung quanh các toà còn trống và duyệt dùng props CC0 có sẵn thay vì tự dựng (Kenney Nature Kit, Kenney City Kit Commercial, Quaternius qua Poly Pizza; nguồn ở `CREDITS.md`). Chỗ đặt nằm trong `frontend/app/features/campus/dressing.ts`, ghi chú dựng ở campus-scene v0.3 §14.
+
+1. **Màu vẫn chỉ từ manifest.** Props bỏ màu và texture gốc: mỗi material được gán một ô màu của `palette.ts` (`hedge`, `trunk`, `lm.wall`, `mk.roof`…), nên hai theme tự đổi màu props như mọi thứ khác. Ô kẻ của bàn ô dù (texture): tán → `mk.roof`, cột → `dark`, khung và chân → `trunk`, mặt bàn → `lm.trim`. Cột trắng dưới tán đỏ hay cam đọc như cây nấm (review vòng 1).
+2. **Bụi cây màu hàng rào, không hồng.** Ô `bloom` trên `plant_bush` ra màu hồng kẹo, nên mọi bụi cây lấy `hedge` (chủ dự án, 2026-10-09). `bloom` chỉ còn ở hoa sen.
+3. **Nướng như phần tĩnh.** Tô bóng theo pháp tuyến thế giới và preset giờ (§2.3), không đèn, không Lambert; tán dù hở được nướng thêm mặt sau. Một mesh, một draw call, không chuyển động idle (§1.2 nguyên tắc 6). Gazebo, quầy hàng ăn, bảng tin, dừa và dù đổ bóng nắng trong lớp bóng có sẵn (§2.2), như cây.
+4. **Không làm:** xe máy (khoảng 3 000 tam giác, quá ngân sách 8k), xe đạp, rổ bóng, nhà chờ xe buýt (không có bản CC0 dùng được). Đèn thêm dùng lại `lamp()` có sẵn, không thêm kiểu đèn thứ hai.
+5. **Không đặt đá vách đế.** Bản đầu có 12 mỏm đá trên bốn vách đất; chúng đọc như tấm bê tông xếp đều, thêm một nhịp nhân tạo cho sa bàn, nên đã bỏ (review vòng 1). Nếu muốn lại: tỉ lệ x không đều, không thẳng hàng với bó vỉa phía trước, ô `dark` hoặc `trunk`.

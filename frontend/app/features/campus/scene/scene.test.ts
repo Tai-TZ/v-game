@@ -53,6 +53,7 @@ import {
   WORLD_BOUNDS,
   type Vec2,
 } from "../layout";
+import { DRESSING } from "../dressing";
 import { step } from "../movement";
 import { siteInfo, siteLook, siteLooks, type SiteLook } from "../sites";
 import {
@@ -73,7 +74,9 @@ import { parseCast } from "./cast";
 import { LABEL_ANCHORS } from "./labels";
 import { desaturate, light, palette, shade, type Palette } from "./palette";
 import { triangleCount, type Face } from "./primitives";
+import type { PropsJson } from "./props";
 import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
+import { buildDressing } from "./useDressing";
 import { clickGoal, pickNpc } from "./useHubFrame";
 
 const THEMES_DIR = path.resolve(process.cwd(), "public", "themes");
@@ -86,11 +89,24 @@ const manifests: ThemeManifest[] = themeIds.map((id) =>
   parseThemeManifest(readJson(path.join(THEMES_DIR, id, "manifest.json"))),
 );
 
-function build(manifest: ThemeManifest, time: TimeOfDay = "day") {
-  return renderHook(
-    ({ campus }) => useCampusGeometry(campus, time, "open", "coming_soon", "coming_soon"),
-    { initialProps: { campus: manifest.campus } },
-  );
+const props = readJson(path.resolve(process.cwd(), "public", "models", "props.json")) as PropsJson;
+/** Props tall or wide enough to cast a sun shadow like the trees (art §2.2). */
+const CASTING_PROPS = [
+  "gazebo",
+  "food-stall",
+  "notice-board",
+  "palm",
+  "palm-short",
+  "parasol-table",
+];
+
+function build(manifest: ThemeManifest, time: TimeOfDay = "day", lit = false) {
+  const looks: [SiteLook, SiteLook, SiteLook] = lit
+    ? ["lit", "lit", "lit"]
+    : ["open", "coming_soon", "coming_soon"];
+  return renderHook(({ campus }) => useCampusGeometry(campus, time, ...looks), {
+    initialProps: { campus: manifest.campus },
+  });
 }
 
 const TIMES: readonly TimeOfDay[] = ["day", "dusk"];
@@ -242,7 +258,7 @@ const deg = (d: number) => (d * Math.PI) / 180;
  * Every vertex the overview frames, as (x − PIVOT.x, y, z − PIVOT.z): the static groups and the
  * trees placed by treeMatrix (orbit-camera §1.3).
  */
-function framedPoints(g: CampusGeometry): Float64Array {
+function framedPoints(g: CampusGeometry, extra: BufferGeometry[] = []): Float64Array {
   const points: number[] = [];
   const v = new Vector3();
   const add = (geometry: BufferGeometry, matrix?: Matrix4) => {
@@ -253,7 +269,9 @@ function framedPoints(g: CampusGeometry): Float64Array {
       points.push(v.x - PIVOT.x, v.y, v.z - PIVOT.z);
     }
   };
-  for (const geometry of [g.terrain, g.landmark, g.library, g.watchtower, g.market]) add(geometry);
+  for (const geometry of [g.terrain, g.landmark, g.library, g.watchtower, g.market, ...extra]) {
+    add(geometry);
+  }
   for (const tree of TREE_INSTANCES) {
     add(tree.kind === "round" ? g.roundTree : g.cypress, treeMatrix(tree));
   }
@@ -704,23 +722,36 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     // overlay (campus-scene v0.3 §13.4 has the measured totals). v0.4 dresses all four sides
     // (orbit-camera §5.2) inside the same groups: by day 20,097 -> 21,413 (spire-hall) and
     // 17,020 -> 18,268 (clock-tower); 21,585 with every zone lit.
+    // The CC0 props (dressing plan §3) add one draw call and 7,818 triangles (7,914 planned,
+    // less the 384 of the dropped wall rocks, plus the parasols' 288 back faces), the six new
+    // lamps 264 in the terrain and their sun shade 56 in the overlay.
     // v0.4 people (npc-cast v0.4, integration spec §6): five baked ground discs replace the
     // librarian's blob (draw calls stay 14 with the statues: +1 merged NPC statues, -1 blob),
-    // then the baked cast swaps the four statue meshes for seven skinned ones: 17 draw calls.
-    // Measured by day: statues 22,177 (spire-hall) / 19,032 (clock-tower), cast 26,112 /
-    // 22,967 (the six figures are 5,235 with the player's x-ray, cast.test.ts).
-    // Caps raised with the cast (integration spec §6): 20 draw calls, 28,000 triangles.
+    // then the baked cast swaps the four statue meshes for seven skinned ones (+3; the six
+    // figures are 5,235 triangles with the player's x-ray, cast.test.ts).
+    // Together, measured: 14 draw calls with the statues, 15 once the props arrive, 18 with the
+    // cast too (main's 15 + the cast's 3 extra meshes). Triangles with props and cast, both
+    // themes, both hours, every zone lit at most: 34,422 (spire-hall by day; clock-tower 31,277).
+    // The cast's 5,235 beat its ~1,020 estimate (npc-cast v0.4 §11), hence caps of 18 draw calls
+    // and 34,500 triangles (the measured peak rounded up): under 60% of the brief's 60k and far
+    // inside the 60 FPS rule's < 80 draw calls (art §6.1).
     it.each(TIMES)("stays well inside 40 draw calls and 60k triangles at %s", (time) => {
-      const { result, unmount } = build(manifest, time);
-      const statues = sceneBudget(result.current);
-      expect(statues.drawCalls).toBe(14);
-      expect(statues.triangles).toBeLessThanOrEqual(28_000);
       if (!CAST) throw new Error("cast.json does not parse");
-      const cast = sceneBudget(result.current, CAST);
-      expect(cast.drawCalls).toBe(17);
-      expect(cast.drawCalls).toBeLessThanOrEqual(20);
-      expect(cast.triangles).toBeLessThanOrEqual(28_000);
-      unmount();
+      for (const lit of [false, true]) {
+        const { result, unmount } = build(manifest, time, lit);
+        const g = result.current;
+        expect(sceneBudget(g).drawCalls).toBe(14); // statues, until the props and the cast arrive
+        const dressing = buildDressing(props, g.palette);
+        const statues = sceneBudget(g, null, dressing);
+        const cast = sceneBudget(g, CAST, dressing);
+        expect(statues.drawCalls).toBe(15);
+        expect(sceneBudget(g, CAST).drawCalls).toBe(17);
+        expect(cast.drawCalls).toBe(18);
+        expect(statues.triangles).toBeLessThan(cast.triangles);
+        expect(cast.triangles).toBeLessThanOrEqual(34_500);
+        dressing.dispose();
+        unmount();
+      }
     });
 
     it("stands the four NPC statues at their spots, 1.36 tall, and bakes a disc under everyone", () => {
@@ -792,6 +823,36 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       expect(points.length).toBeGreaterThan(20);
       const unshaded = points.filter((p) => !inShadow(result.current.shadow, p));
       expect(unshaded.map((p) => p.label)).toEqual([]);
+      unmount();
+    });
+
+    it.each(TIMES)("shades the ground behind the bulky props (%s, review r1)", (time) => {
+      // Without it the gazebo, stall, board, palms and parasols looked pasted on beside the
+      // trees. Oracle: the point 0.9 up each copy's baked height, cast along the sun.
+      const { result, unmount } = build(manifest, time);
+      const { sun } = result.current.palette.light;
+      const unshaded = DRESSING.filter((row) => CASTING_PROPS.includes(row.prop)).flatMap((row) => {
+        const data = props.props[row.prop];
+        if (!data) throw new Error(`no ${row.prop}`);
+        const sy = typeof row.scale === "number" ? row.scale : row.scale[1];
+        let top = 0;
+        for (let i = 1; i < data.position.length; i += 3)
+          top = Math.max(top, (data.position[i] ?? 0) / props.q);
+        const y = (row.y ?? 0) + 0.9 * top * sy;
+        return (
+          row.at
+            .map(([x, z]) => ({
+              label: `${row.prop} (${x}, ${z})`,
+              x: x - (sun.x / sun.y) * y,
+              z: z - (sun.z / sun.y) * y,
+            }))
+            // A palm's shade at dusk falls off the base, which clips it.
+            .filter((p) => p.x > BASE.minX && p.x < BASE.maxX && p.z > BASE.minZ && p.z < BASE.maxZ)
+            .filter((p) => !inShadow(result.current.shadow, p))
+            .map((p) => p.label)
+        );
+      });
+      expect(unshaded).toEqual([]);
       unmount();
     });
 
@@ -909,7 +970,10 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
 
     it("leaves both top HUD corners and the view buttons sky in overview at every yaw", () => {
       const { result, unmount } = build(manifest);
-      const points = framedPoints(result.current);
+      const dressing = buildDressing(props, result.current.palette);
+      // The props and the four standing NPCs (their statues are as tall as the baked figures).
+      const points = framedPoints(result.current, [dressing, result.current.npcs]);
+      dressing.dispose();
       const views = [
         [1280, 800],
         [1366, 657],
@@ -937,7 +1001,8 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       }
       expect([...hits]).toEqual([]);
       unmount();
-    });
+      // A 1° sweep over every vertex, props and NPCs included, for three viewports: slow but exhaustive.
+    }, 20_000);
 
     // Composed for the home view only: from other angles the needle may stand before anything.
     it("keeps the screen behind the spire clear of raised terrain and tree crowns at home", () => {

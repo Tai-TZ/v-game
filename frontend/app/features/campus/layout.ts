@@ -1,5 +1,6 @@
 import type { ZoneLocation } from "~/features/zones/schema";
 
+import { DRESSING_BLOCKS } from "./dressing";
 import { isBlocked, overlapsBox, PLAYER_RADIUS } from "./movement";
 
 export interface Vec2 {
@@ -227,8 +228,8 @@ export const talkSpot = (who: Speaker): Vec2 => speaker(who).talk;
 
 /**
  * Everything the player cannot walk through: buildings, the fountain, round-tree trunks, the
- * lake and the people. Low or slender things (columns, lamps, statues, cypresses, hedges,
- * balustrades) do not block.
+ * lake, the people and the bulky props (dressing.ts). Low or slender things (columns, lamps,
+ * statues, cypresses, hedges, balustrades, benches, shrubs) do not block.
  */
 export const OBSTACLES: readonly Box[] = [
   ...LANDMARK.footprints,
@@ -245,6 +246,7 @@ export const OBSTACLES: readonly Box[] = [
   ...Object.values(BACK),
   NPC_BOX,
   ...NPCS.map(({ spot }) => ({ ...spot, halfX: 0.3, halfZ: 0.3 })),
+  ...DRESSING_BLOCKS,
 ];
 
 /** A smaller z is behind the main building (the player's centre cannot be between -10.25 and -9.9 there). */
