@@ -4,7 +4,14 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { toScreen } from "./camera";
-import { DRESSING, DRESSING_BLOCKS, DRESSING_LAMPS, PROP_COLOURS, type Dressing } from "./dressing";
+import {
+  DRESSING,
+  DRESSING_BLOCKS,
+  DRESSING_LAMPS,
+  PROP_COLOURS,
+  PROP_YAW0,
+  type Dressing,
+} from "./dressing";
 import {
   arcPoint,
   BACK_SPOT,
@@ -168,6 +175,33 @@ describe("dressing data", () => {
     expect(blocking).toHaveLength(10);
     expect(DRESSING_BLOCKS).toEqual(blocking);
     for (const box of DRESSING_BLOCKS) expect(OBSTACLES).toContain(box);
+  });
+  it("gives each block the turned footprint of its prop (boxes never turn with the prop)", () => {
+    // The food stall's box is given already turned by PROP_YAW0 and its yaw: changing either
+    // without swapping the box's halves would misalign its collision.
+    const bad: string[] = [];
+    for (const row of DRESSING) {
+      const data = json.props[row.prop];
+      if (!row.block || !data) continue;
+      const [sx, sy, sz] =
+        typeof row.scale === "number" ? [row.scale, row.scale, row.scale] : row.scale;
+      for (const [x0, z0, yaw = 0] of row.at) {
+        const t = ((yaw + (PROP_YAW0[row.prop] ?? 0)) * Math.PI) / 180;
+        let [hx, hz] = [0, 0];
+        for (let i = 0; i < data.position.length; i += 3) {
+          const [x = 0, y = 0, z = 0] = data.position.slice(i, i + 3).map((v) => v / json.q);
+          if (y * sy >= 0.3) continue; // the foot: what the player would walk into
+          // Turned like useDressing's matrix: a quaternion about +y by t.
+          hx = Math.max(hx, Math.abs(x * sx * Math.cos(t) + z * sz * Math.sin(t)));
+          hz = Math.max(hz, Math.abs(-x * sx * Math.sin(t) + z * sz * Math.cos(t)));
+        }
+        // Within 0.2: the bamboo's lowest leaves spread past its stalks. The stall unturned
+        // would miss by 0.37.
+        if (hx > row.block[0] + 0.2 || hz > row.block[1] + 0.2)
+          bad.push(`${row.prop} (${x0}, ${z0}): foot ${hx.toFixed(2)} × ${hz.toFixed(2)}`);
+      }
+    }
+    expect(bad).toEqual([]);
   });
 });
 
