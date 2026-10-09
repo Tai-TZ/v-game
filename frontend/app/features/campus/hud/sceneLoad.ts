@@ -20,7 +20,7 @@ export interface SceneLoad {
   stage: number;
   /** performance.now() when `stage` was entered. */
   since: number;
-  /** When the loader first painted for this entry: first contentful paint on a direct load. */
+  /** When the loader's appear clock started for this entry: the first paint on a direct load. */
   begun: number;
   /** Entry counter, so a timer from an earlier visit cannot finish this one. */
   run: number;
@@ -46,9 +46,13 @@ export function beginScene() {
   const s = sceneLoad.getState();
   if (s.live || s.failed) return;
   const now = performance.now();
-  // Direct load: the pre-rendered loader has been on screen since the first paint.
-  const fcp = performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? 0;
-  const begun = document.querySelector("[data-scene-loader]") ? fcp : now;
+  // Direct load: the pre-rendered loader's appear delay started with the first paint (of the
+  // sky). Not first-contentful-paint: the loader is at opacity 0 during that delay, so FCP
+  // only fires when it shows. Safari reports FCP only.
+  const paint = (name: string) => performance.getEntriesByName(name)[0]?.startTime;
+  const begun = document.querySelector("[data-scene-loader]")
+    ? (paint("first-paint") ?? paint("first-contentful-paint") ?? now)
+    : now;
   sceneLoad.setState({ stage: STAGE.fetch, since: now, begun, run: s.run + 1 });
   performance.mark("vg-scene-1");
 }

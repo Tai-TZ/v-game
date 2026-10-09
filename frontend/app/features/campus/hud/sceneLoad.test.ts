@@ -45,6 +45,22 @@ describe("stage signals", () => {
     expect(sceneLoad.getState().stage).toBe(STAGE.build);
   });
 
+  it("continue the pre-rendered loader's clock from the first paint on a direct load", () => {
+    const shell = document.createElement("div");
+    shell.dataset.sceneLoader = "";
+    document.body.append(shell);
+    const paints: Record<string, number> = { "first-paint": 120, "first-contentful-paint": 270 };
+    const spy = vi
+      .spyOn(performance, "getEntriesByName")
+      .mockImplementation((name) =>
+        name in paints ? [{ startTime: paints[name] } as PerformanceEntry] : [],
+      );
+    beginScene();
+    expect(sceneLoad.getState().begun).toBe(120);
+    spy.mockRestore();
+    shell.remove();
+  });
+
   it("begin a new entry at stage 1 with a new run", () => {
     beginScene();
     advanceScene(STAGE.done);
