@@ -3,20 +3,25 @@
 //
 //   cd frontend
 //   VITE_THEME_PACKS=town VITE_DEFAULT_THEME=town npm run build
-//   node scripts/serve-build.mjs --port 4351                         (keep it running)
+//   npm run preview -- --port 4351                                   (keep it running)
 //   node ../tools/readme-media/capture-media.mjs [--base URL] [--theme <id from themes/index.json>]
-//                                                [--only hero-walk,mobile] [--realtime]
+//                                                [--only hero-walk,sky] [--realtime]
 //
 // GIF frames go to out/frames/<name>/NNNN.png plus timeline.json; PNGs go to out/png/ (out/ is
 // git-ignored). Then: uvx --with pillow python tools/readme-media/make-gifs.py  (writes docs/media/)
+//
+// Every API the pages call is mocked as frontend/e2e/fixtures.ts does (zones, levels, blocks, a
+// recorded L1 run stream, Open-Meteo); the hub's display is pinned to "Cố định ban ngày" except
+// for the sky stills, which pin the clock instead.
 //
 // Timing: by default the page runs on Playwright's fake clock, paused, and every recorded frame
 // advances it by exactly one frame time (FRAME_MS unless the job sets its own), so walking speed
 // and GIF timing do not depend on how fast SwiftShader renders.
 // --realtime samples the live page on the wall clock instead (fallback if the fake clock
-// misbehaves). ponytail: it assumes the page keeps >= 10 fps; below that useHubFrame caps dt at
+// misbehaves; scene-loader and workbench always record in real time). ponytail: it assumes the page keeps >= 10 fps; below that useHubFrame caps dt at
 // 0.1 s and the hero walk falls short of the librarian.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import http from "node:http";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,7 +34,6 @@ const { chromium } = createRequire(`${REPO}/frontend/package.json`)("@playwright
 
 const FRAME_MS = 80;
 const HINT_ID = "hub-interact-hint";
-const ZONE_LIST = "#hub-zone-list";
 const THEMES = JSON.parse(readFileSync(`${REPO}/frontend/public/themes/index.json`, "utf8")).themes.map(
   (theme) => theme.id,
 );
@@ -44,11 +48,45 @@ const { values: args } = parseArgs({
 });
 if (!THEMES.includes(args.theme)) throw new Error(`--theme must be one of ${THEMES.join(", ")}`);
 
-// The zones API is mocked from the content seed, exactly like frontend/e2e/fixtures.ts.
-const seed = JSON.parse(readFileSync(`${REPO}/backend/src/vgame/content/data/zones.json`, "utf8"));
+// The APIs are mocked from the content seed and e2e/data, exactly like frontend/e2e/fixtures.ts.
+const readJson = (file) => JSON.parse(readFileSync(`${REPO}/${file}`, "utf8"));
+const seed = readJson("backend/src/vgame/content/data/zones.json");
 const zoneList = { zones: seed.zones.map(({ levels, ...zone }) => ({ ...zone, level_count: levels.length })) };
+const E2E_DATA = "frontend/e2e/data";
+/** The lazy scene chunk (three.js), as scripts/check-bundle.mjs reports it. */
+const SCENE_CHUNKS = new Set(readJson("frontend/build/bundle-report.json").threeChunks.map((file) => `/${file}`));
+const WMO = { clear: 0, rain: 63 };
 
-async function openPage(browser, { width, height, scale = 1, mobile = false, url }) {
+/** Open-Meteo's reply, observed at the page's own now (the app rejects a time over 3 h away). */
+async function fulfillWeather(route, condition) {
+  const now = await route
+    .request()
+    .frame()
+    .evaluate(() => Date.now())
+    .catch(() => Date.now());
+  await route.fulfill({
+    headers: { "Access-Control-Allow-Origin": "*" },
+    json: {
+      utc_offset_seconds: 0,
+      timezone: "GMT",
+      current: {
+        time: new Date(now).toISOString().slice(0, 16),
+        interval: 900,
+        temperature_2m: 30,
+        weather_code: WMO[condition],
+      },
+    },
+  });
+}
+
+/**
+ * `display` is the hub's vg-hub-display ("day" pins the daytime look, "live" follows the clock);
+ * `setup(page)` runs before the page loads (routes, a fixed clock).
+ */
+async function openPage(
+  browser,
+  { width, height, scale = 1, mobile = false, url, display = "day", weather = "clear", setup, waitUntil = "load" },
+) {
   const context = await browser.newContext({
     viewport: { width, height },
     deviceScaleFactor: scale,
@@ -57,7 +95,13 @@ async function openPage(browser, { width, height, scale = 1, mobile = false, url
     colorScheme: "light",
     reducedMotion: "no-preference",
   });
-  await context.addInitScript((theme) => localStorage.setItem("vg-theme", theme), args.theme);
+  await context.addInitScript(
+    ({ theme, display }) => {
+      localStorage.setItem("vg-theme", theme);
+      localStorage.setItem("vg-hub-display", display);
+    },
+    { theme: args.theme, display },
+  );
   const page = await context.newPage();
   page.on("pageerror", (error) => console.warn(`  page error: ${error.message}`));
   page.on("console", (message) => {
@@ -71,7 +115,9 @@ async function openPage(browser, { width, height, scale = 1, mobile = false, url
     const zone = seed.zones.find((candidate) => candidate.id === id);
     return route.fulfill(zone ? { json: zone } : { status: 404, json: { detail: "Not found" } });
   });
-  await page.goto(new URL(url, args.base).href);
+  await page.route("**/api.open-meteo.com/**", (route) => fulfillWeather(route, weather));
+  await setup?.(page);
+  await page.goto(new URL(url, args.base).href, { waitUntil });
   await page.evaluate(async () => {
     await document.fonts.ready;
   });
@@ -81,26 +127,21 @@ async function openPage(browser, { width, height, scale = 1, mobile = false, url
   return page;
 }
 
-/** Same rule as frontend/e2e/fixtures.ts: the frame counter stops changing. Needs ?debug=frames. */
+/** Same rule as frontend/e2e/fixtures.ts: drawn, and nothing left to move. Needs ?debug=frames. */
 async function waitForIdleScene(page, timeout = 60_000) {
   await page.locator("canvas").waitFor({ state: "visible", timeout });
   await page.locator("html[data-frames]").waitFor({ state: "attached", timeout });
-  const deadline = Date.now() + timeout;
-  let previous = -1;
-  while (Date.now() < deadline) {
-    const frames = await page.evaluate(() => Number(document.documentElement.dataset.frames));
-    if (frames === previous) return;
-    previous = frames;
-    await page.waitForTimeout(500);
-  }
-  throw new Error("The scene never stopped drawing.");
+  await page.waitForFunction(() => !document.documentElement.hasAttribute("data-scene-busy"), undefined, {
+    timeout,
+  });
 }
 
 class Recorder {
   /** `clip` crops every frame to a page rectangle at native scale (default: the whole viewport). */
-  static async start(page, name, frameMs = FRAME_MS, clip = undefined) {
+  static async start(page, name, frameMs = FRAME_MS, clip = undefined, realtime = args.realtime) {
     const rec = new Recorder(page, name, frameMs, clip);
-    if (!args.realtime) {
+    rec.realtime = realtime;
+    if (!realtime) {
       await page.clock.install();
       // An installed clock still flows with the wall clock (slow screenshots would speed the walk
       // up); paused, only runFor() moves it.
@@ -125,7 +166,7 @@ class Recorder {
 
   /** Recording time in ms: the wall clock with --realtime, else the fake clock. */
   now() {
-    return args.realtime ? Date.now() - this.startedAt : this.virtualMs;
+    return this.realtime ? Date.now() - this.startedAt : this.virtualMs;
   }
 
   async shot() {
@@ -137,7 +178,7 @@ class Recorder {
 
   /** Advances the page by one frame and captures it. */
   async tick() {
-    if (args.realtime) {
+    if (this.realtime) {
       const wait = this.startedAt + this.frames.at(-1).t + this.frameMs - Date.now();
       if (wait > 0) await this.page.waitForTimeout(wait);
     } else {
@@ -166,7 +207,7 @@ class Recorder {
   finish() {
     writeFileSync(
       path.join(this.dir, "timeline.json"),
-      JSON.stringify({ frame_ms: this.frameMs, clock: args.realtime ? "real" : "virtual", frames: this.frames }),
+      JSON.stringify({ frame_ms: this.frameMs, clock: this.realtime ? "real" : "virtual", frames: this.frames }),
     );
     const seconds = ((this.frames.at(-1).t + this.frameMs) / 1000).toFixed(1);
     console.log(`  ${this.frames.length} frames, ${seconds} s -> ${path.relative(HERE, this.dir)}`);
@@ -250,7 +291,9 @@ class Cursor {
 
   /** Eases to a point (or the centre of a locator), one recorded frame per step. */
   async glide(rec, target, ms) {
-    const to = typeof target.boundingBox === "function" ? centre(await target.boundingBox()) : target;
+    const isLocator = typeof target.boundingBox === "function";
+    if (isLocator) await target.scrollIntoViewIfNeeded();
+    const to = isLocator ? centre(await target.boundingBox()) : target;
     const from = this.at;
     const steps = Math.max(1, Math.round(ms / rec.frameMs));
     for (let i = 1; i <= steps; i++) {
@@ -290,81 +333,177 @@ const png = (name) => path.join(OUT, "png", `${name}.png`);
 // --- the media ---------------------------------------------------------------------------------
 
 /**
- * Follow camera at 960x600 (the overview needs about 1056x640 since campus-scene v0.3). Path,
- * checked against app/features/campus/layout.ts OBSTACLES with the player's 0.35 radius:
- * 1. ArrowLeft = world (-1, +1) at WALK_SPEED 4.2 (2.97 per axis per second), held 2.30 s: from
- *    SPAWN (0, -0.8) to about (-6.8, 6.0). The trunks at (-4.9, 0.6), (-5.4, 2.4) and (-4.9, 6.4)
- *    stay off the line and the fountain hedge (PLAZA 0, 5.6) passes 4.5 away on the left.
- * 2. ArrowUp + ArrowRight = world (0, -1): north at x ≈ -6.8 until the librarian's hint appears
- *    near (-6.8, -0.3). The safe x window is (-8.0, -6.1): east of -6.1 the player stops on the
- *    trunk at (-5.4, 2.4); west of about -8.0 the library door (-8.2, -2.8) comes within
- *    INTERACT_RADIUS 1.7 before Lan (NPC_SPOT -6.6, -2.0), so the hint offers the library instead.
- *    Step 1 must therefore last 2.06-2.69 s (planned 2.30 s: -0.24/+0.39 s). The player turns
- *    north beside a garden bed and a tree; the follow camera holds still there for about 0.5 s
- *    (dead zone) while the player keeps walking.
- * 3. The hint holds about 1.2 s so it can be read, then E opens her dialog.
+ * Follow camera at 1024x640 (wide enough for the side dialog, narrower than the ~1056x640
+ * overview). The walk is e2e/play.spec.ts's: ArrowLeft + ArrowUp from SPAWN until the
+ * librarian's hint shows, past the garden beds and props. E opens her dialog; after it, the view
+ * turns 90° so the dressed campus shows from another side.
+ * Then, off the record, her badge list leads to chị Diệp: her dialog is npc-dialog.png.
  */
 async function heroWalk(browser) {
-  const page = await openPage(browser, { width: 960, height: 600, url: "/play?debug=frames" });
+  const page = await openPage(browser, { width: 1024, height: 640, url: "/play?debug=frames" });
   await waitForIdleScene(page);
-  // 10 fps: the follow camera pans, so nearly every pixel changes and 12.5 fps does not fit 4 MB.
+  // 10 fps: the follow camera pans, so nearly every pixel changes.
   const rec = await Recorder.start(page, "hero-walk", 100);
-  await rec.hold(600);
-  await keys(page, { down: ["ArrowLeft"], releaseAfterMs: 2300 });
-  await rec.hold(2300);
-  await keys(page, { up: ["ArrowLeft"], down: ["ArrowUp", "ArrowRight"], releaseOn: HINT_ID });
+  await rec.hold(500);
+  await keys(page, { down: ["ArrowLeft", "ArrowUp"], releaseOn: HINT_ID });
   const lanHint = page.getByRole("button", { name: "Nhấn E hoặc chạm để nói chuyện với cô Lan", exact: true });
-  const arrived = await rec.until(() => lanHint.isVisible(), 6000);
-  await keys(page, { up: ["ArrowUp", "ArrowRight"] });
-  if (!arrived) throw new Error("The librarian's hint never appeared: the walk went off the planned path.");
-  await rec.hold(1200);
+  const arrived = await rec.until(() => lanHint.isVisible(), 8000);
+  await keys(page, { up: ["ArrowLeft", "ArrowUp"] });
+  if (!arrived) throw new Error("The librarian's hint never appeared: the walk went off the e2e path.");
+  await rec.hold(900);
   await keys(page, { down: ["KeyE"] });
   await keys(page, { up: ["KeyE"] });
   await rec.until(() => page.getByRole("dialog").isVisible(), 1600);
-  await rec.hold(3000);
+  await rec.hold(2200);
+  await page.keyboard.press("Escape");
+  await rec.hold(500);
+  // Focus is back on the hint, a button, where , and . do nothing: turn with the view button.
+  const turn = page.getByRole("group", { name: "Góc nhìn" });
+  await turn.getByRole("button", { name: "Xoay theo chiều kim đồng hồ", exact: true }).click();
+  await rec.hold(1800);
   rec.finish();
+
+  await page.clock.resume();
+  await page.locator('[data-badge="registrar"]').click();
+  await page.getByRole("dialog", { name: "Chị Diệp" }).waitFor({ timeout: 60_000 });
+  await waitForIdleScene(page);
+  await page.screenshot({ path: png("npc-dialog") });
+  console.log("  -> png/npc-dialog.png");
   await page.context().close();
 }
 
 /**
- * Overview at 1280x800, where the whole diorama fits and the camera stays put: "Các khu", then
- * "Đi tới khuôn viên phía sau". The player walks its own route (layout.ts routeTo) from SPAWN
- * round the main building to the running track (BACK_SPOT 12.0, -12.3), about 26 units.
- * Recorded as a native-scale 960x600 crop, not scaled down, so the small figure stays visible; the
- * crop keeps "Các khu", the zone list, the whole route and the track.
+ * "Sa bàn đang dựng": the scene chunk is held 2.5 s, so the blueprint sits at step 2, then
+ * steps 3-5 and the hand-over to the 3D board. Real-time (CSS animations ignore the fake clock).
  */
-async function backCampus(browser) {
-  const page = await openPage(browser, { width: 1280, height: 800, url: "/play?debug=frames" });
-  await waitForIdleScene(page);
-  const clip = { x: 300, y: 16, width: 960, height: 600 };
-  const rest = { x: 1180, y: 560 }; // background inside the crop, clear of the diorama and the list
-  const cursor = await Cursor.add(page, rest);
-  const rec = await Recorder.start(page, "back-campus", FRAME_MS, clip);
-  const zones = page.getByRole("button", { name: "Các khu" });
-  await rec.hold(800);
-  await cursor.click(rec, zones, 560);
-  await rec.hold(1200);
-  const walkBack = page.locator(ZONE_LIST).getByRole("button", { name: "Đi tới khuôn viên phía sau", exact: true });
-  await cursor.click(rec, walkBack, 400, 600);
-  // Hidden for the walk; make-gifs.py's loop cross-fade brings it back at `rest` for frame 0.
-  await cursor.fadeOut(rec);
-  // Arrived when a whole recorded frame passes without the scene drawing.
-  const frames = () => page.evaluate(() => Number(document.documentElement.dataset.frames));
-  let previous = -1;
-  const settled = await rec.until(async () => {
-    const now = await frames();
-    const idle = now === previous;
-    previous = now;
-    return idle;
-  }, 12_000);
-  if (!settled) throw new Error("The walk to the back campus never ended.");
-  await rec.hold(1600);
+async function sceneLoader(browser) {
+  const page = await openPage(browser, {
+    width: 1024,
+    height: 640,
+    url: "/play?debug=frames",
+    waitUntil: "domcontentloaded",
+    setup: (p) =>
+      p.route(
+        (url) => SCENE_CHUNKS.has(url.pathname),
+        async (route) => {
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+          await route.continue();
+        },
+      ),
+  });
+  const loader = page.locator("[data-scene-loader]");
+  await loader.waitFor();
+  const rec = await Recorder.start(page, "scene-loader", FRAME_MS, undefined, true);
+  const done = await rec.until(async () => (await loader.count()) === 0, 30_000);
+  if (!done) throw new Error("The loader never left.");
+  await rec.hold(1500);
   rec.finish();
-  // The list reads where the player stands when it opens: "Về mặt trước" only from the back.
-  await page.getByRole("button", { name: "Các khu" }).click();
-  const back = page.locator(ZONE_LIST).getByRole("button", { name: "Về mặt trước", exact: true });
-  if (!(await back.isVisible())) throw new Error("The player stopped before the back campus.");
   await page.context().close();
+}
+
+/** One still per look, at fixed Hanoi times (the display follows the clock): tiled by make-gifs.py. */
+const SKIES = [
+  ["day", "10:00", "clear"],
+  ["dusk", "17:30", "clear"],
+  ["night", "21:00", "clear"],
+  ["rain", "10:00", "rain"],
+];
+
+async function skyStills(browser) {
+  for (const [name, time, weather] of SKIES) {
+    const page = await openPage(browser, {
+      width: 1024,
+      height: 640,
+      url: "/play?debug=frames",
+      display: "live",
+      weather,
+      setup: (p) => p.clock.setFixedTime(new Date(`2026-10-08T${time}:00+07:00`)),
+    });
+    await page.locator(`main[data-sky="${name === "rain" ? "day" : name}"]`).waitFor();
+    await waitForIdleScene(page);
+    await page.screenshot({ path: png(`sky-${name}`) });
+    console.log(`  -> png/sky-${name}.png`);
+    await page.context().close();
+  }
+}
+
+/**
+ * Level 1 on the bench at 1280x800: build the reference solution (e2e/workbench.spec.ts), open
+ * the shift, watch the recorded run stream in, then the stars and cô Lan's diagnosis. The stream
+ * comes from a local server that sends one event every 30 ms, so the run panel fills live.
+ */
+async function workbench(browser) {
+  const events = readFileSync(`${REPO}/${E2E_DATA}/run-l1-reference.sse`, "utf8").split(/\n\n/).filter(Boolean);
+  const server = http.createServer(async (_request, response) => {
+    response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store" });
+    for (const event of events) {
+      response.write(`${event}\n\n`);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+    response.end();
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const page = await openPage(browser, {
+      width: 1280,
+      height: 800,
+      url: "/play/library/grounded-citation",
+      setup: async (p) => {
+        await p.route("**/api/blocks", (route) => route.fulfill({ json: readJson(`${E2E_DATA}/blocks.json`) }));
+        await p.route("**/api/levels/*", (route) => {
+          const id = new URL(route.request().url()).pathname.split("/").at(-1);
+          return route.fulfill({ json: readJson(`${E2E_DATA}/levels/${id}.json`) });
+        });
+        await p.route(
+          (url) => url.pathname === "/api/runs",
+          (route) => route.fulfill({ status: 202, json: { run_id: "1".padStart(32, "0"), created: true, issues: [] } }),
+        );
+        await p.route("**/api/runs/*/events", (route) =>
+          route.continue({ url: `http://127.0.0.1:${server.address().port}/events` }),
+        );
+      },
+    });
+    await page.getByRole("heading", { level: 1, name: "Thôi bịa điều luật" }).waitFor();
+    await page
+      .locator("#wb-bench-title")
+      .evaluate((el) =>
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 24, behavior: "instant" }),
+      );
+    const rest = { x: 1200, y: 760 };
+    const cursor = await Cursor.add(page, rest);
+    const rec = await Recorder.start(page, "workbench", 100, undefined, true);
+    await rec.hold(700);
+    await cursor.click(rec, page.getByRole("switch", { name: "Gắn Vòm Sao" }), 480, 200);
+    await rec.hold(400);
+    const hook = page.getByRole("slider", { name: /Móc kéo/ });
+    await cursor.glide(rec, hook, 400);
+    await hook.fill("3");
+    await rec.hold(400);
+    await cursor.click(rec, page.getByRole("switch", { name: /Máy đóng tem/ }), 400, 200);
+    for (const [slot, value] of [
+      ["Khe thẻ 1", "G1"],
+      ["Khe thẻ 2", "G2"],
+      ["Khe thẻ 3", "G3"],
+    ]) {
+      const select = page.getByLabel(slot);
+      await cursor.glide(rec, select, 320);
+      await select.selectOption(value);
+      await rec.hold(240);
+    }
+    await cursor.click(rec, page.getByRole("button", { name: "Mở ca" }), 480, 200);
+    await cursor.fadeOut(rec);
+    const stars = page.getByText("3/3 sao", { exact: true });
+    if (!(await rec.until(() => stars.isVisible(), 20_000))) throw new Error("The run never finished.");
+    await rec.hold(2400);
+    await page
+      .getByRole("heading", { name: "Cô Lan chẩn đoán" })
+      .evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+    await rec.hold(2400);
+    rec.finish();
+    await page.context().close();
+  } finally {
+    server.close();
+  }
 }
 
 /** The landing page's "Một ca trực ở Thư viện": predict, run, retrieve and rerun, reset. */
@@ -398,24 +537,6 @@ async function landingDemo(browser) {
   await page.context().close();
 }
 
-/**
- * Clipped to the content column, from the top bar down to the footer: in the README's half-width
- * cell the body text stays readable, and it matches mobile.png (width 265) in height.
- */
-async function zoneLibrary(browser) {
-  const page = await openPage(browser, { width: 1024, height: 1280, url: "/play/library" });
-  await page.getByRole("heading", { level: 1, name: "Thư viện" }).waitFor();
-  await page.waitForTimeout(400);
-  const footer = await page.locator("footer").boundingBox();
-  if (!footer) throw new Error("The zone page has no footer to clip to.");
-  await page.screenshot({
-    path: png("zone-library"),
-    clip: { x: footer.x, y: 0, width: footer.width, height: footer.y + footer.height },
-  });
-  console.log("  -> png/zone-library.png");
-  await page.context().close();
-}
-
 async function mobile(browser) {
   const page = await openPage(browser, { width: 375, height: 812, scale: 2, mobile: true, url: "/play?debug=frames" });
   await waitForIdleScene(page);
@@ -426,9 +547,10 @@ async function mobile(browser) {
 
 const JOBS = {
   "hero-walk": heroWalk,
-  "back-campus": backCampus,
+  "scene-loader": sceneLoader,
+  sky: skyStills,
+  workbench,
   "landing-demo": landingDemo,
-  "zone-library": zoneLibrary,
   mobile,
 };
 
@@ -447,11 +569,22 @@ mkdirSync(path.join(OUT, "png"), { recursive: true });
 console.log(`theme ${args.theme}, ${args.realtime ? "real" : "virtual"} clock, ${args.base}`);
 // Headless Chromium has no GPU; render WebGL in software, as playwright.config.ts does.
 const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+// One failed job does not cost the others a new browser; the exit code still says so.
+const failed = [];
 try {
   for (const name of only) {
     console.log(name);
-    await JOBS[name](browser);
+    try {
+      await JOBS[name](browser);
+    } catch (error) {
+      console.error(`  ${name} failed: ${error.message}`);
+      failed.push(name);
+    }
   }
 } finally {
   await browser.close();
+}
+if (failed.length) {
+  console.error(`Failed: ${failed.join(", ")}`);
+  process.exitCode = 1;
 }
