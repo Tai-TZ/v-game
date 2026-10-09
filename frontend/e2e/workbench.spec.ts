@@ -744,4 +744,99 @@ test.describe("workbench", () => {
     release();
     await expect(page.getByRole("heading", { level: 1, name: "Hỏi bằng số điều" })).toBeFocused();
   });
+
+  test("grades the guess slip after the run, with a surprise for a sure call gone wrong", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await mockWorkbenchApi(page, { events: () => sse.short() });
+    await page.goto(L1);
+    await page.getByRole("switch", { name: "Gắn Vòm Sao" }).check();
+    // N6: before any run every slot says so, in words beside its icon.
+    await expect(page.locator("#slot-vs [data-state]")).toHaveText("Trạng thái khối: Chưa chạy");
+
+    // N1 + N19: one click per answer, nothing required.
+    const slip = page.getByRole("region", { name: "Đoán trước khi mở ca" });
+    await slip.getByRole("group", { name: "Đạt mấy/10?" }).getByText("2", { exact: true }).click();
+    const first = slip.getByRole("group", { name: "Câu #1 · Câu mẫu" });
+    await first.getByText("Trượt", { exact: true }).click();
+    await first.getByText("Chắc", { exact: true }).click();
+    await slip.getByRole("group", { name: "Câu nào trượt?" }).getByText("#9").click();
+    // The draft survives a reload, per level.
+    await page.reload();
+    await expect(first.getByRole("radio", { name: "Chắc" })).toBeChecked();
+    await expect(slip.getByRole("checkbox", { name: "Câu #9" })).toBeChecked();
+
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeFocused();
+    const result = page.getByRole("region", { name: "Phiếu đoán của bạn" });
+    await expect(result).toContainText("Bạn đoán 2 câu đạt; thực tế 2/2 câu đạt. Khớp.");
+    await expect(result).toContainText("Đoán sai · câu #1: bạn đoán trượt (chắc).");
+    await expect(result.getByText("Bất ngờ ở câu #1")).toBeVisible();
+    await expect(result).toContainText("Bạn chắc câu này sẽ trượt, nhưng nó đạt.");
+    await expect(result.getByRole("link", { name: "Xem bằng chứng ở câu #1" })).toHaveAttribute(
+      "href",
+      "#cau-1",
+    );
+    // The slip left with the run: the next one starts blank.
+    await expect(slip.getByRole("radio", { name: "2", exact: true })).not.toBeChecked();
+    await expect(slip.getByRole("radio", { name: "Chắc" })).toHaveCount(0);
+    expect(
+      await page.evaluate(() => window.localStorage.getItem("vg.guess.v1.grounded-citation")),
+    ).toBeNull();
+
+    // N18: graded rows turned over (motion allowed here). One live region on the page.
+    const row = page.getByRole("region", { name: "Bảng câu" }).getByRole("button").first();
+    expect(await row.evaluate((el) => getComputedStyle(el).animationName)).toBe("vg-flip");
+    await expect(page.locator("[aria-live]")).toHaveCount(1);
+
+    // N6: the followed case's steps finished; a knob change marks them "run again".
+    await expect(page.locator("#slot-vs [data-state]")).toHaveText("Trạng thái khối: Đạt");
+    await page.getByRole("slider", { name: /Móc kéo/ }).fill("4");
+    await expect(page.locator("#slot-vs [data-state]")).toHaveText("Trạng thái khối: Cần chạy lại");
+    await expect(page.locator("#slot-out [data-state]")).toHaveText(
+      "Trạng thái khối: Cần chạy lại",
+    );
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("asks why case #1 failed before cô Lan's diagnosis (L1 §11)", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const diagnosis = [
+      {
+        case: "lib-l1-v01",
+        flag: "llm.cite_missing",
+        message_vi: "Câu #1 nói đúng ý, nhưng không chỉ ra lấy từ đâu.",
+      },
+    ];
+    const passed =
+      '"case":"lib-l1-v01","status":"ok","passed":true,"counted":true,"criteria":{"points":true,"cited":true,"no_fabrication":true,"no_forbidden":true},"labels":[]';
+    const failed =
+      '"case":"lib-l1-v01","status":"ok","passed":false,"counted":true,"criteria":{"points":true,"cited":false,"no_fabrication":true,"no_forbidden":true},"labels":["cite_missing"]';
+    await mockWorkbenchApi(page, {
+      events: () =>
+        sse
+          .short()
+          .replace(passed, failed)
+          .replace('"diagnosis":[]', `"diagnosis":${JSON.stringify(diagnosis)}`),
+    });
+    await page.goto(L1);
+    await page.getByRole("switch", { name: "Gắn Vòm Sao" }).check();
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeFocused();
+
+    // The failed answer board is an error state, and its row flipped instantly (reduced motion).
+    await expect(page.locator("#slot-out [data-state]")).toHaveText("Trạng thái khối: Lỗi");
+    const row = page.getByRole("region", { name: "Bảng câu" }).getByRole("button").first();
+    await expect(row).toContainText("Trượt");
+    expect(await row.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+
+    const menu = page.getByRole("group", { name: "Vì sao câu #1 sai?" });
+    const lessons = page.getByRole("list", { name: "Cô Lan chẩn đoán" });
+    await expect(menu).toBeVisible();
+    await expect(lessons).toHaveCount(0);
+    await menu.getByText("Các đoạn trong thùng không mang mã, nên không có gì để trích").click();
+    await expect(page.getByText("Đúng lý do.")).toBeFocused();
+    await expect(lessons).toContainText("không chỉ ra lấy từ đâu");
+  });
 });
