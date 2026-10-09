@@ -54,10 +54,12 @@ import {
   lathe,
   merge,
   onFace,
+  outward,
   part,
   quad,
   rect,
   ring,
+  type Face,
   type PartStyle,
 } from "./primitives";
 
@@ -990,7 +992,7 @@ function spireHall(pal: Palette): Parts {
 
 /** Clock hand pointing `angle` radians clockwise from 12, on a clock face centred at (u, v). */
 function hand(
-  face: "+x" | "+z",
+  face: Face,
   plane: number,
   u: number,
   v: number,
@@ -999,7 +1001,8 @@ function hand(
   angle: number,
 ) {
   const geometry = new PlaneGeometry(width, length).translate(0, length / 2, 0).rotateZ(-angle);
-  return onFace(geometry, face, plane + 0.01, u, v);
+  // One more 0.01 out than the dial, on whichever side of the wall "out" is.
+  return onFace(geometry, face, plane + outward(face), u, v);
 }
 
 /** Town hall: hip roof on the shared tower base and a clock tower in front (§5.4). */

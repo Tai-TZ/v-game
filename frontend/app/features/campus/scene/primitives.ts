@@ -74,12 +74,29 @@ export function rect(x0: number, x1: number, z0: number, z1: number, y: number) 
   return flat(new PlaneGeometry(x1 - x0, z1 - z0), (x0 + x1) / 2, y, (z0 + z1) / 2);
 }
 
-export type Face = "+x" | "+z";
+export type Face = "+x" | "+z" | "-x" | "-z";
 
-/** Stands a flat shape (built facing +z) on a façade, 0.01 out from the wall. */
+/** Turn about y taking a shape built facing +z to face `face`: a turn, never a mirror. */
+const TURN: Record<Face, number> = {
+  "+z": 0,
+  "+x": Math.PI / 2,
+  "-z": Math.PI,
+  "-x": -Math.PI / 2,
+};
+
+/** Outward from a façade: +0.01 on the +x/+z walls, −0.01 on the −x/−z walls. */
+export const outward = (face: Face) => (face.startsWith("+") ? 0.01 : -0.01);
+
+/**
+ * Stands a flat shape (built facing +z) on a façade, 0.01 out from the wall; `u` runs along the
+ * wall (world x on a z face, world z on an x face). Half-discs stay arched upwards and a clock on
+ * the −z wall still reads clockwise, since the shape is turned, not mirrored.
+ */
 export function onFace(geometry: BufferGeometry, face: Face, plane: number, u: number, v: number) {
-  if (face === "+z") return geometry.translate(u, v, plane + 0.01);
-  return geometry.rotateY(Math.PI / 2).translate(plane + 0.01, v, u);
+  geometry.rotateY(TURN[face]);
+  return face.endsWith("z")
+    ? geometry.translate(u, v, plane + outward(face))
+    : geometry.translate(plane + outward(face), v, u);
 }
 
 export function quad(face: Face, plane: number, u: number, v: number, w: number, h: number) {
