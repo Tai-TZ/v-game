@@ -57,8 +57,11 @@ export const ORBIT_FRAME = { half: 22.94, top: 13.42, bottom: -13.9 } as const;
  * and on the left for "Về trang chủ" plus the "Hoàng hôn" switch (≈ 337 px, N8 2026-10-08).
  */
 export const HUD_CORNER = { width: 344, height: 76 } as const;
-/** The "Góc nhìn" buttons at the bottom right (3 × 44 + 24, 44 + 24 px), kept sky in overview. */
-export const VIEW_CONTROLS = { width: 156, height: 68 } as const;
+/**
+ * The "Góc nhìn" buttons at the bottom right (3 × 44 + 2 border + 24, 44 + 2 + 24 px), kept sky
+ * in overview.
+ */
+export const VIEW_CONTROLS = { width: 158, height: 70 } as const;
 
 const PAD = 24;
 const FOLLOW_INSET_TOP = 72;
