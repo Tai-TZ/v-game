@@ -21,6 +21,7 @@ from vgame.engine.constants import ALL_VARIANTS, TOKENIZER_ID, IndexVariant
 from vgame.engine.corpus import load_documents
 from vgame.engine.grading import load_grading_spec, public_cases
 from vgame.engine.index import (
+    RERANK_TIMING_FALLBACK,
     IndexNotBuiltError,
     IndexStaleError,
     IndexStore,
@@ -194,6 +195,8 @@ def test_cli_builds_artifacts_with_injected_models(
     assert loaded.manifest["variants"] == ["theo_dieu-512-10"]
     assert loaded.rerank is not None
     assert loaded.rerank.model_id == OverlapReranker.model_id
+    scored = int(np.count_nonzero(~np.isnan(loaded.rerank.scores)))
+    assert loaded.rerank.timing["pairs"] == scored  # this build timed its own scoring
     content = settings.content_dir
     loaded.check_fresh(
         load_documents(content), golden_questions(content), rerank_questions(content)
@@ -359,6 +362,19 @@ def test_build_rerank_table_scores_only_new_pairs(one_variant: IndexStore) -> No
     other = CountingReranker("test/another-model")  # scores of another model are not reused
     build_rerank_table(one_variant, other, {QUESTION: L1_DOCS}, reuse=table, log=_quiet)
     assert len(other.batches[0]) == len(set(l1))
+
+
+def test_rerank_table_keeps_the_scoring_time_per_pair(one_variant: IndexStore) -> None:
+    # §14 (2026-10-09): rerank steps over the table report this x the candidates they score.
+    empty = RerankTable("m", [], [], np.zeros((0, 0), dtype=np.float32))
+    assert empty.timing == RERANK_TIMING_FALLBACK  # a table saved before the timing existed
+    assert empty.ms_per_pair == RERANK_TIMING_FALLBACK["ms_per_pair"]
+    table = build_rerank_table(one_variant, OverlapReranker(), {QUESTION: L1_DOCS}, log=_quiet)
+    assert table.timing["pairs"] == len(set(_texts(one_variant, L1_DOCS)))
+    again = build_rerank_table(
+        one_variant, CountingReranker(), {QUESTION: L1_DOCS}, reuse=table, log=_quiet
+    )
+    assert again.timing == table.timing  # nothing scored: the measured value stays
 
 
 def test_rerank_scores_of_other_scoring_settings_are_not_reused(

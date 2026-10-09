@@ -13,6 +13,7 @@ No pickle.
 import argparse
 import hashlib
 import json
+import platform
 import sys
 import time
 import unicodedata
@@ -136,10 +137,20 @@ def _chunk_from_json(raw: dict[str, Any]) -> Chunk:
     return Chunk(**{**raw, "khoan": tuple(raw["khoan"])})
 
 
+# Live jina-v2 cost when no build has timed it (engine-spike-report §3.4): 873 pairs per question
+# took 102-195 s on an idle i7-12700H, batch 2, pairs cut at 512 tokens.
+RERANK_TIMING_FALLBACK: dict[str, Any] = {
+    "ms_per_pair": 120.0,
+    "source": "engine-spike-report §3.4: i7-12700H idle, batch 2, pairs <= 512 tokens",
+}
+
+
 class RerankTable:
     """Cross-encoder scores computed offline by ``vgame-build-index`` with the real model: the
     server's ``Reranker``. ``score`` returns the floats the live model returned (float32 holds
-    every jina-v2 logit exactly; engine-spike-report §3.4)."""
+    every jina-v2 logit exactly; engine-spike-report §3.4). A lookup takes ~10-20 ms however
+    many pairs it scores, so rerank steps report a simulated ``ms_per_pair`` x pairs instead
+    (engine-v0.2.md §14, 2026-10-09): what the live model cost on the build machine."""
 
     def __init__(
         self,
@@ -148,13 +159,16 @@ class RerankTable:
         texts: Sequence[str],
         scores: Vectors,
         regime: Mapping[str, object] | None = None,
+        timing: Mapping[str, Any] | None = None,
     ) -> None:
         """``questions``: ``question_key`` per row; ``texts``: ``text_key`` per column;
-        ``regime``: ``rerank_regime()`` of the build that scored them."""
+        ``regime``: ``rerank_regime()`` of the build that scored them; ``timing``: what live
+        scoring cost then (``ms_per_pair`` + conditions), ``RERANK_TIMING_FALLBACK`` if unknown."""
         if scores.dtype != np.float32 or scores.shape != (len(questions), len(texts)):
             raise ValueError("rerank scores do not match their questions and texts")
         self._model_id = model_id
         self.regime = dict(regime or {})
+        self.timing = dict(timing or RERANK_TIMING_FALLBACK)
         self.questions, self.texts, self.scores = list(questions), list(texts), scores
         self._rows = {k: i for i, k in enumerate(self.questions)}
         self._cols = {k: i for i, k in enumerate(self.texts)}
@@ -162,6 +176,10 @@ class RerankTable:
     @property
     def model_id(self) -> str:
         return self._model_id
+
+    @property
+    def ms_per_pair(self) -> float:
+        return float(self.timing["ms_per_pair"])
 
     def get(self, question: str, text: str) -> float | None:
         row, col = self._rows.get(question_key(question)), self._cols.get(text_key(text))
@@ -281,6 +299,7 @@ class IndexStore:
             meta = {
                 "model": table.model_id,
                 "regime": table.regime,
+                "timing": table.timing,
                 "questions": table.questions,
                 "texts": table.texts,
             }
@@ -324,7 +343,12 @@ class IndexStore:
                 meta = json.loads((index_dir / "rerank.json").read_text(encoding="utf-8"))
                 scores = np.load(index_dir / "rerank.npy", allow_pickle=False)
                 rerank = RerankTable(
-                    meta["model"], meta["questions"], meta["texts"], scores, meta.get("regime")
+                    meta["model"],
+                    meta["questions"],
+                    meta["texts"],
+                    scores,
+                    meta.get("regime"),
+                    meta.get("timing"),
                 )
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise IndexNotBuiltError(f"index at {index_dir} missing or invalid: {exc}") from exc
@@ -468,7 +492,8 @@ def build_rerank_table(
 ) -> RerankTable:
     """Scores every required pair once, keeping ``reuse`` scores of the same model and
     ``rerank_regime`` (a question edit then scores ~870 pairs, not ~11k). Scores do not depend
-    on the batch (measured), so each question's texts go shortest first: less padding."""
+    on the batch (measured), so each question's texts go shortest first: less padding. The
+    time spent scoring becomes the table's ``timing``; nothing scored keeps ``reuse``'s."""
     by_question: dict[str, set[str]] = {}
     for question, text in required_rerank_pairs(store, rerank):
         by_question.setdefault(question, set()).add(text)
@@ -479,6 +504,7 @@ def build_rerank_table(
     texts = sorted({text_key(t) for ts in by_question.values() for t in ts})
     rows, cols = {k: i for i, k in enumerate(questions)}, {k: i for i, k in enumerate(texts)}
     scores = np.full((len(questions), len(texts)), np.nan, dtype=np.float32)
+    scored, scoring_s = 0, 0.0
     for n, question in enumerate(sorted(by_question), 1):
         started = time.perf_counter()
         known: dict[str, float] = {}
@@ -492,8 +518,20 @@ def build_rerank_table(
         for text, value in known.items():
             scores[row, cols[text_key(text)]] = value
         took = time.perf_counter() - started
+        if missing:
+            scored, scoring_s = scored + len(missing), scoring_s + took
         log(f"rerank {n}/{len(by_question)}: {len(known)} pairs, {len(missing)} new, {took:.0f} s")
-    return RerankTable(reranker.model_id, questions, texts, scores, regime)
+    # ponytail: one mean per table, from whatever load the build machine had; a few new pairs
+    # (a corpus edit) give a noisy mean. Re-time on an idle machine if the L3 numbers look off.
+    timing = old.timing if old is not None else None
+    if scored:
+        timing = {
+            "ms_per_pair": round(scoring_s * 1000 / scored, 1),
+            "pairs": scored,
+            "cpu": platform.processor() or platform.machine(),
+            "measured": datetime.now(UTC).date().isoformat(),
+        }
+    return RerankTable(reranker.model_id, questions, texts, scores, regime, timing)
 
 
 def main(
