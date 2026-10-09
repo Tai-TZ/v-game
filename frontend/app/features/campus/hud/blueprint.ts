@@ -1,6 +1,6 @@
 import type { CampusTheme } from "~/features/theme/schema";
 
-import { cameraCentre, desiredCentre, toScreen, viewFor } from "../camera";
+import { cameraCentre, CONTENT, desiredCentre, toScreen, viewFor } from "../camera";
 import {
   arrivalPose,
   BACK,
@@ -49,7 +49,7 @@ export type Role =
   | "hair";
 
 export interface Shape {
-  tag: "polygon" | "ellipse" | "circle" | "line";
+  tag: "polygon" | "ellipse" | "circle" | "line" | "path";
   cls: string;
   attrs: Record<string, string>;
 }
@@ -394,34 +394,62 @@ export function blueprintViewBox(width: number, height: number, focus: Vec2): st
   return [c.sx - w / 2, -c.sy - h / 2, w, h].map(n3).join(" ");
 }
 
+const { minX, maxX, minZ, maxZ } = BASE;
+
+/** Base: white plate and soil block with the blank board on top, there from the start. */
+const baseShapes = (): Shape[] => [
+  ...boxShapes("plate", [minX - 0.25, maxX + 0.25, -0.8, -0.6, minZ - 0.25, maxZ + 0.25]),
+  ...boxShapes("soil", [minX, maxX, -0.6, 0, minZ, maxZ]).slice(0, 2),
+  flat("board", rect(minX, maxX, minZ, maxZ), 0, { "data-bp": "board" }),
+];
+
+/** 8 × 9 grass tiles on the board, as [x0, z0] corners of 0.05-inset rectangles. */
+const TILE_W = (maxX - minX) / 8;
+const TILE_D = (maxZ - minZ) / 9;
+const tileRects = () =>
+  Array.from({ length: 72 }, (_, k) => {
+    const x0 = minX + Math.floor(k / 9) * TILE_W;
+    const z0 = minZ + (k % 9) * TILE_D;
+    return { x0, z0, xz: rect(x0 + 0.05, x0 + TILE_W - 0.05, z0 + 0.05, z0 + TILE_D - 0.05) };
+  });
+
+/** The model's screen bbox (camera.ts CONTENT) as a viewBox, for the pre-rendered board. */
+export const SHELL_VIEWBOX = [
+  CONTENT.minX,
+  -CONTENT.maxY,
+  CONTENT.maxX - CONTENT.minX,
+  CONTENT.maxY - CONTENT.minY,
+]
+  .map(n3)
+  .join(" ");
+
+/**
+ * The empty board for the pre-rendered shell: the base, and the tiles as one ghost path that
+ * draws exactly like the live diorama's unbuilt tiles (no JS, a small HTML payload).
+ */
+export function shellBoard(): Piece[] {
+  const grid = tileRects()
+    .map(({ xz }) => `M${xz.map(([x, z]) => pt([x, 0.004, z])).join(" ")}Z`)
+    .join("");
+  return [
+    { kind: "base", at: 0, shapes: baseShapes() },
+    { kind: "tile", at: 1, shapes: [{ tag: "path", cls: "f-top bp-grass", attrs: { d: grid } }] },
+  ];
+}
+
 /** Every piece of the diorama in painter's order, each with the progress that builds it. */
 export function blueprintPieces(landmark: CampusTheme["landmark"], player: Vec2): Piece[] {
   const pieces: Piece[] = [];
   const add = (kind: Piece["kind"], at: number, shapes: Shape[], fp?: Piece["fp"]) =>
     pieces.push(fp ? { kind, at, shapes, fp } : { kind, at, shapes });
-  const { minX, maxX, minZ, maxZ } = BASE;
 
-  // Base: white plate and soil block with the blank board on top, there from the start.
-  add("base", 0, [
-    ...boxShapes("plate", [minX - 0.25, maxX + 0.25, -0.8, -0.6, minZ - 0.25, maxZ + 0.25]),
-    ...boxShapes("soil", [minX, maxX, -0.6, 0, minZ, maxZ]).slice(0, 2),
-    flat("board", rect(minX, maxX, minZ, maxZ), 0, { "data-bp": "board" }),
-  ]);
+  add("base", 0, baseShapes());
 
-  // 8 × 9 grass tiles, built as a wave from the far corner towards the viewer.
-  const tw = (maxX - minX) / 8;
-  const td = (maxZ - minZ) / 9;
-  const tiles: { key: number; shape: Shape }[] = [];
-  for (let i = 0; i < 8; i += 1) {
-    for (let j = 0; j < 9; j += 1) {
-      const x0 = minX + i * tw;
-      const z0 = minZ + j * td;
-      tiles.push({
-        key: x0 + z0 + 0.01 * x0,
-        shape: flat("grass", rect(x0 + 0.05, x0 + tw - 0.05, z0 + 0.05, z0 + td - 0.05), 0.004),
-      });
-    }
-  }
+  // Grass tiles, built as a wave from the far corner towards the viewer.
+  const tiles = tileRects().map(({ x0, z0, xz }) => ({
+    key: x0 + z0 + 0.01 * x0,
+    shape: flat("grass", xz, 0.004),
+  }));
   tiles
     .sort((a, b) => a.key - b.key)
     .forEach(({ shape }, i, all) => add("tile", 0.02 + (0.5 * i) / (all.length - 1), [shape]));

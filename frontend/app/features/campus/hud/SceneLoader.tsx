@@ -4,7 +4,14 @@ import { useActiveTheme } from "~/features/theme/context";
 import { REDUCED_MOTION, useMediaQuery } from "~/lib/useMediaQuery";
 
 import { useHub } from "../store";
-import { blueprintPieces, blueprintViewBox, entryFocus, type Piece } from "./blueprint";
+import {
+  blueprintPieces,
+  blueprintViewBox,
+  entryFocus,
+  SHELL_VIEWBOX,
+  shellBoard,
+  type Piece,
+} from "./blueprint";
 import { APPEAR_MS, FADE_MS, progress, sceneLoad, STAGE, STEPS, useSceneLoad } from "./sceneLoad";
 
 /** One label per stage (sceneLoad STAGE): the step being waited for. */
@@ -73,12 +80,22 @@ const ROOT = "pointer-events-none absolute inset-0 z-15 overflow-hidden";
  * "Sa bàn đang dựng" (art §8.4): from the first paint of /play until the first WebGL frame, a
  * pale diorama of the campus builds itself on the sky colour, exactly where the 3D scene will
  * appear, with a card naming the real loading step and a tip from cô Lan. `shell` is the
- * pre-rendered version (HydrateFallback): fixed step 1, no diorama, no store.
+ * pre-rendered version (HydrateFallback): fixed step 1, the empty board framed in CSS, no store.
  */
 export function SceneLoader({ shell = false }: { shell?: boolean }) {
   if (shell) {
     return (
       <div data-scene-loader="" className={`${ROOT} animate-appear bg-scene`}>
+        <svg
+          aria-hidden="true"
+          className="bp bp-shell"
+          viewBox={SHELL_VIEWBOX}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {shellBoard().map((piece) => (
+            <PieceShapes key={piece.kind} piece={piece} state={piece.at ? "" : "is-set"} />
+          ))}
+        </svg>
         <Card stage={STAGE.open} tip={GREETING} live={false} slow={false} lifted={false} />
         <p role="status" className="sr-only" />
       </div>
@@ -108,6 +125,8 @@ function LiveLoader({ onGone }: { onGone: () => void }) {
     () => new URLSearchParams(window.location.search).get("debug") === "loader",
   );
   const [focus] = useState(() => entryFocus(window.location.search));
+  // The pre-rendered board was on screen: the diorama replaces it in place, without fading in.
+  const [afterShell] = useState(() => document.querySelector(".bp-shell") !== null);
   // A loader remounted after hydration continues the shell's appear timing (art §8.4).
   const [delay] = useState(() =>
     Math.max(0, APPEAR_MS - (performance.now() - sceneLoad.getState().begun)),
@@ -221,7 +240,7 @@ function LiveLoader({ onGone }: { onGone: () => void }) {
       {box && (
         <svg
           aria-hidden="true"
-          className="bp absolute inset-0 size-full animate-[vg-fade_300ms_ease-out_both]"
+          className={`bp absolute inset-0 size-full ${afterShell ? "" : "animate-[vg-fade_300ms_ease-out_both]"}`}
           viewBox={blueprintViewBox(box.width, box.height, focus)}
           preserveAspectRatio="xMidYMid meet"
         >

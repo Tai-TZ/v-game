@@ -288,5 +288,26 @@ test.describe("scene loader", () => {
       expect(background).toBe(sky);
       expect(background).not.toBe("rgb(255, 255, 255)");
     });
+
+    test("lays the empty board where the 3D board will be", async ({ page }) => {
+      await page.goto("/play");
+      const size = page.viewportSize() ?? { width: 0, height: 0 };
+      const corners = [
+        [BASE.minX, BASE.minZ],
+        [BASE.maxX, BASE.minZ],
+        [BASE.maxX, BASE.maxZ],
+        [BASE.minX, BASE.maxZ],
+      ].map(([x = 0, z = 0]) => groundPixel(size.width, size.height, x, z));
+      const board = await page.locator('[data-bp="board"]').boundingBox();
+      expect(board).not.toBeNull();
+      if (board) {
+        const xs = corners.map((c) => c.x);
+        const ys = corners.map((c) => c.y);
+        expect(Math.abs(board.x - Math.min(...xs))).toBeLessThanOrEqual(1);
+        expect(Math.abs(board.y - Math.min(...ys))).toBeLessThanOrEqual(1);
+        expect(Math.abs(board.x + board.width - Math.max(...xs))).toBeLessThanOrEqual(1);
+        expect(Math.abs(board.y + board.height - Math.max(...ys))).toBeLessThanOrEqual(1);
+      }
+    });
   });
 });
