@@ -7,11 +7,15 @@ import {
   BASE,
   CYPRESS_TREES,
   FOUNTAIN_RADIUS,
+  FOUNTAIN_WATER,
   LAKE,
   NPC_SPOT,
   PARK_TREES,
   parseArrival,
+  PATHS,
   PLAZA,
+  PLAZA_RADIUS,
+  ROSE_BEDS,
   ROUND_TREES,
   siteFor,
   SPAWN,
@@ -74,9 +78,10 @@ const fromFootprint = (role: Role, f: Box, y0: number, y1: number): Mass =>
   m(role, f.x - f.halfX, f.x + f.halfX, y0, y1, f.z - f.halfZ, f.z + f.halfZ);
 
 /**
- * Mirrors scene/campus.ts (which imports three.js): heights, tower massing and the flat path
- * rectangles of buildTerrain. Coarse boxes and pyramids, one stack per visible mass, listed
- * bottom to top; colonnades, lamps and statues are left out. The bbox test guards buildings.
+ * Mirrors scene/campus.ts (which imports three.js): heights and tower massing. Coarse boxes
+ * and pyramids, one stack per visible mass, listed bottom to top; colonnades, lamps and
+ * statues are left out. The bbox test guards buildings; the ground's paths are not mirrored
+ * but shared with the scene through layout.ts.
  */
 export const MIRROR = {
   /** mainBuilding(): wings and pavilions. Plinths fold into the walls. */
@@ -167,27 +172,6 @@ export const MIRROR = {
     [BACK.stand, 1.16],
   ] as const,
   vault: m("wall", 4.3, 8.9, 1.58, 2.7, -17.5, -13.7),
-  /** Paved flats of buildTerrain and backGrounds: [x0, x1, z0, z1]. */
-  paths: [
-    [-3.4, 3.4, -6.0, -1.8],
-    [-3.1, -2.0, -1.8, 1.7],
-    [2.0, 3.1, -1.8, 1.7],
-    [-8.8, -3.4, -3.1, -2.5],
-    [3.4, 8.8, -3.1, -2.5],
-    [3.6, 7.0, 3.6, 4.2],
-    [BASE.minX, 6.6, 10.5, 11.2],
-    [-12.8, -6.2, 3.6, 9.4],
-    [3.1, 13.1, -0.55, 0.05],
-    [12.3, 13.1, -10.25, -0.55],
-    [4.1, 13.1, -11.25, -10.25],
-    [-9.6, 4.6, -12.95, -12.0],
-  ],
-  /** roseGarden(): six hedged beds on the gravel, [x0, z0], 2.6 × 1.5 each. */
-  roseBeds: [0, 1].flatMap((c) =>
-    [0, 1, 2].map((r) => [-12.6 + 3.2 * c, 3.85 + 1.85 * r] as const),
-  ),
-  plazaRadius: 4.2,
-  fountainWater: 1.3,
 } as const;
 
 // --- Projection and shapes ------------------------------------------------------------------
@@ -448,20 +432,22 @@ export function blueprintPieces(landmark: CampusTheme["landmark"], player: Vec2)
     const t = ((k / 12) * Math.PI) / 2;
     lake.push([LAKE.x - LAKE.rx * Math.cos(t), LAKE.z - LAKE.rz * Math.sin(t)]);
   }
-  const paths = MIRROR.paths.map(([x0, x1, z0, z1]) => flat("path", rect(x0, x1, z0, z1), 0.012));
+  const paths = [...PATHS.front, ...PATHS.low, ...PATHS.back].map(([x0, x1, z0, z1]) =>
+    flat("path", rect(x0, x1, z0, z1), 0.012),
+  );
   const flats: Shape[][] = [
     [flat("water", lake, 0.008)],
     paths.slice(0, 3),
     paths.slice(3, 6),
     [
       ...paths.slice(6, 8),
-      ...MIRROR.roseBeds.map(([x0, z0]) => flat("foliage", rect(x0, x0 + 2.6, z0, z0 + 1.5), 0.14)),
+      ...ROSE_BEDS.map(([x0, z0]) => flat("foliage", rect(x0, x0 + 2.6, z0, z0 + 1.5), 0.14)),
     ],
     paths.slice(8),
-    [disc("path", PLAZA.x, PLAZA.z, MIRROR.plazaRadius, 0.04)],
+    [disc("path", PLAZA.x, PLAZA.z, PLAZA_RADIUS, 0.04)],
     [
       disc("foliage", PLAZA.x, PLAZA.z, FOUNTAIN_RADIUS, 0.14),
-      disc("water", PLAZA.x, PLAZA.z, MIRROR.fountainWater, 0.22),
+      disc("water", PLAZA.x, PLAZA.z, FOUNTAIN_WATER, 0.22),
     ],
   ];
   flats.forEach((shapes, i) => add("flat", 0.55 + (0.05 * i) / (flats.length - 1), shapes));
