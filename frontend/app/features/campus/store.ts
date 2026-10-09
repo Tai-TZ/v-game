@@ -1,6 +1,8 @@
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 
+import type { TimeOfDay } from "~/features/theme/schema";
+
 import {
   INTERACT_RADIUS,
   NPC_SPOT,
@@ -40,9 +42,13 @@ export interface HubState {
   metLan: boolean;
   /** Height (px) of the bottom sheet covering the scene, for the follow camera. */
   sheetInset: number;
+  /** Light preset the player picked (N8); null follows the theme's default. */
+  time: TimeOfDay | null;
   motion: Motion;
   /** Requests a frame from the scene (`invalidate`); a no-op until the scene mounts. */
   wake: () => void;
+  /** True while the 3D scene is mounted: scene-only controls (the dusk toggle) show only then. */
+  sceneUp: boolean;
 
   setNearby: (target: InteractTarget | null) => void;
   openDialog: () => void;
@@ -53,7 +59,9 @@ export interface HubState {
   /** Click-to-move to `goal`, through the lane waypoints when it is in another part of campus. */
   walkTo: (goal: Vec2) => void;
   setSheetInset: (px: number) => void;
-  setWake: (wake: () => void) => void;
+  setTime: (time: TimeOfDay) => void;
+  /** The scene's `invalidate` on mount; null on unmount. */
+  setWake: (wake: (() => void) | null) => void;
 }
 
 const noop = () => undefined;
@@ -64,6 +72,7 @@ export function createHubStore() {
     dialog: null,
     metLan: false,
     sheetInset: 0,
+    time: null,
     motion: {
       position: { ...SPAWN },
       heading: SPAWN_HEADING,
@@ -73,6 +82,7 @@ export function createHubStore() {
       keys: new Set(),
     },
     wake: noop,
+    sceneUp: false,
 
     setNearby: (nearby) => {
       if (nearby !== get().nearby) set({ nearby });
@@ -116,7 +126,8 @@ export function createHubStore() {
         get().wake();
       }
     },
-    setWake: (wake) => set({ wake }),
+    setTime: (time) => set({ time }),
+    setWake: (wake) => set({ wake: wake ?? noop, sceneUp: wake !== null }),
   }));
 }
 

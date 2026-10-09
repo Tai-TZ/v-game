@@ -42,6 +42,16 @@ describe("hub store", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it("knows whether the scene is up from its wake handle", () => {
+    const store = createHubStore();
+    expect(store.getState().sceneUp).toBe(false);
+    store.getState().setWake(vi.fn());
+    expect(store.getState().sceneUp).toBe(true);
+    store.getState().setWake(null);
+    expect(store.getState().sceneUp).toBe(false);
+    expect(() => store.getState().wake()).not.toThrow();
+  });
+
   it("places the player next to the librarian when talking from the zone list", () => {
     const store = createHubStore();
     const wake = vi.fn();

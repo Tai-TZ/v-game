@@ -136,7 +136,7 @@ export function useHubFrame(options: {
 
   useEffect(() => {
     hubStore.getState().setWake(invalidate);
-    return () => hubStore.getState().setWake(() => undefined);
+    return () => hubStore.getState().setWake(null);
   }, [invalidate]);
 
   // Keyboard: movement keys and E. Ignored while focus is in a button, input or dialog.
