@@ -48,12 +48,13 @@ export function PageFrame({
     was.current = revalidation;
   }, [revalidation]);
 
-  // The next page's data is loading (a sleeping API can take half a minute): say so.
-  const loading = useNavigation().state === "loading";
+  // The next page's data is loading (a sleeping API can take half a minute): say so. "Thử lại"
+  // is a revalidation, which leaves the navigation idle.
+  const loading = useNavigation().state === "loading" || revalidation === "loading";
 
   return (
     <>
-      <header className="relative h-16 border-b border-line bg-surface">
+      <header className="h-16 border-b border-line bg-surface">
         <div className={`${box} flex h-full items-center justify-between gap-4`}>
           <Link to={back} className={buttonClass("inline")}>
             <ChevronLeftIcon />
@@ -65,10 +66,14 @@ export function PageFrame({
           {loading ? "Đang tải trang…" : ""}
         </p>
         {loading && (
-          <div aria-hidden="true" className="absolute inset-x-0 -bottom-px h-1 overflow-hidden">
-            <div className="h-full animate-appear">
-              <div className="h-full w-1/3 animate-poster-bar bg-brand motion-reduce:animate-none" />
-            </div>
+          // Fixed: the header scrolls away, and "Vào màn" can be far down a phone's page. With
+          // reduced motion a still bar across the screen, not a strip stuck at a third.
+          <div
+            data-page-loading
+            aria-hidden="true"
+            className="fixed inset-x-0 top-0 z-50 h-1 animate-appear overflow-hidden"
+          >
+            <div className="h-full w-1/3 animate-poster-bar bg-brand motion-reduce:w-full motion-reduce:animate-none" />
           </div>
         )}
       </header>
