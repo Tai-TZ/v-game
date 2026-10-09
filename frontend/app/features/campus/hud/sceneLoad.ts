@@ -72,7 +72,7 @@ export function sceneMounted(live: boolean) {
   if (live) advanceScene(STAGE.build);
 }
 
-export const failScene = () => sceneLoad.setState({ failed: true });
+export const failScene = () => sceneLoad.setState({ failed: true, since: performance.now() });
 
 /** Per stage: the progress floor a, the ceiling b it never reaches, and the easing time τ (ms). */
 export const CEILINGS: readonly (readonly [number, number, number])[] = [

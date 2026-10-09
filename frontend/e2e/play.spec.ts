@@ -22,6 +22,7 @@ test.describe("campus hub", () => {
     page.on("request", (request) => requested.push(request.url()));
     await page.goto("/play?debug=frames");
     const frames = await waitForIdleScene(page);
+    await expect(page.locator("[data-scene-loader]")).toHaveCount(0);
     const before = await frames();
     // Measuring idleness needs time to pass; no state is being waited for here.
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 2000)));

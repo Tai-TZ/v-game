@@ -7,7 +7,7 @@ import { InteractHint } from "~/features/campus/hud/InteractHint";
 import { LanDialog } from "~/features/campus/hud/LanDialog";
 import { advanceScene, beginScene, STAGE } from "~/features/campus/hud/sceneLoad";
 import { SceneBoundary } from "~/features/campus/hud/SceneBoundary";
-import { ScenePoster } from "~/features/campus/hud/ScenePoster";
+import { SceneLoader } from "~/features/campus/hud/SceneLoader";
 import { siteInfo, type InteractTarget } from "~/features/campus/sites";
 import { hubStore, useHub } from "~/features/campus/store";
 import { loadZoneList } from "~/features/zones/api";
@@ -40,7 +40,7 @@ export function clientLoader({ request }: Route.ClientLoaderArgs) {
 export function HydrateFallback() {
   return (
     <main className="relative h-dvh overflow-hidden bg-scene">
-      <ScenePoster />
+      <SceneLoader shell />
     </main>
   );
 }
@@ -103,12 +103,14 @@ export default function Play({ loaderData }: Route.ComponentProps) {
           làm được qua nút Các khu.
         </p>
         <SceneBoundary>
-          <Suspense fallback={<ScenePoster />}>
+          {/* The loader below covers the wait, outside Suspense, until the first frame. */}
+          <Suspense fallback={null}>
             <CampusScene sites={sites} onInteract={onInteract} />
           </Suspense>
         </SceneBoundary>
       </div>
 
+      <SceneLoader />
       <HubTopBar zones={zones} onTalk={() => hubStore.getState().talkToLan()} onRetry={retry} />
       <InteractHint sites={sites} onInteract={onInteract} />
 

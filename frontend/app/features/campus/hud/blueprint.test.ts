@@ -200,7 +200,7 @@ describe("blueprintPieces", () => {
 
 describe("loader modules", () => {
   it("never import three.js, r3f or the scene chunk", () => {
-    for (const file of ["sceneLoad.ts", "blueprint.ts"]) {
+    for (const file of ["sceneLoad.ts", "blueprint.ts", "SceneLoader.tsx"]) {
       const source = readFileSync(
         path.resolve(process.cwd(), "app", "features", "campus", "hud", file),
         "utf8",
