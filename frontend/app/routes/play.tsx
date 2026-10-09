@@ -9,6 +9,7 @@ import { NpcDialog } from "~/features/campus/hud/NpcDialog";
 import { advanceScene, beginScene, STAGE } from "~/features/campus/hud/sceneLoad";
 import { SceneBoundary } from "~/features/campus/hud/SceneBoundary";
 import { SceneLoader } from "~/features/campus/hud/SceneLoader";
+import { WeatherLayer } from "~/features/campus/hud/WeatherLayer";
 import {
   FIRST_LIBRARY_LEVEL,
   isSpeaker,
@@ -104,7 +105,12 @@ export default function Play({ loaderData }: Route.ComponentProps) {
   const npcSite = npcZone ? sites[npcZone] : null;
 
   return (
-    <main className="relative h-dvh overflow-hidden bg-scene">
+    // The sky is attributes, not an inline style (CSP); app.css turns them into --vg-sky.
+    <main
+      data-sky={look.sky}
+      data-clouds={look.clouds}
+      className="relative h-dvh overflow-hidden bg-scene"
+    >
       <h1 className="sr-only">Khuôn viên</h1>
       {/* role="application": keys typed here move the player instead of scrolling the page. */}
       <div
@@ -114,7 +120,7 @@ export default function Play({ loaderData }: Route.ComponentProps) {
         tabIndex={0}
         aria-label="Sa bàn khuôn viên"
         aria-describedby="campus-scene-help"
-        className="absolute inset-0 focus-visible:-outline-offset-4"
+        className="on-scene absolute inset-0 focus-visible:-outline-offset-4"
       >
         <p id="campus-scene-help" className="sr-only">
           Dùng phím mũi tên hoặc W, A, S, D để đi, phím E để nói chuyện hoặc vào khu. Mọi việc cũng
@@ -129,6 +135,7 @@ export default function Play({ loaderData }: Route.ComponentProps) {
         </SceneBoundary>
       </div>
 
+      <WeatherLayer look={look} />
       <SceneLoader />
       <HubTopBar zones={zones} onTalk={(who) => hubStore.getState().talkTo(who)} onRetry={retry} />
       <InteractHint sites={sites} onInteract={onInteract} />

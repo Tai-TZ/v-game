@@ -141,6 +141,49 @@
     }
   }
 
+  /*
+   * The hub's flat sky (art §2.5, campus v0.4 W5): <main data-sky data-clouds> picks the phase's
+   * colour, then mixes in the cloud grey (30 % for a few clouds; full cover: all of it by day and
+   * night, 60 % at dawn and dusk). bg-scene reads --vg-sky.
+   */
+  [data-sky] {
+    --vg-phase-sky: var(--vg-scene-sky);
+    --vg-sky: var(--vg-phase-sky);
+  }
+  [data-sky="dawn"] {
+    --vg-phase-sky: var(--vg-scene-dawn);
+  }
+  [data-sky="dusk"] {
+    --vg-phase-sky: var(--vg-scene-dusk);
+  }
+  [data-sky="night"] {
+    --vg-phase-sky: var(--vg-scene-night);
+  }
+  [data-sky][data-clouds="some"] {
+    --vg-sky: color-mix(in srgb, var(--vg-scene-cloud) 30%, var(--vg-phase-sky));
+  }
+  [data-sky][data-clouds="full"] {
+    --vg-sky: var(--vg-scene-cloud);
+  }
+  [data-sky="dawn"][data-clouds="full"],
+  [data-sky="dusk"][data-clouds="full"] {
+    --vg-sky: color-mix(in srgb, var(--vg-scene-cloud) 60%, var(--vg-phase-sky));
+  }
+  [data-sky="night"][data-clouds="some"] {
+    --vg-sky: color-mix(in srgb, var(--vg-scene-cloud-night) 30%, var(--vg-phase-sky));
+  }
+  [data-sky="night"][data-clouds="full"] {
+    --vg-sky: var(--vg-scene-cloud-night);
+  }
+
+  /*
+   * Controls standing on the scene (.on-scene and its direct children) ring in the surface colour
+   * on the night sky, where the brand ring fades to about 2:1 (weather-time-visuals §4.2).
+   */
+  [data-sky="night"] :is(.on-scene, .on-scene > *):focus-visible {
+    outline-color: var(--color-surface);
+  }
+
   /* Set by the theme bootstrap script until a saved theme's stylesheet has applied. */
   .vg-theme-loading,
   .vg-theme-loading * {
@@ -296,6 +339,9 @@
     outline: 2px solid var(--color-brand);
     outline-offset: -4px;
   }
+  [data-sky="night"] [data-campus-scene]:focus-visible ~ [data-scene-loader] {
+    outline-color: var(--color-surface);
+  }
 
   /* A logo block snapping in as its loading step completes (16-unit tile). */
   .vb-snap {
@@ -336,5 +382,120 @@
   from {
     opacity: 0;
     transform: translateY(-3px);
+  }
+}
+
+@layer components {
+  /*
+   * Weather overlays (weather-time-visuals §2.4): compositor-only animation over the canvas, so
+   * the WebGL scene stays idle. Rain is a 160 px mask tile moved down exactly one tile per cycle,
+   * so the last frame is the first: the global reduced-motion rule leaves it a still picture.
+   */
+  .weather-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .weather-rain {
+    --rain-tile: 160px;
+  }
+  [data-weather="drizzle"] .weather-rain {
+    --rain-tile: 240px;
+  }
+  .weather-rain::before,
+  .weather-rain[data-dense]::after {
+    content: "";
+    position: absolute;
+    inset: calc(-1 * var(--rain-tile)) 0 0 0;
+    background-color: var(--color-surface);
+    mask-image: url("./assets/rain.svg");
+    mask-size: var(--rain-tile) var(--rain-tile);
+    opacity: 0.5;
+    will-change: transform;
+    animation: vg-rain 0.45s linear infinite;
+  }
+  [data-weather="drizzle"] .weather-rain::before {
+    opacity: 0.32;
+    animation-duration: 1.1s;
+  }
+  .weather-rain[data-dense]::after {
+    mask-position: 80px 40px;
+    opacity: 0.6;
+    animation-duration: 0.37s;
+  }
+  /* Thicker at the top of the screen, the far side of the iso view; the only gradient (art §1.3). */
+  .weather-fog {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-scene) 70%, transparent) 0%,
+      color-mix(in srgb, var(--color-scene) 30%, transparent) 65%,
+      color-mix(in srgb, var(--color-scene) 18%, transparent) 100%
+    );
+  }
+  .weather-storm {
+    position: absolute;
+    inset: 0;
+    background-color: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+  /*
+   * Lightning under the WCAG 2.3.1 flash threshold: a white layer at most 0.08 opaque changes
+   * relative luminance by at most 0.08 (the threshold is 0.10), two rises in any second, a 23 s
+   * cycle. One element, under the labels and the HUD, so no text flashes.
+   */
+  .weather-flash {
+    position: absolute;
+    inset: 0;
+    background-color: var(--color-surface);
+    opacity: 0;
+    animation: vg-flash 23s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .weather-flash {
+      display: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .weather-layer {
+      display: none;
+    }
+  }
+}
+
+@keyframes vg-rain {
+  to {
+    transform: translate3d(0, var(--rain-tile), 0);
+  }
+}
+/* A double stroke at 30 %, a single one at 78 %: up in 70 ms, out in 300–500 ms. */
+@keyframes vg-flash {
+  0%,
+  30% {
+    opacity: 0;
+  }
+  30.3% {
+    opacity: 0.08;
+  }
+  31.2% {
+    opacity: 0.02;
+  }
+  31.6% {
+    opacity: 0.07;
+  }
+  33.8% {
+    opacity: 0;
+  }
+  78% {
+    opacity: 0;
+  }
+  78.3% {
+    opacity: 0.06;
+  }
+  80.5%,
+  100% {
+    opacity: 0;
   }
 }

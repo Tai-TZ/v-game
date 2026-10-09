@@ -68,14 +68,14 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
 
   return (
     <>
-      <div className="absolute top-4 left-4 z-20 flex gap-2 lg:top-6 lg:left-6">
+      <div className="on-scene absolute top-4 left-4 z-20 flex gap-2 lg:top-6 lg:left-6">
         <Link to="/" className={buttonClass("secondary", "max-sm:w-11 max-sm:px-0")}>
           <ChevronLeftIcon />
           <span className="sr-only sm:not-sr-only">Về trang chủ</span>
         </Link>
       </div>
 
-      <div className="absolute top-4 right-4 z-20 flex gap-2 lg:top-6 lg:right-6">
+      <div className="on-scene absolute top-4 right-4 z-20 flex gap-2 lg:top-6 lg:right-6">
         <button
           ref={toggleRef}
           type="button"

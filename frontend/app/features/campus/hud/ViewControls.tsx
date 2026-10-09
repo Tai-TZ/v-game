@@ -39,7 +39,7 @@ export function ViewControls() {
     <div
       role="group"
       aria-label="Góc nhìn"
-      className="absolute right-4 bottom-20 z-20 flex rounded-sm border border-line-strong bg-surface lg:right-6 lg:bottom-6"
+      className="on-scene absolute right-4 bottom-20 z-20 flex rounded-sm border border-line-strong bg-surface lg:right-6 lg:bottom-6"
     >
       <button
         type="button"
