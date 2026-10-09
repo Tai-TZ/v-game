@@ -71,7 +71,7 @@ export interface HubDialog {
 /** The hub's sky (campus v0.4 W3): written only on change, never per frame. */
 export interface HubSky {
   phase: Phase;
-  /** The last good /api/weather body; null until one arrives. */
+  /** The last good weather (from Open-Meteo); null until one arrives. */
   weather: Weather | null;
   /** No weather yet and the last fetch failed: the chip says so instead of "loading". */
   failed: boolean;

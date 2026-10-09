@@ -61,21 +61,6 @@ describe("theme sky data (campus v0.4 W2)", () => {
     for (const token of SKY_TOKENS) expect(css, token).toMatch(new RegExp(`${token}:\\s*#`));
   });
 
-  it("stands every pack at the backend's weather place", () => {
-    const config = readFileSync(
-      path.resolve(process.cwd(), "..", "backend", "src", "vgame", "config.py"),
-      "utf8",
-    );
-    const lat = Number(/weather_latitude: float = Field\(default=([-\d.]+)/.exec(config)?.[1]);
-    const lon = Number(/weather_longitude: float = Field\(default=([-\d.]+)/.exec(config)?.[1]);
-    for (const id of ids) {
-      const { place } = parseThemeManifest(
-        JSON.parse(readFileSync(path.join(dir, id, "manifest.json"), "utf8")),
-      );
-      expect([place.lat, place.lon], id).toEqual([lat, lon]);
-    }
-  });
-
   it("refuses a place with an unknown time zone", () => {
     const manifest = JSON.parse(
       readFileSync(path.join(dir, ids[0] ?? "town", "manifest.json"), "utf8"),

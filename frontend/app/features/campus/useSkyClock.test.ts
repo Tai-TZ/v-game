@@ -2,13 +2,15 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hubStore } from "./store";
-import { useSkyClock, WEATHER_EVERY_MS, WEATHER_RETRY_MS } from "./useSkyClock";
+import { FETCH_TIMEOUT_MS, useSkyClock, WEATHER_EVERY_MS, WEATHER_RETRY_MS } from "./useSkyClock";
 
 const HANOI = { lat: 21.0285, lon: 105.8542 };
-const body = { condition: "drizzle", temperature_c: 26.4, updated_at: "2026-10-08T03:00:00Z" };
+/** Open-Meteo's reply (GMT, no offset) and what the store gets from it. */
+const upstream = { current: { time: "2026-10-08T14:00", temperature_2m: 26.43, weather_code: 51 } };
+const body = { condition: "drizzle", temperature_c: 26.4, updated_at: "2026-10-08T14:00:00.000Z" };
 const reply = (status: number) =>
   Promise.resolve(
-    new Response(JSON.stringify(status === 200 ? body : { detail: "Chưa lấy được" }), { status }),
+    new Response(JSON.stringify(status === 200 ? upstream : { reason: "Too many" }), { status }),
   );
 
 let hidden = false;
@@ -48,7 +50,7 @@ describe("useSkyClock", () => {
   });
 
   it("sets the phase at once, retries the weather 2 min after a failure, then every 30 min", async () => {
-    const fetch = vi.fn(() => reply(503));
+    const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(() => reply(429));
     vi.stubGlobal("fetch", fetch);
     localStorage.setItem("vg-hub-display", "day");
     const { unmount } = renderHook(() => useSkyClock(HANOI));
@@ -56,6 +58,11 @@ describe("useSkyClock", () => {
     expect(hubStore.getState().sky.display).toBe("day");
     await settle();
     expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0] ?? [];
+    expect(url).toBe(
+      "https://api.open-meteo.com/v1/forecast?latitude=21.0285&longitude=105.8542&current=temperature_2m%2Cweather_code&forecast_days=1",
+    );
+    expect(init).toMatchObject({ referrerPolicy: "no-referrer" });
     expect(hubStore.getState().sky).toMatchObject({ weather: null, failed: true });
 
     fetch.mockImplementation(() => reply(200));
@@ -82,6 +89,27 @@ describe("useSkyClock", () => {
     unmount();
     await act(() => vi.advanceTimersByTimeAsync(WEATHER_EVERY_MS * 2));
     expect(fetch).toHaveBeenCalledTimes(3);
+    vi.unstubAllGlobals();
+  });
+
+  it("gives up on a hung request at the timeout and retries 2 min later", async () => {
+    const fetch = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("", "AbortError")));
+        }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    hubStore.setState({ sky: { ...hubStore.getState().sky, weather: null, failed: false } });
+    const { unmount } = renderHook(() => useSkyClock(HANOI));
+    await act(() => vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS - 1));
+    expect(hubStore.getState().sky.failed).toBe(false);
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    await settle();
+    expect(hubStore.getState().sky.failed).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(WEATHER_RETRY_MS));
+    expect(fetch).toHaveBeenCalledTimes(2);
+    unmount();
     vi.unstubAllGlobals();
   });
 

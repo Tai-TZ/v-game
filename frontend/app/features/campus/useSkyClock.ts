@@ -1,21 +1,26 @@
 import { useLayoutEffect } from "react";
 
 import type { Place } from "~/features/theme/schema";
-import { getJson } from "~/lib/api";
 
-import { phaseAt, readDisplay, WeatherSchema } from "./sky";
+import { forecastUrl, parseForecast, phaseAt, readDisplay } from "./sky";
 import { hubStore } from "./store";
 
 const PHASE_EVERY_MS = 60_000;
-/** After a good reply; Open-Meteo's current values move every 15 min, the API caches 15 min. */
+/** After a good reply; Open-Meteo's current values move every 15 min. */
 export const WEATHER_EVERY_MS = 30 * 60_000;
-/** After a failure: the API's Retry-After (a Render wake takes about a minute). */
+/** After a failure (a 429, the network, a bad reply). */
 export const WEATHER_RETRY_MS = 2 * 60_000;
+/**
+ * A request still open after this counts as a failure, so a hung one cannot stop the schedule.
+ * Generous: a slow phone network still gets its answer (and e2e holds one until the scene rests).
+ */
+export const FETCH_TIMEOUT_MS = 60_000;
 
 /**
  * Keeps the hub store's sky current (campus v0.4 W3): the phase from the sun at `place` every
- * minute and on return to the tab; the weather on mount, then every 30 min (2 min after a
- * failure), only while the tab is visible. Every failure is silent: weather is decoration.
+ * minute and on return to the tab; the weather from Open-Meteo, straight from the browser, on
+ * mount, then every 30 min (2 min after a failure), only while the tab is visible. Every failure
+ * is silent: weather is decoration.
  * Call once, from the /play route.
  */
 export function useSkyClock(place: Pick<Place, "lat" | "lon">) {
@@ -32,6 +37,7 @@ export function useSkyClock(place: Pick<Place, "lat" | "lon">) {
 
     let controller: AbortController | null = null;
     let timer: number | undefined;
+    let stopped = false;
     /** A fetch fell due while the tab was hidden: it runs when the tab shows again. */
     let due = false;
     const visible = () => document.visibilityState === "visible";
@@ -45,17 +51,21 @@ export function useSkyClock(place: Pick<Place, "lat" | "lon">) {
       }
       const request = new AbortController();
       controller = request;
-      getJson("/api/weather", WeatherSchema, request.signal).then(
-        (weather) => {
+      const timeout = window.setTimeout(() => request.abort(), FETCH_TIMEOUT_MS);
+      // No referrer: Open-Meteo learns the visitor's IP (the popover says so), not the page.
+      void fetch(forecastUrl({ lat, lon }), {
+        signal: request.signal,
+        referrerPolicy: "no-referrer",
+      })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((json: unknown) => parseForecast(json, Date.now()))
+        .catch(() => null)
+        .then((weather) => {
+          window.clearTimeout(timeout);
+          if (stopped) return;
           store.setWeather(weather);
-          later(WEATHER_EVERY_MS);
-        },
-        () => {
-          if (request.signal.aborted) return;
-          store.setWeather(null);
-          later(WEATHER_RETRY_MS);
-        },
-      );
+          later(weather ? WEATHER_EVERY_MS : WEATHER_RETRY_MS);
+        });
     }
     const onVisibility = () => {
       if (!visible()) return;
@@ -68,6 +78,7 @@ export function useSkyClock(place: Pick<Place, "lat" | "lon">) {
     document.addEventListener("visibilitychange", onVisibility);
     fetchWeather();
     return () => {
+      stopped = true;
       window.clearInterval(clock);
       window.clearTimeout(timer);
       controller?.abort();
