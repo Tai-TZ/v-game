@@ -12,7 +12,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Only PR runs are superseded. A cancelled run on main leaves Render's checksPass trigger
+  # without a green commit, so that commit's backend changes never deploy (#24 did not).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gitleaks:
