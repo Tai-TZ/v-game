@@ -5,13 +5,15 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
 import { cameraCentre, desiredCentre, toScreen, viewFor } from "../app/features/campus/camera";
-import { BASE, SPAWN } from "../app/features/campus/layout";
+import { arrivalPose, BASE, siteFor, SPAWN, type Vec2 } from "../app/features/campus/layout";
 import { bundleReport, expect, mockApi, test, waitForIdleScene } from "./fixtures";
 
 const CLIENT_DIR = path.resolve(import.meta.dirname, "..", "build", "client");
 const VIEWPORTS = [
-  { width: 1280, height: 800, project: "desktop" },
-  { width: 375, height: 812, project: "mobile" },
+  // Overview: the board's back corner (top of the diamond) is on screen.
+  { width: 1280, height: 800, project: "desktop", at: null, edge: [BASE.minX, BASE.minZ] },
+  // Follow mode, arriving at the library: a point on the board's back-left edge.
+  { width: 375, height: 812, project: "mobile", at: "library", edge: [BASE.minX, -11.5] },
 ] as const;
 
 const loader = (page: Page) => page.locator("[data-scene-loader]");
@@ -37,9 +39,9 @@ async function holdScene(page: Page) {
 }
 
 /** Where a ground point lands on screen in the first 3D frame (useHubFrame's first camera). */
-function groundPixel(width: number, height: number, x: number, z: number) {
+function groundPixel(width: number, height: number, x: number, z: number, player: Vec2 = SPAWN) {
   const view = viewFor(width, height);
-  const focus = toScreen(SPAWN.x, 0, SPAWN.z);
+  const focus = toScreen(player.x, 0, player.z);
   const centre = cameraCentre(desiredCentre(focus, focus, view), view);
   const p = toScreen(x, 0, z);
   return {
@@ -222,26 +224,31 @@ test.describe("scene loader", () => {
           .toEqual([]);
         release();
       });
+
+      test("hands over to a 3D board that starts where the blueprint's did", async ({ page }) => {
+        await mockApi(page);
+        const { at, edge } = viewport;
+        await page.goto(at ? `/play?at=${at}&debug=frames` : "/play?debug=frames");
+        await waitForIdleScene(page);
+        await expect(loader(page)).toHaveCount(0);
+        // A point on a back edge of the board, projected like the blueprint: 4 px above it is
+        // sky (the page's own colour behind the transparent canvas), 4 px below it the board.
+        const [x, z] = edge;
+        const player = at ? arrivalPose(siteFor(at)).position : SPAWN;
+        const point = groundPixel(viewport.width, viewport.height, x, z, player);
+        const pixel = async (px: number, py: number) => {
+          const shot = await page.screenshot({
+            clip: { x: Math.round(px), y: Math.round(py), width: 1, height: 1 },
+            scale: "css",
+          });
+          return shot.toString("base64");
+        };
+        const sky = await pixel(2, at ? 100 : viewport.height - 2);
+        expect(await pixel(point.x, point.y - 4)).toBe(sky);
+        expect(await pixel(point.x, point.y + 4)).not.toBe(sky);
+      });
     });
   }
-
-  test("hands over to a 3D board that starts where the blueprint's did", async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name !== "desktop", "Pixel positions are for 1280×800.");
-    await mockApi(page);
-    await page.goto("/play?debug=frames");
-    await waitForIdleScene(page);
-    await expect(loader(page)).toHaveCount(0);
-    // The board's back corner (top of the diamond), projected like the blueprint: 1 px clips of
-    // the sky far from the model, 8 px above the corner (sky) and 8 px below it (the board).
-    const top = groundPixel(1280, 800, BASE.minX, BASE.minZ);
-    const pixel = (x: number, y: number) =>
-      page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } });
-    const sky = await pixel(2, 798);
-    expect((await pixel(top.x, top.y - 8)).equals(sky)).toBe(true);
-    expect((await pixel(top.x, top.y + 8)).equals(sky)).toBe(false);
-  });
 
   test.describe("before any JS runs", () => {
     test.use({ javaScriptEnabled: false });
