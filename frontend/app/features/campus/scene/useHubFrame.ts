@@ -2,14 +2,15 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useRef } from "react";
 import {
   Box3,
+  Group,
   Plane,
   Raycaster,
   Vector2,
   Vector3,
-  type Group,
+  SkinnedMesh,
+  type Material,
   type Mesh,
   type Object3D,
-  type SkinnedMesh,
 } from "three";
 
 import {
@@ -43,7 +44,17 @@ import {
 import { isMovementKey, nearestWithin, step } from "../movement";
 import { INTERACT_POINTS, type InteractTarget } from "../sites";
 import { easeView, hubStore, type HubDialog } from "../store";
-import { setState, updateAnim, type CastAnim } from "./cast";
+import {
+  buildFigure,
+  CAST_SCALE,
+  castClips,
+  createAnim,
+  setState,
+  updateAnim,
+  type CastAnim,
+  type CastJson,
+  type CastRole,
+} from "./cast";
 import { LABEL_ANCHORS, labelElements, labelWidths, viewNeedle, type LabelId } from "./labels";
 
 /** People stand this far above the ground (their baked discs lie under it). */
@@ -67,6 +78,41 @@ export interface CastFigure {
 export interface Figures {
   player: CastFigure;
   people: Record<Speaker, CastFigure>;
+}
+
+/**
+ * One skinned figure per person, posed at rest (integration spec §3): the player's x-ray shares
+ * its geometry and skeleton; the NPCs stand at their spots, the player and the librarian go in
+ * the groups the frame loop moves and turns.
+ */
+export function castFigures(
+  cast: CastJson,
+  materials: Record<"figure" | "xray", Material>,
+): Figures {
+  const clips = castClips(cast);
+  const make = (role: CastRole): CastFigure => {
+    const mesh = buildFigure(cast, role, materials.figure);
+    const body = new Group();
+    body.scale.setScalar(CAST_SCALE);
+    body.add(mesh);
+    return { mesh, body, anim: createAnim(mesh, clips) };
+  };
+  const player = make("player");
+  const xray = new SkinnedMesh(player.mesh.geometry, materials.xray);
+  xray.bind(player.mesh.skeleton, player.mesh.bindMatrix);
+  xray.frustumCulled = false;
+  xray.renderOrder = 1;
+  player.mesh.renderOrder = 2;
+  player.body.add(xray);
+  const people = Object.fromEntries(SPEAKERS.map(({ id }) => [id, make(id)])) as Record<
+    Speaker,
+    CastFigure
+  >;
+  for (const { id, spot, yaw } of NPCS) {
+    people[id].body.position.set(spot.x, FIGURE_Y, spot.z);
+    people[id].body.rotation.y = yaw;
+  }
+  return { player, people };
 }
 const RING_INTRO = 0.18;
 const RING_PULSE = 0.7;

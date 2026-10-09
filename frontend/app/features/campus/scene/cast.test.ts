@@ -7,6 +7,7 @@ import {
   Box3,
   Color,
   MathUtils,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   SRGBColorSpace,
   Vector3,
@@ -31,6 +32,8 @@ import {
   type CastJson,
   type CastRole,
 } from "./cast";
+import { NPCS } from "../layout";
+import { castFigures, FIGURE_Y } from "./useHubFrame";
 
 const FILE = path.resolve(process.cwd(), "public", "models", "cast.json");
 const text = readFileSync(FILE, "utf8");
@@ -394,5 +397,25 @@ describe("cast animation (integration spec §5.1)", () => {
     expect(anim.current).toBe("run");
     expect(updateAnim(anim, 1 / 60, 0, true)).toBe(false);
     expect(snapshot(mesh)).toBe(rest);
+  });
+});
+
+describe("castFigures (integration spec §3)", () => {
+  it("binds the x-ray to the player's skeleton and stands each NPC on its spot", () => {
+    const xrayMaterial = new MeshBasicMaterial();
+    const { player, people } = castFigures(cast, { figure: material, xray: xrayMaterial });
+    const xray = player.body.children.find((child) => child !== player.mesh) as SkinnedMesh;
+    // Shared skeleton and geometry: the silhouette follows every walk and run pose.
+    expect(xray.skeleton).toBe(player.mesh.skeleton);
+    expect(xray.geometry).toBe(player.mesh.geometry);
+    expect(xray.material).toBe(xrayMaterial);
+    expect([xray.renderOrder, player.mesh.renderOrder]).toEqual([1, 2]);
+    for (const { id, spot, yaw } of NPCS) {
+      expect(people[id].body.position.toArray(), id).toEqual([spot.x, FIGURE_Y, spot.z]);
+      expect(people[id].body.rotation.y, id).toBe(yaw);
+    }
+    disposeFigure(player.mesh);
+    for (const { mesh } of Object.values(people)) disposeFigure(mesh);
+    xrayMaterial.dispose();
   });
 });

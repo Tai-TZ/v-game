@@ -3,13 +3,12 @@ import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState
 import {
   Color,
   GreaterDepth,
-  Group,
   MeshBasicMaterial,
   MeshLambertMaterial,
   MultiplyBlending,
   NotEqualStencilFunc,
   ReplaceStencilOp,
-  SkinnedMesh,
+  type SkinnedMesh,
   type BufferGeometry,
   type InstancedMesh,
   type Material,
@@ -23,7 +22,7 @@ import type { CampusTheme, TimeOfDay } from "~/features/theme/schema";
 import { cameraOffset } from "../camera";
 import { advanceScene, sceneLoad, sceneMounted, STAGE, type SceneLoad } from "../hud/sceneLoad";
 import { ViewControls } from "../hud/ViewControls";
-import { NPC_SPOT, NPCS, SITES, SPEAKERS, type Speaker } from "../layout";
+import { NPC_SPOT, NPCS, SITES } from "../layout";
 import { siteLooks, type InteractTarget, type SiteInfoMap } from "../sites";
 import { hubStore, useHub } from "../store";
 import {
@@ -33,19 +32,9 @@ import {
   treeMatrix,
   type TreeInstance,
 } from "./campus";
-import {
-  buildFigure,
-  CAST_SCALE,
-  castClips,
-  createAnim,
-  disposeFigure,
-  loadCast,
-  paintFigure,
-  type CastJson,
-  type CastRole,
-} from "./cast";
+import { disposeFigure, loadCast, paintFigure, type CastJson, type CastRole } from "./cast";
 import { useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
-import { FIGURE_Y, useHubFrame, type CastFigure, type Figures } from "./useHubFrame";
+import { castFigures, FIGURE_Y, useHubFrame } from "./useHubFrame";
 import { WorldLabels } from "./WorldLabels";
 
 export interface CampusSceneProps {
@@ -144,40 +133,6 @@ interface CampusProps {
   time: TimeOfDay;
   sites: SiteInfoMap;
   options: Omit<Parameters<typeof useHubFrame>[0], "castPending" | "figures">;
-}
-
-type Materials = Record<"figure" | "xray", Material>;
-
-/**
- * One skinned figure per person, posed at rest (integration spec §3): the player's x-ray shares
- * its geometry and skeleton; the NPCs stand at their spots, the player and the librarian go in
- * the groups the frame loop moves and turns.
- */
-function castFigures(cast: CastJson, materials: Materials): Figures {
-  const clips = castClips(cast);
-  const make = (role: CastRole): CastFigure => {
-    const mesh = buildFigure(cast, role, materials.figure);
-    const body = new Group();
-    body.scale.setScalar(CAST_SCALE);
-    body.add(mesh);
-    return { mesh, body, anim: createAnim(mesh, clips) };
-  };
-  const player = make("player");
-  const xray = new SkinnedMesh(player.mesh.geometry, materials.xray);
-  xray.bind(player.mesh.skeleton, player.mesh.bindMatrix);
-  xray.frustumCulled = false;
-  xray.renderOrder = 1;
-  player.mesh.renderOrder = 2;
-  player.body.add(xray);
-  const people = Object.fromEntries(SPEAKERS.map(({ id }) => [id, make(id)])) as Record<
-    Speaker,
-    CastFigure
-  >;
-  for (const { id, spot, yaw } of NPCS) {
-    people[id].body.position.set(spot.x, FIGURE_Y, spot.z);
-    people[id].body.rotation.y = yaw;
-  }
-  return { player, people };
 }
 
 /** The first frame is on screen: the cast's download starts only then (integration spec §2). */
