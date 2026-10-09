@@ -5,7 +5,8 @@ import { viewNeedle } from "../scene/labels";
 import { hubStore, useHub } from "../store";
 import { STAGE, useSceneLoad } from "./sceneLoad";
 
-const BUTTON = "grid size-11 place-items-center text-fg";
+// An inset ring: brand on the group's surface in every phase, never over the sky or a neighbour.
+const BUTTON = "grid size-11 place-items-center text-fg focus-visible:-outline-offset-4";
 const LIVE = "cursor-pointer hover:bg-subtle";
 const LEFT = "Xoay ngược chiều kim đồng hồ";
 const HOME = "Về góc nhìn mặc định";
@@ -39,7 +40,7 @@ export function ViewControls() {
     <div
       role="group"
       aria-label="Góc nhìn"
-      className="on-scene absolute right-4 bottom-20 z-20 flex rounded-sm border border-line-strong bg-surface lg:right-6 lg:bottom-6"
+      className="absolute right-4 bottom-20 z-20 flex rounded-sm border border-line-strong bg-surface lg:right-6 lg:bottom-6"
     >
       <button
         type="button"
