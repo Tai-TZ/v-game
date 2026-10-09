@@ -32,6 +32,7 @@ import {
   type TreeInstance,
 } from "./campus";
 import { useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
+import { useDressing } from "./useDressing";
 import { useHubFrame } from "./useHubFrame";
 import { WorldLabels } from "./WorldLabels";
 
@@ -142,7 +143,13 @@ function Campus({ campus, time, sites, options }: CampusProps) {
   const g = useCampusGeometry(campus, time, looks.library, looks.watchtower, looks.market);
   const preset = campus.lights[time];
   const sunPosition = useMemo(() => g.palette.light.sun.clone().multiplyScalar(30), [g.palette]);
-  const { player, playerBlob, lan, ring, statics, wake } = useHubFrame(options);
+  const dressing = useDressing(g.palette);
+  // Until props.json is settled, ?debug=frames keeps the scene busy: e2e must not take the gap
+  // between the first frame and the props frame for idle.
+  const { player, playerBlob, lan, ring, statics, wake } = useHubFrame({
+    ...options,
+    rebaking: options.rebaking || dressing === undefined,
+  });
   const materials = useMemo(
     () => ({
       baked: new MeshBasicMaterial({ vertexColors: true }),
@@ -181,6 +188,10 @@ function Campus({ campus, time, sites, options }: CampusProps) {
     materials.ring.color.copy(g.palette.player);
     wake();
   }, [materials, g.palette, wake]);
+  // The props arrive after the first frame: one frame draws them (or, without them, ends busy).
+  useEffect(() => {
+    if (dressing !== undefined) wake();
+  }, [dressing, wake]);
 
   // `?debug=frames` also exposes the building looks, so e2e can check the stars reach the scene.
   const looksKey = Object.entries(looks)
@@ -199,6 +210,7 @@ function Campus({ campus, time, sites, options }: CampusProps) {
       <group ref={statics}>
         <mesh geometry={g.terrain} material={materials.baked} />
         <mesh geometry={g.landmark} material={materials.baked} />
+        {dressing && <mesh geometry={dressing} material={materials.baked} />}
         {SITES.map(({ id }) => (
           <mesh key={id} geometry={g[id]} material={materials.baked} userData={{ site: id }} />
         ))}

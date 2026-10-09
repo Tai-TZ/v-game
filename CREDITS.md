@@ -11,6 +11,8 @@ anywhere (Kenney's support page, <https://kenney.nl/support>, asks that its logo
 | City Kit Commercial 2.1 (parasol table) | Kenney     | <https://kenney.nl/assets/city-kit-commercial>                                                        | CC0 1.0, [text](frontend/public/models/LICENSE-kenney-city-kit-commercial.txt) | `frontend/public/models/props.json`: palette texture baked to vertex colours                        |
 | 7 single models on Poly Pizza           | Quaternius | <https://quaternius.com>, pages listed in [the notice](frontend/public/models/LICENSE-quaternius.txt) | CC0 1.0                                                                        | `frontend/public/models/props.json`                                                                 |
 
+Where each prop stands on the campus: `frontend/app/features/campus/dressing.ts`.
+
 All files were downloaded on 2026-10-09. The raw downloads are not in the repository:
 `tools/assets-sources.json` lists every source file with its URL and SHA-256. To re-bake, use one
 directory per baker holding the files of every pack it lists (its `bake` command) under their

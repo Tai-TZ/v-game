@@ -93,10 +93,14 @@ const CYPRESSES = TREE_INSTANCES.length - ROUND_TREES;
 /**
  * Draw calls and triangles of the hub scene as CampusScene renders it: 5 static groups, the
  * sun-shadow overlay, 2 instanced tree meshes, player + x-ray, librarian, 2 ground blobs and the
- * interaction ring.
+ * interaction ring; and the props (useDressing) once they have arrived.
  */
-export function sceneBudget(g: CampusGeometry): { drawCalls: number; triangles: number } {
+export function sceneBudget(
+  g: CampusGeometry,
+  dressing?: BufferGeometry | null,
+): { drawCalls: number; triangles: number } {
   const statics = [g.terrain, g.landmark, g.library, g.watchtower, g.market, g.shadow];
+  if (dressing) statics.push(dressing);
   const triangles =
     statics.reduce((sum, geometry) => sum + triangleCount(geometry), 0) +
     triangleCount(g.roundTree) * ROUND_TREES +
