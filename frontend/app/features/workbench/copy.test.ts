@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, starterBench, type Bench, type Env } from "./bench";
-import {
-  diagnosisTarget,
-  flagWords,
-  groupDiagnosis,
-  liveMessage,
-  lowerFirst,
-  sameGraphNote,
-} from "./copy";
+import { diagnosisTarget, groupDiagnosis, liveMessage, lowerFirst, sameGraphNote } from "./copy";
 import type { Graph } from "./schema";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
 
@@ -25,11 +18,11 @@ const target = (
   graph: Graph,
   flag: string,
   ranks?: Record<string, number | null>,
-  message_vi = "",
+  cause?: string,
 ) =>
   diagnosisTarget(
     env,
-    { flag, message_vi, cases: ["c1"] },
+    { flag, ...(cause !== undefined && { cause }), cases: ["c1"] },
     ranks && { c1: { gold_chunks: ["x"], ranks, in_pack: false, flags: [] } },
     graph,
   );
@@ -55,7 +48,7 @@ describe("diagnosis copy", () => {
     ]);
   });
 
-  it("points each flag at the knob that fixes it, and a regression at the flag it names", () => {
+  it("points each flag at the knob that fixes it, and a regression at the flag that broke", () => {
     const graph = graphOf(l1);
     expect(target(l1, graph, "ret.stale_doc")).toEqual({ slot: "chunker", param: "only_in_force" });
     expect(target(l1, graph, "ret.boundary_split")?.param).toBe("strategy");
@@ -75,10 +68,13 @@ describe("diagnosis copy", () => {
     // Starter: dense only, gold at rank 9 while Móc kéo stops at 5 -> attach the drawer.
     const starter = graphOf(l3);
     expect(target(l3, starter, "ret.gold_rank:vector_search", { vs: 9 })).toEqual(keyword);
-    // The regression line ("Ai đó tháo Tủ ngăn kéo") names the same flag.
-    const regression =
-      "Ca của Hà trượt: ret.gold_rank:vector_search. Lần đổi này làm vỡ thứ đã chạy được.";
-    expect(target(l3, starter, "regression", { vs: 2 }, regression)).toEqual(keyword);
+    // A regression ("Ai đó tháo Tủ ngăn kéo") carries the same flag in `cause`, grouped or not.
+    const cause = "ret.gold_rank:vector_search";
+    expect(target(l3, starter, "regression", { vs: 2 }, cause)).toEqual(keyword);
+    const [group] = groupDiagnosis([
+      { case: "c1", flag: "regression", cause, message_vi: "Ca của Hà trượt: …" },
+    ]);
+    expect(group && diagnosisTarget(l3, group, undefined, starter)).toEqual(keyword);
     // Keyword only, rank 15: keep the dense search.
     const bmOnly = graphOf(l3, (b) =>
       setAttached(setAttached(b, "vector_search", false), "bm25_search", true),
@@ -130,22 +126,6 @@ describe("diagnosis copy", () => {
       param: "top_k",
     });
     expect(target(l1, graphOf(l1), "budget.exceeded")).toBeNull();
-  });
-
-  it("turns flag keys the server left in a message into words, and leaves unknown ones", () => {
-    expect(
-      flagWords(
-        "Ca của Hà trượt: ret.gold_rank:vector_search. Lần đổi này làm vỡ thứ đã chạy được.",
-      ),
-    ).toBe(
-      "Ca của Hà trượt: đoạn đáp án đứng ngoài số đoạn lấy về. Lần đổi này làm vỡ thứ đã chạy được.",
-    );
-    expect(flagWords("Câu #4 chưa đạt (llm.cite_unknown).")).toBe(
-      "Câu #4 chưa đạt (trích nguồn không có trong thùng).",
-    );
-    expect(flagWords("Câu #4 chưa đạt (ret.something_new).")).toBe(
-      "Câu #4 chưa đạt (ret.something_new).",
-    );
   });
 
   it("tells a rerun of the same graph what it will change", () => {

@@ -13,7 +13,6 @@ import {
   type Bench,
   type Env,
 } from "./bench";
-import { LEVEL_COPY } from "./copy";
 import type { Graph } from "./schema";
 import { LEVEL_IDS, levelFile, testEnv } from "./test-fixtures";
 
@@ -181,12 +180,19 @@ describe("domain", () => {
   });
 });
 
-describe("LEVEL_COPY", () => {
-  it("copies the star rules PublicLevel does not return from the level files", () => {
+describe("PublicLevel", () => {
+  it("carries the star rules of the level files (the captured API payloads)", () => {
     for (const id of LEVEL_IDS) {
       const { rules } = levelFile(id);
-      expect(LEVEL_COPY[id]?.s1Required).toEqual(rules.s1_required);
-      expect(LEVEL_COPY[id]?.s3ForbiddenLabels).toEqual(rules.s3_forbidden_labels);
+      const { level } = testEnv(id);
+      expect(level.s1_required).toEqual(rules.s1_required);
+      expect(level.s3_forbidden_labels).toEqual(rules.s3_forbidden_labels);
     }
+    // L3's info case runs but earns no star: 12 counted, 13 AI calls.
+    expect(testEnv("article-number-lookup").level.case_counts).toEqual({
+      normal: 10,
+      trap: 2,
+      info: 1,
+    });
   });
 });

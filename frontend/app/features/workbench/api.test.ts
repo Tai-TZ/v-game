@@ -43,7 +43,16 @@ describe("describePostError", () => {
     expect(local).toMatchObject({ title: "Chưa mở ca được", issues: null });
   });
 
-  it("429 as the server sends it today: the detail, no time, retry with the same key", () => {
+  it("429 as the server sends it: its detail, then the wait from Retry-After", () => {
+    // backend runs.py: RunBusyError.message_vi + Retry-After = RUN_DEADLINE_S (90 s).
+    const detail = "Máy chủ miễn phí chạy một lượt mỗi lúc và đang bận.";
+    const error = describePostError(429, { detail }, headers({ "Retry-After": "90" }), NOW);
+    expect(error.title).toBe("Máy chủ đang bận");
+    expect(error.lines).toEqual([detail, "Bạn có thể thử lại sau khoảng 2 phút."]);
+    expect(error.retry).toBe(true);
+  });
+
+  it("429 without Retry-After: the detail, no time, retry with the same key", () => {
     const error = describePostError(
       429,
       { detail: "Đang có nhiều lượt chạy, bạn thử lại sau ít phút." },
