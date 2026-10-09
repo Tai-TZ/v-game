@@ -19,6 +19,7 @@ from vgame.api.routes.runs import RUN_ID_PATTERN, RUN_NOT_FOUND
 from vgame.engine.types import EngineEvent
 
 MAX_REFUND: Final = 3
+SAMPLE_CASES: Final = 3  # visible cases per Library level (test_api_quota checks)
 NO_STORE: Final = {"Cache-Control": "no-store"}
 # code -> Vietnamese message of a refused refund (409).
 REFUSED_VI: Final = {
@@ -68,7 +69,7 @@ def _refundable_calls(events: Sequence[EngineEvent]) -> int | str:
     if events[-1].get("scope") != "mau":
         return "not_sample_run"
     graded = [e for e in events if e["type"] == "case.graded"]
-    if len(graded) != MAX_REFUND or not all(e["passed"] for e in graded):
+    if len(graded) != SAMPLE_CASES or not all(e["passed"] for e in graded):
         return "samples_not_passed"
     fresh = sum(
         not fact["replayed"]
