@@ -1,7 +1,9 @@
 export type ButtonVariant = "primary" | "secondary" | "on-ink" | "quiet" | "inline";
 
+// Not transition-colors: it animates outline-color too, so the focus ring faded in from the
+// text colour.
 const base =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-sm text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-sm text-sm font-semibold transition-[color,background-color,border-color] duration-150 disabled:cursor-not-allowed disabled:opacity-50";
 
 // Padding lives in the variant: an extra `px-3` cannot beat a base `px-5` in the generated CSS.
 const variants: Record<ButtonVariant, string> = {

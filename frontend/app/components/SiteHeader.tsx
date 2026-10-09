@@ -22,7 +22,7 @@ export function SiteHeader({ sections = [] }: SiteHeaderProps) {
                 <li key={section.href}>
                   <a
                     href={section.href}
-                    className="text-sm font-medium text-fg-muted transition-colors hover:text-fg"
+                    className="text-sm font-medium text-fg-muted transition-[color] hover:text-fg"
                   >
                     {section.label}
                   </a>
