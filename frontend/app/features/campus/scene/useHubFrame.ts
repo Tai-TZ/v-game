@@ -1,16 +1,30 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useRef } from "react";
-import { Plane, Raycaster, Vector2, Vector3, type Group, type Mesh, type Object3D } from "three";
+import {
+  Box3,
+  Plane,
+  Raycaster,
+  Vector2,
+  Vector3,
+  type Group,
+  type Mesh,
+  type Object3D,
+} from "three";
 
 import {
-  CAMERA_OFFSET,
   cameraCentre,
+  cameraOffset,
   desiredCentre,
+  dragRate,
   easeFactor,
   groundFromScreen,
+  HOME_YAW,
+  PIVOT,
+  rotateAbout,
+  snapYaw,
   toScreen,
   viewFor,
-  type Screen,
+  wrapAngle,
 } from "../camera";
 import {
   INTERACT_RADIUS,
@@ -23,8 +37,8 @@ import {
 } from "../layout";
 import { isMovementKey, nearestWithin, step } from "../movement";
 import { INTERACT_POINTS, type InteractTarget } from "../sites";
-import { hubStore } from "../store";
-import { LABEL_ANCHORS, labelElements, labelWidths, type LabelId } from "./labels";
+import { easeView, hubStore } from "../store";
+import { LABEL_ANCHORS, labelElements, labelWidths, viewNeedle, type LabelId } from "./labels";
 
 const FIGURE_Y = 0.045;
 const LAN_REST_YAW = Math.PI / 4;
@@ -37,8 +51,13 @@ const LABEL_MARGIN = 8;
 /** Consecutive walking frames per DPR check; more than half slower than SLOW_FRAME steps down. */
 const DPR_WINDOW = 45;
 const SLOW_FRAME = 0.022;
-
-const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+/** A press moves this far (px) before it turns the view instead of clicking (orbit §2.1). */
+const MOUSE_SLOP = 6;
+const TOUCH_SLOP = 10;
+/** A released drag settles on a diagonal in this long (orbit §2.4). */
+const SNAP_SECONDS = 0.18;
+/** The people a click can pick; the NPC cast adds theirs here. */
+const SPEAKERS = [{ id: "lan", spot: NPC_SPOT }] as const;
 
 /** Exponential approach of an angle; returns the target once within 0.01 rad. */
 function turn(current: number, target: number, tau: number, dt: number, reduced: boolean) {
@@ -68,9 +87,32 @@ function sceneHasFocus(): boolean {
 const pointer = new Vector2();
 const raycaster = new Raycaster();
 const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
-const bodyPlane = new Plane(new Vector3(0, 1, 0), -0.7);
 const hit = new Vector3();
 const projected = new Vector3();
+const bodyBox = new Box3();
+
+/**
+ * The person whose body the ray meets before any static surface (orbit-camera §2.6): a box
+ * 0.7 wide and 1.6 tall round each spot, head and feet included. From a turned view a building
+ * can stand in front of someone; the click then belongs to the building.
+ */
+export function pickNpc<T>(
+  ray: Raycaster,
+  statics: Object3D | null,
+  spots: readonly { id: T; spot: Vec2 }[],
+): T | null {
+  const [surface] = statics ? ray.intersectObject(statics, true) : [];
+  let best: T | null = null;
+  let nearest = surface?.distance ?? Infinity;
+  for (const { id, spot } of spots) {
+    bodyBox.min.set(spot.x - 0.35, 0, spot.z - 0.35);
+    bodyBox.max.set(spot.x + 0.35, 1.6, spot.z + 0.35);
+    const at = ray.ray.intersectBox(bodyBox, hit);
+    const distance = at ? at.distanceTo(ray.ray.origin) : Infinity;
+    if (distance < nearest) [best, nearest] = [id, distance];
+  }
+  return best;
+}
 
 /**
  * Where a click walks to (campus-scene v0.3 §2.5): the first surface drawn under the ray
@@ -129,7 +171,10 @@ export function useHubFrame(options: {
     walked: 0,
     ringFor: null as InteractTarget | null,
     ringTime: RING_TOTAL,
-    cam: null as Screen | null,
+    /** The camera's look-at on the ground (a screen point means something for one yaw only). */
+    look: null as Vec2 | null,
+    /** The view yaw drawn last; its change since is how far to turn the look-at. */
+    viewYaw: hubStore.getState().view.yaw,
     viewKey: "",
     inset: 0,
     insetEasing: false,
@@ -155,13 +200,22 @@ export function useHubFrame(options: {
     return () => hubStore.getState().setWake(null);
   }, [wake]);
 
-  // Keyboard: movement keys and E. Ignored while focus is in a button, input or dialog.
+  /** The press that may turn into a drag of the view (orbit-camera §2.1). */
+  const drag = useRef({ id: null as number | null, x0: 0, y0: 0, yaw0: 0, dragged: false });
+
+  // Keyboard: movement keys, E, and , . to turn the view. Ignored while focus is in a button,
+  // input or dialog.
   useEffect(() => {
     const { motion } = hubStore.getState();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
       if (!sceneHasFocus() || hubStore.getState().dialog) return;
-      if (isMovementKey(event.code)) {
+      if (event.code === "Comma" || event.code === "Period") {
+        event.preventDefault();
+        // A drag owns the yaw until it ends; one press is one 90° step.
+        if (event.repeat || (drag.current.id !== null && drag.current.dragged)) return;
+        hubStore.getState().rotateView(event.code === "Period" ? 1 : -1);
+      } else if (isMovementKey(event.code)) {
         event.preventDefault();
         motion.keys.add(event.code);
         motion.target = null;
@@ -193,9 +247,71 @@ export function useHubFrame(options: {
     };
   }, [wake]);
 
-  // Click / tap to walk: ray against the librarian's body height, then the scenery (clickGoal).
+  // Drag (mouse, pen, one finger) to turn the view; no inertia. Moves and the release are heard
+  // on window, so a drag that leaves the canvas still ends.
+  useEffect(() => {
+    const d = drag.current;
+    const onDown = (event: PointerEvent) => {
+      if (!event.isPrimary || event.button !== 0 || hubStore.getState().dialog) return;
+      Object.assign(d, {
+        id: event.pointerId,
+        x0: event.clientX,
+        y0: event.clientY,
+        dragged: false,
+      });
+      hubStore.getState().view.to = null; // a press stops a running turn where it is
+    };
+    const onMove = (event: PointerEvent) => {
+      if (event.pointerId !== d.id) return;
+      const { view, wake } = hubStore.getState();
+      if (!d.dragged) {
+        const slop = event.pointerType === "mouse" ? MOUSE_SLOP : TOUCH_SLOP;
+        if (Math.hypot(event.clientX - d.x0, event.clientY - d.y0) < slop) return;
+        // Measured from here, so the view does not jump by the slop.
+        Object.assign(d, { dragged: true, x0: event.clientX, yaw0: view.yaw });
+        view.to = null;
+        try {
+          canvas.setPointerCapture(event.pointerId);
+        } catch {
+          // An ended or synthetic pointer: the drag still runs while it stays over the canvas.
+        }
+        canvas.classList.add("cursor-grabbing");
+      }
+      view.yaw = wrapAngle(d.yaw0 - (event.clientX - d.x0) * dragRate(canvas.clientWidth));
+      wake();
+    };
+    const onUp = (event: PointerEvent | FocusEvent) => {
+      if (d.id === null || ("pointerId" in event && event.pointerId !== d.id)) return;
+      d.id = null;
+      canvas.classList.remove("cursor-grabbing");
+      if (!d.dragged) return;
+      const { view, wake } = hubStore.getState();
+      const settle = snapYaw(view.yaw, reducedMotion.current);
+      if (settle !== view.yaw) easeView(view, settle, SNAP_SECONDS);
+      wake();
+    };
+    canvas.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("blur", onUp);
+    return () => {
+      canvas.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("blur", onUp);
+    };
+  }, [canvas]);
+
+  // Click / tap to walk: the librarian if the ray meets her first (pickNpc), else the scenery
+  // (clickGoal). The click that ends a drag does nothing.
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
+      if (drag.current.dragged) {
+        drag.current.dragged = false;
+        return;
+      }
       const state = hubStore.getState();
       if (state.dialog) return;
       const rect = canvas.getBoundingClientRect();
@@ -204,8 +320,7 @@ export function useHubFrame(options: {
         -((event.clientY - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      const body = raycaster.ray.intersectPlane(bodyPlane, hit);
-      if (body && Math.hypot(body.x - NPC_SPOT.x, body.z - NPC_SPOT.z) < 0.45) {
+      if (pickNpc(raycaster, statics.current, SPEAKERS) === "lan") {
         if (state.nearby === "lan") {
           onInteract.current("lan");
           return;
@@ -231,6 +346,22 @@ export function useHubFrame(options: {
     const dt = a.wasBusy ? Math.min(delta, 0.1) : IDLE_DT;
     let busy = false;
 
+    // View yaw (orbit-camera §2.4): a drag writes view.yaw; keys, buttons and the release snap
+    // ease out (cubic) over a fixed time. First, so the keys walk along what is drawn.
+    const v = state.view;
+    if (v.to !== null) {
+      v.t += dt;
+      const k = reduced || v.t >= v.duration ? 1 : 1 - (1 - v.t / v.duration) ** 3;
+      v.yaw = wrapAngle(v.from + (v.to - v.from) * k);
+      if (k === 1) v.to = null;
+      else busy = true;
+    }
+    const turned = wrapAngle(v.yaw - a.viewYaw);
+    a.viewYaw = v.yaw;
+    // A turned frame is busy: drags count for the DPR step-down and get one closing frame.
+    if (turned !== 0) busy = true;
+    state.setRotated(Math.abs(wrapAngle(v.yaw - HOME_YAW)) > 0.001);
+
     // Movement.
     if (state.dialog) {
       motion.keys.clear();
@@ -239,7 +370,7 @@ export function useHubFrame(options: {
     }
     const moved = step(
       motion.position,
-      { keys: motion.keys, target: motion.target },
+      { keys: motion.keys, target: motion.target, yaw: v.yaw },
       dt,
       OBSTACLES,
       WORLD_BOUNDS,
@@ -303,15 +434,26 @@ export function useHubFrame(options: {
       }
     }
 
-    // Camera: fixed overview, or follow with a dead-zone (art §4).
+    // Camera: overview orbiting PIVOT, or follow with a dead-zone (art §4), both in the screen
+    // axes of the current yaw.
     const view = viewFor(size.width, size.height, state.sheetInset);
+    const at = state.dialog ? NPC_SPOT : motion.position;
+    // Turn the look-at with the view: round what follow tracks, or round PIVOT in overview, whose
+    // look-at is PIVOT + 0.416·h(yaw) (orbit-camera §1.4). Nothing slides on screen meanwhile.
+    if (turned !== 0 && a.look) {
+      a.look = rotateAbout(a.look, view.mode === "follow" ? at : PIVOT, turned);
+    }
     const shift = (view.insetTop - view.insetBottom) / (2 * view.zoom);
-    const focus = state.dialog ? toScreen(NPC_SPOT.x, 0, NPC_SPOT.z) : toScreen(x, 0, z);
+    const focus = toScreen(at.x, 0, at.z, v.yaw);
     const viewKey = `${size.width}x${size.height}`;
-    const current = a.cam ? { sx: a.cam.sx, sy: a.cam.sy - shift } : focus;
-    const goal = cameraCentre(desiredCentre(current, focus, view, state.dialog !== null), view);
-    if (!a.cam || viewKey !== a.viewKey) {
-      a.cam = goal;
+    let cam = a.look ? toScreen(a.look.x, 0, a.look.z, v.yaw) : null;
+    const current = cam ? { sx: cam.sx, sy: cam.sy - shift } : focus;
+    const goal = cameraCentre(
+      desiredCentre(current, focus, view, state.dialog !== null, v.yaw),
+      view,
+    );
+    if (!cam || viewKey !== a.viewKey) {
+      cam = goal;
       a.viewKey = viewKey;
       a.inset = view.insetBottom;
     } else {
@@ -320,23 +462,28 @@ export function useHubFrame(options: {
         a.insetEasing = true;
       }
       const k = easeFactor(a.insetEasing ? 6 : 10, dt, reduced);
-      a.cam = { sx: a.cam.sx + (goal.sx - a.cam.sx) * k, sy: a.cam.sy + (goal.sy - a.cam.sy) * k };
-      if (Math.hypot(goal.sx - a.cam.sx, goal.sy - a.cam.sy) < 0.005) {
-        a.cam = goal;
+      cam = { sx: cam.sx + (goal.sx - cam.sx) * k, sy: cam.sy + (goal.sy - cam.sy) * k };
+      if (Math.hypot(goal.sx - cam.sx, goal.sy - cam.sy) < 0.005) {
+        cam = goal;
         a.insetEasing = false;
       } else {
         busy = true;
       }
     }
-    const look = groundFromScreen(a.cam);
+    const look = groundFromScreen(cam, v.yaw);
+    a.look = look;
+    const [ox, oy, oz] = cameraOffset(v.yaw);
     const { camera } = three;
-    camera.position.set(look.x + CAMERA_OFFSET, CAMERA_OFFSET, look.z + CAMERA_OFFSET);
+    camera.position.set(look.x + ox, oy, look.z + oz);
     camera.lookAt(look.x, 0, look.z);
     if (camera.zoom !== view.zoom) {
       camera.zoom = view.zoom;
       camera.updateProjectionMatrix();
     }
     camera.updateMatrixWorld();
+    // The compass needle points where home's "up" is (a CSSOM write, like the labels).
+    const needle = viewNeedle.element;
+    if (needle) needle.style.transform = `rotate(${(v.yaw - HOME_YAW).toFixed(4)}rad)`;
 
     // DOM labels follow their anchors, clamped inside the viewport; in follow mode, hide those
     // whose anchor is well off screen.
@@ -374,6 +521,9 @@ export function useHubFrame(options: {
     if (countFrames) {
       const root = document.documentElement;
       root.dataset.frames = String(Number(root.dataset.frames ?? "0") + 1);
+      // For e2e: the view in degrees [0, 360) and the player's ground position.
+      root.dataset.yaw = (((((v.yaw * 180) / Math.PI) % 360) + 360) % 360).toFixed(3);
+      root.dataset.player = `${x.toFixed(2)},${z.toFixed(2)}`;
       // The re-bake's own commit wakes the scene again (Campus), so the flag spans the gap.
       if (busy || rebaking.current) root.dataset.sceneBusy = "";
       else delete root.dataset.sceneBusy;

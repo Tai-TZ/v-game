@@ -19,3 +19,6 @@ export const labelElements = new Map<LabelId, HTMLElement>();
 
 /** Rendered widths of the labels (px), kept current by a ResizeObserver in WorldLabels. */
 export const labelWidths = new Map<LabelId, number>();
+
+/** The compass needle of the view buttons (hud/ViewControls), turned by the frame loop. */
+export const viewNeedle: { element: SVGGElement | null } = { element: null };

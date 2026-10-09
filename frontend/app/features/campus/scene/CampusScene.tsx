@@ -18,11 +18,12 @@ import { readProgress } from "~/features/progress/progress";
 import { useActiveTheme } from "~/features/theme/context";
 import type { CampusTheme, TimeOfDay } from "~/features/theme/schema";
 
-import { CAMERA_OFFSET } from "../camera";
+import { cameraOffset } from "../camera";
 import { advanceScene, sceneMounted, STAGE } from "../hud/sceneLoad";
+import { ViewControls } from "../hud/ViewControls";
 import { NPC_SPOT, SITES } from "../layout";
 import { siteLooks, type InteractTarget, type SiteInfoMap } from "../sites";
-import { useHub } from "../store";
+import { hubStore, useHub } from "../store";
 import {
   BLOB_SEGMENTS,
   RING_SEGMENTS,
@@ -66,10 +67,13 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
 
   return (
     <>
-      {/* Dusk paints its own flat sky over the page's day sky (art §2.5). */}
+      {/*
+        Dusk paints its own flat sky over the page's day sky (art §2.5). One finger reaches the
+        drag that turns the view; two still pinch-zoom the page (orbit-camera §2.1).
+      */}
       <div
         aria-hidden="true"
-        className={`absolute inset-0 z-0 touch-manipulation ${time === "dusk" ? "bg-scene-dusk" : ""}`}
+        className={`absolute inset-0 z-0 touch-pinch-zoom select-none ${time === "dusk" ? "bg-scene-dusk" : ""}`}
       >
         <Canvas
           orthographic
@@ -82,7 +86,8 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
             near: 0.1,
             far: 200,
             zoom: 30,
-            position: [CAMERA_OFFSET, CAMERA_OFFSET, CAMERA_OFFSET],
+            // At the view's yaw, so the first frame is never drawn from the wrong side.
+            position: cameraOffset(hubStore.getState().view.yaw),
           }}
         >
           <Campus
@@ -95,6 +100,7 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
         </Canvas>
       </div>
       <WorldLabels sites={sites} />
+      <ViewControls />
     </>
   );
 }

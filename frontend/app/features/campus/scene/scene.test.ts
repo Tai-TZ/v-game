@@ -13,6 +13,7 @@ import {
   type BufferGeometry,
   type Color,
   type Material,
+  type Matrix4,
 } from "three";
 import { describe, expect, it } from "vitest";
 
@@ -26,21 +27,26 @@ import {
 } from "~/features/theme/schema";
 
 import {
-  cameraCentre,
-  CONTENT,
-  desiredCentre,
+  cameraOffset,
+  HOME_YAW,
   HUD_CORNER,
+  ORBIT_FRAME,
+  PIVOT,
   toScreen,
+  VIEW_CONTROLS,
   viewFor,
   type Screen,
 } from "../camera";
 import {
   BASE,
+  LANDMARK,
+  NPC_SPOT,
   OBSTACLES,
   routeTo,
   siteFor,
   SITES,
   SPAWN,
+  towardFor,
   WORLD_BOUNDS,
   type Vec2,
 } from "../layout";
@@ -60,7 +66,7 @@ import { LABEL_ANCHORS } from "./labels";
 import { desaturate, light, palette, shade, type Palette } from "./palette";
 import { triangleCount } from "./primitives";
 import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
-import { clickGoal } from "./useHubFrame";
+import { clickGoal, pickNpc } from "./useHubFrame";
 
 const THEMES_DIR = path.resolve(process.cwd(), "public", "themes");
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"));
@@ -165,6 +171,50 @@ const AWNINGS: [number, number, number][] = [
 ];
 /** The isometric camera's view direction: every click ray is parallel to it. */
 const VIEW = new Vector3(-1, -1, -1).normalize();
+/** The view direction of a camera turned to `yaw` (camera.ts cameraOffset, reversed). */
+const viewDirection = (yaw: number) => new Vector3(...cameraOffset(yaw)).normalize().negate();
+const DIAGONALS = [45, 135, 225, 315].map((d) => (d * Math.PI) / 180);
+const deg = (d: number) => (d * Math.PI) / 180;
+
+/**
+ * Every vertex the overview frames, as (x − PIVOT.x, y, z − PIVOT.z): the static groups and the
+ * trees placed by treeMatrix (orbit-camera §1.3).
+ */
+function framedPoints(g: CampusGeometry): Float64Array {
+  const points: number[] = [];
+  const v = new Vector3();
+  const add = (geometry: BufferGeometry, matrix?: Matrix4) => {
+    const position = geometry.getAttribute("position");
+    for (let i = 0; i < position.count; i += 1) {
+      v.fromBufferAttribute(position, i);
+      if (matrix) v.applyMatrix4(matrix);
+      points.push(v.x - PIVOT.x, v.y, v.z - PIVOT.z);
+    }
+  };
+  for (const geometry of [g.terrain, g.landmark, g.library, g.watchtower, g.market]) add(geometry);
+  for (const tree of TREE_INSTANCES) {
+    add(tree.kind === "round" ? g.roundTree : g.cypress, treeMatrix(tree));
+  }
+  return Float64Array.from(points);
+}
+
+/** Calls `visit(sx, sy)` with each point's screen position relative to PIVOT at `yaw`. */
+function eachAroundPivot(
+  points: Float64Array,
+  yaw: number,
+  visit: (sx: number, sy: number) => void,
+) {
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  const sinE = 1 / Math.sqrt(3);
+  const cosE = Math.sqrt(2 / 3);
+  for (let i = 0; i < points.length; i += 3) {
+    const x = points[i] ?? 0;
+    const y = points[i + 1] ?? 0;
+    const z = points[i + 2] ?? 0;
+    visit(x * c - z * s, y * cosE - (x * s + z * c) * sinE);
+  }
+}
 
 /** Walks a route like the frame loop: step() at 60 Hz, next waypoint on targetDone. */
 function walkRoute(from: Vec2, route: readonly Vec2[]): Vec2 {
@@ -601,40 +651,59 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       unmount();
     });
 
-    it("keeps the landmark and terrain inside all four edges of the camera framing", () => {
+    it("keeps every building, tree and the base inside ORBIT_FRAME at every yaw (orbit §1.3)", () => {
       const { result, unmount } = build(manifest);
-      for (const geometry of [result.current.landmark, result.current.terrain]) {
-        // One expect per geometry: one per vertex timed out under load.
-        const outside = screenVertices(geometry).filter(
-          ({ sx, sy }) =>
-            sx < CONTENT.minX || sx > CONTENT.maxX || sy < CONTENT.minY || sy > CONTENT.maxY,
-        );
-        expect(outside).toEqual([]);
+      const points = framedPoints(result.current);
+      const outside: string[] = [];
+      for (let d = 0; d < 360; d += 1) {
+        let [left, right, low, high] = [Infinity, -Infinity, Infinity, -Infinity];
+        eachAroundPivot(points, deg(d), (sx, sy) => {
+          left = Math.min(left, sx);
+          right = Math.max(right, sx);
+          low = Math.min(low, sy);
+          high = Math.max(high, sy);
+        });
+        if (-left > ORBIT_FRAME.half || right > ORBIT_FRAME.half) outside.push(`${d}°: x`);
+        if (high > ORBIT_FRAME.top || low < ORBIT_FRAME.bottom) outside.push(`${d}°: y`);
       }
+      expect(outside).toEqual([]);
       unmount();
     });
 
-    it("leaves both top HUD corners clear at 1280×800 (v0.3 §4.5)", () => {
+    it("leaves both top HUD corners and the view buttons sky in overview at every yaw", () => {
       const { result, unmount } = build(manifest);
-      const view = viewFor(1280, 800);
-      expect(view.mode).toBe("overview");
-      const centre = cameraCentre(desiredCentre({ sx: 0, sy: 0 }, { sx: 0, sy: 0 }, view), view);
-      const inCorner = ({ sx, sy }: Screen) => {
-        const px = view.width / 2 + (sx - centre.sx) * view.zoom;
-        const py = view.height / 2 - (sy - centre.sy) * view.zoom;
-        return (
-          py < HUD_CORNER.height && (px < HUD_CORNER.width || px > view.width - HUD_CORNER.width)
-        );
-      };
-      const g = result.current;
-      for (const geometry of [g.terrain, g.landmark, g.library, g.watchtower, g.market]) {
-        expect(screenVertices(geometry).filter(inCorner)).toEqual([]);
+      const points = framedPoints(result.current);
+      const views = [
+        [1280, 800],
+        [1366, 657],
+        [1280, 720],
+      ].map(([width = 0, height = 0]) => viewFor(width, height));
+      // A 1° sweep can miss up to 2.4 px of a 0.1° one, so ask for 3 px under the corners.
+      const GAP = 3;
+      for (const view of views) expect(view.mode).toBe("overview");
+      // The overview centre sits 0.24 below PIVOT (camera.ts desiredCentre).
+      const middle = (ORBIT_FRAME.top + ORBIT_FRAME.bottom) / 2;
+      const hits = new Set<string>();
+      for (let d = 0; d < 360; d += 1) {
+        eachAroundPivot(points, deg(d), (sx, sy) => {
+          for (const view of views) {
+            const px = view.width / 2 + sx * view.zoom;
+            const py = view.height / 2 - (sy - middle) * view.zoom;
+            const corner =
+              py < HUD_CORNER.height + GAP &&
+              (px < HUD_CORNER.width || px > view.width - HUD_CORNER.width);
+            const buttons =
+              px > view.width - VIEW_CONTROLS.width && py > view.height - VIEW_CONTROLS.height;
+            if (corner || buttons) hits.add(`${view.width}×${view.height} at ${d}°`);
+          }
+        });
       }
-      expect(crowns.filter(inCorner)).toEqual([]);
+      expect([...hits]).toEqual([]);
       unmount();
     });
 
-    it("keeps the screen behind the spire clear of raised terrain and tree crowns", () => {
+    // Composed for the home view only: from other angles the needle may stand before anything.
+    it("keeps the screen behind the spire clear of raised terrain and tree crowns at home", () => {
       const { result, unmount } = build(manifest);
       const vertices = screenVertices(result.current.terrain);
       const hits = [];
@@ -675,6 +744,58 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
         for (const waypoint of route.slice(0, -1)) expect(waypoint.z, at).toBeGreaterThan(-6);
         expect(walkRoute(SPAWN, route).z, at).toBeGreaterThan(-6);
       }
+      material.dispose();
+      unmount();
+    });
+
+    it.each(DIAGONALS)(
+      "walks a click high on the main building to the side seen from %f rad",
+      (yaw) => {
+        const { result, unmount } = build(manifest);
+        const material = new MeshBasicMaterial();
+        const group = statics(result.current, material);
+        const raycaster = new Raycaster();
+        const direction = viewDirection(yaw);
+        const toward = towardFor(yaw);
+        for (const [x, y, z] of TALL[manifest.campus.landmark.archetype]) {
+          const at = `(${x}, ${y}, ${z})`;
+          raycaster.set(new Vector3(x, y, z).addScaledVector(direction, -40), direction);
+          const goal = clickGoal(raycaster, group);
+          expect(goal, at).not.toBeNull();
+          if (!goal) continue;
+          const stop = walkRoute(SPAWN, routeTo(SPAWN, goal, toward));
+          const { centre } = LANDMARK;
+          const side = (stop.x - centre.x) * Math.sin(yaw) + (stop.z - centre.z) * Math.cos(yaw);
+          expect(side, at).toBeGreaterThan(0);
+        }
+        // The watchtower is a zone: a click on it still walks to its door.
+        const [x, y, z] = WATCHTOWER_TOP;
+        raycaster.set(new Vector3(x, y, z).addScaledVector(direction, -40), direction);
+        expect(clickGoal(raycaster, group)).toEqual(siteFor("watchtower").door);
+        material.dispose();
+        unmount();
+      },
+    );
+
+    it("gives a click on the librarian to whatever the ray meets first (pickNpc, orbit §2.6)", () => {
+      const { result, unmount } = build(manifest);
+      const material = new MeshBasicMaterial();
+      const group = statics(result.current, material);
+      const raycaster = new Raycaster();
+      const speakers = [{ id: "lan", spot: NPC_SPOT }] as const;
+      const aim = (yaw: number, x: number, y: number, z: number) => {
+        const direction = viewDirection(yaw);
+        raycaster.set(new Vector3(x, y, z).addScaledVector(direction, -40), direction);
+      };
+      // From the west the library's porch beam stands in front of her left side.
+      aim(deg(270), NPC_SPOT.x - 0.44, 0.7, NPC_SPOT.z);
+      expect(pickNpc(raycaster, group, speakers)).toBeNull();
+      expect(clickGoal(raycaster, group)).toEqual(siteFor("library").door);
+      aim(deg(270), NPC_SPOT.x, 0.7, NPC_SPOT.z);
+      expect(pickNpc(raycaster, group, speakers)).toBe("lan");
+      // Her head counts too (the v0.3 plane at 0.7 missed it).
+      aim(HOME_YAW, NPC_SPOT.x, 1.4, NPC_SPOT.z);
+      expect(pickNpc(raycaster, group, speakers)).toBe("lan");
       material.dispose();
       unmount();
     });
