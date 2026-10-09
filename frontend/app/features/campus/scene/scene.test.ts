@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { renderHook } from "@testing-library/react";
 import {
+  Color,
   DoubleSide,
   Group,
   InstancedMesh,
@@ -11,7 +12,6 @@ import {
   Raycaster,
   Vector3,
   type BufferGeometry,
-  type Color,
   type Material,
 } from "three";
 import { describe, expect, it } from "vitest";
@@ -20,6 +20,7 @@ import { STARS_SAVED } from "~/features/progress/progress";
 import {
   parseThemeIndex,
   parseThemeManifest,
+  TimeOfDaySchema,
   type LandmarkArchetype,
   type ThemeManifest,
   type TimeOfDay,
@@ -47,8 +48,10 @@ import {
 import { step } from "../movement";
 import { siteInfo, siteLook, siteLooks, type SiteLook } from "../sites";
 import {
+  buildLandmark,
   buildLibrary,
   buildMarket,
+  buildTerrain,
   buildWatchtower,
   entranceLampSpots,
   SHADOW_Y,
@@ -58,7 +61,7 @@ import {
 } from "./campus";
 import { LABEL_ANCHORS } from "./labels";
 import { desaturate, light, palette, shade, type Palette } from "./palette";
-import { triangleCount } from "./primitives";
+import { triangleCount, type Face } from "./primitives";
 import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
 import { clickGoal } from "./useHubFrame";
 
@@ -113,6 +116,57 @@ function inShadow(geometry: BufferGeometry, p: Vec2): boolean {
   }
   return false;
 }
+
+/** Every triangle of a non-indexed geometry: outward normal (from the winding), centre, colour. */
+function triangles(geometry: BufferGeometry) {
+  const position = geometry.getAttribute("position");
+  const colour = geometry.getAttribute("color");
+  return Array.from({ length: position.count / 3 }, (_, t) => {
+    const [a, b, c] = [0, 1, 2].map((k) => new Vector3().fromBufferAttribute(position, 3 * t + k));
+    if (!a || !b || !c) throw new Error("short triangle");
+    const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+    const centre = a.clone().add(b).add(c).divideScalar(3);
+    return { normal, centre, colour: new Color().fromBufferAttribute(colour, 3 * t) };
+  });
+}
+type Triangle = ReturnType<typeof triangles>[number];
+
+/** The wall a triangle faces by its horizontal normal; null for flat ones (roofs, ground). */
+function sideOf(n: Vector3): Face | null {
+  if (Math.max(Math.abs(n.x), Math.abs(n.z)) < 0.1) return null;
+  if (Math.abs(n.x) > Math.abs(n.z)) return n.x > 0 ? "+x" : "-x";
+  return n.z > 0 ? "+z" : "-z";
+}
+
+/** Triangles passing `keep`, counted by the wall they face. */
+function countBySide(geometry: BufferGeometry, keep: (t: Triangle) => boolean) {
+  const count: Record<Face, number> = { "+x": 0, "-x": 0, "+z": 0, "-z": 0 };
+  for (const t of triangles(geometry)) {
+    const side = sideOf(t.normal);
+    if (side && keep(t)) count[side] += 1;
+  }
+  return count;
+}
+
+const sameColour = (a: Color, b: Color) =>
+  Math.abs(a.r - b.r) < 1e-4 && Math.abs(a.g - b.g) < 1e-4 && Math.abs(a.b - b.b) < 1e-4;
+
+/**
+ * The four isometric diagonals (orbit-camera §1.1): the camera sits along h(yaw) = (sin yaw,
+ * cos yaw) from its look-at point, so 45° is home (+x, +z) and each step of 90° turns the model
+ * a quarter round. No browser: a wall is seen when its normal points towards the camera.
+ */
+const ISO_YAWS = [45, 135, 225, 315] as const;
+const towardCamera = (yaw: number) => {
+  const r = (yaw * Math.PI) / 180;
+  return new Vector3(Math.sin(r), 0, Math.cos(r));
+};
+const WALLS: Record<Face, Vector3> = {
+  "+x": new Vector3(1, 0, 0),
+  "-x": new Vector3(-1, 0, 0),
+  "+z": new Vector3(0, 0, 1),
+  "-z": new Vector3(0, 0, -1),
+};
 
 /** Screen position of every vertex, with its world height. */
 function screenVertices(geometry: BufferGeometry): (Screen & { y: number })[] {
@@ -266,6 +320,44 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
   },
 );
 
+describe.each(manifests.map((m) => [m.id, m] as const))(
+  "baked lighting from every side (orbit-camera §6.2), theme %s",
+  (_id, manifest) => {
+    // Every preset the schema knows, so a new hour (dawn, night) joins the loop by itself.
+    it.each(TimeOfDaySchema.options)(
+      "keeps the two walls seen from each iso diagonal apart at %s",
+      (time) => {
+        const l = light(manifest.campus.lights[time]);
+        const top = luminance(shade(UP, l));
+        for (const yaw of ISO_YAWS) {
+          const seen = Object.values(WALLS).filter((n) => n.dot(towardCamera(yaw)) > 0);
+          expect(seen).toHaveLength(2);
+          const [a = 0, b = 0] = seen.map((n) => luminance(shade(n, l)));
+          // Relative to the top face, so dark presets are not asked for daylight contrast.
+          expect(Math.abs(a - b), `${yaw}° at ${time}`).toBeGreaterThanOrEqual(0.08 * top);
+        }
+      },
+    );
+
+    it("leaves every face the home view sees as it was (north walls only)", () => {
+      const day = light(manifest.campus.lights.day);
+      const noNorth = (n: Vector3) => {
+        const sun = Math.max(0, n.dot(day.sun));
+        const view = new Vector3(1, 1, 1).normalize();
+        const direct = sun * (1 + day.rim * (1 - Math.max(0, n.dot(view))) ** 2);
+        const k = day.ground.clone().lerp(day.sky, 0.5 + 0.5 * n.y);
+        k.add(day.sunColor.clone().multiplyScalar(direct));
+        return new Color(Math.min(1, k.r), Math.min(1, k.g), Math.min(1, k.b));
+      };
+      for (const n of [UP, LEFT, RIGHT, new Vector3(1, 1, 0).normalize()]) {
+        expect(sameColour(shade(n, day), noNorth(n)), n.toArray().join()).toBe(true);
+      }
+      const north = WALLS["-z"];
+      expect(luminance(shade(north, day))).toBeLessThan(luminance(noNorth(north)) - 0.05);
+    });
+  },
+);
+
 describe("derived colours", () => {
   it("derives colours by the art §2.2 formulas", () => {
     const campus = manifests.find((m) => m.campus.landmark.archetype === "spire-hall")?.campus;
@@ -384,8 +476,9 @@ describe("zone building looks (N9)", () => {
         const at = `${id} at ${time}`;
         expect(comingSoon, at).toBe(0);
         // Two entrance lamps (a 12-triangle box each); the library also lights its door, a quad
-        // and a half-disc of 8 triangles (QA r2: the watchtower and market doors face away).
-        expect(open, at).toBe(id === "library" ? 102 : 72);
+        // and a half-disc of 8 triangles (QA r2), and the watchtower its door on the west, a quad
+        // (orbit-camera D13). The market hall has no door.
+        expect(open, at).toBe({ library: 102, watchtower: 78, market: 72 }[id]);
         expect(lit, at).toBeGreaterThan(open ?? 0);
         if (id === "library") expect(lit, at).toBeGreaterThan((open ?? 0) + 100); // 13 windows
       }
@@ -444,6 +537,105 @@ describe("zone building looks (N9)", () => {
   });
 });
 
+/** The two walls each "coming soon" scaffold stands outside: axis and wall planes (D12, D14, D16). */
+const SCAFFOLD_WALLS = {
+  library: ["z", -5.8, -0.8],
+  watchtower: ["z", -5.8, -3.8],
+  market: ["x", 7.0, 11.0],
+} as const;
+
+describe.each(manifests.map((m) => [m.id, m] as const))(
+  "four dressed sides (orbit-camera §5.2), theme %s",
+  (_id, manifest) => {
+    // A magenta lake makes ~glass the one colour whose green stays under half its red and blue,
+    // through the bake, the "coming soon" grey and the haze of the back buildings.
+    const campus = { ...manifest.campus, water: "#ff00ff" };
+    const pal = palette(campus, "day");
+    const { archetype, colonnades } = campus.landmark;
+    const baked = (c: Color, n: Vector3) => c.clone().multiply(shade(n, pal.light));
+
+    it("glazes the back and west walls like the front and east (D1-D8, D11, D13, D17-D20)", () => {
+      const groups = {
+        landmark: buildLandmark(pal, archetype, colonnades),
+        library: buildLibrary(pal, "coming_soon"),
+        watchtower: buildWatchtower(pal, "coming_soon"),
+        terrain: buildTerrain(pal, colonnades),
+      };
+      for (const [name, geometry] of Object.entries(groups)) {
+        const glass = countBySide(geometry, ({ colour: c }) => c.g < 0.5 * Math.min(c.r, c.b));
+        expect(glass["+x"] + glass["+z"], name).toBeGreaterThan(0);
+        expect(glass["-x"], `${name} -x`).toBeGreaterThanOrEqual(0.5 * glass["+x"]);
+        expect(glass["-z"], `${name} -z`).toBeGreaterThanOrEqual(0.5 * glass["+z"]);
+        geometry.dispose();
+      }
+    });
+
+    it("dresses the backs of the clock, the gate and the market (D9, D10, D15)", () => {
+      const landmark = buildLandmark(pal, archetype, colonnades);
+      if (archetype === "clock-tower") {
+        // Emissive faces keep the plaza colour exactly: one per wall of the clock box.
+        const faces = countBySide(landmark, (t) => sameColour(t.colour, pal.plaza));
+        for (const side of Object.keys(WALLS) as Face[]) {
+          expect(faces[side], `clock ${side}`).toBeGreaterThan(0);
+        }
+      }
+      if (colonnades) {
+        // Iron arches on the back of the gate (z 11.5), apart from the fence behind it.
+        const iron = countBySide(
+          landmark,
+          (t) => t.centre.z < 12 && sameColour(t.colour, baked(pal.iron, t.normal)),
+        );
+        expect(iron["-z"]).toBeGreaterThanOrEqual(10);
+      }
+      landmark.dispose();
+      const market = buildMarket(pal, "open");
+      const northAwning = triangles(market).filter(
+        (t) =>
+          t.normal.y > 0.5 &&
+          t.normal.z < -0.1 &&
+          sameColour(t.colour, baked(pal.mk.roof, t.normal)),
+      );
+      expect(northAwning.length).toBeGreaterThanOrEqual(2);
+      market.dispose();
+    });
+
+    it("scaffolds every coming-soon zone on two opposite walls (art §1.2 rule 4)", () => {
+      const builders = { library: buildLibrary, watchtower: buildWatchtower, market: buildMarket };
+      const key = (v: Vector3) =>
+        v
+          .toArray()
+          .map((n) => n.toFixed(4))
+          .join();
+      for (const [id, buildSite] of Object.entries(builders)) {
+        const [axis, low, high] = SCAFFOLD_WALLS[id as keyof typeof builders];
+        const open = buildSite(pal, "open");
+        const soon = buildSite(pal, "coming_soon");
+        // Trunk-coloured parts that are not scaffolding (the market's stalls) stand in both.
+        const kept = new Set(
+          triangles(open)
+            .filter((t) => sameColour(t.colour, baked(pal.trunk, t.normal)))
+            .map((t) => key(t.centre)),
+        );
+        const scaffold = triangles(soon).filter(
+          (t) =>
+            sameColour(t.colour, baked(desaturate(pal.trunk), t.normal)) &&
+            !kept.has(key(t.centre)),
+        );
+        expect(
+          scaffold.some((t) => t.centre[axis] > high),
+          `${id} beyond ${high}`,
+        ).toBe(true);
+        expect(
+          scaffold.some((t) => t.centre[axis] < low),
+          `${id} beyond ${low}`,
+        ).toBe(true);
+        open.dispose();
+        soon.dispose();
+      }
+    });
+  },
+);
+
 describe.each(manifests.map((m) => [m.id, m] as const))(
   "scene budget, theme %s",
   (_id, manifest) => {
@@ -451,10 +643,13 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     // built here (open, coming soon, coming soon): 19,248 (spire-hall) / 16,186 (clock-tower) in
     // v0.3; N8/N9 drop the unstarred library's shelves (-88) and add foam and the sun-shadow
     // overlay (campus-scene v0.3 §13.4 has the measured totals). The cap stays v0.3's (§8).
+    // v0.4 dresses all four sides (orbit-camera §5.2) inside the same groups: by day 20,097 ->
+    // 21,413 (spire-hall) and 17,020 -> 18,268 (clock-tower); 21,585 with every zone lit.
     it.each(TIMES)("stays well inside 40 draw calls and 60k triangles at %s", (time) => {
       const { result, unmount } = build(manifest, time);
       const budget = sceneBudget(result.current);
       expect(budget.drawCalls).toBeLessThanOrEqual(16);
+      expect(budget.drawCalls).toBe(14);
       expect(budget.triangles).toBeLessThanOrEqual(23_000);
       unmount();
     });

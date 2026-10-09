@@ -176,8 +176,9 @@ describe("blueprintPieces", () => {
           geometryBounds(buildWatchtower(pal, "open"), noLamps("watchtower")),
           "watchtower",
         );
-        const { y, south, east } = MIRROR.awnings;
+        const { y, north, south, east } = MIRROR.awnings;
         const awnings: Mass[] = [
+          { role: "mk", box: [north[0], north[1], y[1], y[0], north[2], north[3]] },
           { role: "mk", box: [south[0], south[1], y[1], y[0], south[2], south[3]] },
           { role: "mk", box: [east[0], east[1], y[1], y[0], east[2], east[3]] },
         ];
