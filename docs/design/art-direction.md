@@ -194,7 +194,7 @@ Thứ tự vẽ: hình tĩnh và cây (`renderOrder 0`) → x-ray (1) → ngư�
 - Orthographic, isometric thật: elevation `35.264°` (= `atan(1/√2)`), azimuth 45° từ phía `+x,+z`. Hướng nhìn `(−1,−1,−1)/√3`; `camera.position = target + (1,1,1) × 34.641` (khoảng cách 60), `up = (0,1,0)`, `near 0.1`, `far 200`. Khớp `movement.ts`: lên màn hình = thế giới `(−1,−1)`.
 - Trục màn hình (đơn vị thế giới): `R = (1,0,−1)/√2` (sang phải), `U = (−1,2,−1)/√6` (lên). Điểm thế giới `p` có toạ độ màn hình `sx = p·R`, `sy = p·U`. Điểm mặt đất ứng với `(sx, sy)`: `x = (sx√2 − sy√6)/2`, `z = (−sx√2 − sy√6)/2`.
 - Với R3F orthographic, `zoom` = số pixel CSS cho 1 đơn vị thế giới.
-- **Không** xoay camera, **không** pinch/wheel zoom ở v0.1. Canvas có `touch-action: manipulation` (vẫn cho người dùng phóng to trang bằng hai ngón).
+- **Xoay quanh trục đứng (v0.4, orbit-camera §1):** chỉ yaw, pitch cố định, vẫn orthographic và cùng tỷ lệ pixel. Góc home là azimuth 45° như trên; mỗi lần vào `/play` đều bắt đầu ở home (để màn chờ khớp), góc nhìn chỉ giữ trong store bộ nhớ trong lượt đó. Khung overview là `ORBIT_FRAME` quanh `PIVOT` nên không co giãn khi xoay. Kéo chuột hoặc một ngón để xoay (ngưỡng 6/10 px), phím `,` `.` và cụm nút "Góc nhìn" ở góc dưới phải xoay 90°. **Không** pinch/wheel zoom. Wrapper canvas có `touch-action: pinch-zoom` (một ngón tới handler xoay, hai ngón vẫn phóng to trang).
 
 ### 4.2 Khung nội dung
 
@@ -552,6 +552,9 @@ Mọi chuyển động gắn với di chuyển hoặc có thời hạn. Hết ch
 | Cô Lan quay nhìn | người chơi vào bán kính 3.0 quanh `NPC_SPOT`; rời > 3.4 thì quay về `π/4` | cùng công thức, `τ = 0.12 s` | gán thẳng |
 | Vòng tương tác hiện | khi đổi đích tương tác | scale 0.85 → 1.0 trong 180 ms (ease-out cubic), rồi 2 nhịp 1.0 → 1.1 → 1.0, mỗi nhịp 700 ms (sine in-out); tổng ≤ 1.6 s rồi đứng yên | hiện ngay ở scale 1, không nhịp |
 | Camera bám | follow mode, mục 4.5 | `1 − exp(−10·dt)`; đổi inset `1 − exp(−6·dt)` | gán thẳng |
+| Kéo xoay sa bàn | trong lúc kéo | gán thẳng theo con trỏ, `2π / clamp(rộng canvas, 600, 1200)` rad/px, không quán tính | như thường (người dùng tự làm) |
+| Hút về góc chéo | thả cách 45°/135°/225°/315° ≤ 12° | ease-out bậc ba, 0,18 s | không hút, góc ở yên chỗ thả |
+| Xoay bằng phím, nút, la bàn | mỗi lần bấm, 90° (la bàn: về 45°) | ease-out bậc ba, 0,3 s | nhảy thẳng |
 | HUD: gợi ý, sheet, panel | mở/đóng | vào: opacity 0→1 + `translateY(8px → 0)`, 200 ms ease-out; ra: opacity, 120 ms | luật toàn cục trong `app.css` đã rút về 0.01 ms |
 | Sa bàn đang dựng | từ lần vẽ đầu tới khung hình WebGL đầu tiên | mảnh ghép hiện theo tín hiệu thật: ô cỏ/đường mờ dần 200 ms, cây và người bật 300 ms, nhà mọc 380 ms; khối logo đang chờ nhấp nhô 2 px, 1.2 s, chỉ khi đang tải | sa bàn vẽ đủ, đứng yên; chỉ chữ và số bước đổi |
 | Rời màn chờ | khi khung hình đầu đã lên | cả lớp mờ đi 200 ms ease-in | tắt ngay |
