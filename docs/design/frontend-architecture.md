@@ -2,6 +2,7 @@
 
 - **Ngày:** 2026-10-07 · **Chủ sở hữu file:** coder.
 - **Sửa 2026-10-08:** thêm §8 (luật trực quan hoá, [roadmap-v0.4](roadmap-v0.4.md) N23); §1–§7 giữ nguyên.
+- **Sửa 2026-10-09 (v0.4, bộ nhân vật):** §1 thêm `scene/cast.ts` và `public/models/cast.json`; §3 cập nhật draw call, tam giác và mức chặn.
 - **Nguồn:** [build-brief-v0.1.md](build-brief-v0.1.md), [art-direction.md](art-direction.md).
 
 ## 1. Sơ đồ module
@@ -27,7 +28,9 @@ app/
 │  │     ├─ campus.ts     builder từng nhóm (§5): terrain, landmark, library, watchtower,
 │  │     │                market, player, lan, cây
 │  │     ├─ useCampusGeometry.ts  memo theo theme/status + dispose; sceneBudget()
-│  │     ├─ useHubFrame.ts        vòng frame + input (phím, click/chạm)
+│  │     ├─ useHubFrame.ts        vòng frame + input (phím, click/chạm); castFigures
+│  │     ├─ cast.ts       giải mã public/models/cast.json (nướng sẵn, không GLTFLoader):
+│  │     │                parseCast, buildFigure, paintFigure, clip và mixer (chỉ import three)
 │  │     ├─ labels.ts, WorldLabels.tsx  nhãn DOM bám neo thế giới
 │  │     └─ CampusScene.tsx       <Canvas>, vật liệu dùng chung, mesh
 │  ├─ zones/              schema (valibot), api (loadZoneList, loadZonePage), ZoneCard,
@@ -57,7 +60,7 @@ app/
 |---|---|---|
 | Trang chủ không có three | 0 chunk | `scripts/check-bundle.mjs` (manifest + dò chuỗi `THREE.WebGLRenderer`) và `e2e/landing.spec.ts` (danh sách chunk từ `build/bundle-report.json`) |
 | `/play` ≤ 300 kB gzip ¹ | 268,9 kB (sau N8/N9 và QA vòng 2, campus-scene v0.3 §13.4) | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
-| ≤ 40 draw call, ≤ 60k tam giác | 14 (lớp bóng nắng riêng, QA vòng 1 2026-10-08); 20 185 (campus) / 17 108 (town) ban ngày với Thư viện `lit`, đo bằng `sceneBudget()` sau QA vòng 2 (campus-scene v0.3 §13.4) | `scene.test.ts` (fail nếu > 16 hoặc > 23 000). Xoay 360° (v0.4) không thêm draw call hay tam giác; `scene.test.ts` còn kiểm khung `ORBIT_FRAME` và góc HUD ở mọi yaw |
+| ≤ 40 draw call, ≤ 60k tam giác | v0.4: 14 khi còn tượng, 17 khi bộ nhân vật Kenney đã tải (6 SkinnedMesh + x-ray người chơi); ban ngày 22 177 / 19 032 (tượng) và 26 112 (campus) / 22 967 (town) (bộ nhân vật), đo bằng `sceneBudget()` | `scene.test.ts` (fail nếu > 20 hoặc > 28 000; trước v0.4 là 16 và 23 000). Xoay 360° (v0.4) không thêm draw call hay tam giác; `scene.test.ts` còn kiểm khung `ORBIT_FRAME` và góc HUD ở mọi yaw |
 | `frameloop="demand"` | không frame khi đứng yên | `e2e/play.spec.ts` với `?debug=frames` |
 | Không shadow map / postprocessing | — | `scene.test.ts` grep `app/features/campus` |
 | DPR | `dpr={[1, 2]}`, `[1, 1.5]` khi `(pointer: coarse)` hoặc < 768 px | xem dưới |

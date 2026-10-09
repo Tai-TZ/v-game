@@ -181,9 +181,9 @@ Unit test (`scene.test.ts`, mỗi theme): ngày `shade(+y)` đúng bằng `(1, 1
 | Hình tĩnh (5 nhóm gộp) | `MeshBasicMaterial({ vertexColors: true })`, ánh sáng nướng sẵn (mục 2.3). Rẻ nhất về fragment trên GPU tích hợp, màu tất định, test được bằng vitest. |
 | Người, cây (động hoặc instanced) | `MeshLambertMaterial({ vertexColors: true, flatShading: true })`. Hai đèn trên được hiệu chỉnh để Lambert cho đúng 1.00/0.80/0.60 như hình nướng (đã đo pixel: trắng → 255/231/204). Cây dùng `instanceColor` nhân thêm độ sáng. |
 | Bóng blob người chơi | `CircleGeometry(0.36, 20)` nằm ngang, `y = 0.05`, `MeshBasicMaterial({ color: #000000, transparent: true, opacity: 0.18, depthWrite: false })` |
-| Bóng blob cô Lan | như trên, bán kính `0.40` |
+| Bóng blob cô Lan | Sửa 2026-10-09 (v0.4): bỏ. Mỗi người nói chuyện được có một đĩa đục nướng vào `G-terrain` (sàn × 0,8, `SPEAKER_DISC_Y`), không tốn draw call. |
 | Bóng cây | không dùng blob trong suốt; nướng đĩa đục `~contact` vào địa hình (mục 2.4) |
-| X-ray người chơi | dùng chung geometry người chơi, `MeshBasicMaterial({ color: ~xray, depthFunc: GreaterDepth, depthWrite: false })`, **đục** (không `transparent`), `renderOrder = 1`; mesh người chơi `renderOrder = 2`. Hiện bóng người chơi phía sau mái Chợ, hàng cây mép nam/đông, mặt sau landmark. |
+| X-ray người chơi | (v0.4: `SkinnedMesh` dùng chung geometry và skeleton của nhân vật Kenney, `castFigures` trong `scene/useHubFrame.ts`) dùng chung geometry người chơi, `MeshBasicMaterial({ color: ~xray, depthFunc: GreaterDepth, depthWrite: false })`, **đục** (không `transparent`), `renderOrder = 1`; mesh người chơi `renderOrder = 2`. Hiện bóng người chơi phía sau mái Chợ, hàng cây mép nam/đông, mặt sau landmark. |
 
 Thứ tự vẽ: hình tĩnh và cây (`renderOrder 0`) → x-ray (1) → người chơi (2) → blob, vòng (trong suốt, three tự vẽ sau). Vì x-ray đục và vẽ trước người chơi, nó không tự xuyên qua thân người chơi.
 
@@ -517,6 +517,8 @@ Gốc ở chân, mặt hướng `+z` cục bộ (`rotation.y = heading` của `m
 | `D-ring` | động, chỉ khi gần | Basic | 1 | 80 | 80 | đổi màu vật liệu |
 | **Tổng** | | | **13** (12 khi không có vòng) | **8 778** | **7 226** | |
 
+**Sửa 2026-10-09 (v0.4, bộ nhân vật):** 14 draw call khi còn tượng (+1 tượng bốn NPC gộp, −1 blob cô Lan), 17 khi bộ nhân vật Kenney đã tải (6 `SkinnedMesh` + x-ray), cả hai tính vòng tương tác. Ban ngày 26 112 (campus) / 22 967 (town) tam giác. `scene.test.ts` chặn ở 20 draw call và 28 000 tam giác.
+
 Ngân sách brief: ≤ 40 draw call, ≤ 60k tam giác. Thực tế dùng 33% và 15%. Phần dư **không** dùng để thêm chi tiết ở v0.1; nó để dành cho NPC và hiệu ứng hậu quả của các bản sau.
 
 Bộ nhớ đỉnh khoảng 26k đỉnh × 24 byte ≈ 0.63 MB. Số program shader: 4 (Basic + vertexColors, Lambert + vertexColors, Lambert + instancing, Basic màu đơn).
@@ -560,6 +562,7 @@ Mọi chuyển động gắn với di chuyển hoặc có thời hạn. Hết ch
 | HUD: gợi ý, sheet, panel | mở/đóng | vào: opacity 0→1 + `translateY(8px → 0)`, 200 ms ease-out; ra: opacity, 120 ms | luật toàn cục trong `app.css` đã rút về 0.01 ms |
 | Sa bàn đang dựng | từ lần vẽ đầu tới khung hình WebGL đầu tiên | mảnh ghép hiện theo tín hiệu thật: ô cỏ/đường mờ dần 200 ms, cây và người bật 300 ms, nhà mọc 380 ms; khối logo đang chờ nhấp nhô 2 px, 1.2 s, chỉ khi đang tải | sa bàn vẽ đủ, đứng yên; chỉ chữ và số bước đổi |
 | Rời màn chờ | khi khung hình đầu đã lên | cả lớp mờ đi 200 ms ease-in | tắt ngay |
+| NPC chào, nói, gật (v0.4) | chỉ bắt đầu từ thao tác người chơi: đi lại gần (chào một lần) hoặc mở hội thoại (nói) | một clip mỗi lúc, chuyển 0,15 s; tự về `rest` ≤ 1,6 s | không chào, không nói; chỉ quay người (gán thẳng) |
 
 **Vòng lặp idle được phép: không có.** Nước, cây, cờ, đèn đều tĩnh. Không có NPC thở, không có "!" nhấp nháy.
 
@@ -754,7 +757,7 @@ Chụp ở **1280×800** và **375×812**, mỗi kích thước cho **cả hai t
 - [ ] Đứng cạnh cô Lan: vòng tương tác màu `player` dưới chân cô, gợi ý ở giữa đáy đúng chữ §4.
 - [ ] Hội thoại mở ở panel phải, cô Lan vẫn thấy được bên trái; có lớp phủ nhẹ; hai nút đúng thứ tự.
 - [ ] Đi tới cửa Chợ `(0, 5.3)`: bóng x-ray nhạt của người chơi hiện qua mái.
-- [ ] `renderer.info.render.calls ≤ 13` (sửa 2026-10-08: đo được 13 lệnh vẽ mỗi khung khi vòng tương tác ẩn, đã gồm lớp bóng nắng), tam giác theo campus-scene v0.3 §13.4; đứng yên 3 s thì bộ đếm frame không tăng.
+- [ ] `renderer.info.render.calls ≤ 17` (sửa 2026-10-09, v0.4: 17 với bộ nhân vật và vòng tương tác, 16 khi vòng ẩn; khi còn tượng 14/13; trước đó ≤ 13 với lớp bóng nắng), tam giác theo campus-scene v0.3 §13.4; đứng yên 3 s thì bộ đếm frame không tăng.
 - [ ] Vào `/play` lần đầu (tải chậm): nền trời ngay từ đầu, không nền trắng; thẻ có logo, tên bước + "Bước n/5", mẹo của cô Lan; thẻ không che nút trên; khi cảnh hiện, sa bàn trùng chỗ rồi mờ đi trong 200 ms; `?debug=loader` thấy hai lớp trùng nhau.
 
 **Hub `/play`, 375×812:**
