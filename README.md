@@ -54,16 +54,16 @@ từ dấu vết của chính lượt chạy, không phải đáp án mẫu.
 
 > [!NOTE]
 > Engine và API ở bản **v0.2**, hub ở bản **v0.4**: ba level của khu Thư viện chơi được từ đầu tới cuối trên
-> bàn thợ khi chạy local với khoá Gemini và index; trang chủ, hub 3D và trang khu đã có bản chạy thử công
-> khai. Xem [Trạng thái và lộ trình](#trạng-thái-và-lộ-trình).
+> bàn thợ, cả ở bản chạy thử công khai lẫn khi chạy local. Xem [Trạng thái và lộ trình](#trạng-thái-và-lộ-trình).
 
 ## Bản chạy thử
 
 **<https://v-game-theta.vercel.app>** đang chạy, chỉ với theme town; địa chỉ chính thức sẽ là
 `vgame.ai20k.cloud` khi tên miền được trỏ xong. API nằm ở gói miễn phí và ngủ khi không có truy cập, nên
-lần mở đầu có thể chờ khoảng một phút. Bản này có trang chủ, hub 3D, trang khu và bàn thợ với dữ liệu thật;
-bàn thợ lắp được agent nhưng chưa mở ca được (API trả `503` vì gói free chưa có index truy xuất). Cách
-deploy: [Kỹ thuật › Deploy](#deploy).
+lần mở đầu có thể chờ khoảng một phút. Bản này có trang chủ, hub 3D, trang khu và bàn thợ chạy ca thật:
+index, vector và điểm rerank đóng gói sẵn trong code, máy chủ không nạp model nào. Cấu hình khởi đầu và lời
+giải mẫu phát lại câu trả lời Gemini đã lưu nên không tốn lời gọi; cấu hình khác gọi Gemini thật trong trần
+mỗi ngày. Cách deploy: [Kỹ thuật › Deploy](#deploy).
 
 ## Xem nhanh
 
@@ -151,7 +151,8 @@ Cần Node ≥ 22.22, Python 3.12, [uv](https://docs.astral.sh/uv/); khoá Gemin
 cd backend
 uv sync
 cp .env.example .env          # rồi điền khoá vào backend/.env, xem bên dưới
-uv run vgame-build-index      # chạy một lần: tải model embedding (~2,2 GB) và reranker, dựng 24 biến thể index
+# Không cần dựng index: index, vector và điểm rerank đã đi kèm code (backend/src/vgame/engine/data/).
+# Chỉ khi đổi corpus mới chạy `uv run vgame-build-index` (tải model embedding ~2,2 GB và reranker).
 uv run uvicorn --factory vgame.main:create_app --reload --port 8000
 ```
 
@@ -204,7 +205,7 @@ Danh sách endpoint, mã lỗi và biến môi trường: [backend/README.md](ba
 - [x] Bản chạy thử công khai: Vercel cho frontend, Render free cho API, chỉ theme town
 - [ ] Bước đoán kết quả trong game; mở khoá level theo sao
 - [ ] Ba gợi ý tăng dần trên màn kết quả
-- [ ] Chạy agent trên bản deploy: chỗ chạy index truy xuất và reranker (gói free không đủ RAM)
+- [x] Chạy agent trên bản deploy: index, vector và điểm rerank đóng gói sẵn, máy chủ không nạp model (~120–160 MB RAM)
 - [ ] Chốt nội dung và ngân sách token của level 2, 3 qua thêm lượt chạy với model thật
 - [ ] Tháp canh (guardrails) và Chợ model (token, context, chọn model)
 - [ ] Lưu bền và giám sát theo [ADR 0003](docs/adr/0003-backend-stack.md): PostgreSQL/pgvector, Redis, Langfuse; đăng nhập và vai trò giáo viên
@@ -299,7 +300,7 @@ test thất bại khi bị vượt.
 
 | Hạng mục | Đo được |
 |---|---|
-| Dựng index (một lần) | tải `multilingual-e5-large` (~2,2 GB) và reranker; 24 biến thể chia chunk, artifact 11,7 MB |
+| Dựng lại index (khi đổi corpus) | tải `multilingual-e5-large` (~2,2 GB) và reranker; 24 biến thể chia chunk, artifact đóng gói 6,8 MB |
 | Một lượt level 1, lời giải mẫu | **10.262 token**, 3 sao; mỗi ca p50 1,28 s, p95 3,08 s (`gemini-3.5-flash-lite`) |
 
 <sub>Nguồn: <a href="docs/design/engine-spike-report.md">báo cáo spike</a>.</sub>
