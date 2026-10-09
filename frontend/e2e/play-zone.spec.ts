@@ -1,7 +1,7 @@
 import { expect, mockApi, seedDetail, test } from "./fixtures";
 
 test.describe("zone page", () => {
-  test("lists the library's three levels in order, none playable yet", async ({
+  test("lists the library's three levels in order, each with a way into its workbench", async ({
     page,
     consoleErrors,
   }) => {
@@ -18,9 +18,10 @@ test.describe("zone page", () => {
     ]);
     await expect(levels.nth(2).getByText("Sự cố", { exact: true })).toBeVisible();
     await expect(levels.nth(0).getByText("Sự cố", { exact: true })).toHaveCount(0);
-    const building = page.getByRole("button", { name: "Đang xây" });
-    await expect(building).toHaveCount(3);
-    for (const button of await building.all()) await expect(button).toBeDisabled();
+    const enter = levels.getByRole("link", { name: /^Vào màn / });
+    await expect(enter).toHaveCount(3);
+    await expect(enter.nth(0)).toHaveAttribute("href", "/play/library/grounded-citation");
+    await expect(enter.nth(2)).toHaveAccessibleName("Vào màn Hỏi bằng số điều");
 
     await page.getByRole("main").getByRole("link", { name: "Về khuôn viên" }).click();
     await expect(page).toHaveURL(/\/play\?at=library$/);

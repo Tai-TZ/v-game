@@ -5,7 +5,15 @@ import {
   toScreen,
   viewFor,
 } from "../app/features/campus/camera";
-import { expect, mockApi, test, themeIds, waitForIdleScene, zoneList } from "./fixtures";
+import {
+  expect,
+  mockApi,
+  mockWorkbenchApi,
+  test,
+  themeIds,
+  waitForIdleScene,
+  zoneList,
+} from "./fixtures";
 
 const LINE_1 =
   "Chào bạn, mình là Lan, thủ thư ca tối. Trợ lý tra cứu của thư viện vừa trả lời sai quy chế cho một bạn sinh viên, còn gán cho Điều 47 một quy định không hề có.";
@@ -31,11 +39,11 @@ test.describe("campus hub", () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test("talks to the librarian and enters the library with the keyboard only", async ({
+  test("talks to the librarian and starts teaching the assistant with the keyboard only", async ({
     page,
     consoleErrors,
   }) => {
-    await mockApi(page);
+    await mockWorkbenchApi(page);
     await page.goto("/play");
     const zonesButton = page.getByRole("button", { name: "Các khu" });
     await zonesButton.focus();
@@ -50,14 +58,16 @@ test.describe("campus hub", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(LINE_1, { exact: true })).toBeVisible();
     await expect(dialog.getByText(LINE_2, { exact: true })).toBeVisible();
-    const enter = dialog.getByRole("button", { name: "Vào Thư viện" });
-    await expect(enter).toBeFocused();
+    const teach = dialog.getByRole("button", { name: "Dạy trợ lý tra sách" });
+    await expect(teach).toBeFocused();
 
     // Focus stays inside the dialog.
     await page.keyboard.press("Tab");
+    await expect(dialog.getByRole("button", { name: "Vào Thư viện" })).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(dialog.getByRole("button", { name: "Để sau" })).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(enter).toBeFocused();
+    await expect(teach).toBeFocused();
 
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
@@ -66,10 +76,11 @@ test.describe("campus hub", () => {
     // Second meeting in the same session: one line.
     await page.keyboard.press("Enter");
     await expect(dialog.getByText("Trợ lý vẫn đang chờ bạn ở quầy tra cứu.")).toBeVisible();
-    await expect(enter).toBeFocused();
+    await expect(teach).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/play\/library$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Thư viện" })).toBeVisible();
+    await expect(page).toHaveURL(/\/play\/library\/grounded-citation$/);
+    // Focus lands on the level's h1, so a screen reader hears the new page.
+    await expect(page.getByRole("heading", { level: 1, name: "Thôi bịa điều luật" })).toBeFocused();
     expect(consoleErrors).toEqual([]);
   });
 
