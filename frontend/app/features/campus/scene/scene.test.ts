@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { renderHook } from "@testing-library/react";
 import {
+  Color,
   DoubleSide,
   Group,
   InstancedMesh,
@@ -11,7 +12,6 @@ import {
   Raycaster,
   Vector3,
   type BufferGeometry,
-  type Color,
   type Material,
 } from "three";
 import { describe, expect, it } from "vitest";
@@ -20,6 +20,7 @@ import { STARS_SAVED } from "~/features/progress/progress";
 import {
   parseThemeIndex,
   parseThemeManifest,
+  TimeOfDaySchema,
   type LandmarkArchetype,
   type ThemeManifest,
   type TimeOfDay,
@@ -58,7 +59,7 @@ import {
 } from "./campus";
 import { LABEL_ANCHORS } from "./labels";
 import { desaturate, light, palette, shade, type Palette } from "./palette";
-import { triangleCount } from "./primitives";
+import { triangleCount, type Face } from "./primitives";
 import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
 import { clickGoal } from "./useHubFrame";
 
@@ -113,6 +114,26 @@ function inShadow(geometry: BufferGeometry, p: Vec2): boolean {
   }
   return false;
 }
+
+const sameColour = (a: Color, b: Color) =>
+  Math.abs(a.r - b.r) < 1e-4 && Math.abs(a.g - b.g) < 1e-4 && Math.abs(a.b - b.b) < 1e-4;
+
+/**
+ * The four isometric diagonals (orbit-camera §1.1): the camera sits along h(yaw) = (sin yaw,
+ * cos yaw) from its look-at point, so 45° is home (+x, +z) and each step of 90° turns the model
+ * a quarter round. No browser: a wall is seen when its normal points towards the camera.
+ */
+const ISO_YAWS = [45, 135, 225, 315] as const;
+const towardCamera = (yaw: number) => {
+  const r = (yaw * Math.PI) / 180;
+  return new Vector3(Math.sin(r), 0, Math.cos(r));
+};
+const WALLS: Record<Face, Vector3> = {
+  "+x": new Vector3(1, 0, 0),
+  "-x": new Vector3(-1, 0, 0),
+  "+z": new Vector3(0, 0, 1),
+  "-z": new Vector3(0, 0, -1),
+};
 
 /** Screen position of every vertex, with its world height. */
 function screenVertices(geometry: BufferGeometry): (Screen & { y: number })[] {
@@ -262,6 +283,44 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       expect(luminance(shade(edgeOn, day))).toBeGreaterThan(luminance(shade(edgeOn, noRim)));
       const awayFromSun = new Vector3(1, 0, -1).normalize();
       expect(shade(awayFromSun, day).equals(shade(awayFromSun, noRim))).toBe(true);
+    });
+  },
+);
+
+describe.each(manifests.map((m) => [m.id, m] as const))(
+  "baked lighting from every side (orbit-camera §6.2), theme %s",
+  (_id, manifest) => {
+    // Every preset the schema knows, so a new hour (dawn, night) joins the loop by itself.
+    it.each(TimeOfDaySchema.options)(
+      "keeps the two walls seen from each iso diagonal apart at %s",
+      (time) => {
+        const l = light(manifest.campus.lights[time]);
+        const top = luminance(shade(UP, l));
+        for (const yaw of ISO_YAWS) {
+          const seen = Object.values(WALLS).filter((n) => n.dot(towardCamera(yaw)) > 0);
+          expect(seen).toHaveLength(2);
+          const [a = 0, b = 0] = seen.map((n) => luminance(shade(n, l)));
+          // Relative to the top face, so dark presets are not asked for daylight contrast.
+          expect(Math.abs(a - b), `${yaw}° at ${time}`).toBeGreaterThanOrEqual(0.08 * top);
+        }
+      },
+    );
+
+    it("leaves every face the home view sees as it was (north walls only)", () => {
+      const day = light(manifest.campus.lights.day);
+      const noNorth = (n: Vector3) => {
+        const sun = Math.max(0, n.dot(day.sun));
+        const view = new Vector3(1, 1, 1).normalize();
+        const direct = sun * (1 + day.rim * (1 - Math.max(0, n.dot(view))) ** 2);
+        const k = day.ground.clone().lerp(day.sky, 0.5 + 0.5 * n.y);
+        k.add(day.sunColor.clone().multiplyScalar(direct));
+        return new Color(Math.min(1, k.r), Math.min(1, k.g), Math.min(1, k.b));
+      };
+      for (const n of [UP, LEFT, RIGHT, new Vector3(1, 1, 0).normalize()]) {
+        expect(sameColour(shade(n, day), noNorth(n)), n.toArray().join()).toBe(true);
+      }
+      const north = WALLS["-z"];
+      expect(luminance(shade(north, day))).toBeLessThan(luminance(noNorth(north)) - 0.05);
     });
   },
 );

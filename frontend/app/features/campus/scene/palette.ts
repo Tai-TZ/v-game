@@ -24,7 +24,10 @@ export function desaturate(c: Color): Color {
     .multiplyScalar(0.97);
 }
 
-/** Towards the camera: fixed, since the isometric camera never turns (art §4.1). */
+/**
+ * The home view direction, a fixed world vector (art §4.1): the camera may turn, the bake does not
+ * (orbit-camera §6.2: shade reads the world normal and the preset only).
+ */
 const VIEW = new Vector3(1, 1, 1).normalize();
 
 /**
@@ -62,10 +65,14 @@ export function shade(n: Vector3, l: Light, out = new Color()): Color {
   const sun = Math.max(0, n.dot(l.sun));
   const up = 0.5 + 0.5 * n.y;
   const direct = sun * (1 + l.rim * (1 - Math.max(0, n.dot(VIEW))) ** 2);
+  // North walls see less sky: without it the +x and −z walls, the pair seen from 135°, bake
+  // alike and the building reads as a paper cut-out. A factor, so dark presets keep their walls
+  // off black; 1 on every face with n.z ≥ 0, so the home view is unchanged (orbit-camera §6.2).
+  const north = 1 - 0.2 * Math.max(0, -n.z) * (1 - Math.abs(n.y));
   return out.setRGB(
-    Math.min(1, l.ground.r + (l.sky.r - l.ground.r) * up + l.sunColor.r * direct),
-    Math.min(1, l.ground.g + (l.sky.g - l.ground.g) * up + l.sunColor.g * direct),
-    Math.min(1, l.ground.b + (l.sky.b - l.ground.b) * up + l.sunColor.b * direct),
+    Math.min(1, l.ground.r + (l.sky.r - l.ground.r) * up + l.sunColor.r * direct) * north,
+    Math.min(1, l.ground.g + (l.sky.g - l.ground.g) * up + l.sunColor.g * direct) * north,
+    Math.min(1, l.ground.b + (l.sky.b - l.ground.b) * up + l.sunColor.b * direct) * north,
   );
 }
 
