@@ -34,6 +34,10 @@ const homeHtml = await home.text();
 check(home.status === 200 && homeHtml.includes("V-Game"), `GET / -> ${home.status}`);
 const csp = home.headers.get("content-security-policy") ?? "";
 check(csp.includes("default-src 'self'"), "Content-Security-Policy is set");
+check(
+  /connect-src [^;]*https:\/\/api\.open-meteo\.com/.test(csp),
+  "CSP connect-src allows Open-Meteo (campus weather)",
+);
 check(home.headers.has("strict-transport-security"), "Strict-Transport-Security is set");
 check(home.headers.get("x-content-type-options") === "nosniff", "X-Content-Type-Options: nosniff");
 
