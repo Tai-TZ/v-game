@@ -520,6 +520,10 @@ test.describe("workbench", () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
+    let releaseRetry: () => void = () => undefined;
+    const retryHeld = new Promise<void>((resolve) => {
+      releaseRetry = resolve;
+    });
     let loads = 0;
     await page.route("**/api/levels/*", async (route) => {
       loads += 1;
@@ -527,6 +531,7 @@ test.describe("workbench", () => {
         await held;
         return route.fulfill({ status: 500, json: { detail: "Lỗi" } });
       }
+      await retryHeld;
       return route.fallback();
     });
     await page.goto("/play/library");
@@ -543,6 +548,10 @@ test.describe("workbench", () => {
     await expect(page.getByRole("main")).not.toHaveAttribute("aria-busy", "true");
     await retry.focus();
     await page.keyboard.press("Enter");
+    // A retry is a revalidation, not a navigation: it says it is loading all the same.
+    await expect(page.getByRole("status").filter({ hasText: "Đang tải trang…" })).toBeAttached();
+    await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "true");
+    releaseRetry();
     // "Thử lại" leaves the page with the level: focus goes to its h1, not to <body>.
     await expect(page.getByRole("heading", { level: 1, name: "Thôi bịa điều luật" })).toBeFocused();
   });
@@ -642,5 +651,97 @@ test.describe("workbench", () => {
     // Below lg the case table sits under the whole bench: the bench bar links to it.
     await page.getByRole("link", { name: "Đổi câu ở bảng câu" }).click();
     await expect(page.getByRole("heading", { name: "Bảng câu" })).toBeInViewport();
+  });
+
+  test("comes back to the diagnosis after 'Xem câu' on a level opened by its own link", async ({
+    page,
+  }) => {
+    // The first page of a visit: its history entry and the hash's both have the key "default".
+    const diagnosis = [
+      { case: "lib-l1-v01", flag: "llm.cite_missing", message_vi: "Câu #1 không trích nguồn." },
+    ];
+    await mockWorkbenchApi(page, {
+      events: () =>
+        sse.reference().replace('"diagnosis": []', `"diagnosis":${JSON.stringify(diagnosis)}`),
+    });
+    await page.goto(L1);
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeFocused();
+    const link = page.getByRole("link", { name: "Xem câu #1" });
+    await link.scrollIntoViewIfNeeded();
+    const before = await page.evaluate(() => window.scrollY);
+    await link.click();
+    await expect(page).toHaveURL(/#cau-1$/);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).not.toBe(before);
+    await page.goBack();
+    await expect(page).toHaveURL(/grounded-citation$/);
+    await expect
+      .poll(() => page.evaluate((y) => Math.abs(window.scrollY - y), before))
+      .toBeLessThan(5);
+  });
+
+  test("keeps 'Khôi phục' shut while the graph is being sent", async ({ page }) => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const mock = await mockWorkbenchApi(page, {
+      post: async () => {
+        await held;
+        return undefined;
+      },
+    });
+    await page.goto(L1);
+    await page.getByRole("button", { name: "Khôi phục cấu hình khởi đầu" }).click();
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await expect.poll(() => mock.posts.length).toBe(1);
+    await expect(page.getByRole("button", { name: "Đang gửi cấu hình…" })).toBeVisible();
+    // Restoring now would unlock the bench and let a second POST out beside the first.
+    await expect(page.getByRole("button", { name: "Khôi phục", exact: true })).toBeDisabled();
+    release();
+    await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeFocused();
+    expect(mock.posts).toHaveLength(1);
+  });
+
+  test("drops the discarded-config notice once the bench saves again", async ({ page }) => {
+    await mockWorkbenchApi(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem(["vg", "bench", "v1", "grounded-citation"].join("."), "{broken");
+    });
+    await page.goto(L1);
+    const discarded = page.getByText("Cấu hình đã lưu không còn hợp với màn này");
+    await expect(discarded).toBeVisible();
+    await page.getByRole("switch", { name: "Gắn Vòm Sao" }).check();
+    await expect(page.getByText("Đã lưu cấu hình trên máy này.")).toBeVisible();
+    await expect(discarded).toHaveCount(0);
+  });
+
+  test("shows the loading bar on screen after 'Vào màn' far down the zone page", async ({
+    page,
+  }) => {
+    await mockWorkbenchApi(page);
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/api/levels/article-number-lookup", async (route) => {
+      await held;
+      return route.fallback();
+    });
+    await page.goto("/play/library");
+    const enter = page.getByRole("link", { name: "Vào màn Hỏi bằng số điều" });
+    await enter.scrollIntoViewIfNeeded();
+    await page.mouse.wheel(0, 2000);
+    await enter.click();
+    const bar = page.locator("[data-page-loading]");
+    await expect(bar).toBeInViewport();
+    // Reduced motion: a still bar across the screen, not a strip stuck at a third.
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const width = page.viewportSize()?.width ?? 0;
+    await expect
+      .poll(async () => (await bar.locator("div").boundingBox())?.width ?? 0)
+      .toBeGreaterThanOrEqual(width - 1);
+    release();
+    await expect(page.getByRole("heading", { level: 1, name: "Hỏi bằng số điều" })).toBeFocused();
   });
 });

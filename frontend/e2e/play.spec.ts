@@ -84,6 +84,40 @@ test.describe("campus hub", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("says the level is opening from cô Lan's dialog, and enters the zone from it", async ({
+    page,
+  }) => {
+    await mockWorkbenchApi(page);
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/api/levels/*", async (route) => {
+      await held;
+      return route.fallback();
+    });
+    await page.goto("/play");
+    await page.getByRole("button", { name: "Các khu" }).click();
+    await page.getByRole("button", { name: "Nói chuyện với cô Lan", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Cô Lan" });
+    await dialog.getByRole("button", { name: "Dạy trợ lý tra sách" }).click();
+    // A sleeping API can take half a minute: the dialog stays and says the level is opening.
+    const opening = dialog.getByRole("button", { name: "Đang mở màn…" });
+    await expect(opening).toBeFocused();
+    await expect(opening).toHaveAttribute("aria-busy", "true");
+    await expect(dialog.getByRole("status")).toHaveText("Đang mở màn…");
+    release();
+    await expect(page.getByRole("heading", { level: 1, name: "Thôi bịa điều luật" })).toBeFocused();
+
+    await page.goBack();
+    await page.getByRole("button", { name: "Các khu" }).click();
+    await page.getByRole("button", { name: "Nói chuyện với cô Lan", exact: true }).click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Vào Thư viện" }).click();
+    await expect(page).toHaveURL(/\/play\/library$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Thư viện" })).toBeFocused();
+  });
+
   test("walks to the librarian with the arrow keys and opens the dialog with E", async ({
     page,
   }) => {
