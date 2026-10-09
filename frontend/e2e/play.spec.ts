@@ -316,7 +316,7 @@ test.describe("campus hub", () => {
     await mockApi(page);
     await page.goto("/play?debug=frames");
     await waitForIdleScene(page);
-    // The inherited name is no library star; every open zone is lit while no star is saved.
+    // The inherited name is no library star: open (lit only while STARS_SAVED is off).
     await expect(page.locator("html")).toHaveAttribute(
       "data-looks",
       `library:${STARS_SAVED ? "open" : "lit"} watchtower:coming_soon market:coming_soon`,
