@@ -77,6 +77,11 @@ export interface Dressing {
   /** Half sizes of the OBSTACLES box each copy adds; left out, the player walks past. */
   block?: readonly [halfX: number, halfZ: number];
   /**
+   * The sun-shadow caster of each copy (campus.ts buildShadows): half sizes along x and z (like
+   * `block`, never turned), the heights it spans, and an octagon for a crown or canopy.
+   */
+  shade?: { half: readonly [number, number]; y: readonly [number, number]; round?: true };
+  /**
    * What the placement checks hold it to: `ground` clear of everything; `stacked` on another
    * prop's spot; `fence` in the strip inside the front fence; `shore` on the lake's rim; `water`
    * wholly in the lake; `pier` from the shore into it.
@@ -125,12 +130,20 @@ export const DRESSING: readonly Dressing[] = [
     ],
   },
   // B: the market's food stall and café, the lake.
-  { prop: "food-stall", scale: 1.3, block: [0.78, 0.38], kind: "ground", at: [[8.3, 6.5]] },
+  {
+    prop: "food-stall",
+    scale: 1.3,
+    block: [0.78, 0.38],
+    shade: { half: [0.75, 0.36], y: [0, 1.35] },
+    kind: "ground",
+    at: [[8.3, 6.5]],
+  },
   {
     prop: "parasol-table",
     // Taller than the plan's 2.5, so the canopy clears the table.
     scale: [2.3, 2.9, 2.3],
     block: [0.4, 0.4],
+    shade: { half: [0.4, 0.46], y: [0.87, 1.3], round: true },
     kind: "ground",
     at: [
       [6, 7.3],
@@ -194,9 +207,22 @@ export const DRESSING: readonly Dressing[] = [
     ],
   },
   // C: the library's lawn, the west edge, the beds behind the library.
-  { prop: "gazebo", scale: 1.3, block: [0.7, 0.84], kind: "ground", at: [[-10.4, 1.8]] },
+  {
+    prop: "gazebo",
+    scale: 1.3,
+    block: [0.7, 0.84],
+    shade: { half: [0.62, 0.7], y: [0.85, 1.75] },
+    kind: "ground",
+    at: [[-10.4, 1.8]],
+  },
   { prop: "bush", scale: 1.6, kind: "ground", at: row(0.15, [-12, -11.1, -10.2, -9.3]) },
-  { prop: "notice-board", scale: 0.8, kind: "ground", at: [[-8, -1.1, 90]] },
+  {
+    prop: "notice-board",
+    scale: 0.8,
+    shade: { half: [0.2, 0.22], y: [0.35, 0.83] },
+    kind: "ground",
+    at: [[-8, -1.1, 90]],
+  },
   {
     prop: "bamboo",
     scale: 2.6,
@@ -240,13 +266,21 @@ export const DRESSING: readonly Dressing[] = [
     prop: "palm",
     scale: 1.5,
     block: [0.3, 0.3],
+    shade: { half: [0.7, 0.75], y: [1.9, 2.27], round: true },
     kind: "ground",
     at: [
       [13.95, -9],
       [14, -11.6, 120],
     ],
   },
-  { prop: "palm-short", scale: 1.6, block: [0.3, 0.3], kind: "ground", at: [[11.1, -7.1, 40]] },
+  {
+    prop: "palm-short",
+    scale: 1.6,
+    block: [0.3, 0.3],
+    shade: { half: [0.8, 0.8], y: [1.38, 1.7], round: true },
+    kind: "ground",
+    at: [[11.1, -7.1, 40]],
+  },
   { prop: "bench", scale: 2, kind: "ground", at: [[9.65, -15.5, 90]] },
   {
     prop: "bush",

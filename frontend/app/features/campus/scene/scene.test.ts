@@ -45,6 +45,7 @@ import {
   WORLD_BOUNDS,
   type Vec2,
 } from "../layout";
+import { DRESSING } from "../dressing";
 import { step } from "../movement";
 import { siteInfo, siteLook, siteLooks, type SiteLook } from "../sites";
 import {
@@ -75,6 +76,15 @@ const manifests: ThemeManifest[] = themeIds.map((id) =>
 );
 
 const props = readJson(path.resolve(process.cwd(), "public", "models", "props.json")) as PropsJson;
+/** Props tall or wide enough to cast a sun shadow like the trees (art §2.2). */
+const CASTING_PROPS = [
+  "gazebo",
+  "food-stall",
+  "notice-board",
+  "palm",
+  "palm-short",
+  "parasol-table",
+];
 
 function build(manifest: ThemeManifest, time: TimeOfDay = "day") {
   return renderHook(
@@ -649,9 +659,10 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     // overlay (campus-scene v0.3 §13.4 has the measured totals). The cap stays v0.3's (§8).
     // v0.4 dresses all four sides (orbit-camera §5.2) inside the same groups: by day 20,097 ->
     // 21,413 (spire-hall) and 17,020 -> 18,268 (clock-tower); 21,585 with every zone lit.
-    // The CC0 props (dressing plan §3) add one draw call and 8,202 triangles (7,914 planned +
-    // the parasols' 288 back faces), the six new lamps 264 in the terrain: by day 29,879
-    // (spire-hall) and 26,734 (clock-tower), 30,051 with every zone lit. Cap 31,500: that plus
+    // The CC0 props (dressing plan §3) add one draw call and 7,818 triangles (7,914 planned,
+    // less the 384 of the dropped wall rocks, plus the parasols' 288 back faces), the six new
+    // lamps 264 in the terrain and their sun shade 56 in the overlay: by day 29,551
+    // (spire-hall) and 26,406 (clock-tower), 29,723 with every zone lit. Cap 31,500: that plus
     // the v0.4 cast's ~1,020 (npc-cast v0.4 §11), about half the brief's 60k (art §6.1).
     it.each(TIMES)("stays well inside 40 draw calls and 60k triangles at %s", (time) => {
       const { result, unmount } = build(manifest, time);
@@ -711,6 +722,36 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       expect(points.length).toBeGreaterThan(20);
       const unshaded = points.filter((p) => !inShadow(result.current.shadow, p));
       expect(unshaded.map((p) => p.label)).toEqual([]);
+      unmount();
+    });
+
+    it.each(TIMES)("shades the ground behind the bulky props (%s, review r1)", (time) => {
+      // Without it the gazebo, stall, board, palms and parasols looked pasted on beside the
+      // trees. Oracle: the point 0.9 up each copy's baked height, cast along the sun.
+      const { result, unmount } = build(manifest, time);
+      const { sun } = result.current.palette.light;
+      const unshaded = DRESSING.filter((row) => CASTING_PROPS.includes(row.prop)).flatMap((row) => {
+        const data = props.props[row.prop];
+        if (!data) throw new Error(`no ${row.prop}`);
+        const sy = typeof row.scale === "number" ? row.scale : row.scale[1];
+        let top = 0;
+        for (let i = 1; i < data.position.length; i += 3)
+          top = Math.max(top, (data.position[i] ?? 0) / props.q);
+        const y = (row.y ?? 0) + 0.9 * top * sy;
+        return (
+          row.at
+            .map(([x, z]) => ({
+              label: `${row.prop} (${x}, ${z})`,
+              x: x - (sun.x / sun.y) * y,
+              z: z - (sun.z / sun.y) * y,
+            }))
+            // A palm's shade at dusk falls off the base, which clips it.
+            .filter((p) => p.x > BASE.minX && p.x < BASE.maxX && p.z > BASE.minZ && p.z < BASE.maxZ)
+            .filter((p) => !inShadow(result.current.shadow, p))
+            .map((p) => p.label)
+        );
+      });
+      expect(unshaded).toEqual([]);
       unmount();
     });
 
