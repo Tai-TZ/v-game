@@ -39,6 +39,7 @@ import {
   type Box,
   type Vec2,
 } from "../layout";
+import { DRESSING_LAMPS } from "../dressing";
 import type { SiteLook } from "../sites";
 import { desaturate, type BuildingPalette, type Palette } from "./palette";
 import {
@@ -815,6 +816,7 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
     ]),
     // Without colonnades the hedge arcs get lamps instead.
     ...(colonnades ? [] : SIDES.flatMap((s) => [0.37, 0.66].map((k) => arcPoint(s * k * PI, 3.4)))),
+    ...DRESSING_LAMPS,
   ];
   const statues = [
     ...grid([-3.05, 3.05], [-1.35, -0.45, 0.45, 1.35], (x, z) => ({ x, z })),
