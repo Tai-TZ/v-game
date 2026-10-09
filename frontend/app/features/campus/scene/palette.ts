@@ -95,7 +95,7 @@ export interface BuildingPalette {
 
 export type Palette = ReturnType<typeof palette>;
 
-export function palette(campus: CampusTheme, time: TimeOfDay = campus.lights.default) {
+export function palette(campus: CampusTheme, time: TimeOfDay = "day") {
   const c = (hex: string) => new Color(hex);
   const building = (b: { wall: string; trim: string; roof: string }): BuildingPalette => ({
     wall: c(b.wall),

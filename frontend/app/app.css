@@ -72,8 +72,8 @@
   --color-on-brand: var(--vg-on-brand);
   --color-on-ink: var(--vg-on-ink);
   --color-on-ink-muted: var(--vg-on-ink-muted);
-  --color-scene: var(--vg-scene-sky);
-  --color-scene-dusk: var(--vg-scene-dusk);
+  /* The hub's flat sky: <main data-sky data-clouds> sets --vg-sky (campus v0.4 W0.10). */
+  --color-scene: var(--vg-sky, var(--vg-scene-sky));
 
   --color-success: var(--vg-success);
   --color-success-tint: var(--vg-success-tint);
@@ -95,7 +95,11 @@
     --vg-text: #1f2328;
     --vg-brand: #1f4e79;
     --vg-scene-sky: #eef2f5;
+    --vg-scene-dawn: #ece2e6;
     --vg-scene-dusk: #dcd7e4;
+    --vg-scene-night: #1f2b38;
+    --vg-scene-cloud: #d4d9d8;
+    --vg-scene-cloud-night: #2a3037;
     --vg-radius-sm: 4px;
     --vg-radius-md: 8px;
     color-scheme: light;

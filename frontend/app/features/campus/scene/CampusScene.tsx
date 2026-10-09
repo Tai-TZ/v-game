@@ -60,7 +60,7 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
   );
   // Deferred: the click paints the pressed button first, then the scene re-bakes every group in
   // a background render, a long task on slow CPUs (QA r2; campus-scene v0.3 §13.1).
-  const picked = useHub((state) => state.time) ?? campus.lights.default;
+  const picked = useHub((state) => state.time) ?? "day";
   const time = useDeferredValue(picked);
   // Loader signal (hud/sceneLoad): the canvas is in the DOM. SceneReady sends the next two.
   useLayoutEffect(() => {

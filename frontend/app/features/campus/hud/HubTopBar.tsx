@@ -35,8 +35,8 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const showSkeleton = useDelayedFlag(zones === undefined, 300);
-  const { lights, npcs } = useActiveTheme().campus;
-  const defaultTime = lights.default;
+  const { npcs } = useActiveTheme().campus;
+  const defaultTime = "day";
   const dusk = (useHub((state) => state.time) ?? defaultTime) === "dusk";
   // The light preset lives in the scene; while it is down (no WebGL, failed) the button would
   // do nothing.

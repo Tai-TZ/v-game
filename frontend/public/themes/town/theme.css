@@ -164,6 +164,10 @@
 
   --vg-footer-image: none;
   --vg-scene-sky: #e3efec;
-  /* Flat dusk sky behind the hub at "Hoàng hôn" (art §2.5, rev. 2026-10-08). */
+  /* Flat sky behind the hub per phase and cloud cover (art §2.5, campus v0.4 W2). */
+  --vg-scene-dawn: #ece2e6;
   --vg-scene-dusk: #e7cfc3;
+  --vg-scene-night: #1f2b38;
+  --vg-scene-cloud: #d4d9d8;
+  --vg-scene-cloud-night: #2a3037;
 }

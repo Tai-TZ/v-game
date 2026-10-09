@@ -43,7 +43,29 @@ const NpcLook = v.strictObject({
   accent: HexColor,
 });
 
-export const TimeOfDaySchema = v.picklist(["day", "dusk"]);
+/** The four phases of the hub's day, from the sun at the theme's place (campus v0.4 W0.1). */
+export const TimeOfDaySchema = v.picklist(["dawn", "day", "dusk", "night"]);
+
+/**
+ * Where the campus stands: the hub's time of day comes from the sun here, and the weather chip
+ * names it. Never the viewer's location. Must match the backend's WEATHER_LATITUDE/LONGITUDE.
+ */
+const PlaceSchema = v.strictObject({
+  name: v.pipe(v.string(), v.nonEmpty()),
+  lat: v.pipe(v.number(), v.minValue(-90), v.maxValue(90)),
+  lon: v.pipe(v.number(), v.minValue(-180), v.maxValue(180)),
+  timeZone: v.pipe(
+    v.string(),
+    v.check((timeZone) => {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Unknown IANA time zone"),
+  ),
+});
 
 export const ThemeSummarySchema = v.strictObject({
   id: ThemeId,
@@ -62,6 +84,7 @@ export const ThemeManifestSchema = v.strictObject({
     orgName: v.nullable(v.string()),
     disclaimer: v.nullable(v.string()),
   }),
+  place: PlaceSchema,
   fonts: v.strictObject({
     preload: v.array(RelativeAsset),
   }),
@@ -99,9 +122,10 @@ export const ThemeManifestSchema = v.strictObject({
       market: BuildingColors,
     }),
     lights: v.strictObject({
-      default: TimeOfDaySchema,
+      dawn: LightPresetSchema,
       day: LightPresetSchema,
       dusk: LightPresetSchema,
+      night: LightPresetSchema,
     }),
     npcs: v.strictObject({
       guard: NpcLook,
@@ -119,6 +143,7 @@ export type LandmarkArchetype = CampusTheme["landmark"]["archetype"];
 export type TimeOfDay = v.InferOutput<typeof TimeOfDaySchema>;
 export type LightPreset = CampusTheme["lights"]["day"];
 export type NpcLook = CampusTheme["npcs"]["guard"];
+export type Place = ThemeManifest["place"];
 
 export function parseThemeIndex(data: unknown): ThemeSummary[] {
   return v.parse(ThemeIndexSchema, data).themes;
