@@ -93,6 +93,8 @@ export interface LevelCopy {
   /** Star rules PublicLevel does not return (engine/levels/<id>.json `rules`); see §8.2. */
   s1Required: readonly string[];
   s3ForbiddenLabels: readonly string[];
+  /** Knobs that do nothing at this level, by param, with why (shown dimmed, scenario §5). */
+  inertKnobs?: Readonly<Record<string, string>>;
 }
 
 /** Cô Lan's lines per level, verbatim from each scenario §4 (beats 3 and 12). */
@@ -123,6 +125,7 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
     win3: "Ca của Hà vẫn xanh. Cái bảng đó là thứ mình xem đầu tiên mỗi khi có ai sửa trợ lý.",
     s1Required: ["lib-l3-v01"],
     s3ForbiddenLabels: [],
+    inertKnobs: { only_in_force: "Kho tối nay không có văn bản hết hiệu lực." },
   },
 };
 

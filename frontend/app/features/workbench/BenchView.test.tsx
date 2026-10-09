@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
@@ -8,7 +8,7 @@ import { validateGraph } from "./validate";
 
 const l3 = testEnv("article-number-lookup");
 
-function Bench({ bench }: { bench: Bench }) {
+function Bench({ bench, highlight = null }: { bench: Bench; highlight?: "chunker" | null }) {
   const graph = graphFromBench(l3, bench);
   return (
     <BenchSection
@@ -18,7 +18,7 @@ function Bench({ bench }: { bench: Bench }) {
       onChange={() => undefined}
       locked={false}
       issues={validateGraph(l3, graph)}
-      highlight={null}
+      highlight={highlight}
       view={null}
       saved={false}
       discarded={false}
@@ -50,5 +50,23 @@ describe("BenchSection", () => {
         expect(shown[index]).toContain(issue.message_vi.replaceAll("*", ""));
       });
     }
+  });
+
+  it("dims the stale-document filter at L3, whose corpus has no expired document", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} />);
+    const filter = screen.getByRole("switch", { name: /Kính lọc hiệu lực/ });
+    expect(filter).toHaveProperty("disabled", true);
+    expect(filter.getAttribute("aria-describedby")).toBeTruthy();
+    expect(screen.getByText("Kho tối nay không có văn bản hết hiệu lực.")).toBeDefined();
+  });
+
+  it("lights a slot opened from a diagnosis unlike a finished step (fill, not only a ring)", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    const { container } = render(<Bench bench={start} highlight="chunker" />);
+    const frame = container.querySelector("#slot-ix");
+    expect(frame?.className).toContain("bg-brand-tint");
   });
 });

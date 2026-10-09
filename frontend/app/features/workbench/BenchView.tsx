@@ -31,6 +31,7 @@ import {
   fmt,
   fmtValue,
   LABEL_VI,
+  LEVEL_COPY,
   outcomeText,
   shownLabels,
   stepStatusText,
@@ -194,7 +195,8 @@ const DANGER = new Set(["llm_error", "index_error"]);
 
 function frameClass(step: StepView | undefined, highlighted: boolean, failed: boolean): string {
   // The lamp of a diagnosis ("Xem ở …") wins over the run state until the next edit.
-  if (highlighted) return "border-brand ring-2 ring-brand bg-surface";
+  // Filled: a finished step's green ring looks the same as a brand ring in the town theme.
+  if (highlighted) return "border-brand ring-2 ring-brand bg-brand-tint";
   // The answer board of a failed case: every step can be "Xong" while the answer is wrong.
   if (failed) return "border-danger ring-1 ring-danger bg-surface";
   if (step?.state === "running") return "border-brand ring-1 ring-brand bg-surface";
@@ -303,6 +305,7 @@ function Slot({
                 param={name}
                 domain={d}
                 value={params[name] ?? null}
+                inert={LEVEL_COPY[level.id]?.inertKnobs?.[name]}
                 onValue={(value) => onChange(setParam(env, bench, type, name, value))}
               />
             );
@@ -442,6 +445,7 @@ function Control({
   param,
   domain: d,
   value,
+  inert,
   onValue,
 }: {
   env: Env;
@@ -449,6 +453,8 @@ function Control({
   param: string;
   domain: Domain;
   value: JsonValue;
+  /** Why this switch does nothing at this level: it is shown dimmed and disabled. */
+  inert?: string | undefined;
   onValue: (value: JsonValue) => void;
 }) {
   const id = useId();
@@ -465,19 +471,25 @@ function Control({
       );
     case "toggle":
       return (
-        <label
-          data-param={param}
-          className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"
-        >
-          <input
-            type="checkbox"
-            role="switch"
-            checked={value === true}
-            onChange={(event) => onValue(event.target.checked)}
-            className="size-5 shrink-0 accent-brand"
-          />
-          <span>{label}</span>
-        </label>
+        <div data-param={param}>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm has-disabled:cursor-not-allowed has-disabled:text-fg-muted">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={value === true}
+              disabled={inert !== undefined}
+              aria-describedby={inert ? `${id}-inert` : undefined}
+              onChange={(event) => onValue(event.target.checked)}
+              className="size-5 shrink-0 accent-brand disabled:opacity-60"
+            />
+            <span>{label}</span>
+          </label>
+          {inert && (
+            <p id={`${id}-inert`} className="text-xs text-fg-muted">
+              {inert}
+            </p>
+          )}
+        </div>
       );
     case "choice":
       return (
