@@ -61,8 +61,8 @@ Mỗi level có câu thấy được, câu ẩn và câu bẫy; agent phải tr�
 
 ```mermaid
 flowchart LR
-    L1("L1 Thôi bịa điều luật") -->|"mở thêm chunker"| L2("L2 Lược dao chunk")
-    L2 -->|"mở thêm bm25, fusion, rerank"| L3("L3 Hỏi bằng số điều")
+    L1("L1 Thôi bịa điều luật") -->|"chỉnh được chunker"| L2("L2 Lược dao chunk")
+    L2 -->|"thêm bm25_search, fusion, rerank"| L3("L3 Hỏi bằng số điều")
     L1 -.- C1("Truy xuất và trích nguồn, không bịa")
     L2 -.- C2("Kích thước chunk, overlap, top-k, lọc văn bản hết hiệu lực")
     L3 -.- C3("Tìm kiếm lai BM25 và vector, RRF, xếp hạng lại")
@@ -140,7 +140,8 @@ sequenceDiagram
     A-->>B: 202 run_id, hoặc 422 gom mọi lỗi
     B->>A: GET /api/runs/{id}/events (SSE)
     loop Mỗi câu hỏi
-        A->>L: Truy xuất rồi gọi LLM (replay cache trước)
+        A->>A: Truy xuất trên index đóng gói sẵn
+        A->>L: Gọi LLM (tra replay cache trước)
         A-->>B: step.started, step.finished, case.graded
     end
     A-->>B: run.scored (sao), run.finished (đáp án, chẩn đoán)
@@ -165,7 +166,7 @@ Mục tiêu 60 FPS trên laptop GPU tích hợp; build hoặc test thất bại 
 | Hạng mục                 | Ngân sách     | Hiện tại |
 | ------------------------ | ------------- | -------- |
 | Draw call trong cảnh hub | ≤ 40          | 18       |
-| Tam giác trong cảnh hub  | ≤ 60.000      | ~31.000  |
+| Tam giác trong cảnh hub  | ≤ 60.000      | ~32.000  |
 | Chunk route `/play`      | ≤ 300 kB gzip | ~293 kB  |
 | three.js trên trang chủ  | 0 chunk       | 0        |
 | Khung hình khi đứng yên  | 0             | 0        |
@@ -188,11 +189,11 @@ npm ci
 npm run dev             # http://localhost:5173/play, /api proxy sang :8000
 ```
 
-| Lệnh                                                          | Ở đâu       | Làm gì                                             |
-| ------------------------------------------------------------- | ----------- | -------------------------------------------------- |
-| `npm run check && npm run build && npm run test:e2e`          | `frontend/` | Format, lint, type, unit, build kèm ngân sách, e2e |
-| `uv run ruff check && uv run mypy src tests && uv run pytest` | `backend/`  | Lint, type, test offline với LLM giả               |
-| `lefthook install`                                            | gốc repo    | Git hook: gitleaks và lint file đã stage           |
+| Lệnh                                                                                        | Ở đâu       | Làm gì                                             |
+| ------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------- |
+| `npm run check && npm run build && npm run test:e2e`                                        | `frontend/` | Format, lint, type, unit, build kèm ngân sách, e2e |
+| `uv run ruff check && uv run ruff format --check && uv run mypy src tests && uv run pytest` | `backend/`  | Lint, format, type, test offline với LLM giả       |
+| `lefthook install`                                                                          | gốc repo    | Git hook: gitleaks và lint file đã stage           |
 
 ## Trạng thái và lộ trình
 
@@ -201,7 +202,6 @@ npm run dev             # http://localhost:5173/play, /api proxy sang :8000
 - [x] Engine không nạp model chạy trên Render free, production ở <https://vgame.ai20k.cloud>
 - [ ] Bàn thợ đợt B: bước đoán kết quả, gợi ý, mở khoá level theo sao
 - [ ] Khu Tháp canh (guardrails) và Chợ model (token, context, chọn model)
-- [ ] Bài học ngắn của NPC, chờ duyệt nội dung
 
 ## Tài liệu
 
