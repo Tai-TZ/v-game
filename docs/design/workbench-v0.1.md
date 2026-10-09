@@ -430,7 +430,7 @@ Tiếng Việt, viết hoa đầu câu, nút bắt đầu bằng động từ. C
 | Công tắc gắn | "Gắn {đồ chơi}" (`role="switch"`, trạng thái đọc "bật/tắt") |
 | Lăng kính | "Khe thẻ {i}", option "Trống"; "Dặn dò: {n} ký tự, đi riêng ngoài thùng." |
 | Lưu | "Đã lưu cấu hình trên máy này." (chỉ khi ghi được) |
-| Bỏ cấu hình đã lưu | "Cấu hình đã lưu không còn hợp với màn này nên bàn thợ dùng cấu hình khởi đầu." |
+| Bỏ cấu hình đã lưu | "Cấu hình đã lưu không còn hợp với màn này nên bàn thợ dùng cấu hình khởi đầu." Vòng 4: mất đi khi lần sửa đầu đã lưu (không đứng cạnh "Đã lưu cấu hình trên máy này.") |
 | Khoá khi chạy | "Bàn thợ khóa trong lúc chạy." |
 
 Chính tả trong chữ giao diện: "khóa", "hủy" (đặt dấu kiểu cũ, như máy chủ: "Tìm từ khóa").
@@ -447,7 +447,7 @@ Chính tả trong chữ giao diện: "khóa", "hủy" (đặt dấu kiểu cũ, 
 | Nút chính | "Mở ca"; khi gửi: "Đang gửi cấu hình…" (`aria-busy`, `disabled`) |
 | Còn lỗi | "Còn {n} lỗi cần sửa trước khi mở ca." |
 | JSON | `<details>` "Xem cấu hình JSON" (`<pre>` đúng thân sẽ gửi) |
-| Khôi phục | "Khôi phục cấu hình khởi đầu" (`buttonClass("inline")`) → xác nhận tại chỗ: câu "Cấu hình hiện tại sẽ được thay bằng cấu hình khởi đầu của màn." + "Khôi phục" (`primary`) + "Giữ cấu hình" (`secondary`). Mở: focus vào câu hỏi (`tabIndex -1`, để trình đọc màn hình đọc nó). Đóng (cả hai nút): focus về nút đã mở |
+| Khôi phục | "Khôi phục cấu hình khởi đầu" (`buttonClass("inline")`) → xác nhận tại chỗ: câu "Cấu hình hiện tại sẽ được thay bằng cấu hình khởi đầu của màn." + "Khôi phục" (`primary`) + "Giữ cấu hình" (`secondary`). Mở: focus vào câu hỏi (`tabIndex -1`, để trình đọc màn hình đọc nó). Đóng (cả hai nút): focus về nút đã mở. Vòng 4: cả hai nút `disabled` khi đang gửi cấu hình (khôi phục lúc POST đang đi đặt lại yêu cầu về idle và mở đường cho POST thứ hai) |
 
 ### 8.5 Khi chạy
 | Chỗ | Chữ |
@@ -509,7 +509,7 @@ Trước vòng sửa 1 nút focus điều khiển **đầu** của khe: với L�
 ### 8.7 Tải trang
 | Trạng thái | Chữ |
 |---|---|
-| Đang chuyển trang (vòng 3: vào màn từ trang khu, quay về trang khu) | trang cũ ở yên tới khi `clientLoader` của trang mới xong (`GET /api/levels/{id}` + `/api/blocks`; API ngủ có thể mất nửa phút). `PageFrame` đọc `useNavigation()`: khi `loading`, `main` có `aria-busy`, dòng sr-only `role="status"` "Đang tải trang…", và một thanh vô định `bg-brand` cao 4 px ở mép dưới header (`animate-poster-bar` như thanh của khe khi chạy; hiện sau 150 ms bằng `animate-appear` để không nháy khi tải nhanh; `motion-reduce` đứng yên). Không có chữ hiện trong header: ở 375 px nút quay về và nút giao diện đã gần kín hàng |
+| Đang chuyển trang (vòng 3: vào màn từ trang khu, quay về trang khu) | trang cũ ở yên tới khi `clientLoader` của trang mới xong (`GET /api/levels/{id}` + `/api/blocks`; API ngủ có thể mất nửa phút). `PageFrame` đọc `useNavigation()`: khi `loading`, `main` có `aria-busy`, dòng sr-only `role="status"` "Đang tải trang…", và một thanh vô định `bg-brand` cao 4 px (vòng 4: `fixed` ở mép trên màn, vì header cuộn đi mất khi "Vào màn" ở xa dưới trang 375 px; "Thử lại" là revalidation, cũng hiện thanh và status) (`animate-poster-bar` như thanh của khe khi chạy; hiện sau 150 ms bằng `animate-appear` để không nháy khi tải nhanh; `motion-reduce` đứng yên và phủ hết bề ngang). Không có chữ hiện trong header: ở 375 px nút quay về và nút giao diện đã gần kín hàng |
 | Đang tải (`HydrateFallback`, khung tĩnh như art §9.4) | sr-only "Đang tải màn"; link "Về danh sách màn" trỏ `/play/{zoneId}` (đọc `useParams`), như trang đã tải, không về `/play` (khuôn viên 3D, nạp three.js) |
 | Không tìm thấy (id sai mẫu, 404, hoặc `level.zone ≠ zoneId`) | h1 "Không tìm thấy màn này"; "Đường dẫn không khớp màn nào của khu."; nút "Về danh sách màn" |
 | Lỗi tải | hộp `bg-warning-tint`: "Chưa tải được màn này." / "Kiểm tra kết nối rồi thử lại." / "Thử lại" (revalidate) + "Về danh sách màn" |
@@ -727,7 +727,8 @@ Lỗi thật có test hỏng trước rồi mới sửa: unit `Results.test.tsx`
 - Khung "Đang tải màn…" thay trang khu khi đang chuyển: dùng thanh + status trong khung chung thay vì kéo `LevelPageSkeleton` (module bàn thợ) vào gốc ứng dụng; chữ hiện trong header bị bỏ vì ở 375 px không còn chỗ.
 - 429: bỏ hoặc rút câu `detail` của máy chủ khi có `Retry-After`: giữ nguyên văn (W4, §6.1), vì máy chủ có thể nói lý do khác "bận" (hạn mức ngày); máy chủ hiện không gửi header này, chỉ sửa đơn vị giờ.
 - Đổi "Xếp hạng lại" thành "Kính lúp" trong câu `W_RERANK_NOOP`: câu chép nguyên văn máy chủ (W4, như vòng 1); bước sửa thêm sau nó gọi tên đồ chơi.
-- Hội thoại cô Lan trên khuôn viên 3D ("Dạy trợ lý tra sách") không dùng `PageFrame`, nên chưa có thanh tải; khi API ngủ, nút cũng đứng im tới khi màn tải xong. Thêm khi cần: cùng `useNavigation()` trong HUD của `/play`.
+- Hội thoại cô Lan trên khuôn viên 3D ("Dạy trợ lý tra sách") không dùng `PageFrame`. Vòng 4: hội thoại ở lại tới khi màn tải xong; `/play` đọc `useNavigation()`, nút chính thành "Đang mở màn…" với `aria-busy` (không `disabled`, để giữ focus; bấm lần nữa không làm gì) và một status sr-only cùng chữ.
+- Vòng 4: Back sau "Xem câu #n" khi màn là trang đầu của lần vào (link trực tiếp, tab mới): mục đầu và mục neo đều có `location.key` "default", nên `ScrollRestoration` lưu vị trí của neo đè lên vị trí của trang. `getKey={scrollKey}` (`lib/scroll.ts`) đặt khoá `pathname + hash` cho mục "default".
 
 Không gọi Gemini thật ở vòng này: mọi thay đổi là logic và chữ phía client, kiểm bằng unit, e2e mock và ảnh chụp bản build với API mock (luồng tổng hợp theo hình của `grading.py`).
 
