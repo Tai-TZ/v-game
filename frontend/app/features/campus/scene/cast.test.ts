@@ -21,10 +21,13 @@ import {
   CAST_JOINTS,
   CAST_PARENTS,
   castClips,
+  createAnim,
   disposeFigure,
   paintFigure,
   parseCast,
+  setState,
   unpackIndex,
+  updateAnim,
   type CastJson,
   type CastRole,
 } from "./cast";
@@ -314,5 +317,70 @@ describe("cast sizes (scene units)", () => {
     expect(peak("player", "walk")).toBeCloseTo(1.27, 2);
     expect(peak("player", "walk")).toBeLessThanOrEqual(1.31);
     expect(peak("player", "run")).toBeLessThanOrEqual(1.31);
+  });
+});
+
+describe("cast animation (integration spec §5.1)", () => {
+  /** A figure with its state machine and its pose at rest. */
+  const animated = (role: CastRole = "player") => {
+    const mesh = buildFigure(cast, role, material);
+    const anim = createAnim(mesh, castClips(cast));
+    return { mesh, anim, rest: snapshot(mesh) };
+  };
+  /** Frames at `fps` until the figure is no longer busy; returns the seconds that took. */
+  const settle = (anim: ReturnType<typeof animated>["anim"], fps: number, speed = 0) => {
+    let t = 0;
+    while (updateAnim(anim, 1 / fps, speed, false)) {
+      t += 1 / fps;
+      if (t > 10) throw new Error("never settles");
+    }
+    return t;
+  };
+
+  it("stands at rest and asks for no frame: there is no idle loop", () => {
+    const { mesh, anim, rest } = animated();
+    expect(anim.current).toBe("rest");
+    expect(updateAnim(anim, 1 / 60, 0, false)).toBe(false);
+    expect(snapshot(mesh)).toBe(rest);
+  });
+
+  it("runs at 4.2 u/s with no foot slide, then fades back to the exact rest pose", () => {
+    const { mesh, anim, rest } = animated();
+    for (let i = 0; i < 60; i += 1) expect(updateAnim(anim, 1 / 60, 4.2, false)).toBe(true);
+    expect(anim.current).toBe("run");
+    expect(anim.actions.run.timeScale).toBeCloseTo(4.2 / 2.39, 5);
+    expect(snapshot(mesh)).not.toBe(rest);
+    expect(settle(anim, 60)).toBeLessThanOrEqual(0.2);
+    expect(anim.current).toBe("rest");
+    expect(snapshot(mesh)).toBe(rest);
+  });
+
+  it("walks below 2 u/s, its pace clamped to 0.6-1.8", () => {
+    const { anim } = animated();
+    updateAnim(anim, 1 / 60, 0.5, false);
+    expect(anim.current).toBe("walk");
+    expect(anim.actions.walk.timeScale).toBe(0.6);
+    updateAnim(anim, 1 / 60, 1.4, false);
+    expect(anim.actions.walk.timeScale).toBeCloseTo(1.4 / 1.56, 5);
+  });
+
+  it("talks twice and is back at rest within 1.6 s; a nod at 10 FPS lands on rest too", () => {
+    const talker = animated("guard");
+    setState(talker.anim, "talk", { times: 2 });
+    expect(settle(talker.anim, 60)).toBeLessThanOrEqual(1.6);
+    expect(snapshot(talker.mesh)).toBe(talker.rest);
+
+    const nodder = animated("examiner");
+    setState(nodder.anim, "nod");
+    expect(settle(nodder.anim, 10)).toBeLessThanOrEqual(1);
+    expect(snapshot(nodder.mesh)).toBe(nodder.rest);
+  });
+
+  it("with reduced motion, walks without fades and stops at rest in the frame it stops", () => {
+    const { mesh, anim, rest } = animated();
+    for (let i = 0; i < 20; i += 1) updateAnim(anim, 1 / 60, 3, true);
+    expect(anim.current).toBe("run");
+    expect(updateAnim(anim, 1 / 60, 0, true)).toBe(false);
+    expect(snapshot(mesh)).toBe(rest);
   });
 });

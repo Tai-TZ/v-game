@@ -1,14 +1,17 @@
 import {
   AnimationClip,
+  AnimationMixer,
   Bone,
   BufferAttribute,
   BufferGeometry,
   Color,
+  LoopRepeat,
   MathUtils,
   NormalAnimationBlendMode,
   Skeleton,
   SkinnedMesh,
   SRGBColorSpace,
+  type AnimationAction,
   type AnimationClipJSON,
   type Material,
 } from "three";
@@ -222,4 +225,90 @@ export function castClips(cast: CastJson): AnimationClip[] {
   return cast.clips.map((clip) =>
     AnimationClip.parse({ ...clip, blendMode: NormalAnimationBlendMode }),
   );
+}
+
+export const CAST_CLIPS = ["rest", "walk", "run", "talk", "nod"] as const;
+export type CastClip = (typeof CAST_CLIPS)[number];
+
+/** Crossfade between states (s). */
+const FADE = 0.15;
+/** Ground speed (u/s) of walk and run at timeScale 1 and CAST_SCALE: the feet do not slide. */
+const WALK_STRIDE = 1.56;
+const RUN_STRIDE = 2.39;
+const RUN_FROM = 2.0;
+
+/** One figure's mixer with exactly one "state" action at full weight at a time. */
+export interface CastAnim {
+  mixer: AnimationMixer;
+  actions: Record<CastClip, AnimationAction>;
+  current: CastClip;
+  /** Seconds the running gesture has left before it hands back to rest. */
+  left: number;
+  /** Seconds the running crossfade has left. */
+  fade: number;
+}
+
+/** Starts at rest, posed at once; nothing loops on its own, so an idle figure draws no frame. */
+export function createAnim(mesh: SkinnedMesh, clips: readonly AnimationClip[]): CastAnim {
+  const mixer = new AnimationMixer(mesh);
+  const action = (name: CastClip) => {
+    const clip = clips.find((c) => c.name === name);
+    if (!clip) throw new Error(`cast.json has no ${name} clip`);
+    return mixer.clipAction(clip);
+  };
+  const actions = {
+    rest: action("rest"),
+    walk: action("walk"),
+    run: action("run"),
+    talk: action("talk"),
+    nod: action("nod"),
+  };
+  actions.rest.play();
+  mixer.update(0);
+  return { mixer, actions, current: "rest", left: 0, fade: 0 };
+}
+
+/** Switches state; talk and nod play `times` and then return to rest by themselves. */
+export function setState(
+  a: CastAnim,
+  name: CastClip,
+  { fade = FADE, times = 1 }: { fade?: number; times?: number } = {},
+): void {
+  if (a.current === name) return;
+  const next = a.actions[name].reset();
+  const gesture = name === "talk" || name === "nod";
+  next.setLoop(LoopRepeat, gesture ? times : Infinity);
+  next.play();
+  if (fade > 0) a.actions[a.current].crossFadeTo(next, fade, false);
+  else a.actions[a.current].stop();
+  a.current = name;
+  a.fade = fade;
+  // Hand back to rest one fade before the end, so rest fades in while the gesture still plays
+  // and the bind pose never shows for a frame.
+  a.left = gesture ? next.getClip().duration * times - fade : 0;
+}
+
+/**
+ * Advances one drawn frame. `speed` is the figure's ground speed (u/s; 0 for the NPCs).
+ * Returns true while the figure still moves, i.e. needs another frame.
+ */
+export function updateAnim(a: CastAnim, dt: number, speed: number, reduced: boolean): boolean {
+  const fade = reduced ? 0 : FADE;
+  if (speed > 0.05) {
+    setState(a, speed < RUN_FROM ? "walk" : "run", { fade });
+    a.actions[a.current].timeScale = MathUtils.clamp(
+      speed / (a.current === "run" ? RUN_STRIDE : WALK_STRIDE),
+      0.6,
+      1.8,
+    );
+  } else if (a.current === "walk" || a.current === "run") {
+    setState(a, "rest", { fade });
+  }
+  if (a.left > 0) {
+    a.left -= dt;
+    if (a.left <= 0) setState(a, "rest", { fade });
+  }
+  a.mixer.update(dt);
+  a.fade = Math.max(0, a.fade - dt);
+  return a.current !== "rest" || a.fade > 0;
 }
