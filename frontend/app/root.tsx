@@ -14,6 +14,7 @@ import { themeBootstrapScript } from "./features/theme/bootstrap";
 import { loadThemeCatalog } from "./features/theme/catalog.server";
 import { ThemeProvider } from "./features/theme/context";
 import { THEME_STYLESHEET_ID, themeAssetUrl, themeStylesheetUrl } from "./features/theme/paths";
+import { scrollKey } from "./lib/scroll";
 import { AUTHOR } from "./lib/site";
 
 // Runs at build time only (pre-render and SPA shell); the result is embedded in the HTML.
@@ -84,7 +85,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
-        <ScrollRestoration />
+        <ScrollRestoration getKey={scrollKey} />
         <Scripts />
       </body>
     </html>
