@@ -11,7 +11,10 @@
   /* HUD motion (art §7). The global reduced-motion rule below cuts these to ~0 ms. */
   --animate-enter: vg-enter 200ms ease-out both;
   --animate-appear: vg-appear 1ms 150ms both;
-  --animate-poster-bar: vg-poster-bar 1.2s linear infinite;
+  /* An animation, not a transition: swapped in for animate-appear, a transition never starts. */
+  --animate-leave: vg-leave 200ms ease-in forwards;
+  /* The scene loader's waited logo block: the only loop, and only while loading (art §7). */
+  --animate-hover: vg-hover 1.2s ease-in-out infinite alternate;
 
   @keyframes vg-enter {
     from {
@@ -24,12 +27,14 @@
       opacity: 0;
     }
   }
-  @keyframes vg-poster-bar {
-    from {
-      transform: translateX(-100%);
-    }
+  @keyframes vg-leave {
     to {
-      transform: translateX(300%);
+      opacity: 0;
+    }
+  }
+  @keyframes vg-hover {
+    to {
+      transform: translateY(-2px);
     }
   }
 }
@@ -147,5 +152,172 @@
     background-position: center bottom;
     background-repeat: no-repeat;
     background-size: cover;
+  }
+}
+
+@layer components {
+  /*
+   * Scene loader diorama (art §8.4). SVG user unit = 1 world unit. Shapes fill with
+   * currentColor, shaded per face like the scene (art §2.3); role classes set the colour from
+   * theme tokens, so both packs follow without new values.
+   */
+  .bp .f-top {
+    fill: currentColor;
+  }
+  .bp .f-left {
+    fill: color-mix(in srgb-linear, currentColor 80%, black);
+  }
+  .bp .f-right {
+    fill: color-mix(in srgb-linear, currentColor 60%, black);
+  }
+  .bp .stroke {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.12;
+    stroke-linecap: round;
+  }
+  .bp-plate,
+  .bp-path,
+  .bp-wall,
+  .bp-lmroof,
+  .bp-fig,
+  .bp-head {
+    color: var(--color-surface);
+  }
+  .bp-board,
+  .bp-trim {
+    color: var(--color-subtle);
+  }
+  .bp-soil {
+    color: color-mix(in srgb, var(--color-success) 40%, var(--color-scene));
+  }
+  .bp-grass {
+    color: color-mix(in srgb, var(--color-success) 28%, var(--color-subtle));
+  }
+  .bp-water {
+    color: color-mix(in srgb, var(--color-brand) 32%, var(--color-subtle));
+  }
+  .bp-foliage {
+    color: color-mix(in srgb, var(--color-success) 62%, var(--color-subtle));
+  }
+  .bp-trunk,
+  .bp-hair {
+    color: color-mix(in srgb, var(--color-ink) 55%, var(--color-subtle));
+  }
+  .bp-lib {
+    color: var(--color-brand);
+  }
+  .bp-wt {
+    color: var(--color-ink);
+  }
+  .bp-mk {
+    color: var(--color-accent);
+  }
+
+  /*
+   * The pre-rendered empty board, framed like the first 3D frame without JS (camera.ts
+   * viewFor, at the spawn). Overview (fit 22–56): the model's bbox inside a 24 px pad.
+   */
+  .bp-shell {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    width: calc(100% - 48px);
+    height: calc(100% - 48px);
+  }
+  /*
+   * Follow mode: the zoom, the spawn at the centre (0.5657, 0.3266), the clamp to the model's
+   * bottom edge (−12.05) and the 72 px top inset, in calc(). The values mirror camera.ts
+   * CONTENT and layout.ts SPAWN; an e2e checks the board against the camera maths.
+   * ponytail: very tall portrait tablets (height ≥ ~1150 px) centre the model instead; the live
+   * diorama corrects the framing at hydration.
+   */
+  @media (width < 1054.72px) or (height < 639.14px) {
+    .bp-shell {
+      --z: clamp(28px, min((100vw - 32px) / 11.5, (100dvh - 72px) / 8), 40px);
+      top: calc(
+        50% + 36px - 14.82 * var(--z) + max(0.3266 * var(--z), 50% - 36px - 12.05 * var(--z))
+      );
+      left: calc(50% - 20.2957 * var(--z));
+      width: calc(45.76 * var(--z));
+      height: calc(26.87 * var(--z));
+    }
+  }
+
+  /* A piece is a ghost line drawing until its signal builds it. */
+  .bp-pc {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+  }
+  .bp-pc:not(.is-built, .is-set) * {
+    fill: var(--color-surface);
+    fill-opacity: 0.2;
+    stroke: var(--color-line-strong);
+    stroke-opacity: 0.55;
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+  }
+  .bp-pc:is(.k-tile, .k-flat):not(.is-built, .is-set) * {
+    fill-opacity: 0;
+    stroke-opacity: 0.4;
+  }
+  .bp-pc:is(.k-tile, .k-flat).is-built {
+    animation: vg-fade 200ms ease-out both;
+  }
+  .bp-pc:is(.k-tree, .k-fig).is-built {
+    animation: vg-pop 300ms ease-out both;
+  }
+  .bp-pc.k-bldg.is-built {
+    animation: vg-rise 380ms ease-out both;
+  }
+
+  /*
+   * The scene region's focus ring is painted under the opaque loader (a later sibling with the
+   * same box), so the loader shows it while it is up (WCAG 2.4.7).
+   */
+  [data-campus-scene]:focus-visible ~ [data-scene-loader] {
+    outline: 2px solid var(--color-brand);
+    outline-offset: -4px;
+  }
+
+  /* A logo block snapping in as its loading step completes (16-unit tile). */
+  .vb-snap {
+    animation: vg-snap 200ms cubic-bezier(0.2, 0.8, 0.2, 1.2) both;
+  }
+}
+
+@keyframes vg-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vg-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes vg-rise {
+  from {
+    transform: scaleY(0);
+  }
+  72% {
+    transform: scaleY(1.05);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes vg-snap {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
   }
 }

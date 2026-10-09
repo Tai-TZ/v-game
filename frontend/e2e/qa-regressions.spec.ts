@@ -9,7 +9,7 @@ test.describe("QA regressions", () => {
     await mockApi(page);
     // A viewer who switched theme on an earlier visit (key from app/features/theme/paths.ts).
     await page.addInitScript(() => window.localStorage.setItem("vg-theme", "town"));
-    for (const path of ["/", "/play/library"]) {
+    for (const path of ["/", "/play", "/play/library"]) {
       await page.goto(path);
       await expect(page.locator("html")).toHaveAttribute("data-theme", "town");
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();

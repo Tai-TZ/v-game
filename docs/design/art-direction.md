@@ -134,7 +134,7 @@ Mặt nghiêng (mái, nón, cầu) tự nhận giá trị trung gian từ cùng 
 
 ### 2.5 Bầu trời, sương mù, trường hợp thêm trường manifest
 
-- **Bầu trời:** một màu phẳng lấy từ biến đã có `--vg-scene-sky` trong cả hai `theme.css` (`#dfeaf5` / `#e3efec`). Canvas trong suốt (`alpha: true`, không đặt `scene.background`); khung chứa canvas tô `bg-scene`. Coder thêm một token vào `app/app.css`: `--color-scene: var(--vg-scene-sky);` trong `@theme inline`, và fallback `--vg-scene-sky: #eef2f5` trong `:root` của `@layer base`. Poster chờ tải dùng cùng token nên không có nháy màu khi canvas hiện.
+- **Bầu trời:** một màu phẳng lấy từ biến đã có `--vg-scene-sky` trong cả hai `theme.css` (`#dfeaf5` / `#e3efec`). Canvas trong suốt (`alpha: true`, không đặt `scene.background`); khung chứa canvas tô `bg-scene`. Coder thêm một token vào `app/app.css`: `--color-scene: var(--vg-scene-sky);` trong `@theme inline`, và fallback `--vg-scene-sky: #eef2f5` trong `:root` của `@layer base`. Màn chờ sa bàn (loader) dùng cùng token `bg-scene` từ lần vẽ đầu (trang `/play` được prerender) nên không có nháy màu.
 - **Sương mù:** không. Đế mô hình nổi trên nền trời phẳng; cạnh đế là đường viền rõ ràng.
 - **Manifest additions: không có.** Đã cân nhắc `sky`, `signal`, `skin`, `glass` và bỏ cả bốn: trời đã có trong `theme.css`; vòng tương tác dùng `player`, huy hiệu "!" dùng token CSS `accent`; tượng người không có da; kính và đèn phái sinh được. Vì vậy D8 không kích hoạt: coder **không** sửa `schema.ts` hay hai `manifest.json` cho art.
 
@@ -526,9 +526,12 @@ Mọi chuyển động gắn với di chuyển hoặc có thời hạn. Hết ch
 | Vòng tương tác hiện | khi đổi đích tương tác | scale 0.85 → 1.0 trong 180 ms (ease-out cubic), rồi 2 nhịp 1.0 → 1.1 → 1.0, mỗi nhịp 700 ms (sine in-out); tổng ≤ 1.6 s rồi đứng yên | hiện ngay ở scale 1, không nhịp |
 | Camera bám | follow mode, mục 4.5 | `1 − exp(−10·dt)`; đổi inset `1 − exp(−6·dt)` | gán thẳng |
 | HUD: gợi ý, sheet, panel | mở/đóng | vào: opacity 0→1 + `translateY(8px → 0)`, 200 ms ease-out; ra: opacity, 120 ms | luật toàn cục trong `app.css` đã rút về 0.01 ms |
-| Poster chờ tải | khi chunk chưa về | thanh tiến trình chạy ngang 1.2 s linear lặp | đứng yên (luật toàn cục) |
+| Sa bàn đang dựng | từ lần vẽ đầu tới khung hình WebGL đầu tiên | mảnh ghép hiện theo tín hiệu thật: ô cỏ/đường mờ dần 200 ms, cây và người bật 300 ms, nhà mọc 380 ms; khối logo đang chờ nhấp nhô 2 px, 1.2 s, chỉ khi đang tải | sa bàn vẽ đủ, đứng yên; chỉ chữ và số bước đổi |
+| Rời màn chờ | khi khung hình đầu đã lên | cả lớp mờ đi 200 ms ease-in | tắt ngay |
 
 **Vòng lặp idle được phép: không có.** Nước, cây, cờ, đèn đều tĩnh. Không có NPC thở, không có "!" nhấp nháy.
+
+Vòng lặp duy nhất được phép là khối logo đang chờ trong màn chờ, và nó dừng khi màn chờ rời đi.
 
 ---
 
@@ -616,7 +619,13 @@ Khi nói chuyện: bottom sheet thay chỗ gợi ý; insetBottom = chiều cao s
 - Đang tải (> 300 ms): 3 dòng khung `h-12 bg-subtle`, không shimmer.
 - Lỗi API: thay các dòng khu bằng khối `m-4 rounded-md border border-line bg-warning-tint p-4`: tiêu đề `text-sm font-semibold text-fg`, câu giải thích `text-sm text-fg-muted`, nút `secondary` "Thử lại". Mục cô Lan vẫn còn. Cảnh vẫn chạy.
 
-**Poster chờ tải chunk 3D:** `absolute inset-0 bg-scene grid place-items-center`, hiện sau 150 ms (tránh nháy). Giữa: chữ `text-sm font-medium text-fg-muted` và thanh `h-1 w-40 rounded-sm bg-line` có lõi `bg-brand w-1/3` chạy ngang. Không dùng ảnh hero (lệch phong cách, tốn byte). Cụm nút trên và danh sách khu render **ngoài** ranh giới lazy nên dùng được ngay.
+**Màn chờ "Sa bàn đang dựng"** (`hud/SceneLoader.tsx`, trạng thái ở `hud/sceneLoad.ts`): từ lần vẽ đầu của `/play` tới khung hình WebGL đầu tiên, một sa bàn mờ của khuôn viên tự vẽ trên nền trời, đúng chỗ cảnh 3D sẽ hiện, kèm thẻ tên bước và mẹo của cô Lan. Cụm nút trên và danh sách khu render **ngoài** ranh giới lazy nên dùng được ngay.
+- 5 bước, mỗi bước bắt đầu bằng một tín hiệu thật; thẻ ghi bước **đang chờ**: "Đang mở sa bàn" (HTML prerender, chưa có JS) → "Đang tải bộ dựng 3D" (`clientLoader` xin chunk cảnh) → "Đang bật bàn vẽ 3D" (chunk đã chạy) → "Đang dựng nhà và trồng cây" (canvas vào DOM) → "Đang lên màu" (cây cảnh trong Canvas đã commit, kể cả phần suspend) → "Xong rồi, mời bạn vào" (khung hình đầu đã lên). Trong một bước, tiến độ tiến dần tới trần mà không chạm sàn bước sau (không hứa trước điều chưa xảy ra). Mỗi bước ghi `performance.mark("vg-scene-N")`.
+- Sa bàn sinh từ `layout.ts` và chiếu bằng chính toán của `camera.ts` trên cùng khung với canvas, nên lúc bàn giao nó nằm đúng dưới khung hình 3D đầu. Chiều cao nhà chép từ `scene/campus.ts` (khối `MIRROR`, test giữ sai số ≤ 0.15 đơn vị); lối đi, luống hồng và bán kính quảng trường thì cảnh và sa bàn cùng đọc từ `layout.ts` (`PATHS`, `ROSE_BEDS`), nên không thể lệch nhau. Mảnh nào một tín hiệu "nợ" thì vẽ ngay ở trạng thái cuối (luồng chính có thể đứng hình ngay sau đó); chỉ mảnh hiện dần trong một bước mới có hiệu ứng mọc lên.
+- HTML prerender đã có sẵn bàn trống (đế và lưới 8 × 9 ô nét mờ, một `path`), đóng khung bằng CSS (`.bp-shell` trong `app.css`): overview khi đủ rộng, còn màn hẹp thì tính zoom và khung theo chế độ follow tại điểm xuất phát bằng `calc()`. Máy yếu nhờ vậy thấy sa bàn ngay từ lần vẽ đầu, trước khi JS chạy. Màu: token ngữ nghĩa (`bg-scene`, `surface`, `subtle`, `line-strong`, `success`, `brand`, `ink`, `accent`), mảnh chưa dựng là nét `line-strong` trên nền `surface` 20%. Không gradient, blur, bóng.
+- Thẻ: `rounded-md border border-line-strong bg-surface p-4`; 375: `inset-x-4` sát đáy (chừa safe area); ≥ `sm`: giữa, `w-md`; `lg:bottom-6`; khi gợi ý tương tác đang hiện (vào bằng `?at=`) thì nâng lên `bottom-24`. Ô logo: 5 khối, mỗi tín hiệu một khối đặc, khối đang chờ nét đứt nhấp nhô. Mẹo của cô Lan đổi mỗi 8 s; bản prerender chỉ có câu chào "Chào bạn, mình đang bày sa bàn ra đây.", bản sống bắt đầu ở mẹo kế tiếp mà người xem chưa đọc (nhớ trong `localStorage["vg-tip"]`, lỗi thì quay vòng trong phiên). Từ bước "Đang dựng nhà và trồng cây" trở đi thẻ đứng yên: không đổi mẹo, không thêm câu báo chậm, để thẻ không đổi cỡ lúc mờ đi.
+- Lớp: `z-15`, trên nhãn công trình (`z-10`), dưới cụm nút (`z-20`); `pointer-events-none`, không có gì nhận focus; vòng focus của vùng cảnh được vẽ lại trên lớp chờ. Hiện sau 150 ms (`animate-appear`, tính từ lần vẽ đầu), rời bằng mờ 200 ms (`animate-leave`, một animation chứ không phải transition) khi khung hình đầu đã lên; xong trước 150 ms thì không hiện. Sau 10 s thêm câu báo chậm chỉ tới nút "Các khu". Một vùng `role="status"` lịch sự: chỉ đọc bước đã kéo dài ≥ 1 s và câu báo chậm.
+- `?debug=loader`: giữ sa bàn ở 50% đè lên cảnh thật để soát độ trùng.
 
 **Lỗi API trên hub:** không chặn cảnh. Nhãn khu dùng tên §4, trạng thái theo `DEFAULT_STATUS`. Lỗi chỉ hiện trong danh sách khu và trong thẻ khu của hội thoại (cùng khối lỗi như trên).
 
@@ -647,7 +656,9 @@ Vì hai dòng cuối, huy hiệu Sự cố dùng **chữ `text-ink`** trên `bg-
 | Trạng thái | "Đang mở" / "Sắp mở" | trang chủ đã dùng |
 | Số màn | "{n} màn" | trang chủ dùng "màn" |
 | Huy hiệu level sự cố | "Sự cố" | trang chủ đã dùng |
-| Poster | "Đang tải khuôn viên" | mới |
+| Màn chờ, các bước | "Đang mở sa bàn" / "Đang tải bộ dựng 3D" / "Đang bật bàn vẽ 3D" / "Đang dựng nhà và trồng cây" / "Đang lên màu" / "Xong rồi, mời bạn vào"; dòng phụ "Bước {n}/5" | mới |
+| Màn chờ, báo chậm | "Hôm nay sa bàn hơi nặng. Trong lúc chờ, mọi việc vẫn làm được qua nút "Các khu" ở góc trên." | mới |
+| Màn chờ, mẹo của cô Lan | 12 câu trong `SceneLoader.tsx` (`TIPS`): đúng kiến thức AI, ≤ 120 ký tự, gắn với một khu hoặc một màn; chỉ cô Lan nói | mới |
 | Lỗi API (tiêu đề + câu) | "Chưa tải được thông tin các khu." / "Cảnh vẫn dùng được. Kiểm tra kết nối rồi thử lại." | mới; nút "Thử lại" theo brief |
 | Trang khu Sắp mở | "Khu này sắp mở" | mới |
 | Trang không tìm thấy | "Không tìm thấy khu này" / "Đường dẫn không khớp khu nào trong khuôn viên." | mới |
@@ -710,6 +721,7 @@ Chụp ở **1280×800** và **375×812**, mỗi kích thước cho **cả hai t
 - [ ] Hội thoại mở ở panel phải, cô Lan vẫn thấy được bên trái; có lớp phủ nhẹ; hai nút đúng thứ tự.
 - [ ] Đi tới cửa Chợ `(0, 5.3)`: bóng x-ray nhạt của người chơi hiện qua mái.
 - [ ] `renderer.info.render.calls ≤ 13`, `triangles ≤ 9 000`; đứng yên 3 s thì bộ đếm frame không tăng.
+- [ ] Vào `/play` lần đầu (tải chậm): nền trời ngay từ đầu, không nền trắng; thẻ có logo, tên bước + "Bước n/5", mẹo của cô Lan; thẻ không che nút trên; khi cảnh hiện, sa bàn trùng chỗ rồi mờ đi trong 200 ms; `?debug=loader` thấy hai lớp trùng nhau.
 
 **Hub `/play`, 375×812:**
 - [ ] Follow mode, zoom ≈ 29.8: người chơi cao ≈ 31 px, nằm trong dead-zone giữa màn; không cuộn ngang trang.

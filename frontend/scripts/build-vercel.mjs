@@ -7,7 +7,8 @@
 // - Security headers (including the per-build CSP hashes) come from build/security-headers.json.
 // - /api/* is proxied to VG_API_ORIGIN, so the browser stays same-origin (CSP connect-src 'self').
 // - Theme packs not listed in VITE_THEME_PACKS are left out of the deployment.
-// - Unknown /assets and /themes paths answer 404; every other path gets the SPA fallback.
+// - /play gets its pre-rendered page; unknown /assets and /themes paths answer 404; every other
+//   path gets the SPA fallback.
 import { execSync } from "node:child_process";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -81,6 +82,8 @@ const config = {
     },
     { src: "^/api/(.*)$", dest: `${api.origin}/api/$1` },
     { handle: "filesystem" },
+    // Pre-rendered page with the scene loader, whatever Vercel does with directory indexes.
+    { src: "^/play/?$", dest: "/play/index.html" },
     { src: "^/(assets|themes)/(.*)$", status: 404 },
     { src: "^/(.*)$", dest: "/__spa-fallback.html" },
   ],

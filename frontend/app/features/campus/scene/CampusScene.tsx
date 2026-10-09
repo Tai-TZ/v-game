@@ -1,4 +1,4 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { addAfterEffect, Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Color,
@@ -15,6 +15,7 @@ import { useActiveTheme } from "~/features/theme/context";
 import type { CampusTheme } from "~/features/theme/schema";
 
 import { CAMERA_OFFSET } from "../camera";
+import { advanceScene, sceneMounted, STAGE } from "../hud/sceneLoad";
 import { NPC_SPOT, SITES } from "../layout";
 import type { InteractTarget, SiteInfoMap } from "../sites";
 import {
@@ -50,6 +51,11 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
   const [countFrames] = useState(
     () => new URLSearchParams(window.location.search).get("debug") === "frames",
   );
+  // Loader signal (hud/sceneLoad): the canvas is in the DOM. SceneReady sends the next two.
+  useLayoutEffect(() => {
+    sceneMounted(true);
+    return () => sceneMounted(false);
+  }, []);
 
   return (
     <>
@@ -74,11 +80,33 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
             sites={sites}
             options={{ reducedMotion, countFrames, onInteract }}
           />
+          <SceneReady />
         </Canvas>
       </div>
       <WorldLabels sites={sites} />
     </>
   );
+}
+
+/**
+ * Loader signals: the scene graph is built, then the first frame is on screen. Rendered last
+ * inside the Canvas, it commits only once every sibling has resolved, so a child that suspends
+ * (an asset still loading) holds the loader up instead of revealing an empty sky.
+ */
+function SceneReady() {
+  const gl = useThree((state) => state.gl);
+  useLayoutEffect(() => {
+    advanceScene(STAGE.paint);
+    // Runs after every loop tick and never invalidates, so an idle scene stays idle.
+    const off = addAfterEffect(() => {
+      if (gl.info.render.frame === 0) return; // a tick that rendered nothing
+      off();
+      // The next animation frame starts once the rendered one has been presented.
+      requestAnimationFrame(() => advanceScene(STAGE.done));
+    });
+    return off;
+  }, [gl]);
+  return null;
 }
 
 interface CampusProps {
