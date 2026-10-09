@@ -1,6 +1,6 @@
 # Credits
 
-Third-party art in V-Game. Every asset below is **CC0 1.0** (public domain): credit is not
+Third-party art and data in V-Game. Every art asset below is **CC0 1.0** (public domain): credit is not
 required, we give it anyway. Nothing is credited inside the game; no logo of any author is used
 anywhere (Kenney's support page, <https://kenney.nl/support>, asks that its logo is not used).
 
@@ -28,3 +28,9 @@ Add `--check` to prove the committed JSON is byte-identical to a fresh bake.
 
 The characters are fictional and appear only under role ids (`player`, `lan`, `guard`,
 `registrar`, `operator`, `examiner`).
+
+## Data
+
+The campus weather comes from [Open-Meteo](https://open-meteo.com/) under **CC BY 4.0**. The
+viewer's browser fetches it directly; the weather popover on `/play` names the source and links
+to it.

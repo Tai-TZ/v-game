@@ -8,10 +8,11 @@
     uvx --with pillow python tools/readme-media/make-gifs.py hero-walk  # just one
     uvx --with pillow python tools/readme-media/make-gifs.py --check    # self-check, no frames needed
 
-Each GIF: resized to 960 px wide, at most ~12 fps (hero-walk is captured at 10 fps), identical
-frames merged, one shared palette without dithering (the scene is flat-shaded), retried with fewer
-colours until it is at most 4 MB (4,000,000 bytes). The width never shrinks: exits 1 if a GIF
-still does not fit (shorten the capture). The PNGs in out/png/ are re-saved optimised.
+Each GIF: resized to its width (WIDTHS, else 960 px), at most ~12 fps (hero-walk and workbench are
+captured at 10 fps), identical frames merged, one shared palette without dithering (the scene is
+flat-shaded), retried with fewer colours until it is at most 4 MB (4,000,000 bytes). The width
+never shrinks: exits 1 if a GIF still does not fit (shorten the capture). The PNGs in out/png/
+are re-saved with 256 colours; the sky-*.png stills are tiled into one sky.png (GRIDS) instead.
 """
 
 from __future__ import annotations
@@ -31,13 +32,18 @@ FRAMES, PNGS, OUT = (
 )
 MAX_BYTES = 4_000_000
 WIDTH = 960
+# Narrower where the GIF would not fit the README's ~6 MB of media at 960 px.
+WIDTHS = {"hero-walk": 800, "scene-loader": 800}
 MIN_FRAME_MS = 1000 / 12 * 0.9  # keep at most ~12 frames per second
 # Frames cross-faded from the last frame back to the first, for GIFs that do not loop seamlessly.
 # Not hero-walk: its follow camera pans, so each faded frame costs ~0.1 MB it does not have.
-LOOP_FADE = {"back-campus": 4}
+LOOP_FADE = {"scene-loader": 4}
 FADE_MS = 80
 # Palette sizes tried in order until the file fits MAX_BYTES.
 ATTEMPTS = (256, 192, 128, 96, 64)
+# Stills tiled 2 x 2 into one PNG, in reading order: the four looks of the live sky.
+GRIDS = {"sky": ["sky-day", "sky-dusk", "sky-night", "sky-rain"]}
+GAP = 8
 
 
 def timings(stamps: list[float], frame_ms: float) -> list[tuple[int, int]]:
@@ -50,13 +56,23 @@ def timings(stamps: list[float], frame_ms: float) -> list[tuple[int, int]]:
     return [(k, round(end - stamps[k])) for k, end in zip(kept, ends, strict=True)]
 
 
-def to_width(frame: Image.Image) -> Image.Image:
-    """Scales to WIDTH px wide (before blending and merging, so merged frames compare equal)."""
-    if frame.width == WIDTH:
+def to_width(frame: Image.Image, width: int = WIDTH) -> Image.Image:
+    """Scales to `width` px wide (before blending and merging, so merged frames compare equal)."""
+    if frame.width == width:
         return frame
     return frame.resize(
-        (WIDTH, round(frame.height * WIDTH / frame.width)), Image.Resampling.LANCZOS
+        (width, round(frame.height * width / frame.width)), Image.Resampling.LANCZOS
     )
+
+
+def tile(images: list[Image.Image]) -> Image.Image:
+    """2 x 2 grid on white, each image at half of WIDTH (minus the gap)."""
+    w, h = to_width(images[0], (WIDTH - GAP) // 2).size
+    grid = Image.new("RGB", (2 * w + GAP, 2 * h + GAP), "white")
+    for i, image in enumerate(images):
+        cell = image.resize((w, h), Image.Resampling.LANCZOS)
+        grid.paste(cell, ((i % 2) * (w + GAP), (i // 2) * (h + GAP)))
+    return grid
 
 
 def merge_identical(frames: list[Image.Image], durations: list[int]) -> tuple[list, list[int]]:
@@ -104,7 +120,10 @@ def build(name: str) -> bool:
     stamps = [float(frame["t"]) for frame in timeline["frames"]]
     picked = timings(stamps, float(timeline["frame_ms"]))
     frames = [
-        to_width(Image.open(folder / timeline["frames"][i]["file"]).convert("RGB"))
+        to_width(
+            Image.open(folder / timeline["frames"][i]["file"]).convert("RGB"),
+            WIDTHS.get(name, WIDTH),
+        )
         for i, _ in picked
     ]
     durations = [ms for _, ms in picked]
@@ -131,10 +150,27 @@ def build(name: str) -> bool:
     return False
 
 
+def save_png(image: Image.Image, target: Path) -> None:
+    """256 colours, no dithering: a third of the size, and the flat-shaded scene shows no banding."""
+    indexed = image.convert("RGB").quantize(
+        256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE
+    )
+    indexed.save(target, optimize=True)
+
+
 def copy_pngs() -> None:
+    tiled = {part for parts in GRIDS.values() for part in parts}
+    for name, parts in GRIDS.items():
+        sources = [PNGS / f"{part}.png" for part in parts]
+        if all(source.exists() for source in sources):
+            target = OUT / f"{name}.png"
+            save_png(tile([Image.open(source).convert("RGB") for source in sources]), target)
+            print(f"  {name}.png: {len(sources)} stills -> {target.stat().st_size / 1e6:.2f} MB")
     for source in sorted(PNGS.glob("*.png")):
+        if source.stem in tiled:
+            continue
         target = OUT / source.name
-        Image.open(source).save(target, optimize=True)
+        save_png(Image.open(source), target)
         print(
             f"  {source.name}: {source.stat().st_size / 1e6:.2f} MB -> {target.stat().st_size / 1e6:.2f} MB"
         )
@@ -149,6 +185,8 @@ def check() -> None:
     frames, ms = merge_identical([red, red.copy(), blue, blue.copy(), red], [80, 80, 80, 80, 80])
     assert ms == [160, 160, 80] and len(frames) == 3
     assert to_width(Image.new("RGB", (1280, 800))).size == (960, 600)
+    assert to_width(Image.new("RGB", (1024, 640)), 800).size == (800, 500)
+    assert tile([Image.new("RGB", (1024, 640))] * 4).size == (960, 2 * 298 + GAP)
     print("make-gifs: self-check passed")
 
 
