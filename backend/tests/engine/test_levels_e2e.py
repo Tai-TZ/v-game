@@ -213,6 +213,37 @@ def test_naive_graph_produces_its_model_dependent_flags(
             assert_expectation(x, events)
 
 
+def test_l3_rerank_ms_is_the_build_timing_times_the_candidates(
+    real_models: tuple[IndexStore, Reranker],
+) -> None:
+    # §14 (2026-10-09): a lookup in the shipped table took ~10-20 ms whatever it scored, so
+    # L3's "Kính lúp tốn {ms} ms" showed the slow-but-sure block as nearly free.
+    store, _ = real_models
+    table = store.rerank
+    assert table is not None
+    assert table.ms_per_pair > 50  # live jina: ~120 ms per pair
+    level = load_level("article-number-lookup")
+    totals = []
+    for top_k in (3, 10):
+        nodes = [
+            n.model_copy(update={"params": {**n.params, "top_k": top_k}}) if n.id == "fu" else n
+            for n in level.reference_graph.nodes
+        ]
+        graph = level.reference_graph.model_copy(update={"nodes": nodes})
+        steps = [e for e in run_graph(level, graph, store, table) if e["type"] == "step.finished"]
+        scored = {
+            e["case"]: len(f["items"])
+            for e in steps
+            if e["node"] == "fu"
+            for f in e["facts"]
+            if f["kind"] == "retrieved"
+        }
+        ms = {e["case"]: e["ms"] for e in steps if e["node"] == "rr"}
+        assert ms == {case: round(n * table.ms_per_pair) for case, n in scored.items()}
+        totals.append(sum(ms.values()))
+    assert totals[0] < totals[1]
+
+
 def every_graph() -> list[Any]:
     return [
         pytest.param(level, graph, id=f"{level.id}-{name}")
