@@ -167,9 +167,9 @@ function Editing({
       </h2>
       <p className="text-sm">Ngân sách sao 2: {fmt(level.token_budget)} token cho cả lượt.</p>
       <p className="text-sm text-fg-muted">
-        Mỗi lần mở ca, trợ lý gọi AI thật một lần cho mỗi câu (ít nhất{" "}
-        {level.case_counts.normal + level.case_counts.trap} lời gọi). Cấu hình đã chạy rồi thì dùng
-        kết quả đã lưu, không gọi lại.
+        Mỗi lần mở ca, trợ lý gọi AI thật một lần cho mỗi câu (
+        {level.case_counts.normal + level.case_counts.trap + level.case_counts.info} lời gọi). Cấu
+        hình đã chạy rồi thì dùng kết quả đã lưu, không gọi lại.
       </p>
       {/* Only after a finished run: after a failed one, running the same graph again is the fix. */}
       {body === lastBody && run?.phase === "finished" && (

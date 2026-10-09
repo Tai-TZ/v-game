@@ -35,7 +35,11 @@ def test_public_level_hides_solutions_gold_and_hidden_questions() -> None:
     assert public["visible_cases"] == [
         {"id": "lib-l3-v01", "vai": "sv", "question": "Khoản 2 Điều 47 nói gì?"}
     ]
-    assert public["case_counts"] == {"normal": 2, "trap": 1}  # lib-l3-t03 is info only
+    # lib-l3-t03 is info only: it runs (one more AI call) but earns no star.
+    assert public["case_counts"] == {"normal": 2, "trap": 1, "info": 1}
+    # Star rules stars_vi words, so the client's star evidence needs no copy of them.
+    assert public["s1_required"] == ["lib-l3-v01"]
+    assert public["s3_forbidden_labels"] == []
     assert public["param_limits"]["rerank.top_n"] == {"ge": 1, "le": 5}
     assert public["starter_graph"]["schema"] == 1
 

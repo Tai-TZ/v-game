@@ -11,3 +11,7 @@ Shared by vitest (`app/features/workbench/*.test.ts`) and Playwright (`e2e/workb
 
 JSON files are Prettier-formatted (`npx prettier --write e2e/data`); the content is unchanged.
 Re-capture when the backend's level files, block registry or event contract change.
+Without a running backend, the JSON files can be captured from the same app with FastAPI's
+`TestClient` (no index or Gemini key needed for these GET routes): `GET` each path from
+`create_app(Settings(_env_file=None, gemini_api_key=None))`, write `json.dumps(body,
+ensure_ascii=False, indent=2)`, then run Prettier. Last capture: 2026-10-09.

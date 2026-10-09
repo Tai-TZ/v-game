@@ -17,9 +17,7 @@ _TERMINAL = frozenset({"run.finished", "run.failed"})
 
 
 class RunBusyError(EngineError):
-    message_vi = (
-        "Máy chủ miễn phí chạy một lượt mỗi lúc và đang bận. Bạn thử lại sau khoảng 1 phút nhé."
-    )
+    message_vi = "Máy chủ miễn phí chạy một lượt mỗi lúc và đang bận."
 
 
 class IdempotencyConflictError(EngineError):

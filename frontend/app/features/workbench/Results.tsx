@@ -9,7 +9,6 @@ import {
   BACK_TO_LEVELS,
   diagnosisTarget,
   FLAG_VI,
-  flagWords,
   fmt,
   groupDiagnosis,
   knobName,
@@ -61,7 +60,7 @@ export function Results({
   const score = run.score;
   if (!score) return null;
   const copy = LEVEL_COPY[level.id];
-  const first = run.cases.find((c) => c.id === copy?.s1Required[0]);
+  const first = run.cases.find((c) => c.id === level.s1_required[0]);
   const skipped = unfinished(run).length;
   const calls = llmCalls(run);
   const conditions = [
@@ -80,7 +79,7 @@ export function Results({
       ok: score.s3,
       evidence: [
         `${score.traps_passed}/${score.traps_total} câu bẫy đạt`,
-        ...(copy?.s3ForbiddenLabels ?? []).map((label) => {
+        ...level.s3_forbidden_labels.map((label) => {
           const count = run.cases.filter((c) => c.graded?.labels.includes(label)).length;
           return `${count} câu ${LABEL_EVIDENCE[label] ?? lowerFirst(LABEL_VI[label] ?? label)}`;
         }),
@@ -183,7 +182,7 @@ export function Results({
             const attached = graph.nodes.some((node) => node.type === target?.slot);
             return (
               <li key={group.flag} className="rounded-md border border-line bg-surface p-3">
-                <p>{rich(flagWords(group.message_vi))}</p>
+                <p>{rich(group.message_vi)}</p>
                 {showSlot && target.why && <p className="mt-1 text-sm">{target.why}</p>}
                 {rest.length > 0 && (
                   <p className="mt-1 text-sm">

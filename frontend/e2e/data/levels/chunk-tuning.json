@@ -3,7 +3,7 @@
   "version": 1,
   "zone": "library",
   "title": "Lược dao chunk",
-  "brief": "Câu trả lời bị cụt hoặc lạc đề. Chỉnh kích thước chunk, độ chồng lấp và top-k cho đến khi agent lấy đủ ngữ cảnh.",
+  "brief": "Câu trả lời bị cụt hoặc lạc đề. Chỉnh kích thước chunk, độ chồng lấp và top-k cho đến khi trợ lý lấy đủ ngữ cảnh.",
   "kind": "standard",
   "corpus": ["qcdt-2024", "qcdt-2019"],
   "allowed_blocks": [
@@ -115,6 +115,8 @@
     "Có sao 1 và cả lượt chạy tốn không quá 20.000 token.",
     "Có sao 1, ba câu bẫy đều đạt và không câu nào mang văn bản hết hiệu lực vào thùng."
   ],
+  "s1_required": ["lib-l2-v01"],
+  "s3_forbidden_labels": ["stale_doc"],
   "visible_cases": [
     {
       "id": "lib-l2-v01",
@@ -134,6 +136,7 @@
   ],
   "case_counts": {
     "normal": 10,
-    "trap": 3
+    "trap": 3,
+    "info": 0
   }
 }

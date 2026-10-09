@@ -65,7 +65,7 @@ class LevelSpec(_Strict):
         return self
 
     def public(self, cases: Sequence[PublicCase]) -> dict[str, JsonValue]:
-        """PublicLevel: no reference/naive graphs, diagnosis, hidden questions, gold, info cases."""
+        """PublicLevel: no reference/naive graphs, diagnosis, hidden questions, gold, info ids."""
         zone = load_catalog().find_zone(self.zone)
         meta = next((lv for lv in zone.levels if lv.id == self.id), None) if zone else None
         if meta is None:
@@ -90,6 +90,9 @@ class LevelSpec(_Strict):
             "budget_metric": "tokens",
             "token_budget": self.rules["token_budget"],
             "stars_vi": list(self.stars_vi),
+            # The star rules stars_vi words, for the client's star evidence (workbench §8.2).
+            "s1_required": list(self.rules["s1_required"]),
+            "s3_forbidden_labels": list(self.rules["s3_forbidden_labels"]),
             "visible_cases": [
                 {"id": c.id, "vai": c.vai, "question": c.question}
                 for c in cases
@@ -98,6 +101,8 @@ class LevelSpec(_Strict):
             "case_counts": {
                 "normal": sum(c.role in ("visible", "hidden") for c in cases),
                 "trap": sum(c.role == "trap" and c.id not in info for c in cases),
+                # Runs (one AI call each) but earns no star: the cost line counts it.
+                "info": sum(c.id in info for c in cases),
             },
         }
 
