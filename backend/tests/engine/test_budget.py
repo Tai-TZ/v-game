@@ -51,3 +51,17 @@ def test_run_budget_keeps_usage_per_case() -> None:
     assert budget.case_usage("c1") == Usage(11, 3)
     assert budget.case_usage("c3") == Usage()
     assert budget.usage == Usage(16, 4)
+
+
+def test_daily_cap_reports_use_and_takes_at_most_what_is_left() -> None:
+    # GET /api/quota reads used/remaining; the shared reserve R is a DailyCap too (take).
+    day = [date(2026, 10, 7)]
+    reserve = DailyCap(5, today=lambda: day[0])
+    reserve.reserve()
+    assert (reserve.cap, reserve.used, reserve.remaining) == (5, 1, 4)
+    assert reserve.take(3) == 3
+    assert reserve.take(3) == 1  # only one left
+    assert reserve.take(3) == 0
+    assert reserve.exhausted
+    day[0] = date(2026, 10, 8)
+    assert (reserve.used, reserve.remaining) == (0, 5)
