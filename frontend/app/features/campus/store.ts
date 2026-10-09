@@ -3,6 +3,7 @@ import { createStore } from "zustand/vanilla";
 
 import type { TimeOfDay } from "~/features/theme/schema";
 
+import { HOME_YAW, nextIsoYaw, wrapAngle } from "./camera";
 import {
   INTERACT_RADIUS,
   NPC_SPOT,
@@ -10,6 +11,7 @@ import {
   routeTo,
   SPAWN,
   SPAWN_HEADING,
+  towardFor,
   type Vec2,
 } from "./layout";
 import { nearestWithin } from "./movement";
@@ -31,6 +33,33 @@ export interface Motion {
   keys: Set<string>;
 }
 
+/**
+ * Camera azimuth (camera.ts yaw), mutated in place like `motion`: drags write `yaw`; while `to`
+ * is set the frame loop eases `yaw` from `from` to `to` (unwrapped, so the ease turns the way it
+ * was asked) over `duration` seconds.
+ */
+export interface ViewYaw {
+  yaw: number;
+  from: number;
+  to: number | null;
+  t: number;
+  duration: number;
+}
+
+/** A rotate key, button or the compass turns in 0.3 s (orbit-camera §2.4). */
+export const TURN_SECONDS = 0.3;
+
+/**
+ * Starts an ease from the shown yaw to `target`: the short way for `dir` 0, else the way `dir`
+ * turns (+1 clockwise from above, yaw growing).
+ */
+export function easeView(view: ViewYaw, target: number, duration: number, dir: -1 | 0 | 1 = 0) {
+  let delta = wrapAngle(target - view.yaw);
+  if (dir > 0 && delta < 0) delta += 2 * Math.PI;
+  if (dir < 0 && delta > 0) delta -= 2 * Math.PI;
+  Object.assign(view, { from: view.yaw, to: view.yaw + delta, t: 0, duration });
+}
+
 export type DialogLines = "first" | "again";
 
 export interface HubState {
@@ -45,6 +74,10 @@ export interface HubState {
   /** Light preset the player picked (N8); null follows the theme's default. */
   time: TimeOfDay | null;
   motion: Motion;
+  /** Camera azimuth; module scope, so it outlives a visit to a zone page (not a reload). */
+  view: ViewYaw;
+  /** Coarse: the view is away from HOME_YAW (the compass button's disabled state). */
+  rotated: boolean;
   /** Requests a frame from the scene (`invalidate`); a no-op until the scene mounts. */
   wake: () => void;
   /** True while the 3D scene is mounted: scene-only controls (the dusk toggle) show only then. */
@@ -60,6 +93,14 @@ export interface HubState {
   walkTo: (goal: Vec2) => void;
   setSheetInset: (px: number) => void;
   setTime: (time: TimeOfDay) => void;
+  /** Turn to the next diagonal, clockwise for +1; 0 goes back to HOME_YAW. */
+  rotateView: (dir: -1 | 0 | 1) => void;
+  setRotated: (rotated: boolean) => void;
+  /**
+   * Back to HOME_YAW at once: a new entry to /play starts at home, where the loader's blueprint
+   * is drawn (hud/blueprint.ts), so its first 3D frame lands on it.
+   */
+  resetView: () => void;
   /** The scene's `invalidate` on mount; null on unmount. */
   setWake: (wake: (() => void) | null) => void;
 }
@@ -81,6 +122,8 @@ export function createHubStore() {
       talkOnArrival: false,
       keys: new Set(),
     },
+    view: { yaw: HOME_YAW, from: HOME_YAW, to: null, t: 0, duration: 0 },
+    rotated: false,
     wake: noop,
     sceneUp: false,
 
@@ -113,7 +156,7 @@ export function createHubStore() {
     },
     walkTo: (goal) => {
       const { motion } = get();
-      const [next, ...rest] = routeTo(motion.position, goal);
+      const [next, ...rest] = routeTo(motion.position, goal, towardFor(get().view.yaw));
       motion.target = next ?? null;
       motion.route = rest;
       motion.talkOnArrival = false;
@@ -130,6 +173,19 @@ export function createHubStore() {
       set({ time });
       // Flags the scene busy at once (?debug=frames); the re-bake's commit wakes it again.
       get().wake();
+    },
+    rotateView: (dir) => {
+      const { view } = get();
+      const target = dir === 0 ? HOME_YAW : nextIsoYaw(view.to ?? view.yaw, dir);
+      easeView(view, target, TURN_SECONDS, dir);
+      get().wake();
+    },
+    setRotated: (rotated) => {
+      if (rotated !== get().rotated) set({ rotated });
+    },
+    resetView: () => {
+      Object.assign(get().view, { yaw: HOME_YAW, to: null });
+      get().setRotated(false);
     },
     setWake: (wake) => set({ wake: wake ?? noop, sceneUp: wake !== null }),
   }));

@@ -24,8 +24,9 @@ export const meta: Route.MetaFunction = () => [{ title: "Khuôn viên · V-Game"
 
 export function clientLoader({ request }: Route.ClientLoaderArgs) {
   // Start the scene chunk download now, in parallel with the route render. A failure reaches
-  // SceneBoundary through lazy().
-  beginScene();
+  // SceneBoundary through lazy(). A new entry starts at the home view, where the loader's
+  // blueprint is drawn, so the first 3D frame lands on it after the view was turned.
+  if (beginScene()) hubStore.getState().resetView();
   void loadScene().then(
     () => advanceScene(STAGE.boot),
     () => undefined,
@@ -101,7 +102,8 @@ export default function Play({ loaderData }: Route.ComponentProps) {
       >
         <p id="campus-scene-help" className="sr-only">
           Dùng phím mũi tên hoặc W, A, S, D để đi, phím E để nói chuyện hoặc vào khu. Mọi việc cũng
-          làm được qua nút Các khu.
+          làm được qua nút Các khu. Kéo hoặc vuốt ngang để xoay sa bàn, phím phẩy và chấm xoay 90
+          độ.
         </p>
         <SceneBoundary>
           {/* The loader below covers the wait, outside Suspense, until the first frame. */}
