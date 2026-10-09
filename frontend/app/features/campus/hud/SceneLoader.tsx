@@ -39,13 +39,28 @@ export const TIPS = [
   "Hội thoại càng dài, mỗi lượt càng gửi lại nhiều lịch sử. Tóm tắt phần cũ giúp ngữ cảnh gọn mà vẫn giữ ý chính.",
 ] as const;
 
+/** Cô Lan's line in the pre-rendered shell, which cannot know which tip is next. */
+export const GREETING = "Chào bạn, mình đang bày sa bàn ra đây.";
+
 const SLOW_MS = 10_000;
 const ANNOUNCE_MS = 1000;
 const TIP_MS = 8000;
 const TICK_MS = 100;
 
-/** The tip the next loader starts with: 0 matches the pre-rendered shell, then unseen ones. */
-let nextTip = 0;
+const TIP_KEY = "vg-tip";
+/** The tip the next loader starts with, remembered per viewer so each visit shows unseen ones. */
+let nextTip: number | undefined;
+function firstTip(): number {
+  if (nextTip === undefined) {
+    try {
+      const stored = Number(localStorage.getItem(TIP_KEY));
+      nextTip = Number.isInteger(stored) && stored > 0 ? stored % TIPS.length : 0;
+    } catch {
+      nextTip = 0; // storage blocked: rotate within this page session only
+    }
+  }
+  return nextTip;
+}
 
 const ROOT = "pointer-events-none absolute inset-0 z-15 overflow-hidden";
 
@@ -59,7 +74,7 @@ export function SceneLoader({ shell = false }: { shell?: boolean }) {
   if (shell) {
     return (
       <div data-scene-loader="" className={`${ROOT} animate-appear bg-scene`}>
-        <Card stage={STAGE.open} tip={0} rotated={false} slow={false} lifted={false} />
+        <Card stage={STAGE.open} tip={GREETING} live={false} slow={false} lifted={false} />
         <p role="status" className="sr-only" />
       </div>
     );
@@ -150,16 +165,17 @@ function LiveLoader({ onGone }: { onGone: () => void }) {
     return () => window.clearTimeout(timer);
   }, [done, begun]);
 
-  const [tip, setTip] = useState(nextTip);
-  const [rotated, setRotated] = useState(false);
+  const [tip, setTip] = useState(firstTip);
   useEffect(() => {
     nextTip = (tip + 1) % TIPS.length;
+    try {
+      localStorage.setItem(TIP_KEY, String(nextTip));
+    } catch {
+      // A per-viewer convenience only.
+    }
   }, [tip]);
   useEffect(() => {
-    const id = window.setInterval(() => {
-      setTip((t) => (t + 1) % TIPS.length);
-      setRotated(true);
-    }, TIP_MS);
+    const id = window.setInterval(() => setTip((t) => (t + 1) % TIPS.length), TIP_MS);
     return () => window.clearInterval(id);
   }, []);
 
@@ -218,7 +234,7 @@ function LiveLoader({ onGone }: { onGone: () => void }) {
         </svg>
       )}
       {!(done && debug) && (
-        <Card stage={stage} tip={tip} rotated={rotated} slow={slow} lifted={lifted} />
+        <Card stage={stage} tip={TIPS[tip] ?? ""} live slow={slow} lifted={lifted} />
       )}
       <p role="status" className="sr-only">
         {said}
@@ -239,12 +255,13 @@ const PieceShapes = memo(function PieceShapes({ piece, state }: { piece: Piece; 
 
 function Card(props: {
   stage: number;
-  tip: number;
-  rotated: boolean;
+  tip: string;
+  /** Live tips slide in (art §7); the pre-rendered greeting is static. */
+  live: boolean;
   slow: boolean;
   lifted: boolean;
 }) {
-  const { stage, tip, rotated, slow, lifted } = props;
+  const { stage, tip, live, slow, lifted } = props;
   // Never over the HUD (top corners) nor the interact hint (bottom, shown on ?at= arrivals).
   const bottom = lifted
     ? "bottom-24"
@@ -267,8 +284,8 @@ function Card(props: {
         <LanAvatar />
         <div>
           <p className="text-xs font-semibold text-fg-muted">Cô Lan</p>
-          <p key={tip} className={`mt-0.5 text-sm text-fg ${rotated ? "animate-enter" : ""}`}>
-            {TIPS[tip]}
+          <p key={tip} className={`mt-0.5 text-sm text-fg ${live ? "animate-enter" : ""}`}>
+            {tip}
           </p>
           {slow && <p className="mt-2 text-sm text-fg-muted">{SLOW}</p>}
         </div>

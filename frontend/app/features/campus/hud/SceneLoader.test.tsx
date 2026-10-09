@@ -10,7 +10,7 @@ import { parseThemeIndex, parseThemeManifest } from "~/features/theme/schema";
 
 import { hubStore } from "../store";
 import { advanceScene, beginScene, sceneLoad, STAGE } from "./sceneLoad";
-import { LABELS, SceneLoader, TIPS } from "./SceneLoader";
+import { GREETING, LABELS, SceneLoader, TIPS } from "./SceneLoader";
 
 const read = (...parts: string[]): unknown =>
   JSON.parse(readFileSync(path.resolve(process.cwd(), ...parts), "utf8"));
@@ -66,12 +66,12 @@ afterEach(() => {
 });
 
 describe("SceneLoader shell (pre-rendered)", () => {
-  it("shows step 1 and the first tip, without any style attribute (CSP)", () => {
+  it("shows step 1 and cô Lan's greeting, without any style attribute (CSP)", () => {
     const html = renderToStaticMarkup(<SceneLoader shell />);
     expect(html).toContain("data-scene-loader");
     expect(html).toContain(LABELS[0]);
     expect(html).toContain("Bước 1/5");
-    expect(html).toContain(TIPS[0]);
+    expect(html).toContain(GREETING);
     expect(html).not.toMatch(/\sstyle=|<style/);
   });
 });
@@ -160,6 +160,17 @@ describe("SceneLoader", () => {
 });
 
 describe("tips", () => {
+  it("start each visit on one this viewer has not seen yet", () => {
+    const tip = () => TIPS.findIndex((text) => screen.queryByText(text) !== null);
+    renderLoader();
+    const first = tip();
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(localStorage.getItem("vg-tip")).toBe(String((first + 1) % TIPS.length));
+    cleanup();
+    renderLoader();
+    expect(tip()).toBe((first + 1) % TIPS.length);
+  });
+
   it("are short, plain text", () => {
     expect(TIPS).toHaveLength(12);
     for (const tip of TIPS) {
