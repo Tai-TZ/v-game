@@ -10,7 +10,7 @@ import { ZoneCard, ZonesErrorNotice } from "~/features/zones/ZoneCard";
 import { AUTHOR } from "~/lib/site";
 import { useDelayedFlag } from "~/lib/useSettled";
 
-import { BACK_SPOT, BACK_Z, SPAWN, type Speaker } from "../layout";
+import { BACK_SPOT, BACK_Z, NPCS, SPAWN, type Speaker } from "../layout";
 import { hubStore, useHub } from "../store";
 
 const PANEL_ID = "hub-zone-list";
@@ -24,8 +24,8 @@ interface HubTopBarProps {
 
 /**
  * Top HUD: back to the landing page, the "Các khu" list and the theme switch. The list is the
- * path through the hub that needs no canvas: talk to the librarian, read every zone card,
- * enter open zones.
+ * path through the hub that needs no canvas: talk to the librarian and the four NPCs, read
+ * every zone card, enter open zones.
  */
 export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
   const [open, setOpen] = useState(false);
@@ -35,7 +35,8 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const showSkeleton = useDelayedFlag(zones === undefined, 300);
-  const defaultTime = useActiveTheme().campus.lights.default;
+  const { lights, npcs } = useActiveTheme().campus;
+  const defaultTime = lights.default;
   const dusk = (useHub((state) => state.time) ?? defaultTime) === "dusk";
   // The light preset lives in the scene; while it is down (no WebGL, failed) the button would
   // do nothing.
@@ -138,6 +139,17 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
               Nói chuyện với cô Lan
             </button>
           </li>
+          {NPCS.map(({ id }) => (
+            <li key={id}>
+              <button
+                type="button"
+                onClick={() => onTalk(id)}
+                className="min-h-12 w-full px-4 text-left text-sm font-semibold hover:bg-subtle"
+              >
+                Nói chuyện với {npcs[id].name}
+              </button>
+            </li>
+          ))}
           <li>
             <button
               type="button"

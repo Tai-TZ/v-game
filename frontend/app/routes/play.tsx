@@ -5,6 +5,7 @@ import { arrivalPose, parseArrival, SPAWN, SPAWN_HEADING } from "~/features/camp
 import { HubTopBar } from "~/features/campus/hud/HubTopBar";
 import { InteractHint } from "~/features/campus/hud/InteractHint";
 import { LanDialog } from "~/features/campus/hud/LanDialog";
+import { NpcDialog } from "~/features/campus/hud/NpcDialog";
 import { advanceScene, beginScene, STAGE } from "~/features/campus/hud/sceneLoad";
 import { SceneBoundary } from "~/features/campus/hud/SceneBoundary";
 import { SceneLoader } from "~/features/campus/hud/SceneLoader";
@@ -14,7 +15,9 @@ import {
   siteInfo,
   type InteractTarget,
 } from "~/features/campus/sites";
+import { NPC_ROLES } from "~/features/campus/npcs";
 import { hubStore, useHub } from "~/features/campus/store";
+import { useActiveTheme } from "~/features/theme/context";
 import { loadZoneList } from "~/features/zones/api";
 import { ZoneCard } from "~/features/zones/ZoneCard";
 import { useDelayedFlag, useSettled } from "~/lib/useSettled";
@@ -56,6 +59,8 @@ export default function Play({ loaderData }: Route.ComponentProps) {
   const zones = useSettled(loaderData.zones);
   const sites = useMemo(() => siteInfo(zones?.ok ? zones.zones : null), [zones]);
   const dialog = useHub((state) => state.dialog);
+  const visits = useHub((state) => (state.dialog ? (state.met[state.dialog.who] ?? 0) : 0));
+  const { npcs } = useActiveTheme().campus;
   const navigate = useNavigate();
   const opening = useNavigation().state === "loading";
   const revalidator = useRevalidator();
@@ -91,6 +96,8 @@ export default function Play({ loaderData }: Route.ComponentProps) {
 
   const retry = () => void revalidator.revalidate();
   const library = sites.library;
+  const npcZone = dialog && dialog.who !== "lan" ? NPC_ROLES[dialog.who].zone : null;
+  const npcSite = npcZone ? sites[npcZone] : null;
 
   return (
     <main className="relative h-dvh overflow-hidden bg-scene">
@@ -144,6 +151,17 @@ export default function Play({ loaderData }: Route.ComponentProps) {
               showCardSkeleton && <div aria-hidden="true" className="h-28 rounded-sm bg-subtle" />
             )
           }
+        />
+      )}
+      {dialog && dialog.who !== "lan" && (
+        <NpcDialog
+          who={dialog.who}
+          name={npcs[dialog.who].name}
+          visits={visits}
+          site={npcSite}
+          onEnter={() => npcSite && enterZone(npcSite.zoneId)}
+          onClose={() => hubStore.getState().closeDialog()}
+          zoneCard={npcSite?.zone && <ZoneCard zone={npcSite.zone} variant="full" />}
         />
       )}
     </main>
