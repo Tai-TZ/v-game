@@ -39,7 +39,9 @@ import {
   type Screen,
 } from "../camera";
 import {
+  BACK,
   BASE,
+  LAKE,
   LANDMARK,
   NPC_SPOT,
   NPCS,
@@ -57,16 +59,27 @@ import { DRESSING } from "../dressing";
 import { step } from "../movement";
 import { siteInfo, siteLook, siteLooks, type SiteLook } from "../sites";
 import {
+  AO_FRAME,
+  AO_Y,
   buildLandmark,
   buildLibrary,
   buildMarket,
   buildTerrain,
   buildWatchtower,
   entranceLampSpots,
+  KERB,
+  KERB_Y,
+  LAKE_SECTION,
+  lampSpots,
+  MOW_WIDTH,
+  MOW_Y,
+  PAVED,
   SHADOW_Y,
   shadowCasters,
   SPEAKER_DISC_SEGMENTS,
   SPEAKER_DISC_Y,
+  STATUES,
+  STRATA,
   TREE_INSTANCES,
   treeMatrix,
 } from "./campus";
@@ -122,6 +135,7 @@ const LOOKS = TimeOfDaySchema.options.flatMap((phase) =>
 );
 
 const TIMES: readonly TimeOfDay[] = ["day", "dusk"];
+
 /**
  * Heights of raised items under 0.03 that stand over the sun-shadow overlay on purpose, like the
  * plaza and the steps above it (art §2.4 item 4): a solid slab, not a ground decal.
@@ -748,20 +762,23 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     // and 34,500 triangles (the measured peak rounded up): under 60% of the brief's 60k and far
     // inside the 60 FPS rule's < 80 draw calls (art §6.1).
     // Every look (campus v0.4 W4): weather adds no draw call; overcast drops the shadow overlay.
+    // Visual polish (art §15, 2026-10-09): the contact-darkening overlay adds one draw call
+    // (15 / 16 / 18 / 19) and, with the kerbs, slab bands and mowing stripes, about 570
+    // triangles: peak 34,986 (spire-hall) / 31,865 (clock-tower), hence the cap of 35,500.
     it.each(LOOKS)("stays well inside 40 draw calls and 60k triangles at %s, %s", (time, bake) => {
       if (!CAST) throw new Error("cast.json does not parse");
       for (const lit of [false, true]) {
         const { result, unmount } = build(manifest, time, lit, bake);
         const g = result.current;
-        expect(sceneBudget(g).drawCalls).toBe(14); // statues, until the props and the cast arrive
+        expect(sceneBudget(g).drawCalls).toBe(15); // statues, until the props and the cast arrive
         const dressing = buildDressing(props, g.palette);
         const statues = sceneBudget(g, null, dressing);
         const cast = sceneBudget(g, CAST, dressing);
-        expect(statues.drawCalls).toBe(15);
-        expect(sceneBudget(g, CAST).drawCalls).toBe(17);
-        expect(cast.drawCalls).toBe(18);
+        expect(statues.drawCalls).toBe(16);
+        expect(sceneBudget(g, CAST).drawCalls).toBe(18);
+        expect(cast.drawCalls).toBe(19);
         expect(statues.triangles).toBeLessThan(cast.triangles);
-        expect(cast.triangles).toBeLessThanOrEqual(34_500);
+        expect(cast.triangles).toBeLessThanOrEqual(35_500);
         dressing.dispose();
         unmount();
       }
@@ -1164,6 +1181,290 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       const { result, unmount } = build(manifest);
       const names = Object.keys(result.current.terrain.attributes).sort();
       expect(names).toEqual(["color", "position"]);
+      unmount();
+    });
+  },
+);
+
+/** Heights of the flat terrain decals under y 0.03 (RAISED slabs left out). */
+function flatHeights(geometry: BufferGeometry): number[] {
+  const position = geometry.getAttribute("position");
+  const heights = new Set<number>();
+  for (let i = 0; i + 2 < position.count; i += 3) {
+    const y = position.getY(i);
+    const raised = RAISED.some((h) => Math.abs(h - y) < 1e-6);
+    if (
+      position.getY(i + 1) === y &&
+      position.getY(i + 2) === y &&
+      y > 1e-6 &&
+      y < 0.03 &&
+      !raised
+    ) {
+      heights.add(y);
+    }
+  }
+  return [...heights];
+}
+
+/** Positions are float32: constants compare through this. */
+const f32 = Math.fround;
+
+/** A ground point as a set key (rounded). */
+const at = (x: number, z: number) => `${x.toFixed(4)},${z.toFixed(4)}`;
+
+/** Every vertex position at height `y`, as set keys. */
+function cornersAt(geometry: BufferGeometry, y: number): Set<string> {
+  const position = geometry.getAttribute("position");
+  const out = new Set<string>();
+  for (let i = 0; i < position.count; i += 1) {
+    if (Math.abs(position.getY(i) - y) < 1e-6) out.add(at(position.getX(i), position.getZ(i)));
+  }
+  return out;
+}
+
+const vertex = (geometry: BufferGeometry, i: number) =>
+  new Vector3().fromBufferAttribute(geometry.getAttribute("position"), i);
+
+describe.each(manifests.map((m) => [m.id, m] as const))(
+  "baked ground detail (art §2.4, §5.1, 2026-10-09), theme %s",
+  (_id, manifest) => {
+    const { colonnades } = manifest.campus.landmark;
+    const top = (pal: Palette) => shade(UP, pal.light);
+
+    it.each(LOOKS)("darkens every contact softly with one overlay at %s, %s", (time, bake) => {
+      const { result, unmount } = build(manifest, time, false, bake);
+      const { ao, terrain, palette: pal } = result.current;
+      const position = ao.getAttribute("position");
+      const colour = ao.getAttribute("color");
+      const white = new Color(1, 1, 1);
+      const centres = new Set<string>();
+      for (let i = 0; i < position.count; i += 1) {
+        expect(position.getY(i)).toBe(f32(AO_Y));
+        const c = new Color().fromBufferAttribute(colour, i);
+        expect(sameColour(c, pal.ao) || sameColour(c, white), `vertex ${i}`).toBe(true);
+        if (sameColour(c, pal.ao)) centres.add(at(position.getX(i), position.getZ(i)));
+      }
+      // Soft but there: no channel goes black, the darkest factor reads as contact, not shade.
+      for (const k of [pal.ao.r, pal.ao.g, pal.ao.b]) expect(k).toBeGreaterThan(0);
+      expect(luminance(pal.ao)).toBeLessThanOrEqual(0.85);
+      // Strong enough to see at 1280 px (review r1: 0.35 to white read as nothing), and half-way
+      // to grey: contact blocks sky light, so a dusk blob on a warm path never turns lavender.
+      const spread = (k: Color) => Math.max(k.r, k.g, k.b) - Math.min(k.r, k.g, k.b);
+      expect(luminance(pal.ao)).toBeCloseTo(0.2 + 0.8 * luminance(pal.shadow), 5);
+      expect(spread(pal.ao)).toBeLessThanOrEqual(0.4 * spread(pal.shadow) + 1e-6);
+      // Over every ground layer, under the speakers' discs: a night pool is never darkened.
+      const ground = flatHeights(terrain).filter((y) => y !== f32(SPEAKER_DISC_Y));
+      expect(Math.max(...ground)).toBeLessThan(AO_Y);
+      expect(AO_Y).toBeLessThan(SPEAKER_DISC_Y);
+      expect(AO_Y).toBeLessThan(SHADOW_Y);
+      // One blob under each tree, standing prop, lamp and life-size statue.
+      const standing = DRESSING.filter((row) => row.kind === "ground" || row.kind === "fence");
+      const lamps = lampSpots(colonnades);
+      const spots = [
+        ...TREE_INSTANCES,
+        ...standing.flatMap((row) => row.at.map(([x, z]) => ({ x, z }))),
+        ...lamps,
+        ...STATUES,
+      ];
+      expect(spots.filter(({ x, z }) => !centres.has(at(x, z)))).toEqual([]);
+      const frames = LANDMARK.footprints.length + SITES.length + 5;
+      const copies = standing.reduce((n, row) => n + row.at.length, 0);
+      expect(triangleCount(ao)).toBe(
+        frames * 8 +
+          TREE_INSTANCES.length * 12 +
+          copies * 8 +
+          lamps.length * 6 +
+          STATUES.length * 8,
+      );
+      unmount();
+    });
+
+    it("frames every building with a soft edge: dark at the wall, white AO_FRAME out", () => {
+      const { result, unmount } = build(manifest);
+      const corners = cornersAt(result.current.ao, AO_Y);
+      for (const f of [...LANDMARK.footprints, ...SITES.map((s) => s.footprint), BACK.hall]) {
+        for (const [sx, sz] of [
+          [-1, -1],
+          [1, 1],
+        ] as const) {
+          const x = f.x + sx * f.halfX;
+          const z = f.z + sz * f.halfZ;
+          expect(corners.has(at(x, z))).toBe(true);
+          expect(corners.has(at(x + sx * AO_FRAME, z + sz * AO_FRAME))).toBe(true);
+        }
+      }
+      // The opaque skirts and tree discs are gone from the terrain (y 0.006 and 0.0125).
+      const heights = flatHeights(result.current.terrain);
+      expect(heights.filter((y) => y === f32(0.006) || y === f32(0.0125))).toEqual([]);
+      unmount();
+    });
+
+    it("puts a kerb under every paved rect, clipped to the base, darker when wet", () => {
+      for (const bake of ["clear", "wet"] as const) {
+        const { result, unmount } = build(manifest, "day", false, bake);
+        const { terrain, palette: pal } = result.current;
+        const corners = cornersAt(terrain, KERB_Y);
+        for (const [x0, x1, z0, z1] of PAVED) {
+          const kx0 = Math.max(x0 - KERB, BASE.minX);
+          const kx1 = Math.min(x1 + KERB, BASE.maxX);
+          const kz0 = Math.max(z0 - KERB, BASE.minZ);
+          const kz1 = Math.min(z1 + KERB, BASE.maxZ);
+          for (const c of [at(kx0, kz0), at(kx1, kz0), at(kx1, kz1), at(kx0, kz1)]) {
+            expect(corners.has(c), `kerb of [${x0}, ${x1}, ${z0}, ${z1}]`).toBe(true);
+          }
+        }
+        const kerb = pal.kerb.clone().multiply(top(pal));
+        expect(verticesColoured(terrain, kerb)).toBe(PAVED.length * 6);
+        unmount();
+      }
+      const clear = palette(manifest.campus, "day", "clear").kerb;
+      expect(luminance(palette(manifest.campus, "day", "wet").kerb)).toBeLessThan(luminance(clear));
+      // Under every path (0.011, 0.012), over the park lawn (0.010).
+      expect(KERB_Y).toBeGreaterThan(0.01);
+      expect(KERB_Y).toBeLessThan(0.011);
+    });
+
+    it("cuts the slab into turf, topsoil and subsoil, with the lake in section", () => {
+      const { result, unmount } = build(manifest);
+      const { terrain, palette: pal } = result.current;
+      const position = terrain.getAttribute("position");
+      const colour = terrain.getAttribute("color");
+      const [, lip, soil, bottom] = STRATA;
+      const west = shade(new Vector3(-1, 0, 0), pal.light);
+      const band = (y: number) =>
+        y > f32(lip) ? pal.ground : y > f32(soil) ? pal.soil : pal.subsoil;
+      let checked = 0;
+      const min = new Vector3(Infinity, 0, Infinity);
+      const max = new Vector3(-Infinity, 0, -Infinity);
+      for (let t = 0; t + 2 < position.count; t += 3) {
+        const v = [t, t + 1, t + 2].map((i) => vertex(terrain, i));
+        for (const p of v) {
+          if (p.y < 0) {
+            min.min(p);
+            max.max(p);
+          }
+        }
+        // The −x side of the slab: no lake there, so each band shows its own colour.
+        if (!v.every((p) => p.x === f32(BASE.minX) && p.y <= 0 && p.y >= f32(bottom))) continue;
+        const y = v.reduce((sum, p) => sum + p.y, 0) / 3;
+        const lit = band(y).clone().multiply(west);
+        for (let k = 0; k < 3; k += 1) {
+          const c = new Color().fromBufferAttribute(colour, t + k);
+          const ok = sameColour(c, lit) || sameColour(c, lit.clone().multiplyScalar(0.82));
+          expect(ok, `−x side at y ${y}`).toBe(true);
+          checked += 1;
+        }
+      }
+      expect(checked).toBe(3 * 2 * 3); // two triangles per band
+      // The plinth still sets the outline under the slab: the blueprint draws the same.
+      const outline = [BASE.minX - 0.25, BASE.maxX + 0.25, BASE.minZ - 0.25, BASE.maxZ + 0.25];
+      [min.x, max.x, min.z, max.z].forEach((v, i) => expect(v).toBeCloseTo(outline[i] ?? 0, 5));
+      // Water in the cut sides, spanning exactly the lake on each.
+      const r5 = (v: number) => Math.round(v * 1e5) / 1e5;
+      const span = (n: Vector3, axis: 0 | 2) => {
+        const deep = pal.deep.clone().multiply(shade(n, pal.light));
+        const along: number[] = [];
+        const ys: number[] = [];
+        for (let i = 0; i < position.count; i += 1) {
+          if (!sameColour(new Color().fromBufferAttribute(colour, i), deep)) continue;
+          along.push(position.getComponent(i, axis));
+          ys.push(position.getY(i));
+        }
+        return [Math.min(...along), Math.max(...along), Math.min(...ys), Math.max(...ys)].map(r5);
+      };
+      expect(span(new Vector3(1, 0, 0), 2)).toEqual(
+        [LAKE.z - LAKE.rz, LAKE.z, -LAKE_SECTION, 0].map(r5),
+      );
+      expect(span(new Vector3(0, 0, 1), 0)).toEqual(
+        [LAKE.x - LAKE.rx, LAKE.x, -LAKE_SECTION, 0].map(r5),
+      );
+      unmount();
+    });
+
+    it("deepens the lake towards the slab corner; the shore keeps the manifest hex by day", () => {
+      const { result, unmount } = build(manifest);
+      const { terrain, palette: pal } = result.current;
+      const position = terrain.getAttribute("position");
+      const colour = terrain.getAttribute("color");
+      const water = new Color(manifest.campus.water);
+      let corner = 0;
+      let shore = 0;
+      for (let i = 0; i < position.count; i += 1) {
+        if (Math.abs(position.getY(i) - 0.008) > 1e-6) continue;
+        const c = new Color().fromBufferAttribute(colour, i);
+        if (position.getX(i) === f32(LAKE.x) && position.getZ(i) === f32(LAKE.z)) {
+          expect(sameColour(c, pal.deep)).toBe(true);
+          corner += 1;
+        } else if (sameColour(c, water)) shore += 1;
+      }
+      expect(corner).toBe(16);
+      expect(shore).toBe(32);
+      unmount();
+    });
+
+    it("mows the lawn in stripes: light strips at the manifest hex, dark ones × 0.925", () => {
+      const { result, unmount } = build(manifest);
+      const { terrain } = result.current;
+      const position = terrain.getAttribute("position");
+      const colour = terrain.getAttribute("color");
+      const ground = new Color(manifest.campus.ground);
+      let strips = 0;
+      let lawn = 0;
+      for (let t = 0; t + 2 < position.count; t += 3) {
+        const v = [t, t + 1, t + 2].map((i) => vertex(terrain, i));
+        const c = new Color().fromBufferAttribute(colour, t);
+        if (v.every((p) => p.y === f32(MOW_Y))) {
+          expect(sameColour(c, ground.clone().multiplyScalar(0.925))).toBe(true);
+          const inside = v.every(
+            (p) =>
+              p.x >= f32(BASE.minX) &&
+              p.x <= f32(BASE.maxX) &&
+              p.z >= f32(BASE.minZ) &&
+              p.z <= f32(BASE.maxZ),
+          );
+          expect(inside).toBe(true);
+          strips += 1;
+        }
+        if (v.every((p) => Math.abs(p.y) < 1e-6) && sameColour(c, ground)) lawn += 1;
+      }
+      expect(strips).toBe(12 * 2);
+      expect(lawn).toBe(2); // the slab's top face shows between the strips
+      expect(MOW_WIDTH).toBe(1.4);
+      // Under every other ground layer.
+      const others = flatHeights(terrain).filter((y) => y !== f32(MOW_Y));
+      expect(Math.min(...others)).toBeGreaterThan(f32(MOW_Y));
+      unmount();
+    });
+
+    it("darkens the foot of every upright prop face like the buildings' (× 0.82)", () => {
+      const { result, unmount } = build(manifest);
+      const dressing = buildDressing(props, result.current.palette);
+      const position = dressing.getAttribute("position");
+      const colour = dressing.getAttribute("color");
+      // The bench by the gate at (−11, 9.95): one copy, one part.
+      const near = (i: number) =>
+        Math.abs(position.getX(i) + 11) < 1 && Math.abs(position.getZ(i) - 9.95) < 0.6;
+      let minY = Infinity;
+      for (let i = 0; i < position.count; i += 1) {
+        if (near(i)) minY = Math.min(minY, position.getY(i));
+      }
+      let feet = 0;
+      for (let t = 0; t + 2 < position.count; t += 3) {
+        const ids = [t, t + 1, t + 2];
+        if (!ids.every(near)) continue;
+        const [a, b, c] = ids.map((i) => vertex(dressing, i));
+        if (!a || !b || !c) continue;
+        if (Math.abs(b.clone().sub(a).cross(c.clone().sub(a)).normalize().y) >= 0.5) continue;
+        const low = ids.find((i) => position.getY(i) <= minY + 0.001);
+        const high = ids.find((i) => position.getY(i) > minY + 0.001);
+        if (low === undefined || high === undefined) continue;
+        const foot = new Color().fromBufferAttribute(colour, low);
+        const above = new Color().fromBufferAttribute(colour, high).multiplyScalar(0.82);
+        expect(sameColour(foot, above)).toBe(true);
+        feet += 1;
+      }
+      expect(feet).toBeGreaterThan(0);
+      dressing.dispose();
       unmount();
     });
   },

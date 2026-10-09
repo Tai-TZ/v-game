@@ -109,7 +109,7 @@ const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 const grid = <T>(xs: readonly number[], ys: readonly number[], f: (x: number, y: number) => T) =>
   xs.flatMap((x) => ys.map((y) => f(x, y)));
 
-// --- Trees (shared by the terrain contact discs and the instanced meshes) -------------------
+// --- Trees (shared by the contact overlay and the instanced meshes) ---------------------------
 
 export interface TreeInstance {
   x: number;
@@ -143,9 +143,6 @@ export const TREE_INSTANCES: readonly TreeInstance[] = TREE_LISTS.flatMap(
   };
 });
 
-/** Front trees stand on bare ground; park trees on the park lawn and paths (y 0.010–0.011). */
-const FRONT_TREES = ROUND_TREES.length + CYPRESS_TREES.length;
-
 export function treeMatrix(tree: TreeInstance): Matrix4 {
   return new Matrix4().compose(
     new Vector3(tree.x, 0, tree.z),
@@ -169,43 +166,6 @@ function groundQuad(
       y,
     ),
   );
-}
-
-function skirt(footprint: Box, pal: Palette, y = 0.006) {
-  const x0 = footprint.x - footprint.halfX;
-  const x1 = footprint.x + footprint.halfX;
-  const z0 = footprint.z - footprint.halfZ;
-  const z1 = footprint.z + footprint.halfZ;
-  const w = 0.45;
-  const inner = (x: number, z: number) => ({ x, z, color: pal.skirt });
-  const outer = (x: number, z: number) => ({ x, z, color: pal.ground });
-  const corners = [
-    [inner(x0, z0), outer(x0 - w, z0 - w)],
-    [inner(x1, z0), outer(x1 + w, z0 - w)],
-    [inner(x1, z1), outer(x1 + w, z1 + w)],
-    [inner(x0, z1), outer(x0 - w, z1 + w)],
-  ] as const;
-  const vertices = corners.flatMap(([a, aOut], i) => {
-    const [b, bOut] = corners[(i + 1) % 4] ?? corners[0];
-    return [a, aOut, bOut, a, bOut, b];
-  });
-  return paint(pal)(groundTriangles(vertices, y));
-}
-
-function contactDisc(pal: Palette, tree: TreeInstance, y: number) {
-  const color = pal.contact;
-  const r = (tree.kind === "round" ? 0.62 : 0.26) * tree.scale;
-  const vertices = [];
-  for (let i = 0; i < 12; i += 1) {
-    const a0 = (i / 12) * PI * 2;
-    const a1 = ((i + 1) / 12) * PI * 2;
-    vertices.push(
-      { x: tree.x, z: tree.z, color },
-      { x: tree.x + Math.cos(a0) * r, z: tree.z + Math.sin(a0) * r, color },
-      { x: tree.x + Math.cos(a1) * r, z: tree.z + Math.sin(a1) * r, color },
-    );
-  }
-  return paint(pal)(groundTriangles(vertices, y));
 }
 
 /** Flat fan from `centre` through consecutive `points` (n − 1 triangles), one colour. */
@@ -293,8 +253,9 @@ const FOAM = 0.22;
 function lake(pal: Palette): Parts {
   const water = (p: Vec2) => ({ ...p, color: pal.water });
   // The water stops where the foam starts: side by side at one height, so they never z-fight.
+  // Deepest at the slab's corner, where the cut side shows the water (art §5.1 T1).
   const fan = range(LAKE_STEPS).flatMap((i) => [
-    water(LAKE),
+    { ...LAKE, color: pal.deep },
     water(shore(i, 1, -FOAM)),
     water(shore(i + 1, 1, -FOAM)),
   ]);
@@ -410,6 +371,15 @@ function forecourtRays(pal: Palette) {
   );
 }
 
+/** The examiner's car park and the path north past building G (back of campus). */
+const ASPHALT = [4.6, 8.6, -12.85, -11.25] as const;
+const NORTH_PATH = [-1.3, -0.5, BASE.minZ, -16.6] as const;
+/** Every paved rect: each gets a kerb under it (art §5.1 T11). */
+export const PAVED = [...PATHS.front, ...PATHS.low, ...PATHS.back, ASPHALT, NORTH_PATH];
+/** How far a kerb shows round its paving, and its height: under every path, over the park lawn. */
+export const KERB = 0.06;
+export const KERB_Y = 0.0105;
+
 /** Lanes to the back, the back park, courts, running track and open-air stage (v0.3 §6.1). */
 function backGrounds(pal: Palette): Parts {
   const P = paint(pal);
@@ -450,8 +420,8 @@ function backGrounds(pal: Palette): Parts {
     // E1, E2, E4, E5, E7 lanes; E6 forecourt of the domed hall. E1 runs on to x 13.1 so the
     // corner at the lane mouth is paved.
     ...PATHS.back.map(([x0, x1, z0, z1]) => P(rect(x0, x1, z0, z1, 0.012), pal.path)),
-    P(rect(4.6, 8.6, -12.85, -11.25, 0.012), pal.asphalt),
-    P(rect(-1.3, -0.5, BASE.minZ, -16.6, 0.012), pal.path),
+    P(rect(...ASPHALT, 0.012), pal.asphalt),
+    P(rect(...NORTH_PATH, 0.012), pal.path),
     // K1, K2: park lawn and its paths.
     P(rect(-14.6, -1.6, -21.4, -16.4, 0.01), pal.park),
     groundQuad(
@@ -859,7 +829,7 @@ export const SPEAKER_DISC_Y = 0.0135;
 export const SPEAKER_DISC_SEGMENTS = 16;
 
 /**
- * A baked disc under each person (floor × 0.8, like `contact`), in place of a blob mesh. After
+ * A baked disc under each person (floor × 0.8), in place of a blob mesh. After
  * dark it is a pool of warm light 2.2 times as wide, the person standing in it (§1.4).
  */
 function speakerDiscs(pal: Palette): Parts {
@@ -886,10 +856,9 @@ function speakerDiscs(pal: Palette): Parts {
   });
 }
 
-export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry {
-  const P = paint(pal);
-  const { minX, maxX, minZ, maxZ } = BASE;
-  const lamps: Vec2[] = [
+/** Every campus lamp: the plaza and the lanes, the hedge arcs without colonnades, the props'. */
+export function lampSpots(colonnades: boolean): Vec2[] {
+  return [
     // East lane to the back (v0.3 E3).
     { x: 13.4, z: -3.0 },
     { x: 13.4, z: -7.0 },
@@ -902,13 +871,51 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
     ...(colonnades ? [] : SIDES.flatMap((s) => [0.37, 0.66].map((k) => arcPoint(s * k * PI, 3.4)))),
     ...DRESSING_LAMPS,
   ];
-  const statues = [
-    ...grid([-3.05, 3.05], [-1.35, -0.45, 0.45, 1.35], (x, z) => ({ x, z })),
-    ...grid([-3.3, 3.3], [-2.05, -5.5], (x, z) => ({ x, z })),
-  ];
+}
+
+/** Life-size statues on the lawn walks and by the forecourt. */
+export const STATUES: readonly Vec2[] = [
+  ...grid([-3.05, 3.05], [-1.35, -0.45, 0.45, 1.35], (x, z) => ({ x, z })),
+  ...grid([-3.3, 3.3], [-2.05, -5.5], (x, z) => ({ x, z })),
+];
+
+/** Mowing stripes (art §5.1 T12): dark strips this wide, one every two widths along z. */
+export const MOW_WIDTH = 1.4;
+export const MOW_Y = 0.003;
+const MOW_STRIPS = 12;
+
+/** The slab's bands, top down: turf lip, topsoil, subsoil (art §5.1 T1). */
+export const STRATA = [0, -0.06, -0.32, -0.6] as const;
+/** Water in the slab's cut side under the lake, this deep. */
+export const LAKE_SECTION = 0.18;
+
+export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry {
+  const P = paint(pal);
+  const { minX, maxX, minZ, maxZ } = BASE;
+  const [top, lip, soil, bottom] = STRATA;
+  const kerb = ([x0, x1, z0, z1]: readonly [number, number, number, number]) =>
+    P(
+      rect(
+        Math.max(x0 - KERB, minX),
+        Math.min(x1 + KERB, maxX),
+        Math.max(z0 - KERB, minZ),
+        Math.min(z1 + KERB, maxZ),
+        KERB_Y,
+      ),
+      pal.kerb,
+    );
   return merge([
-    P(box(minX, maxX, -0.6, 0, minZ, maxZ), { top: pal.ground, side: pal.soil }),
+    P(box(minX, maxX, lip, top, minZ, maxZ), pal.ground),
+    P(box(minX, maxX, soil, lip, minZ, maxZ), pal.soil, { ao: true }),
+    P(box(minX, maxX, bottom, soil, minZ, maxZ), pal.subsoil, { ao: true }),
+    P(quad("+x", maxX, LAKE.z - LAKE.rz / 2, -LAKE_SECTION / 2, LAKE.rz, LAKE_SECTION), pal.deep),
+    P(quad("+z", maxZ, LAKE.x - LAKE.rx / 2, -LAKE_SECTION / 2, LAKE.rx, LAKE_SECTION), pal.deep),
     P(box(minX - 0.25, maxX + 0.25, -0.8, -0.6, minZ - 0.25, maxZ + 0.25), pal.plaza),
+    ...range(MOW_STRIPS).map((k) => {
+      const z0 = minZ + MOW_WIDTH * (2 * k + 1);
+      return P(rect(minX, maxX, z0, Math.min(z0 + MOW_WIDTH, maxZ), MOW_Y), pal.mow);
+    }),
+    ...PAVED.map(kerb),
     ...PATHS.low.map(([x0, x1, z0, z1]) => P(rect(x0, x1, z0, z1, 0.011), pal.path)),
     ...PATHS.front.map(([x0, x1, z0, z1]) => P(rect(x0, x1, z0, z1, 0.012), pal.path)),
     ...forecourtRays(pal),
@@ -919,8 +926,8 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
     ...fountain(pal),
     ...lake(pal),
     ...balustrades(pal),
-    ...statues.flatMap(({ x, z }) => statue(x, z, pal)),
-    ...lamps.flatMap((spot) => lamp(spot, pal)),
+    ...STATUES.flatMap(({ x, z }) => statue(x, z, pal)),
+    ...lampSpots(colonnades).flatMap((spot) => lamp(spot, pal)),
     // Clipped bushes at the foot of the colonnades.
     ...SIDES.flatMap((s) =>
       [0.42, 0.52, 0.62].map((k) => {
@@ -928,16 +935,95 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
         return P(ico(0.22, 0, 0, 0, 0).scale(1, 0.8, 1).translate(x, 0.18, z), pal.hedge);
       }),
     ),
-    ...[...LANDMARK.footprints, ...SITES.map((site) => site.footprint)].map((f) => skirt(f, pal)),
-    // Back skirts sit just above the park lawn (0.010) and under the lanes (0.012).
-    ...[BACK.annex, BACK.solarHall, BACK.westHall, BACK.hall, BACK.chiller].map((f) =>
-      skirt(f, pal, 0.0105),
-    ),
-    ...TREE_INSTANCES.map((tree, i) => contactDisc(pal, tree, i < FRONT_TREES ? 0.006 : 0.0125)),
     ...speakerDiscs(pal),
     ...backGrounds(pal),
     ...backCampus(pal),
   ]);
+}
+
+// --- Contact darkening overlay (art §2.4, 2026-10-09) ---------------------------------------
+
+/**
+ * Over every ground layer (the highest, 0.013) and under the speakers' discs (0.0135), so a
+ * night pool of light is never darkened; the sun shade (0.014) multiplies over both.
+ */
+export const AO_Y = 0.0133;
+/** How far the soft frame round a building's footprint reaches. */
+export const AO_FRAME = 0.45;
+const WHITE = new Color(1, 1, 1);
+interface AoVertex {
+  x: number;
+  z: number;
+  color: Color;
+}
+
+/** Soft frame round a footprint: `~ao` along the walls, white (no change) `AO_FRAME` out. */
+function aoFrame(f: Box, ao: Color): AoVertex[] {
+  const w = AO_FRAME;
+  const corners = [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ] as const;
+  return corners.flatMap(([sx, sz], i) => {
+    const [tx, tz] = corners[(i + 1) % 4] ?? corners[0];
+    const a = { x: f.x + sx * f.halfX, z: f.z + sz * f.halfZ, color: ao };
+    const b = { x: f.x + tx * f.halfX, z: f.z + tz * f.halfZ, color: ao };
+    const aOut = { x: a.x + sx * w, z: a.z + sz * w, color: WHITE };
+    const bOut = { x: b.x + tx * w, z: b.z + tz * w, color: WHITE };
+    return [a, aOut, bOut, a, bOut, b];
+  });
+}
+
+/** Elliptic blob: `~ao` at the centre, white on the rim. */
+function aoBlob(ao: Color, x: number, z: number, rx: number, rz: number, segments: number) {
+  const rim = (k: number): AoVertex => {
+    const a = (k / segments) * 2 * PI;
+    return { x: x + Math.cos(a) * rx, z: z + Math.sin(a) * rz, color: WHITE };
+  };
+  return range(segments).flatMap((i) => [{ x, z, color: ao }, rim(i), rim(i + 1)]);
+}
+
+/** Blob size of a prop copy: its shade or blocking box, else a guess from its scale. */
+function propReach(row: (typeof DRESSING)[number]): [number, number] {
+  const s = typeof row.scale === "number" ? row.scale : row.scale[0];
+  // A crown or canopy darkens about its own width, like a tree; a box reaches past its corners.
+  if (row.shade?.round) return [...row.shade.half];
+  const [hx, hz] = row.shade?.half ?? row.block ?? [0.16 * s, 0.16 * s];
+  return [1.5 * hx, 1.5 * hz];
+}
+
+/**
+ * Contact darkening, multiplied over the ground like the sun shade (one draw call, the shadow
+ * material without its stencil): a soft frame round every building, a blob under every tree,
+ * standing prop, lamp and life-size statue. Factors, not baked light: `~ao` fading to white.
+ */
+export function buildAo(pal: Palette, colonnades: boolean): BufferGeometry {
+  const { ao } = pal;
+  const footprints = [
+    ...LANDMARK.footprints,
+    ...SITES.map((site) => site.footprint),
+    BACK.annex,
+    BACK.solarHall,
+    BACK.westHall,
+    BACK.hall,
+    BACK.chiller,
+  ];
+  const vertices = [
+    ...footprints.flatMap((f) => aoFrame(f, ao)),
+    ...TREE_INSTANCES.flatMap((tree) => {
+      const r = (tree.kind === "round" ? 0.71 : 0.3) * tree.scale;
+      return aoBlob(ao, tree.x, tree.z, r, r, 12);
+    }),
+    ...DRESSING.filter((row) => row.kind === "ground" || row.kind === "fence").flatMap((row) => {
+      const [rx, rz] = propReach(row);
+      return row.at.flatMap(([x, z]) => aoBlob(ao, x, z, rx, rz, 8));
+    }),
+    ...lampSpots(colonnades).flatMap(({ x, z }) => aoBlob(ao, x, z, 0.22, 0.22, 6)),
+    ...STATUES.flatMap(({ x, z }) => aoBlob(ao, x, z, 0.3, 0.3, 8)),
+  ];
+  return groundTriangles(vertices, AO_Y);
 }
 
 // --- Landmark: shared U-shaped main building, tower archetype, colonnades (G-landmark) -------

@@ -121,8 +121,63 @@ const IDLE_DT = 1 / 60;
 /** Keeps labels this far (px) from the viewport edges. */
 const LABEL_MARGIN = 8;
 /** Consecutive walking frames per DPR check; more than half slower than SLOW_FRAME steps down. */
-const DPR_WINDOW = 45;
+export const DPR_WINDOW = 45;
 const SLOW_FRAME = 0.022;
+/** Seconds after a step-down before a new interaction tries one level up again. */
+export const DPR_PROBE_AFTER = 5;
+
+/** The pixel-ratio guard's memory, kept in the frame loop's ref (no React state). */
+export const dprGuard = () => ({
+  sampled: 0,
+  slow: 0,
+  /** When it last stepped down (s), null once probed or before any step-down. */
+  downAt: null as number | null,
+  probed: false,
+  /** A step-down after a probe: this device stays where it is for the session. */
+  latched: false,
+});
+
+/**
+ * Adaptive pixel ratio (art §6.1), one busy frame at a time; idle frames never reach the loop.
+ * Steps down (2 → 1.5 → 1) when more than half of a window of consecutive busy frames is slower
+ * than 22 ms (a median test, no sort). A one-off stall (a bake landing mid-walk) would otherwise
+ * keep a capable laptop blurred all session, so the first busy frame of a new interaction at
+ * least DPR_PROBE_AFTER after a step-down probes one level up, at most to `initialDpr`. Frame
+ * deltas are vsync-bound, so speed cannot be measured from below; the probe is the honest test,
+ * and a step-down after it latches the guard. Returns the new pixel ratio, or null to keep it.
+ */
+export function stepDpr(
+  g: ReturnType<typeof dprGuard>,
+  f: {
+    busy: boolean;
+    wasBusy: boolean;
+    delta: number;
+    now: number;
+    dpr: number;
+    initialDpr: number;
+  },
+): number | null {
+  if (!(f.busy && f.wasBusy && f.dpr > 1)) {
+    g.sampled = 0;
+    g.slow = 0;
+    const due = g.downAt !== null && f.now - g.downAt >= DPR_PROBE_AFTER;
+    if (!f.busy || f.wasBusy || g.latched || !due || f.dpr >= f.initialDpr) return null;
+    g.downAt = null;
+    g.probed = true;
+    return Math.min(f.initialDpr, f.dpr < 1.5 ? 1.5 : 2);
+  }
+  g.sampled += 1;
+  if (f.delta > SLOW_FRAME) g.slow += 1;
+  if (g.sampled < DPR_WINDOW) return null;
+  const slow = g.slow > DPR_WINDOW / 2;
+  g.sampled = 0;
+  g.slow = 0;
+  if (!slow) return null;
+  g.downAt = f.now;
+  if (g.probed) g.latched = true;
+  return f.dpr > 1.5 ? 1.5 : 1;
+}
+
 /** A press moves this far (px) before it turns the view instead of clicking (orbit §2.1). */
 const MOUSE_SLOP = 6;
 const TOUCH_SLOP = 10;
@@ -264,8 +319,7 @@ export function useHubFrame(options: {
     inset: 0,
     insetEasing: false,
     wasBusy: false,
-    slowFrames: 0,
-    sampledFrames: 0,
+    dpr: dprGuard(),
   });
 
   const countFrames = options.countFrames;
@@ -614,21 +668,17 @@ export function useHubFrame(options: {
         (px < -24 || py < -24 || px > size.width + 24 || py > size.height + 24);
     }
 
-    // Step the pixel ratio down (2 → 1.5 → 1) while the scene animates below ~45 FPS: more than
-    // half of a window of consecutive busy (animating) frames slower than 22 ms (a median test,
-    // no sort). An idle frame, or the first busy one after it, starts a new window.
-    if (busy && a.wasBusy && three.viewport.dpr > 1) {
-      a.sampledFrames += 1;
-      if (delta > SLOW_FRAME) a.slowFrames += 1;
-      if (a.sampledFrames === DPR_WINDOW) {
-        if (a.slowFrames > DPR_WINDOW / 2) three.setDpr(three.viewport.dpr > 1.5 ? 1.5 : 1);
-        a.sampledFrames = 0;
-        a.slowFrames = 0;
-      }
-    } else {
-      a.sampledFrames = 0;
-      a.slowFrames = 0;
-    }
+    // Adaptive pixel ratio: samples busy frames only, so an idle scene stays idle.
+    const { dpr, initialDpr } = three.viewport;
+    const next = stepDpr(a.dpr, {
+      busy,
+      wasBusy: a.wasBusy,
+      delta,
+      now: performance.now() / 1000,
+      dpr,
+      initialDpr,
+    });
+    if (next !== null) three.setDpr(next);
 
     if (countFrames) {
       const root = document.documentElement;

@@ -75,7 +75,8 @@ export function buildDressing(props: PropsJson, pal: Palette): BufferGeometry {
       paintProp(geometry, data, colours);
       geometry.applyMatrix4(matrix);
       const sides = data.doubleSided ? [geometry, backFaces(geometry.clone())] : [geometry];
-      return sides.map((side) => part(side, {}, pal.light));
+      // The foot of each upright face darkens like the buildings' (art §2.4 item 1).
+      return sides.map((side) => part(side, { ao: true }, pal.light));
     });
   });
   return merge(parts);

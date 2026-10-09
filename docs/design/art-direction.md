@@ -78,8 +78,12 @@ Ký hiệu khoá dùng trong toàn bộ mục 5: `lm.*` = `campus.landmark.*`, `
 | Gáy sách trong cửa sổ Thư viện | lần lượt `lib.roof`, `lm.accent`, `mk.roof`, `wt.roof`, `lib.trim` |
 | Giàn giáo, quầy chợ | `trunk` |
 | Thân cây / tán tròn / tán bách | `trunk` / `foliage` / `~cypress` |
-| Vệt tiếp đất dưới cây | `~contact` |
-| Viền tối quanh chân công trình | `~skirt` → `ground` |
+| Vệt tiếp đất dưới cây, prop đứng, đèn, tượng (sửa 2026-10-09) | `~ao` → trắng: hệ số nhân, lớp phủ riêng (§2.4 mục 2) |
+| Viền tối quanh chân công trình (sửa 2026-10-09) | `~ao` → trắng, cùng lớp phủ |
+| Bờ lát quanh đường (2026-10-09) | `~kerb` |
+| Vạch cỏ cắt (2026-10-09) | `~mow` (vạch tối); vạch sáng là mặt đế, đúng `ground` |
+| Mặt cắt đế: viền cỏ / đất mặt / đất đáy (2026-10-09) | `ground` / `~soil` / `~subsoil` |
+| Lòng hồ sâu, nước trong mặt cắt đế (2026-10-09) | `~deep` |
 | Cột đèn, tóc, kính, kim đồng hồ | `~dark` |
 | Người chơi: áo / quần, ba lô / đầu | `player` / `~pants` / `plaza` |
 | Cô Lan: áo len / váy / sách / đầu / tóc, búi, kính | `npc` / `~lanSkirt` / `lib.roof` / `plaza` / `~dark` |
@@ -95,8 +99,11 @@ Mọi phép tính làm trên `THREE.Color` trong không gian **linear** (`new Co
 | Khoá | Công thức | Campus | Town |
 |---|---|---|---|
 | `~soil` | `mul(ground, 0.45)` | `#81966f` | `#8b9a7a` |
-| `~skirt` | `mul(ground, 0.70)` | `#9eb788` | `#aabc96` |
-| `~contact` | `mul(ground, 0.80)` | `#a7c391` | `#b5c79f` |
+| `~subsoil` (2026-10-09) | `lerp(~soil, trunk, 0.35)` | `#767b51` | `#88896a` |
+| `~mow` (2026-10-09, sửa sau review cùng ngày) | `mul(ground, 0.925)` (0.955 không nhìn thấy ở 1280 px) | `#a1be7f` | `#c1d5aa` |
+| `~kerb` (2026-10-09) | `mul(lm.trim, 0.92 × lát)`, `lát = 1 − 0.22w` (§14 mục 4), nên ướt thì tối hơn | `#d7d1c7` | `#c7beaa` |
+| `~deep` (2026-10-09) | `mul(water, 0.78)` | `#80a5b9` | `#8bb9c1` |
+| `~ao` (2026-10-09, sửa sau review cùng ngày) | Hệ số nhân `lerpW(lerp(~shadow, xám(~shadow), 0.5), 0.2)`: bóng nắng kéo nửa đường về xám cùng độ sáng, 80% độ đậm. Tiếp đất che cả ánh trời xanh, nên vệt dưới đèn trên đường ấm lúc hoàng hôn ra xám ấm, không ngả tím | ngày `#d5d7db`, hoàng hôn `#c7d0e4` | như campus |
 | `~glass` | `mul(water, 0.45)` | `#6288a1` | `#6c9097` |
 | `~lit` (hoàng hôn sửa 2026-10-09, sau QA vòng 5) | Ngày: `lerpW(lm.accent, 0.20)`. Hoàng hôn: `full(lerp(lm.accent, dusk.sun, 0.5))`, với `full` chia cho kênh lớn nhất, vì tường `+z` hứng nắng chiều nướng ra gần đúng màu ngày (§12 mục 10) | ngày `#ddba8b`, hoàng hôn `#ffbc49` | ngày `#c9937d`, hoàng hôn `#ffa930` |
 | `~waterHi` | `lerpW(water, 0.35)` | `#c0daef` | `#c6e1e7` |
@@ -152,11 +159,11 @@ Unit test (`scene.test.ts`, mỗi theme): ngày `shade(+y)` đúng bằng `(1, 1
 
 **Màu cuối của một đỉnh** = `màuKhoá × shade(n) × ao` (nhân từng kênh), trừ phần có cờ **E** (emissive: cửa chính khu mở, cửa sổ khu đã có sao, chụp đèn, mặt đồng hồ, kim đồng hồ, gáy sách) dùng `shade = 1`, `ao = 1`. Vì vậy ở hoàng hôn cửa sổ sáng giữ đúng độ sáng đầy đủ trong khi mọi thứ khác tối đi: cửa sổ tự "phát sáng" mà không cần bloom. Phần "mù xa" của toà phía sau (v0.3 §5.2) giờ pha về màu mặt trên của preset thay cho trắng (ngày vẫn là trắng).
 
-### 2.4 AO giả (không tốn draw call; riêng bóng nắng ở mục 4 tốn 1, sửa 2026-10-08)
+### 2.4 AO giả (không tốn draw call; riêng bóng nắng ở mục 4 và lớp tiếp đất ở mục 2 tốn 1 mỗi lớp, sửa 2026-10-09)
 
 1. **AO dọc:** với phần có cờ **AO** ở bảng mục 5, mọi đỉnh của mặt đứng (`|n.y| < 0.5`) nằm ở đáy của phần đó (`y ≤ bbox.min.y + 0.001`) nhân `0.82`; đỉnh trên giữ `1.0`. Nội suy theo chiều cao tạo vệt tối nhẹ dần lên.
-2. **Viền chân công trình (skirt):** quanh 4 footprint (`LANDMARK.footprint` và 3 `SITES[*].footprint`), một khung phẳng rộng `0.45` ở `y = 0.006`, 4 hình thang (8 tam giác). Đỉnh trong màu `~skirt`, đỉnh ngoài màu `ground` (hoà vào cỏ). Đường đi nằm trên (`y = 0.012`) nên che skirt ở chỗ giao, chấp nhận.
-3. **Vệt tiếp đất dưới cây:** đĩa phẳng `circle(r, 12)` ở `y = 0.006`, màu `~contact`, `r = 0.62·s` (cây tròn) hoặc `0.40·s` (cây bách), `s` là scale của cây đó (mục 5.6). Đục, không trong suốt, nằm trong nhóm địa hình.
+2. **Lớp tiếp đất `G-ao` (sửa 2026-10-09, thay skirt đục và đĩa đục dưới cây):** một lưới phẳng riêng ở `AO_Y = 0.0133`, trên mọi lớp đất (cao nhất 0.013) và dưới đĩa người nói chuyện (0.0135), nên vũng sáng ban đêm không bị tối. Vẽ bằng vật liệu của lớp bóng nắng bỏ stencil (`MultiplyBlending`, không ghi depth): cùng program, +1 draw call. Đỉnh trong màu `~ao`, đỉnh ngoài trắng (không đổi), nên mép mềm và cỏ, đường, vạch cỏ cắt đều tối đúng tỉ lệ, không còn đường viền `ground` lộ ra. Gồm: khung rộng `AO_FRAME = 0.45` quanh 11 footprint (3 của landmark, 3 khu, 5 toà phía sau; 8 tam giác mỗi khung, chỗ hai khung chồng ở góc trong tối thêm một chút, đúng như AO); quạt 12 tam giác dưới mỗi cây, `r = 0.71·s` (tròn) hoặc `0.30·s` (bách); quạt 8 tam giác dưới mỗi prop `ground`/`fence` (tán tròn: bằng nửa cạnh `shade`; hộp: 1.5 × nửa cạnh `shade` hoặc `block`; còn lại `0.24 × scale`); quạt 6 tam giác `r = 0.22` dưới mỗi đèn; quạt 8 tam giác `r = 0.3` dưới mỗi tượng lớn. Hệ số, không phải ánh sáng nướng, như lớp bóng nắng. Nhiều mây và mưa không có bóng nắng, nên lớp này là thứ duy nhất giữ đồ vật dính đất.
+3. **Chân prop (2026-10-09):** `buildDressing` bật cờ AO dọc (mục 1) cho mọi prop, như tường công trình.
 4. **Bóng nắng (2026-10-08, N8; sửa sau QA vòng 1 cùng ngày):** mỗi khối của nhà chính, tháp theo archetype, ba toà khu và toà phía sau được chiếu theo `−L` xuống mặt đất (`p − p.y·L/L.y`), lấy bao lồi, cắt theo mép đế. Các bao lồi gộp thành một lưới riêng `G-shadow` ở `y = 0.014`, trên mọi lớp đất (cao nhất là cát và vạch đường chạy, 0.0135), tô hệ số `~shadow` và vẽ bằng `MeshBasicMaterial` trộn kiểu nhân (`MultiplyBlending`, không ghi depth). Vì vậy cỏ, đường, mặt hồ và đường chạy dưới bóng đều tối đi đúng tỉ lệ, không còn vệt đường sáng cắt ngang bóng như bản đục ở `y = 0.007`. Stencil (`stencil: true` trên canvas; ghi 1, chỉ vẽ nơi chưa bằng 1) giữ cho chỗ hai bóng chồng nhau chỉ tối một lần. Giá: +1 draw call (14 theo `sceneBudget()`, trần test 16), số tam giác như cũ (92–108). Vật cao hơn 0.014 (quảng trường, luống hoa, bậc) che lớp bóng nên vẫn sáng, chấp nhận (QA vòng 3 nêu lại, vẫn giữ; cách sửa ở campus-scene v0.3 §13.2). Hoàng hôn có nắng thấp nên bóng dài, chạm mép đế thì bị cắt. Danh sách khối ở campus-scene v0.3 §13.2. **Sửa sau QA vòng 2 (2026-10-08):** thêm cổng trước, theo kiểu cổng (cổng ba vòm: khối giữa, attic, hai cánh; cổng trụ: hai trụ và dầm treo, nên nắng lọt qua lối đi), và tán của mọi cây (đúng các đỉnh của tán, đặt như mesh instanced đặt cây). Trước đó nửa trái campus không có bóng nào lúc hoàng hôn, cạnh Chợ và Tháp canh bóng dài. Giá: lưới bóng từ 108 lên 817 tam giác (campus ngày; town 802), vẫn 1 draw call. Chấp nhận không đổ bóng: hai hàng cột cong (bao lồi của cung sẽ lấp kín lòng cung), đèn, tượng, hàng rào, thân cây (đã có đĩa tiếp đất), và người: người chơi và cô Lan vẫn sáng khi đứng trong bóng toà nhà, vì Lambert không nhận bóng. **Sửa sau QA vòng 3 (2026-10-09):** cây có tâm tán trong bóng toà nhà nhân màu instance với `~shadow` (`treesInShade`), 0 draw call, 0 tam giác; người thì vẫn không, vì họ di chuyển. Test: mọi mặt đất phẳng dưới `y 0.03` nằm dưới `SHADOW_Y`, trừ bậc thấp nhất của sân khấu (khối đặc, như quảng trường); e2e kiểm canvas có bộ đệm stencil.
 5. **Bọt sóng tĩnh (2026-10-08, N8):** một vành `~foam` rộng 0.22 ngay trong bờ hồ, 32 tam giác. Mặt nước dừng ở mép trong của vành, nên bọt nằm cạnh nước ở cùng `y = 0.008`, không đè lên nhau. Không chuyển động.
 
@@ -184,7 +191,7 @@ Unit test (`scene.test.ts`, mỗi theme): ngày `shade(+y)` đúng bằng `(1, 1
 | Người, cây (động hoặc instanced) | `MeshLambertMaterial({ vertexColors: true, flatShading: true })`. Hai đèn trên được hiệu chỉnh để Lambert cho đúng 1.00/0.80/0.60 như hình nướng (đã đo pixel: trắng → 255/231/204). Cây dùng `instanceColor` nhân thêm độ sáng. |
 | Bóng blob người chơi | `CircleGeometry(0.36, 20)` nằm ngang, `y = 0.05`, `MeshBasicMaterial({ color: #000000, transparent: true, opacity: 0.18, depthWrite: false })` |
 | Bóng blob cô Lan | Sửa 2026-10-09 (v0.4): bỏ. Mỗi người nói chuyện được có một đĩa đục nướng vào `G-terrain` (sàn × 0,8, `SPEAKER_DISC_Y`), không tốn draw call. |
-| Bóng cây | không dùng blob trong suốt; nướng đĩa đục `~contact` vào địa hình (mục 2.4) |
+| Bóng cây | không dùng blob riêng; quạt `~ao` → trắng trong lớp tiếp đất `G-ao` (mục 2.4, sửa 2026-10-09) |
 | X-ray người chơi | (v0.4: `SkinnedMesh` dùng chung geometry và skeleton của nhân vật Kenney, `castFigures` trong `scene/useHubFrame.ts`) dùng chung geometry người chơi, `MeshBasicMaterial({ color: ~xray, depthFunc: GreaterDepth, depthWrite: false })`, **đục** (không `transparent`), `renderOrder = 1`; mesh người chơi `renderOrder = 2`. Hiện bóng người chơi phía sau mái Chợ, hàng cây mép nam/đông, mặt sau landmark. |
 
 Thứ tự vẽ: hình tĩnh và cây (`renderOrder 0`) → x-ray (1) → người chơi (2) → blob, vòng (trong suốt, three tự vẽ sau). Vì x-ray đục và vẽ trước người chơi, nó không tự xuyên qua thân người chơi.
@@ -279,7 +286,7 @@ else:          mode = "follow",   zoom = clamp(min((W − 32) / 11.5, (H − 72)
 
 | # | Phần | Hình | Màu | Cờ |
 |---|---|---|---|---|
-| T1 | Đế đất | `box(−14.8,14.8 │ −0.6,0 │ −10.8,10.8)` (= `WORLD_BOUNDS` + 0.8) | `{top: ground, side: ~soil}` | |
+| T1 | Đế đất (sửa 2026-10-09: ba lớp, cùng khối ngoài) | `box(BASE │ −0.06,0)` viền cỏ; `box(BASE │ −0.32,−0.06)` đất mặt; `box(BASE │ −0.6,−0.32)` đất đáy (`STRATA`). Hai mặt `+x`, `+z` có dải nước `quad` cao `LAKE_SECTION = 0.18` đúng bằng nhịp hồ trên mép đế | `ground` / `~soil` / `~subsoil`; nước `~deep` | AO ở hai lớp đất |
 | T2 | Tấm đế trắng | `box(−15.05,15.05 │ −0.8,−0.6 │ −11.05,11.05)` | `plaza` | |
 | T3 | Trục Bắc–Nam (landmark → Chợ) | `rect(−1.0,1.0 │ −5.4,6.1 │ 0.012)` | `path` | |
 | T4 | Trục Đông–Tây (cửa Thư viện → cửa Tháp canh, z = door.z = 2) | `rect(−6.3,7.1 │ 1.4,2.6 │ 0.012)` | `path` | |
@@ -287,8 +294,10 @@ else:          mode = "follow",   zoom = clamp(min((W − 32) / 11.5, (H − 72)
 | T6 | Quảng trường | `cyl(4.9,4.9,48 │ 0→0.04 │ PLAZA)` | `plaza` | |
 | T7 | Vòng lát trong | `ring(2.30,2.45,48 │ PLAZA.x, 0.041, PLAZA.z)` | `lm.trim` | |
 | T8 | Vòng lát ngoài | `ring(4.50,4.65,48 │ PLAZA.x, 0.041, PLAZA.z)` | `lm.trim` | |
-| T9 | Skirt × 4 | mục 2.4 | `~skirt`→`ground` | |
-| T10 | Vệt tiếp đất × 39 | mục 2.4 | `~contact` | |
+| T9 | Lớp tiếp đất (2026-10-09, thay skirt và vệt dưới cây) | mục 2.4 mục 2, nhóm riêng `G-ao` | `~ao` → trắng | |
+| T11 | Bờ lát (2026-10-09) | mỗi hình chữ nhật lát (`PATHS`, bãi xe, lối bắc) nở `KERB = 0.06`, cắt theo `BASE`, `rect(… │ KERB_Y = 0.0105)`: dưới mọi đường (0.011, 0.012), trên bãi cỏ công viên (0.010), nên chỗ giao tự có viền | `~kerb` | |
+| T12 | Vạch cỏ cắt (2026-10-09) | 12 dải `rect(BASE.minX, BASE.maxX │ z0, z0 + 1.4 │ 0.003)`, cách nhau 1.4, dưới mọi lớp đất khác | `~mow` | |
+| T13 | Lòng hồ (2026-10-09) | đỉnh tâm quạt hồ (góc đế) `~deep`, đỉnh bờ giữ `water`: chuyển màu trên 16 tam giác sẵn có | `~deep` → `water` | |
 | F1 | Thành bể + gờ | `lathe([(1.22,0.04),(1.22,0.46),(1.5,0.46),(1.5,0.40),(1.4,0.40),(1.4,0.04),(1.22,0.04)], 32)` tại PLAZA | `lm.wall` | |
 | F2 | Mặt nước bể | `circle(1.22,32 │ PLAZA.x, 0.30, PLAZA.z)` | `water` | |
 | F3 | Gợn sáng (tĩnh) | `ring(0.70,0.80,32 │ y 0.302)` | `~waterHi` | |
@@ -522,6 +531,8 @@ Gốc ở chân, mặt hướng `+z` cục bộ (`rotation.y = heading` của `m
 **Sửa 2026-10-09 (v0.4, bộ nhân vật):** 14 draw call khi còn tượng (+1 tượng bốn NPC gộp, −1 blob cô Lan), 17 khi bộ nhân vật Kenney đã tải (6 `SkinnedMesh` + x-ray), cả hai tính vòng tương tác. Ban ngày 26 112 (campus) / 22 967 (town) tam giác. `scene.test.ts` chặn ở 20 draw call và 28 000 tam giác.
 
 **Sửa 2026-10-09 (gộp props CC0 + bộ nhân vật):** đo được 14 draw call khi còn tượng, 15 khi props đã tải, 18 khi có cả bộ nhân vật (15 của props + 3 mesh thêm của bộ nhân vật). Tam giác cao nhất (props + bộ nhân vật, mọi khu sáng, hai theme, hai giờ): 34 422 (campus, ban ngày) / 31 277 (town). `scene.test.ts` chặn ở 18 draw call và 34 500 tam giác (đỉnh đo được làm tròn lên), dưới 60% của 60k và xa ngưỡng < 80 draw call cho 60 FPS.
+
+**Sửa 2026-10-09 (làm đẹp nướng sẵn, §15):** lớp tiếp đất `G-ao` thêm 1 draw call (15 khi còn tượng, 16 khi props đã tải, 19 khi có bộ nhân vật). Tam giác cao nhất 34 986 (campus) / 31 865 (town), +564 / +588. `scene.test.ts` chặn ở 19 draw call và 35 500 tam giác trên cả 20 look. Đo trong trình duyệt (town, 1280×800, `WebGL2` đếm lệnh vẽ, vòng tương tác ẩn): 17 → 18 lệnh vẽ, 31 025 → 31 613 tam giác. Program shader vẫn 4.
 
 Ngân sách brief: ≤ 40 draw call, ≤ 60k tam giác. Thực tế dùng 33% và 15%. Phần dư **không** dùng để thêm chi tiết ở v0.1; nó để dành cho NPC và hiệu ứng hậu quả của các bản sau.
 
@@ -761,7 +772,8 @@ Chụp ở **1280×800** và **375×812**, mỗi kích thước cho **cả hai t
 - [ ] Đứng cạnh cô Lan: vòng tương tác màu `player` dưới chân cô, gợi ý ở giữa đáy đúng chữ §4.
 - [ ] Hội thoại mở ở panel phải, cô Lan vẫn thấy được bên trái; có lớp phủ nhẹ; hai nút đúng thứ tự.
 - [ ] Đi tới cửa Chợ `(0, 5.3)`: bóng x-ray nhạt của người chơi hiện qua mái.
-- [ ] `renderer.info.render.calls ≤ 17` (sửa 2026-10-09, v0.4: 17 với bộ nhân vật và vòng tương tác, 16 khi vòng ẩn; khi còn tượng 14/13; trước đó ≤ 13 với lớp bóng nắng), tam giác theo campus-scene v0.3 §13.4; đứng yên 3 s thì bộ đếm frame không tăng.
+- [ ] (2026-10-09) Tiếp đất: quanh chân toà, dưới cây, prop, đèn và tượng có vệt tối mềm, mép tan vào cỏ, không còn đĩa xám mép cứng; vũng sáng dưới người ban đêm không bị tối. Đường có bờ lát mảnh; cỏ có vạch cắt rất nhẹ, lấy mẫu pixel cỏ ở vạch sáng; mặt cắt đế thấy ba lớp và dải nước dưới hồ; lòng hồ đậm dần về góc đế.
+- [ ] `renderer.info.render.calls ≤ 19` khi vòng tương tác hiện, `≤ 18` khi vòng ẩn, khớp `sceneBudget()` (sửa 2026-10-09 lần hai: +1 lớp tiếp đất, e2e `play.spec.ts` đếm 18 lệnh vẽ lúc đứng yên; trước đó ≤ 17; v0.4: 17 với bộ nhân vật và vòng tương tác, 16 khi vòng ẩn; khi còn tượng 14/13; trước đó ≤ 13 với lớp bóng nắng), tam giác theo campus-scene v0.3 §13.4; đứng yên 3 s thì bộ đếm frame không tăng.
 - [ ] Vào `/play` lần đầu (tải chậm): nền trời ngay từ đầu, không nền trắng; thẻ có logo, tên bước + "Bước n/5", mẹo của cô Lan; thẻ không che nút trên; khi cảnh hiện, sa bàn trùng chỗ rồi mờ đi trong 200 ms; `?debug=loader` thấy hai lớp trùng nhau.
 
 **Hub `/play`, 375×812:**
@@ -852,3 +864,15 @@ Nguồn: `campus-v0.4-plan.md` mục "Thời tiết và giờ thật" (W0 chốt
 9. **Ngân sách:** +0 draw call, +0 program, +0 tam giác (u ám bớt tam giác bóng); `scene.test.ts` chạy trần 18 draw call / 34 500 tam giác trên cả 20 look. Không frame WebGL khi đứng yên, kể cả đêm dông (e2e).
 10. **QA thêm (§10):** đêm: khu có sao sáng nhất, landmark lác đác cửa sổ ấm mờ hơn, người đứng trong vũng sáng, nhận ra màu áo; mưa: đường tối hơn, không bóng nắng, vệt mưa thấy được trên cỏ và tường nhưng không che nhãn; sương: phía xa mờ hơn, tháp vẫn nhận ra; "Cố định ban ngày" giống hệt cảnh ngày cũ.
 11. **Bỏ qua (thêm khi cần):** vũng nước và vũng sáng đèn đường (`G-glow`) khi ảnh QA ban đêm hay lúc mưa trông chưa đủ; chuyển mờ giữa các pha; mưa xiên; sấm; bảng giờ mọc trong manifest; đồng hồ phút trong chip.
+
+## 15. Quyết định 2026-10-09: làm đẹp nướng sẵn, không thêm chi phí mỗi khung
+
+Nguồn: chủ dự án hỏi "có cách nào làm cho đẹp hơn, nâng đồ hoạ mà vẫn tối ưu, không lag". Kế hoạch và bảng ứng viên ở `feat/campus-visual-polish` (plan B1–B7, C1–C6).
+
+1. **Mọi thứ nướng khi dựng look**, không có gì mới chạy mỗi khung ngoài một lưới phủ nhỏ. Không phụ thuộc mới, program shader vẫn 4, đứng yên vẫn 0 frame.
+2. **Lớp tiếp đất `G-ao`** (§2.4 mục 2): +1 draw call. Hệ số `~ao = lerpW(~shadow, 0.35)` thay cho `~shadow × 0.9` của kế hoạch: bản kế hoạch tối gần bằng bóng nắng (≈ 0.5 linear ban ngày), đậm hơn skirt cũ (0.7), đọc như bóng chứ không như tiếp đất. Sửa sau review cùng ngày: `0.35` nhạt quá, ở 1280 px vệt dưới cây và đèn gần như không thấy, nên nay `lerpW(lerp(~shadow, xám, 0.5), 0.2)` (đậm hơn, nửa đường về xám để hoàng hôn không ngả tím), và vạch cỏ cắt `× 0.955` thành `× 0.925`. `AO_Y` đặt dưới đĩa người nói chuyện (0.0133 < 0.0135) thay vì trên lớp bóng: vũng sáng ban đêm sạch theo cấu trúc, không cần kiểm từng blob.
+3. **Bờ lát, mặt cắt ba lớp, lòng hồ sâu, vạch cỏ cắt, AO chân prop** (§5.1 T1, T11–T13; §2.4 mục 3): 0 draw call. Khối ngoài của đế và tấm đế giữ nguyên, sa bàn tải (`.bp-shell`, `.bp-soil`) vẫn trùng.
+4. **DPR thích ứng có đường lên lại:** bộ chặn cũ chỉ hạ (2 → 1.5 → 1) khi quá nửa 45 khung bận chậm hơn 22 ms, nên một lần khựng (bake rơi giữa lúc đi) giữ máy mạnh ở DPR thấp cả phiên. Nay khung bận đầu tiên của một lần tương tác mới, sau lần hạ ≥ 5 s, thử lên một nấc (tối đa `initialDpr`); hạ lại sau lần thử thì khoá cho cả phiên. Logic là hàm thuần `stepDpr()` có test; chỉ chạy trong khung bận.
+5. **Ngân sách:** 18 → 19 draw call, đỉnh 34 422 → 34 986 tam giác (trần 35 500), `/play` 293,2 → 293,8 kB gzip (+0,65 kB).
+6. **Không làm:** SSAO, bloom, `EffectComposer`, shadow map (cấm ở §1.3, §3 và test ngân sách render; tốn 15–40 kB và một lượt toàn màn mỗi khung); bóng đổ CSS dưới đế (cấm ở §10; `box-shadow` không theo được viền đế khi xoay 360°, `filter: drop-shadow` làm mờ lại cả lớp canvas mỗi khung bận); nhiễu màu đất tần số thấp (phá luật mặt trên đúng hex manifest, đọc như vết bẩn; vạch cỏ cắt là bản có chủ đích). Hoãn: viền mờ quanh bóng nắng (≈ +800 tam giác, rủi ro thứ tự stencil) và AO góc trong trên toà (chạm mọi builder).
+7. **Câu hỏi mở cho chủ dự án:** một sắc trời cùng tông rất nhẹ (±3% độ sáng theo `--vg-sky`) không tốn GPU và thêm chiều sâu sau đế, nhưng §1.3, §2.5 và §10 cấm gradient bầu trời. Có thêm ngoại lệ thứ ba cạnh lớp sương (§14) không, hay giữ trời phẳng? Bóng đổ dưới đế vẫn bị loại dù trả lời thế nào.
