@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
-import { expect, mockApi, mockWorkbenchApi, npcNames, test, titleOf } from "./fixtures";
+import { expect, mockApi, mockWorkbenchApi, npcNames, test, titleOf, WEATHER } from "./fixtures";
 
 const VIEWPORTS = [
   { width: 375, height: 812 },
@@ -98,3 +98,39 @@ for (const viewport of VIEWPORTS) {
     });
   });
 }
+
+test.describe("axe on the live night sky (campus v0.4 W7)", () => {
+  test.use({ hubDisplay: "live" });
+
+  test("rain at night, the chip's focus ring and its popover", async ({ page }) => {
+    test.slow();
+    await page.clock.setFixedTime(new Date("2026-10-08T21:00:00+07:00"));
+    await mockApi(page);
+    await page.route("**/api/weather", (route) =>
+      route.fulfill({ json: { ...WEATHER, condition: "rain" } }),
+    );
+    await page.goto("/play");
+    await expect(page.locator("main")).toHaveAttribute("data-sky", "night");
+    await expect(page.locator(".weather-rain")).toHaveCount(1);
+    await expect(page.locator("[data-scene-loader]")).toHaveCount(0);
+    expect(await seriousViolations(page)).toEqual([]);
+
+    // On the night sky the ring is the surface colour: brand fades to about 2:1 there (§4.2).
+    const chip = page.getByRole("button", { name: /°C/ });
+    await chip.focus();
+    const ring = await chip.evaluate((el) => getComputedStyle(el).outlineColor);
+    const surface = await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.style.color = "var(--color-surface)";
+      document.body.append(probe);
+      const colour = getComputedStyle(probe).color;
+      probe.remove();
+      return colour;
+    });
+    expect(ring).toBe(surface);
+
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#hub-weather")).toBeVisible();
+    expect(await seriousViolations(page)).toEqual([]);
+  });
+});
