@@ -227,3 +227,26 @@ const NOT_YOUR_FAULT = new Set(["skipped_budget", "llm_error", "timeout"]);
  */
 export const unfinished = (run: RunView) =>
   run.cases.filter((c) => c.graded && NOT_YOUR_FAULT.has(c.graded.status));
+
+/** Where the bench stands against the run on show: none, edited since, running, or over. */
+export type BenchRun = "none" | "stale" | "active" | "done";
+/** N6 block states: chưa chạy, cần chạy lại, đang chờ, đang chạy, đạt, lỗi. */
+export type BlockState = "idle" | "stale" | "queued" | "running" | "passed" | "error";
+
+/**
+ * State of one slot for the followed case. Ingestion blocks (corpus, chunker) are compiled into
+ * the index and never send steps: they are ready once run.started lists the index.
+ * `failedAnswer`: the answer board of a counted case that failed (every step can be "ok").
+ */
+export function blockState(
+  bench: BenchRun,
+  step: StepView | undefined,
+  { started, ingest, failedAnswer }: { started: boolean; ingest: boolean; failedAnswer: boolean },
+): BlockState {
+  if (bench === "none") return "idle";
+  if (bench === "stale") return "stale";
+  if (ingest) return started ? "passed" : bench === "active" ? "queued" : "idle";
+  if (step?.state === "running") return "running";
+  if (step) return step.status === "ok" && !failedAnswer ? "passed" : "error";
+  return bench === "active" ? "queued" : "idle";
+}
