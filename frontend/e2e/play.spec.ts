@@ -27,11 +27,43 @@ test.describe("campus hub", () => {
     consoleErrors,
   }) => {
     await mockApi(page);
+    // WebGL draw calls of the last frame that drew anything (the page exposes no renderer.info).
+    await page.addInitScript(() => {
+      const proto = WebGL2RenderingContext.prototype as unknown as Record<
+        string,
+        (...args: unknown[]) => unknown
+      >;
+      let calls = 0;
+      for (const name of [
+        "drawElements",
+        "drawArrays",
+        "drawElementsInstanced",
+        "drawArraysInstanced",
+      ]) {
+        const draw = proto[name];
+        proto[name] = function (this: unknown, ...args: unknown[]) {
+          calls += 1;
+          return draw?.apply(this, args);
+        };
+      }
+      const tick = () => {
+        if (calls) (window as unknown as { drawCalls: number }).drawCalls = calls;
+        calls = 0;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     const requested: string[] = [];
     page.on("request", (request) => requested.push(request.url()));
     await page.goto("/play?debug=frames");
     const frames = await waitForIdleScene(page);
     await expect(page.locator("[data-scene-loader]")).toHaveCount(0);
+    // sceneBudget() with the cast is 19 with the interaction ring; at the spawn the ring is hidden.
+    // Pins every mesh CampusScene draws (the contact overlay too), which the unit budget cannot.
+    await expect(page.locator("html")).toHaveAttribute("data-cast", "ready");
+    const drawCalls = () =>
+      page.evaluate(() => (window as unknown as { drawCalls?: number }).drawCalls);
+    expect(await drawCalls()).toBe(18);
     const before = await frames();
     // Measuring idleness needs time to pass; no state is being waited for here.
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 2000)));
