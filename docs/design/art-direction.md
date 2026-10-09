@@ -23,10 +23,10 @@ Theme campus gợi lại khuôn viên tham chiếu bằng ba hình dễ nhận r
 1. **Maquette, không phải đồ chơi.** Đế trắng, lớp đất dày 0.6, người là tượng đơn sắc (đầu màu `plaza`, không mặt, không da). Không mắt to, không nảy tưng.
 2. **Màu thật ở mặt trên.** Mặt hướng lên luôn hiện đúng mã hex của manifest. Bóng đổ chỉ làm tối mặt đứng theo một quy tắc cố định (mục 2.3), nên đổi theme là đổi màu, không đổi ánh sáng. **Sửa 2026-10-08:** luật này áp cho preset ngày (mặc định). Preset hoàng hôn là ngoại lệ duy nhất: mặt trên tối và ấm đi theo công thức, QA so với bảng §2.3 thay cho hex manifest (§10).
 3. **Một điểm nhấn.** Tháp nhọn của landmark là thứ cao nhất và là thứ duy nhất có kim loại vàng ở đỉnh. Trong các khu, chỉ khu đang mở có cửa chính sáng ấm, nên mắt tự đi về Thư viện. **Sửa 2026-10-08 (N9):** cửa sổ của khu mở chỉ sáng khi người chơi đã có ít nhất 1 sao ở một màn của khu đó; khi đó Thư viện hiện thêm gáy sách sau cửa sổ. Ánh sáng ấm là phần thưởng, không phải trang trí. **Sửa sau QA vòng 2 (2026-10-08):** (a) chưa có gì ghi sao (bàn thợ chưa gọi `recordStars`), nên khoá `STARS_SAVED = false` giữ cửa sổ và gáy sách sáng ở mọi khu mở như v0.3 cho tới khi có đường ghi (§12 mục 6); (b) mỗi khu mở có thêm hai đèn lối vào sáng hai bên cửa, vì cửa Tháp canh và Chợ quay về phía tây, camera không thấy (nguyên tắc 7).
-4. **Hình nói trạng thái, không chỉ màu.** Mở: hai đèn lối vào sáng (Thư viện thêm cửa chính sáng), màu đầy đủ, không giàn giáo. Đã có sao: thêm cửa sổ sáng (Chợ: đèn lồng dưới mép mái hiên). Sắp mở: giảm bão hoà **và** có giàn giáo gỗ (tín hiệu không dựa vào màu). Tương tác được: vòng sáng dưới đất và huy hiệu "!" ở DOM.
+4. **Hình nói trạng thái, không chỉ màu.** Mở: hai đèn lối vào sáng (Thư viện, và từ 2026-10-09 cả Tháp canh, thêm cửa chính sáng), màu đầy đủ, không giàn giáo. Đã có sao: thêm cửa sổ sáng (Chợ: đèn lồng dưới mép mái hiên). Sắp mở: giảm bão hoà **và** có giàn giáo gỗ (tín hiệu không dựa vào màu). Tương tác được: vòng sáng dưới đất và huy hiệu "!" ở DOM.
 5. **Chữ ở DOM, hình ở 3D.** Không có chữ nào dựng trong WebGL. Nhãn công trình, "!", lời thoại, thẻ khu đều là DOM dùng token Tailwind.
 6. **Đứng yên là im lặng.** Không vòng lặp idle. Mọi chuyển động trả lời một thao tác và tự dừng (mục 7). Không ai làm gì thì không có khung hình mới.
-7. **Chỉ dựng phần camera thấy.** Camera không xoay (azimuth cố định), nên cửa sổ, cửa, giàn giáo chỉ dựng trên mặt `+x` và `+z`. Mặt `−x`, `−z` để trơn.
+7. **Dựng đủ bốn mặt** (sửa 2026-10-09, thay "chỉ dựng phần camera thấy"; `orbit-camera.md` §5). Từ v0.4 camera xoay quanh trục đứng, nên mọi toà có cửa sổ, cửa, giàn giáo trên cả bốn mặt đứng, trừ phần bị khối khác che hẳn (lưng chòi cánh dưới mái cánh, chân lưng khối đế tháp sau toà A). Chi tiết ở mặt `−x`, `−z` dựng bằng cùng helper với mặt `"-x"`, `"-z"` (bảng `TURN` của `onFace`: phép quay, không soi gương, nên vòm vẫn cong lên và đồng hồ mặt sau vẫn chỉ 4:30), cùng màu và cờ (`lit`, `look`) như mặt trước. Cửa thật của Tháp canh (mặt `−x`, nhìn ra quảng trường) sáng khi khu mở, như cửa Thư viện. Giàn giáo "Sắp mở" dựng trên hai mặt đối nhau, nên mọi góc trừ đúng 90° và 270° đều thấy ít nhất một giàn. Toà mới cũng theo luật này. Test `scene.test.ts` ("four dressed sides"): kính ở `−x`, `−z` ít nhất bằng nửa kính ở `+x`, `+z` cho landmark, Thư viện, Tháp canh và các toà phía sau; mặt đồng hồ, lưng cổng, mái hiên bắc của Chợ; giàn giáo vượt ra ngoài cả hai mặt tường đối nhau. Chi phí: khoảng +1,3k tam giác, 0 draw call.
 
 ### 1.3 Danh sách chống "AI slop" (cấm)
 
@@ -119,16 +119,18 @@ Hình tĩnh dùng `MeshBasicMaterial({ vertexColors: true })`; ánh sáng đư�
 **Bản mới:** mỗi theme khai báo preset ánh sáng trong manifest (`campus.lights.day`, `campus.lights.dusk`, mỗi preset là đúng tham số của hai đèn three.js, §3). Code đổi preset ra hệ số linear `S = sky·I_h/π`, `G = ground·I_h/π`, `U = sun·I_s/π` (mỗi kênh một số), rồi:
 
 ```ts
-const V = new Vector3(1, 1, 1).normalize(); // hướng về camera: cố định vì camera không xoay (§4.1)
+const V = new Vector3(1, 1, 1).normalize(); // hướng nhìn ở góc home: một vector hằng của thế giới (§4.1)
 const shade = (n: Vector3) => {                       // trả về màu (r, g, b), mỗi kênh ≤ 1
   const sun = Math.max(0, n.dot(L));
   const direct = sun * (1 + rim * (1 - Math.max(0, n.dot(V))) ** 2); // rim: nắng viền mặt nhìn nghiêng
-  return G + (S − G)·(0.5 + 0.5·n.y) + U·direct;      // từng kênh, cắt ở 1
+  const north = 1 − 0.2·max(0, −n.z)·(1 − abs(n.y));  // tường bắc khuất trời (sửa 2026-10-09)
+  return (G + (S − G)·(0.5 + 0.5·n.y) + U·direct)·north; // từng kênh, cắt ở 1 rồi mới nhân
 };
 ```
 
 - **Hơi ấm:** `U` ngả vàng, `S` ngả xanh, nên mặt hứng nắng ấm lên và mặt khuất nắng lạnh đi; độ sáng giữ thứ bậc 1.0 / 0.8 / 0.6. **Sửa sau QA vòng 2 (2026-10-08):** ban ngày ấm và lạnh rõ hơn (mặt trái `r − b` từ 0.04 lên 0.15, mặt phải `b − r` từ 0.05 lên 0.12), vì QA vòng 1 đo mặt bên chỉ lệch v0.3 khoảng 2 mức. Mặt trên vẫn đúng `(1, 1, 1)`, độ sáng vẫn 0.80 / 0.60. Nắng ngày giờ vàng hơn (`#ffd059`), trời xanh hơn (`#d0e5ff`), nên bóng ngày cũng ngả xanh.
 - **Rim:** số hạng thêm nắng cho mặt gần như nhìn nghiêng mà vẫn hướng về mặt trời (viền trái của cột, cầu, nón). Mặt hộp có `n·V = 0.577` nên chỉ đổi rất ít. Rim chỉ có ở hình nướng; người và cây (Lambert) không có, chấp nhận vì chúng nhỏ.
+- **Tường bắc (sửa 2026-10-09, `orbit-camera.md` §6.2):** khi camera xoay, ở góc 135° hai mặt thấy được là `+x` và `−z`, và công thức cũ cho hai mặt này cùng độ sáng ở cả ngày lẫn hoàng hôn (chênh 0): nhà đọc như hình cắt giấy. Hệ số `north` làm mặt quay về bắc tối đi tới 20%. Nó bằng 1 ở mọi mặt có `n.z ≥ 0`, nên góc home và các giá trị trong bảng dưới không đổi. Dạng nhân, không trừ, để preset tối không kéo tường về đen. Hợp đồng với mọi preset (kể cả preset thời tiết sau này): `shade` chỉ đọc pháp tuyến thế giới và hằng của preset (`V` là hằng, không phải camera đang chạy); ở bốn góc chéo 45°, 135°, 225°, 315°, hai mặt tường thấy được chênh `|ΔY| ≥ 0.08·Y(mặt trên)`. Đo được (hai theme cùng preset): ngày 0.201 / 0.120 / 0.233 / 0.089 (ngưỡng 0.080), hoàng hôn 0.305 / 0.053 / 0.493 / 0.135 (ngưỡng 0.041). Sát nhất là 315° ban ngày, nên ai chỉnh `rim` hay hướng nắng thì test bắt ngay. Mặt sau trông thế nào khi xoay thì xem ảnh ở PR camera xoay.
 - **Đúng với Lambert:** bỏ rim thì công thức trùng Lambert với hai đèn của preset, nên người và cây cùng tông với hình nướng ở mọi preset. Sửa sau QA vòng 1: test chỉ so `shade()` với cùng công thức viết lại từ cùng hệ số, tức kiểm công thức nhất quán chứ không chạy đường Lambert thật của three.js (màu × cường độ / π, sRGB sang linear). Phần khớp với three.js dựa trên quy ước đó và được xác nhận bằng mắt trên ảnh chụp, chưa có test pixel.
 
 | Preset | Hướng tới mặt trời `L` | rim | Trên `+y` | Trái `+z` | Phải `+x` |
@@ -145,7 +147,7 @@ Tường landmark (campus `#f6f3ee`, town `#e9e2d3`) thành:
 | Hoàng hôn, campus | `#caafa2` | `#dfb69e` | `#84859a` |
 | Hoàng hôn, town | `#bfa38f` | `#d3a98c` | `#7c7b88` |
 
-Unit test (`scene.test.ts`, mỗi theme): ngày `shade(+y)` đúng bằng `(1, 1, 1)` (luật màu thật ở mặt trên); độ sáng `+z` 0.80 và `+x` 0.60 (±0.005), `+z` có `r − b > 0.1`, `+x` có `b − r > 0.08` (QA vòng 2; đỏ trước khi đổi preset); hoàng hôn mặt trên tối hơn 0.9 và ấm, `+x` tối hơn 0.5; bỏ rim thì bằng công thức hai đèn viết lại trong test (không chạy shader three.js; tên test sửa ở QA vòng 2 cho khớp); rim chỉ thêm ở mặt nhìn nghiêng hướng nắng.
+Unit test (`scene.test.ts`, mỗi theme): ngày `shade(+y)` đúng bằng `(1, 1, 1)` (luật màu thật ở mặt trên); độ sáng `+z` 0.80 và `+x` 0.60 (±0.005), `+z` có `r − b > 0.1`, `+x` có `b − r > 0.08` (QA vòng 2; đỏ trước khi đổi preset); hoàng hôn mặt trên tối hơn 0.9 và ấm, `+x` tối hơn 0.5; bỏ rim thì bằng công thức hai đèn viết lại trong test (không chạy shader three.js; tên test sửa ở QA vòng 2 cho khớp); rim chỉ thêm ở mặt nhìn nghiêng hướng nắng; ở bốn góc chéo, mọi preset của schema, hai tường thấy được chênh ít nhất `0.08·Y(trên)` (đỏ trước khi có `north`), và mặt home không đổi.
 
 **Màu cuối của một đỉnh** = `màuKhoá × shade(n) × ao` (nhân từng kênh), trừ phần có cờ **E** (emissive: cửa chính khu mở, cửa sổ khu đã có sao, chụp đèn, mặt đồng hồ, kim đồng hồ, gáy sách) dùng `shade = 1`, `ao = 1`. Vì vậy ở hoàng hôn cửa sổ sáng giữ đúng độ sáng đầy đủ trong khi mọi thứ khác tối đi: cửa sổ tự "phát sáng" mà không cần bloom. Phần "mù xa" của toà phía sau (v0.3 §5.2) giờ pha về màu mặt trên của preset thay cho trắng (ngày vẫn là trắng).
 
