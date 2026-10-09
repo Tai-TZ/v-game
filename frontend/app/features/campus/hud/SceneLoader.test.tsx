@@ -129,6 +129,7 @@ describe("SceneLoader", () => {
     expect(screen.getByText(LABELS[STAGE.done])).toBeDefined();
     run(() => vi.advanceTimersByTime(220));
     expect(loader()).toBeNull();
+    expect(vi.getTimerCount()).toBe(0); // no tip, tick or slow timer outlives it
   });
 
   it("never shows when the scene is ready within the appear delay", () => {

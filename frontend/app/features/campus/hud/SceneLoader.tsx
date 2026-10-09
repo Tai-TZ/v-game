@@ -64,10 +64,17 @@ export function SceneLoader({ shell = false }: { shell?: boolean }) {
       </div>
     );
   }
-  return <LiveLoader />;
+  return <LiveLoaderGate />;
 }
 
-function LiveLoader() {
+/** Unmounts the live loader once it has left, so none of its timers or listeners outlive it. */
+function LiveLoaderGate() {
+  // A failed scene stays failed for the page session: later entries skip the loader.
+  const [gone, setGone] = useState(() => sceneLoad.getState().failed);
+  return gone ? null : <LiveLoader onGone={() => setGone(true)} />;
+}
+
+function LiveLoader({ onGone }: { onGone: () => void }) {
   const stage = useSceneLoad((s) => s.stage);
   const since = useSceneLoad((s) => s.since);
   const begun = useSceneLoad((s) => s.begun);
@@ -85,8 +92,6 @@ function LiveLoader() {
   const [delay] = useState(() =>
     Math.max(0, APPEAR_MS - (performance.now() - sceneLoad.getState().begun)),
   );
-  // A failed scene stays failed for the page session: later entries skip the loader.
-  const [gone, setGone] = useState(() => sceneLoad.getState().failed);
 
   const done = stage >= STAGE.done || failed;
   const leaving = done && !debug;
@@ -95,9 +100,9 @@ function LiveLoader() {
 
   useEffect(() => {
     if (!leaving) return;
-    const timer = window.setTimeout(() => setGone(true), seen ? FADE_MS + 20 : 0);
+    const timer = window.setTimeout(onGone, seen ? FADE_MS + 20 : 0);
     return () => window.clearTimeout(timer);
-  }, [leaving, seen]);
+  }, [leaving, seen, onGone]);
 
   // Diorama progress, as the highest piece threshold reached (re-renders only on a change).
   const pieces = useMemo(() => blueprintPieces(landmark, focus), [landmark, focus]);
@@ -171,7 +176,7 @@ function LiveLoader() {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  if (gone || (leaving && !seen)) return null;
+  if (leaving && !seen) return null;
   // ?debug=loader keeps the diorama alone at 50% over the live scene, to check the alignment.
   const state = leaving
     ? "bg-scene animate-leave"
