@@ -106,7 +106,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"{doc.doc_id}: {count_tokens(doc.text)} tokens, longest Điều {longest.dieu}={n}")
 
     try:
-        store = IndexStore.load(settings.engine_cache_dir / "index")
+        store = IndexStore.load(settings.index_dir)
         dense = True
         print("index:", json.dumps(store.manifest, ensure_ascii=False))
     except IndexNotBuiltError as exc:

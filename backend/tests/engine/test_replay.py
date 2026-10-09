@@ -1,6 +1,10 @@
+import json
+from dataclasses import replace
 from pathlib import Path
 
-from vgame.engine.replay import ReplayStore, replay_key
+import pytest
+
+from vgame.engine.replay import ReplayStore, replay_key, response_json
 from vgame.engine.types import LLMMessage, LLMRequest, LLMResponse, Usage
 
 REQ = LLMRequest("can_bang", "khung\n\nG1", (LLMMessage("user", "Câu hỏi: x"),), 8192)
@@ -49,3 +53,30 @@ def test_errors_are_not_cached_and_first_write_wins(tmp_path: Path) -> None:
     assert hit is not None
     assert hit.text == RESP.text
     reopened.close()
+
+
+def test_seed_import_keeps_runtime_rows_and_is_idempotent(tmp_path: Path) -> None:
+    seeded = LLMResponse("Mẫu đã lưu [ab12cd34]", "end", Usage(900, 120), "gemini-3.5-flash-lite")
+    seed = tmp_path / "seed.json"
+    entries = {"k-runtime": response_json(seeded), "k-seed": response_json(seeded)}
+    seed.write_text(json.dumps({"version": 1, "entries": entries}), encoding="utf-8")
+    store = ReplayStore(":memory:")
+    store.put("k-runtime", RESP)
+    assert store.import_seed(seed) == 1  # INSERT OR IGNORE: the runtime row wins
+    assert store.import_seed(seed) == 0  # every startup imports again, harmlessly
+    runtime_hit, seed_hit = store.get("k-runtime"), store.get("k-seed")
+    assert runtime_hit is not None
+    assert runtime_hit.text == RESP.text
+    assert seed_hit == replace(seeded, replayed=True)
+
+
+@pytest.mark.parametrize(
+    "seed",
+    [{"version": 2, "entries": {}}, {"version": 1, "entries": {"k": {"text": "x"}}}],
+    ids=["version", "fields"],
+)
+def test_malformed_seed_fails_fast(tmp_path: Path, seed: object) -> None:
+    path = tmp_path / "seed.json"
+    path.write_text(json.dumps(seed), encoding="utf-8")
+    with pytest.raises(ValueError, match="seed"):
+        ReplayStore(":memory:").import_seed(path)

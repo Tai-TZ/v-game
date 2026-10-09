@@ -109,25 +109,14 @@ def fuse_alpha(vector: DocList, bm25: DocList, *, alpha: float, top_k: int) -> D
     return _sorted_by_score(scores, by_id, top_k)
 
 
-# ponytail: unbounded dict, fine for ~50 fixed questions x a few thousand chunks; LRU once
-# players can type free questions. Keyed by the scored text, not the 32-bit id.
-_RERANK_CACHE: dict[tuple[str, str, str], float] = {}
-
-
 def rerank(
     store: IndexStore, reranker: Reranker, question: str, docs: DocList, *, top_n: int
 ) -> DocList:
     """Scores ``bm25_text`` (article headings + chunk text): a mid-article chunk's text lacks
-    "Điều N", so scoring bare text could never rescue a number lookup (L3 N8)."""
-    keys = [
-        (reranker.model_id, question, bm25_text(store.document(h.chunk.doc_id), h.chunk))
-        for h in docs.hits
-    ]
-    missing = list(dict.fromkeys(k for k in keys if k not in _RERANK_CACHE))
-    if missing:
-        fresh = reranker.score(question, [text for _, _, text in missing])
-        _RERANK_CACHE.update(zip(missing, fresh, strict=True))
-    scores = [_RERANK_CACHE[k] for k in keys]
+    "Điều N", so scoring bare text could never rescue a number lookup (L3 N8). On the server
+    ``reranker`` is the precomputed ``index.RerankTable`` (no model, no cache needed)."""
+    texts = [bm25_text(store.document(h.chunk.doc_id), h.chunk) for h in docs.hits]
+    scores = reranker.score(question, texts) if texts else []
     chunks = [h.chunk for h in docs.hits]
     return DocList("rerank", tuple(_ranked(chunks, scores, top_n, lambda _: True)))
 
@@ -183,18 +172,18 @@ def summarize_docs(docs: DocList, *, n_in: int = 0, method: str = "rrf") -> str:
     return _with_items(f"Lấy {n} đoạn", items) if n else "Không lấy được đoạn nào."
 
 
-# --- Real models (fastembed, CPU ONNX). Imported lazily: tests never load them. ---------------
+# --- Real models (fastembed, CPU ONNX; the "models" dependency group). Only vgame-build-index
+# and the slow tests load them, lazily: the server reads the precomputed index and rerank table.
 
 # fastembed defaults to 256 per batch; through e5-large with 512-token chunks that held ~16 GB.
 # ponytail: fixed small batch, a few GB peak; raise only with a measured RAM budget.
 MODEL_BATCH_SIZE = 8
-# The reranker runs in the API process, up to MAX_CONCURRENT_CASES at once per run, and ONNX's
-# CPU arena keeps the peak of those concurrent runs for good: batch 8 at jina's 1024 tokens left a
-# legal L3 graph at ~15 GB committed. Attention memory and time grow with batch x length^2, so
-# batches are small and pairs stop at 512 tokens, e5's limit (dense search never sees more of a
-# chunk either). Measured 2026-10-08, 3 concurrent: ~3.2 GB committed even for the heaviest legal
-# L3 graph; rerank p50 ~2.3 s (L3 reference) / ~5.5 s (heaviest graph), engine-spike-report §3.3.
-# The arena stays on: with the peak bounded, turning it off only cost ~20 % more time.
+# The reranker ran in the API process until 2026-10-08 (now offline only, in vgame-build-index):
+# ONNX's CPU arena keeps its peak for good, and batch 8 at jina's 1024 tokens reached ~15 GB.
+# Attention memory and time grow with batch x length^2, so batches are small and pairs stop at
+# 512 tokens, e5's limit (dense search never sees more of a chunk either); ~2.1 GB peak in one
+# process (engine-spike-report §3.3). Scores do not depend on the batch size (bit-identical for
+# batch 1, 2, 8 and any order, §3.4), so the shipped table matches live reranking exactly.
 RERANK_BATCH_SIZE = 2
 RERANK_MAX_TOKENS = 512
 

@@ -22,7 +22,7 @@ from vgame.engine.constants import ALL_VARIANTS
 from vgame.engine.corpus import Document, find_quote
 from vgame.engine.index import IndexStore
 from vgame.engine.retrieval import bm25_search, vector_search, vi_number
-from vgame.engine.scoring import compute_stars, render
+from vgame.engine.scoring import PLACEHOLDER_RE, compute_stars, render
 from vgame.engine.types import (
     BlockType,
     CaseGrade,
@@ -205,6 +205,7 @@ _TEMPLATE_KEY = {
     "cite_missing": "llm.cite_missing",
 }
 _FALLBACK_TEMPLATE = "Câu #{n} chưa đạt ({flag})."
+_SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -483,7 +484,15 @@ class LevelEvaluator:
         if trap:  # e.g. L3 has no llm.cite_unknown line but a refusal-trap line
             candidates.append("trap.failed")
         template = next((templates[k] for k in candidates if k in templates), _FALLBACK_TEMPLATE)
-        return render(template, variables)
+        # A sentence about a block the graph lacks (L3 "Kính lúp …" without a rerank node) or
+        # a number this case has none of keeps its {placeholders} unset: drop it, never show
+        # braces. Nothing left -> the generic line.
+        kept = [
+            sentence
+            for sentence in _SENTENCE_END_RE.split(template)
+            if set(PLACEHOLDER_RE.findall(sentence)) <= variables.keys()
+        ]
+        return render(" ".join(kept) if kept else _FALLBACK_TEMPLATE, variables)
 
 
 def _culprit(views: Sequence[_NodeView], span: Span) -> tuple[_NodeView, int | None] | None:

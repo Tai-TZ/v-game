@@ -1,4 +1,4 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { addAfterEffect, Canvas, useThree } from "@react-three/fiber";
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Color,
@@ -19,6 +19,7 @@ import { useActiveTheme } from "~/features/theme/context";
 import type { CampusTheme, TimeOfDay } from "~/features/theme/schema";
 
 import { CAMERA_OFFSET } from "../camera";
+import { advanceScene, sceneMounted, STAGE } from "../hud/sceneLoad";
 import { NPC_SPOT, SITES } from "../layout";
 import { siteLooks, type InteractTarget, type SiteInfoMap } from "../sites";
 import { useHub } from "../store";
@@ -55,7 +56,13 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
   );
   // Deferred: the click paints the pressed button first, then the scene re-bakes every group in
   // a background render, a long task on slow CPUs (QA r2; campus-scene v0.3 §13.1).
-  const time = useDeferredValue(useHub((state) => state.time) ?? campus.lights.default);
+  const picked = useHub((state) => state.time) ?? campus.lights.default;
+  const time = useDeferredValue(picked);
+  // Loader signal (hud/sceneLoad): the canvas is in the DOM. SceneReady sends the next two.
+  useLayoutEffect(() => {
+    sceneMounted(true);
+    return () => sceneMounted(false);
+  }, []);
 
   return (
     <>
@@ -82,13 +89,35 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
             campus={campus}
             time={time}
             sites={sites}
-            options={{ reducedMotion, countFrames, onInteract }}
+            options={{ reducedMotion, countFrames, rebaking: picked !== time, onInteract }}
           />
+          <SceneReady />
         </Canvas>
       </div>
       <WorldLabels sites={sites} />
     </>
   );
+}
+
+/**
+ * Loader signals: the scene graph is built, then the first frame is on screen. Rendered last
+ * inside the Canvas, it commits only once every sibling has resolved, so a child that suspends
+ * (an asset still loading) holds the loader up instead of revealing an empty sky.
+ */
+function SceneReady() {
+  const gl = useThree((state) => state.gl);
+  useLayoutEffect(() => {
+    advanceScene(STAGE.paint);
+    // Runs after every loop tick and never invalidates, so an idle scene stays idle.
+    const off = addAfterEffect(() => {
+      if (gl.info.render.frame === 0) return; // a tick that rendered nothing
+      off();
+      // The next animation frame starts once the rendered one has been presented.
+      requestAnimationFrame(() => advanceScene(STAGE.done));
+    });
+    return off;
+  }, [gl]);
+  return null;
 }
 
 interface CampusProps {
@@ -107,7 +136,7 @@ function Campus({ campus, time, sites, options }: CampusProps) {
   const g = useCampusGeometry(campus, time, looks.library, looks.watchtower, looks.market);
   const preset = campus.lights[time];
   const sunPosition = useMemo(() => g.palette.light.sun.clone().multiplyScalar(30), [g.palette]);
-  const invalidate = useThree((state) => state.invalidate);
+  const { player, playerBlob, lan, ring, statics, wake } = useHubFrame(options);
   const materials = useMemo(
     () => ({
       baked: new MeshBasicMaterial({ vertexColors: true }),
@@ -139,13 +168,13 @@ function Campus({ campus, time, sites, options }: CampusProps) {
     () => () => Object.values(materials).forEach((material: Material) => material.dispose()),
     [materials],
   );
+  // A re-bake (time or theme) wakes the scene the way a walk does, so ?debug=frames flags it
+  // busy until the new geometry is drawn.
   useEffect(() => {
     materials.xray.color.copy(g.palette.xray);
     materials.ring.color.copy(g.palette.player);
-    invalidate();
-  }, [materials, g.palette, invalidate]);
-
-  const { player, playerBlob, lan, ring, statics } = useHubFrame(options);
+    wake();
+  }, [materials, g.palette, wake]);
 
   // `?debug=frames` also exposes the building looks, so e2e can check the stars reach the scene.
   const looksKey = Object.entries(looks)

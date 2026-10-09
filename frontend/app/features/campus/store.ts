@@ -126,7 +126,11 @@ export function createHubStore() {
         get().wake();
       }
     },
-    setTime: (time) => set({ time }),
+    setTime: (time) => {
+      set({ time });
+      // Flags the scene busy at once (?debug=frames); the re-bake's commit wakes it again.
+      get().wake();
+    },
     setWake: (wake) => set({ wake: wake ?? noop, sceneUp: wake !== null }),
   }));
 }

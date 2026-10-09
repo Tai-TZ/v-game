@@ -1,0 +1,221 @@
+{
+  "$comment": "Third-party models baked into frontend/public/models/. Raw downloads are not committed: fetch each file below, check its sha256, put it in the bake directory under `as` (one directory per baker, holding every pack whose `bake` names that baker), then run the bake command. All CC0 1.0; see CREDITS.md.",
+  "packs": [
+    {
+      "id": "kenney-mini-characters",
+      "name": "Mini Characters 1.0",
+      "author": "Kenney",
+      "page": "https://kenney.nl/assets/mini-characters",
+      "license": "CC0-1.0",
+      "licenseFile": "frontend/public/models/LICENSE-kenney-mini-characters.txt",
+      "download": "https://kenney.nl/media/pages/assets/mini-characters/bfc7e272b4-1774770718/kenney_mini-characters.zip",
+      "sha256": "9e1d48e6d7b8479ebbe84df71eb5bd8e1b3f0da546dea641890dccc8a02d0999",
+      "bytes": 2403059,
+      "downloaded": "2026-10-09",
+      "bake": "node tools/characters/bake-cast.mjs <dir> frontend/public/models/cast.json",
+      "files": [
+        {
+          "path": "Models/GLB format/character-male-a.glb",
+          "as": "character-male-a.glb",
+          "sha256": "77572792bfe2773b715b8cd8e18644b52b3e1f155fe10450254b50f9c364382a"
+        },
+        {
+          "path": "Models/GLB format/character-female-a.glb",
+          "as": "character-female-a.glb",
+          "sha256": "8cfcff43460da8b421f2a7fdfb43ec177321cad2746db9497cbf128d5806e2a8"
+        },
+        {
+          "path": "Models/GLB format/character-male-c.glb",
+          "as": "character-male-c.glb",
+          "sha256": "672a6506f7475bbd655da1d7ff712c1729a430f134c62385a4e5d3c1378acb40"
+        },
+        {
+          "path": "Models/GLB format/character-female-d.glb",
+          "as": "character-female-d.glb",
+          "sha256": "67f61708743bd34f91a4c2ba8160b61bf2e7d4ec2ca6647dfe99873422561410"
+        },
+        {
+          "path": "Models/GLB format/character-female-f.glb",
+          "as": "character-female-f.glb",
+          "sha256": "2ff4311897bfaf99be80d2fa13918db30f506607da0291640b2609d82b70e0ca"
+        },
+        {
+          "path": "Models/GLB format/character-male-d.glb",
+          "as": "character-male-d.glb",
+          "sha256": "dd12b2e75ffb1cdb45aaec3916c3d6e732929ccb4a8b89b946f69baaabfa64da"
+        },
+        {
+          "path": "Models/GLB format/Textures/colormap.png",
+          "as": "mini-characters/colormap.png",
+          "sha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e"
+        }
+      ]
+    },
+    {
+      "id": "kenney-nature-kit",
+      "name": "Nature Kit 2.1",
+      "author": "Kenney",
+      "page": "https://kenney.nl/assets/nature-kit",
+      "license": "CC0-1.0",
+      "licenseFile": "frontend/public/models/LICENSE-kenney-nature-kit.txt",
+      "download": "https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip",
+      "sha256": "fa7974a0d342bfe63c38664ba9f8ec1a4aab8ea25f099bdc56870e33588c4d9d",
+      "bytes": 10537521,
+      "downloaded": "2026-10-09",
+      "bake": "node tools/props/bake-props.mjs <dir> frontend/public/models/props.json",
+      "files": [
+        {
+          "path": "Models/GLTF format/plant_bushLarge.glb",
+          "as": "plant_bushLarge.glb",
+          "sha256": "10e1d9fbf29d96d1d1a56fb2ce25ae66537505101759229afe01ae22c6c45e02"
+        },
+        {
+          "path": "Models/GLTF format/plant_bush.glb",
+          "as": "plant_bush.glb",
+          "sha256": "ae7b1beb39e242b13f5f29e3ec23ef21034b814f82297b8aa00a9bf4e1b09590"
+        },
+        {
+          "path": "Models/GLTF format/pot_large.glb",
+          "as": "pot_large.glb",
+          "sha256": "57e60214bc6ab1dc3764c9ffe80091ff45f2bfd49fbc313c1b68dcaab1537aef"
+        },
+        {
+          "path": "Models/GLTF format/lily_large.glb",
+          "as": "lily_large.glb",
+          "sha256": "c8f7080df0ae3166e9d33f523b66360c2ac7556dff36cc9c8ee78b6a676c7db2"
+        },
+        {
+          "path": "Models/GLTF format/lily_small.glb",
+          "as": "lily_small.glb",
+          "sha256": "38184c9eeb560acabd4d7f1d16852422df056edf0b318c97854c250e048cad3c"
+        },
+        {
+          "path": "Models/GLTF format/plant_flatTall.glb",
+          "as": "plant_flatTall.glb",
+          "sha256": "b192523736f32754788de4dc7a5dcf30a58322b260ec8969120c91432a10b633"
+        },
+        {
+          "path": "Models/GLTF format/stone_smallA.glb",
+          "as": "stone_smallA.glb",
+          "sha256": "b48e731e6c4b453e8e5e8caace6edc18da40bc09874d831b7914e840fc853ae4"
+        },
+        {
+          "path": "Models/GLTF format/crops_bambooStageA.glb",
+          "as": "crops_bambooStageA.glb",
+          "sha256": "7bafbd69c78b1f6b92fe72e8fd6d1b6ea4b25d6af141c0baa85c27b60aa34e41"
+        },
+        {
+          "path": "Models/GLTF format/crops_dirtRow.glb",
+          "as": "crops_dirtRow.glb",
+          "sha256": "a36752160e42703c0539386bf07260984796dd07674d322ae18c1fc5201b59b2"
+        },
+        {
+          "path": "Models/GLTF format/crops_leafsStageB.glb",
+          "as": "crops_leafsStageB.glb",
+          "sha256": "aea4fe9a7943e7b2b7df99dc4fa00b85e34d00ea9b8e1b144504cef25d77b98c"
+        },
+        {
+          "path": "Models/GLTF format/tree_palm.glb",
+          "as": "tree_palm.glb",
+          "sha256": "27bbb23d26ed788d84de6df2f7fab0acc3fe0ff16c7d08cdcfa1fffcb11de324"
+        },
+        {
+          "path": "Models/GLTF format/tree_palmShort.glb",
+          "as": "tree_palmShort.glb",
+          "sha256": "d2526ca31c144a238820aa5c0f6183c5b9cf37fd3cc037932e637cf7c473ba27"
+        },
+        {
+          "path": "Models/GLTF format/cliff_large_stone.glb",
+          "as": "cliff_large_stone.glb",
+          "sha256": "d63595d0a8727a7a339dd315117fbb85e000224c0add26b6cc907054df046dac"
+        }
+      ]
+    },
+    {
+      "id": "kenney-city-kit-commercial",
+      "name": "City Kit Commercial 2.1",
+      "author": "Kenney",
+      "page": "https://kenney.nl/assets/city-kit-commercial",
+      "license": "CC0-1.0",
+      "licenseFile": "frontend/public/models/LICENSE-kenney-city-kit-commercial.txt",
+      "download": "https://kenney.nl/media/pages/assets/city-kit-commercial/a742d900eb-1753115042/kenney_city-kit-commercial_2.1.zip",
+      "sha256": "f8b09b081c2bb88bcc126e2dec1cb40fd0dad7e7e591b6c26aaefe96fb35276b",
+      "bytes": 4096974,
+      "downloaded": "2026-10-09",
+      "bake": "node tools/props/bake-props.mjs <dir> frontend/public/models/props.json",
+      "files": [
+        {
+          "path": "Models/GLB format/detail-parasol-a.glb",
+          "as": "detail-parasol-a.glb",
+          "sha256": "70e636bea8dc67c3bfd19b163333e824356118458c8c401017322ec43c10a7f7"
+        },
+        {
+          "path": "Models/GLB format/Textures/colormap.png",
+          "as": "city-kit/colormap.png",
+          "sha256": "191bec3889aaaca5018380038fecc129ebb5c2182879a099b7b538b3fa050b5d"
+        }
+      ]
+    },
+    {
+      "id": "quaternius-poly-pizza",
+      "name": "Single models on Poly Pizza, uploaded by the author",
+      "author": "Quaternius",
+      "page": "https://poly.pizza/u/Quaternius",
+      "license": "CC0-1.0",
+      "licenseFile": "frontend/public/models/LICENSE-quaternius.txt",
+      "downloaded": "2026-10-09",
+      "bake": "node tools/props/bake-props.mjs <dir> frontend/public/models/props.json",
+      "files": [
+        {
+          "page": "https://poly.pizza/m/7uSlZo3n9Y",
+          "url": "https://static.poly.pizza/6d0f118b-d6cf-4e62-8dc8-d50d11d6e402.glb",
+          "as": "7uSlZo3n9Y-bench-q2.glb",
+          "bytes": 16452,
+          "sha256": "7d454debdc6c20ea3a6a8d1961aa9a9db07072899f8f81680c9a7df344de761d"
+        },
+        {
+          "page": "https://poly.pizza/m/hts7l0NZxW",
+          "url": "https://static.poly.pizza/8927a168-7f28-4f44-8a8e-e951aeffdf89.glb",
+          "as": "hts7l0NZxW-market-stand-q2.glb",
+          "bytes": 63640,
+          "sha256": "8f3aadd10a1392e5dcc9890d8c331b53cadbb9afc0ebab935256b2905a3e0487"
+        },
+        {
+          "page": "https://poly.pizza/m/XViKoBh2UN",
+          "url": "https://static.poly.pizza/fad3fcb3-d174-469b-9f1c-a3ab00d74fb9.glb",
+          "as": "XViKoBh2UN-dock-q1.glb",
+          "bytes": 18520,
+          "sha256": "77449f8e456eb817f2ab3f15db1a5ceba5736b800fc1ea22da70d0221eb4296b"
+        },
+        {
+          "page": "https://poly.pizza/m/5UEl54KsuC",
+          "url": "https://static.poly.pizza/c5fe6584-9f6e-46cf-bcf6-95979c7494e4.glb",
+          "as": "5UEl54KsuC-boat-q.glb",
+          "bytes": 13720,
+          "sha256": "263e5d46f79e8b37afecd0db9056b22dc33c6456074d260589285d1891192335"
+        },
+        {
+          "page": "https://poly.pizza/m/xYZB1TmGMv",
+          "url": "https://static.poly.pizza/a0c33317-3662-478e-b826-78590c348d83.glb",
+          "as": "xYZB1TmGMv-gazebo-q.glb",
+          "bytes": 51956,
+          "sha256": "2b60d9b6c9483ccb2d8db0f608aff1e4782ad2a37995c11e1ba59a7e316493c0"
+        },
+        {
+          "page": "https://poly.pizza/m/4MSsNFk5fc",
+          "url": "https://static.poly.pizza/c8fdcd5a-875a-4196-841c-df2cd6ebdc52.glb",
+          "as": "4MSsNFk5fc-sign-q.glb",
+          "bytes": 16576,
+          "sha256": "3952d6fa5123df4f638a4b83cd5a343b7fd1671e9dd7edfa6ba331b1317314c1"
+        },
+        {
+          "page": "https://poly.pizza/m/dwmvPHHCdq",
+          "url": "https://static.poly.pizza/8f3134c7-f206-41e1-9c67-55f3fe566490.glb",
+          "as": "dwmvPHHCdq-arrow-sign-q.glb",
+          "bytes": 7488,
+          "sha256": "82e18a5f075c91d74b5e0ab1ffbf10ced35ff77819f1e9905b69433cd387b7af"
+        }
+      ]
+    }
+  ]
+}

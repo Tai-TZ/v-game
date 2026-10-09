@@ -24,11 +24,15 @@ import {
   COLONNADE_COLUMNS,
   COLONNADE_PIERS,
   CYPRESS_TREES,
+  FOUNTAIN_WATER,
   GATE,
   LAKE,
   LANDMARK,
   PARK_TREES,
+  PATHS,
   PLAZA,
+  PLAZA_RADIUS,
+  ROSE_BEDS,
   ROUND_TREES,
   SITES,
   siteFor,
@@ -280,7 +284,7 @@ function fountain(pal: Palette): Parts {
     .rotateZ(-0.35)
     .translate(px + 0.13, 1.88, pz);
   return [
-    P(cyl(4.2, 4.2, 48, 0, 0.04, px, pz), pal.plaza),
+    P(cyl(PLAZA_RADIUS, PLAZA_RADIUS, 48, 0, 0.04, px, pz), pal.plaza),
     P(ring(2.3, 2.55, 48, px, 0.041, pz), trim),
     P(ring(2.75, 2.82, 48, px, 0.041, pz), pal.band),
     P(ring(3.6, 3.85, 48, px, 0.041, pz), trim),
@@ -305,7 +309,7 @@ function fountain(pal: Palette): Parts {
       ),
       wall,
     ),
-    P(circle(1.3, 32, px, 0.22, pz), pal.water),
+    P(circle(FOUNTAIN_WATER, 32, px, 0.22, pz), pal.water),
     P(ring(1.12, 1.2, 32, px, 0.222, pz), pal.waterHi),
     ...range(8).flatMap((k) => {
       const a = PI / 8 + (k * PI) / 4;
@@ -324,9 +328,7 @@ function fountain(pal: Palette): Parts {
 /** Rose garden: six hedged beds on gravel, front-left of the plaza. */
 function roseGarden(pal: Palette): Parts {
   const P = paint(pal);
-  return grid([0, 1], [0, 1, 2], (c, r) => {
-    const x0 = -12.6 + 3.2 * c;
-    const z0 = 3.85 + 1.85 * r;
+  return ROSE_BEDS.flatMap(([x0, z0]) => {
     return [
       P(box(x0, x0 + 2.6, 0, 0.14, z0, z0 + 1.5), pal.hedge),
       P(rect(x0 + 0.12, x0 + 2.48, z0 + 0.12, z0 + 1.38, 0.142), pal.foliage),
@@ -334,7 +336,7 @@ function roseGarden(pal: Palette): Parts {
         P(rect(x0 + 0.35, x0 + 2.25, z0 + dz, z0 + dz + 0.2, 0.143), pal.bloom),
       ),
     ];
-  }).flat();
+  });
 }
 
 /** Balustrade across the lawn in front of the plaza, one run on each side of the axis. */
@@ -417,10 +419,7 @@ function backGrounds(pal: Palette): Parts {
   return [
     // E1, E2, E4, E5, E7 lanes; E6 forecourt of the domed hall. E1 runs on to x 13.1 so the
     // corner at the lane mouth is paved.
-    P(rect(3.1, 13.1, -0.55, 0.05, 0.012), pal.path),
-    P(rect(12.3, 13.1, -10.25, -0.55, 0.012), pal.path),
-    P(rect(4.1, 13.1, -11.25, -10.25, 0.012), pal.path),
-    P(rect(-9.6, 4.6, -12.95, -12.0, 0.012), pal.path),
+    ...PATHS.back.map(([x0, x1, z0, z1]) => P(rect(x0, x1, z0, z1, 0.012), pal.path)),
     P(rect(4.6, 8.6, -12.85, -11.25, 0.012), pal.asphalt),
     P(rect(-1.3, -0.5, BASE.minZ, -16.6, 0.012), pal.path),
     // K1, K2: park lawn and its paths.
@@ -800,16 +799,8 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
   return merge([
     P(box(minX, maxX, -0.6, 0, minZ, maxZ), { top: pal.ground, side: pal.soil }),
     P(box(minX - 0.25, maxX + 0.25, -0.8, -0.6, minZ - 0.25, maxZ + 0.25), pal.plaza),
-    // Loop road inside the gate (v0.3 F1).
-    P(rect(minX, 6.6, 10.5, 11.2, 0.011), pal.path),
-    // Forecourt, lawn walks, entrance paths, rose-garden gravel.
-    P(rect(-3.4, 3.4, -6.0, -1.8, 0.012), pal.path),
-    P(rect(-3.1, -2.0, -1.8, 1.7, 0.012), pal.path),
-    P(rect(2.0, 3.1, -1.8, 1.7, 0.012), pal.path),
-    P(rect(-8.8, -3.4, -3.1, -2.5, 0.012), pal.path),
-    P(rect(3.4, 8.8, -3.1, -2.5, 0.012), pal.path),
-    P(rect(3.6, 7.0, 3.6, 4.2, 0.012), pal.path),
-    P(rect(-12.8, -6.2, 3.6, 9.4, 0.011), pal.path),
+    ...PATHS.low.map(([x0, x1, z0, z1]) => P(rect(x0, x1, z0, z1, 0.011), pal.path)),
+    ...PATHS.front.map(([x0, x1, z0, z1]) => P(rect(x0, x1, z0, z1, 0.012), pal.path)),
     ...forecourtRays(pal),
     P(rect(-3.4, 3.4, -2.0, -1.9, 0.013), pal.band),
     ...roseGarden(pal),

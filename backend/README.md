@@ -8,32 +8,52 @@ Engine design: [`docs/design/engine-v0.2.md`](../docs/design/engine-v0.2.md).
 
 ```sh
 uv sync
-uv run vgame-build-index        # once: downloads the models and precomputes the index
 uv run uvicorn --factory vgame.main:create_app --reload --port 8000
 ```
 
 API docs (development and test only): <http://localhost:8000/docs>
 
-The app always starts. Without an index or a Gemini key it serves zones, levels and blocks, and
-`POST /api/runs` answers `503` with a Vietnamese message (`llm_not_configured`, `index_missing`,
-`index_stale` or `rerank_unavailable`).
+The app always starts. Without a Gemini key it serves zones, levels and blocks, and
+`POST /api/runs` answers `503` with a Vietnamese message (`llm_not_configured`; `index_stale` or
+`index_missing` if the shipped index does not match `docs/content`).
 
-### Build the index
+### The shipped index (no ML model at run time)
 
-`uv run vgame-build-index` downloads `EMBED_MODEL` (multilingual-e5-large, about 2.2 GB) and
-`RERANK_MODEL` into `ENGINE_CACHE_DIR/models`, then precomputes the 24 chunker variants and the
-embeddings of every golden question into `ENGINE_CACHE_DIR/index`. Runs only ask the
-golden questions, so nothing is embedded at run time. Rerun it after editing `docs/content`:
-at startup the server compares the index with the corpus (`corpus_sha256` of the manifest) and the
-golden questions, and a stale index answers `503 index_stale` until it is rebuilt. A rebuild
-reuses the vectors already on disk (same embed model and fastembed version) and embeds only new
-passages and questions, so a question edit takes seconds plus the model load.
-`--variant theo_dieu-512-10` builds one variant.
+Runs only ask the golden questions, so everything model-dependent is computed offline and
+committed in `src/vgame/engine/data/index` (~6.7 MB): the chunks of the 24 chunker variants, one
+float32 e5 vector per distinct passage text (shared by every variant), the vector of every golden
+question, and a float32 table of jina rerank scores for every (question, passage) pair a legal
+graph can rerank (the L3 questions x every `qcdt-2024` passage). The API process loads no model:
+about 120 MB of RAM after startup, about 160 MB once its 200-run store is full. A pair missing from the table is an `index_error` (`run.failed`
+`index_stale`), never a silent fallback.
 
-The API process loads the index and the reranker (~2.1 GB committed at startup). Reranking runs
-on the CPU, pairs cut at 512 tokens, batches of 2: about 3.2 GB committed with 3 L3 cases at once,
-even for the heaviest legal graph, and 2-6 s per case on an idle dev laptop
-(`docs/design/engine-spike-report.md` §3.3).
+`uv run vgame-build-index` (needs the `models` dependency group, included in `uv sync`) downloads
+`EMBED_MODEL` (multilingual-e5-large, about 2.2 GB) and `RERANK_MODEL` into
+`ENGINE_CACHE_DIR/models` and rewrites `INDEX_DIR` (default: the shipped folder). Rerun it after
+editing `docs/content` or a level's `allowed_blocks`, then commit the folder: at startup the server
+compares the index with the corpus (`corpus_sha256`), the golden questions and the rerank pairs,
+and a stale index answers `503 index_stale`; the fast test `test_shipped_index_is_fresh_and_complete`
+fails in CI too. A rebuild reuses the vectors and scores already there (same models) and computes
+only new passages, questions and pairs: a question edit takes about 2 minutes plus the model load,
+a full rebuild 1-1.5 hours (~5 GB of RAM). `--variant theo_dieu-512-10` adds one variant to the index already in `INDEX_DIR` (it never
+shrinks it). Scores are reused only when the model, `RERANK_MAX_TOKENS`, fastembed and
+onnxruntime versions match (`rerank.json` `regime`). The build also writes `rerank.json` `timing`:
+the mean ms per pair spent scoring, weighted by pairs with the old table's timing (a corpus edit
+barely moves it), the pair count, CPU and date; a table without one uses 120 ms
+(engine-spike-report §3.4), and a missing, zero or NaN value fails the index load.
+A rerank step over the table reports a simulated `round(candidates x ms_per_pair)` ms, the live
+model's cost, not the ~10-20 ms lookup, so L3's cost numbers stay honest (engine-v0.2 §14). Build
+on an idle machine: load inflates the value. To re-time, delete `rerank.json` and `rerank.npy` and
+rebuild (25-60 minutes).
+
+### Replay seed
+
+`src/vgame/engine/data/replay-seed.json` holds real Gemini answers (`gemini-3.5-flash-lite`) for
+the reference and the starter graph of each Library level, only the fields the replay cache keeps
+(text, stop reason, token usage, model). Startup merges it into the replay cache (rows already
+there win), so those runs cost no Gemini call. A change to one of those graphs, the prompt frame,
+the packer, the corpus or the index makes `tests/engine/test_replay_seed.py` fail until the seed
+is regenerated (command in `scripts/spike_llm.py`, at most 72 calls; replayed answers cost none).
 
 ### Gemini key
 
@@ -69,6 +89,7 @@ answered. Star 2 budgets are calibrated on the primary model only. Rotate the ke
 | `POST /api/runs?level={level_id}`  | body = graph JSON; `202 {run_id, created, issues}`                      |
 | `GET /api/runs/{run_id}/events`    | SSE stream; send `Last-Event-ID: n` to replay events after `n`          |
 | `POST /api/runs/{run_id}/cancel`   | `202`; the run ends with `run.failed` (`cancelled`)                     |
+| `GET /api/weather`                 | `{condition, temperature_c, updated_at}` (UTC) from Open-Meteo; max-age 300 (60 when stale); 503 + `Retry-After: 120` when nothing is cached |
 
 `POST /api/runs` needs `Content-Type: application/json` (415 otherwise) and accepts an optional
 `Idempotency-Key` header, 16-64 chars of `[A-Za-z0-9_-]` (same key, level and graph returns the
@@ -92,8 +113,8 @@ Content: zones in `src/vgame/content/data/zones.json`, levels in `src/vgame/engi
 uv run ruff check
 uv run ruff format --check
 uv run mypy src tests
-uv run pytest -q              # offline: fake models and a fake LLM, no network
-uv run pytest -m slow         # real models; needs `uv run vgame-build-index` first
+uv run pytest -q              # offline: fake models, the shipped index and a fake LLM
+uv run pytest -m slow         # real models (downloaded by `uv run vgame-build-index`)
 ```
 
 ## Environment variables
@@ -108,12 +129,15 @@ Read from the process environment, or from `backend/.env` (see `.env.example`).
 | `GEMINI_MODEL`        | `gemini-3.5-flash-lite`                     | primary model; profiles map to thinking LOW/MEDIUM/HIGH |
 | `GEMINI_FALLBACK_MODELS` | `gemini-3.1-flash-lite,gemini-3.5-flash` | tried in order on 429/503 or when busy; empty = none; each must accept `thinking_level` (not `gemini-2.5-flash`) |
 | `GEMINI_RPM`          | free-tier table in `engine/llm.py`          | `model=rpm,...` overrides; unknown models get 5       |
-| `DAILY_LLM_CALL_CAP`  | `500`                                       | real Gemini calls per UTC day, whole server           |
-| `MAX_CONCURRENT_RUNS` | `1`                                         | more answers 429; 3 x this = Gemini calls and CPU reranks in flight |
-| `ENGINE_CACHE_DIR`    | `backend/.cache/engine`                     | models, index, replay cache (gitignored)              |
+| `DAILY_LLM_CALL_CAP`  | `500`                                       | real Gemini calls per UTC day, whole server (Render: 200) |
+| `MAX_CONCURRENT_RUNS` | `1`                                         | more answers 429; 3 x this = Gemini calls in flight   |
+| `INDEX_DIR`           | `src/vgame/engine/data/index`               | shipped index, vectors and rerank table (committed)   |
+| `ENGINE_CACHE_DIR`    | `backend/.cache/engine`                     | model files (build tool only), replay cache (gitignored) |
 | `CONTENT_DIR`         | `<repo>/docs/content`                       | corpus and golden files                               |
 | `EMBED_MODEL`         | `intfloat/multilingual-e5-large`            | rebuild the index after changing it                   |
 | `RERANK_MODEL`        | `jinaai/jina-reranker-v2-base-multilingual` | CC-BY-NC-4.0 licence                                  |
+| `WEATHER_LATITUDE`    | `21.0285`                                   | campus place; change together with the theme `place`  |
+| `WEATHER_LONGITUDE`   | `105.8542`                                  | campus place; change together with the theme `place`  |
 
 ## Docker
 
@@ -122,6 +146,6 @@ docker build -t v-game-backend .
 docker run --rm -p 8000:8000 -e CORS_ORIGINS=https://your-frontend.example v-game-backend
 ```
 
-The image runs as a non-root user with `ENV=production`. It does not ship `docs/content` or the
-engine cache yet, so runs need both mounted (`CONTENT_DIR`, `ENGINE_CACHE_DIR`); v0.2 targets
-local runs.
+The image runs as a non-root user with `ENV=production` and ships the index and the replay seed
+(they live in the package). It does not ship `docs/content` yet, so runs need it mounted
+(`CONTENT_DIR`).

@@ -39,6 +39,42 @@ export const SPAWN: Vec2 = { x: 0, z: -0.8 };
 export const PLAZA: Vec2 = { x: 0, z: 5.6 };
 /** Radius of the hedge ring around the fountain basin. */
 export const FOUNTAIN_RADIUS = 1.88;
+/** Radii of the fountain plaza's paving and of the basin's water. */
+export const PLAZA_RADIUS = 4.2;
+export const FOUNTAIN_WATER = 1.3;
+
+type Rect = readonly [x0: number, x1: number, z0: number, z1: number];
+/**
+ * Paved flats of the ground, drawn by the scene (buildTerrain, backGrounds) and by the
+ * loader's blueprint, so both always agree.
+ */
+export const PATHS = {
+  /** Forecourt, lawn walks, entrance paths, the path to the market. */
+  front: [
+    [-3.4, 3.4, -6.0, -1.8],
+    [-3.1, -2.0, -1.8, 1.7],
+    [2.0, 3.1, -1.8, 1.7],
+    [-8.8, -3.4, -3.1, -2.5],
+    [3.4, 8.8, -3.1, -2.5],
+    [3.6, 7.0, 3.6, 4.2],
+  ],
+  /** Loop road inside the gate (v0.3 F1) and the rose-garden gravel, a hair lower. */
+  low: [
+    [BASE.minX, 6.6, 10.5, 11.2],
+    [-12.8, -6.2, 3.6, 9.4],
+  ],
+  /** Lanes E1, E2, E4 to the back and E6, the domed hall's forecourt. */
+  back: [
+    [3.1, 13.1, -0.55, 0.05],
+    [12.3, 13.1, -10.25, -0.55],
+    [4.1, 13.1, -11.25, -10.25],
+    [-9.6, 4.6, -12.95, -12.0],
+  ],
+} as const satisfies Record<string, readonly Rect[]>;
+/** Rose-garden beds, 2.6 × 1.5 each: [x0, z0] of six beds in two columns. */
+export const ROSE_BEDS = [0, 1].flatMap((c) =>
+  [0, 1, 2].map((r) => [-12.6 + 3.2 * c, 3.85 + 1.85 * r] as const),
+);
 export const INTERACT_RADIUS = 1.7;
 
 const span = (x0: number, x1: number, z0: number, z1: number): Box => ({

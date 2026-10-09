@@ -1,6 +1,7 @@
 # Frontend architecture v0.1
 
 - **Ngày:** 2026-10-07 · **Chủ sở hữu file:** coder.
+- **Sửa 2026-10-08:** thêm §8 (luật trực quan hoá, [roadmap-v0.4](roadmap-v0.4.md) N23); §1–§7 giữ nguyên.
 - **Nguồn:** [build-brief-v0.1.md](build-brief-v0.1.md), [art-direction.md](art-direction.md).
 
 ## 1. Sơ đồ module
@@ -19,7 +20,7 @@ app/
 │  │  ├─ sites.ts         DEFAULT_STATUS, tên dự phòng, INTERACT_POINTS, chữ gợi ý §4
 │  │  ├─ store.ts         zustand: nearby, dialog, metLan, sheetInset + `motion` (mutable)
 │  │  ├─ hud/             HubTopBar (+ danh sách "Các khu"), InteractHint, LanDialog,
-│  │  │                   ScenePoster, SceneBoundary
+│  │  │                   SceneLoader + sceneLoad + blueprint (màn chờ), SceneBoundary
 │  │  └─ scene/           chunk lazy: three + r3f
 │  │     ├─ palette.ts    màu manifest + màu phái sinh §2.2, shade §2.3
 │  │     ├─ primitives.ts box/cyl/quad/prismX/arcSlab… + part() nướng sáng vào vertex colour
@@ -111,3 +112,151 @@ Không thêm thư viện mới cho v0.1. `drei` vẫn trong `package.json` nhưn
 vào bundle). `isbot` được ghi thẳng vào `dependencies` (5.2.2, vốn là phụ thuộc gián tiếp của
 `@react-router/dev`): CLI `react-router typegen` tự cài nó nếu thiếu ở package.json, và lần tự
 cài đó làm hỏng `node_modules` trên Windows.
+
+## 8. Trực quan hoá (luật, chốt 2026-10-08)
+
+Áp dụng cho mọi biểu đồ, thanh, bảng hạng và bài vi mô của bàn thợ và các route sau này (đề xuất
+N23, [roadmap-v0.4](roadmap-v0.4.md)). Số đo hiệu năng và kích thước gói lấy từ báo cáo trực quan
+hoá 2026-10-08; header CSP và hành vi CSP ở §8.5 đo lại trên site thật cùng ngày.
+
+### 8.1 Cách vẽ
+
+- **SVG hoặc HTML/CSS, không thư viện biểu đồ.** Scale tuyến tính tự viết (một dòng). `d3-scale`,
+  `d3-shape`, `d3-array` (≈ 12,5 kB gzip cộng lại) chỉ thêm khi bump chart hoặc biên Pareto cần, ghi
+  lý do trong PR; luật "không thêm dependency" của v0.1 (§7) vẫn đứng.
+- **Đủ nhanh ở cỡ của V-Game.** Mọi trực quan dự kiến có ≤ 500 phần tử (dải token ≤ 500, bump chart
+  ≤ 25 đường, ma trận ≤ 400 ô, bản đồ sao ≤ 175 điểm). Đo trên Chrome 152, Intel Iris Xe, trung vị 15
+  lần, mặt vẽ 800×500: SVG cập nhật mọi điểm mỗi khung chịu khoảng 700 điểm trong 8 ms; cập nhật một
+  điểm (rê, chọn) dưới 2 ms tới 20.000 điểm (số SVG chưa gồm thời gian paint, chi phí thật cao hơn); dựng mới 5.000 điểm mất 71 ms (một tác vụ dài, hỏng độ
+  phản hồi lúc vào route). Canvas 2D chỉ khi cần hoạt cảnh trên 700 điểm. WebGL và worker không dùng
+  ngoài `/play`. Tìm điểm gần nhất bằng quét tuyến tính (≤ 0,1 ms ở 10.000 điểm), không cần quadtree.
+- **Kích thước và màu không qua `style=`.** Dùng thuộc tính SVG (`width`, `x`, `transform`) hoặc lớp
+  Tailwind; màu bằng lớp `fill-*`/`stroke-*` của token ngữ nghĩa. `style={{…}}` của React chỉ chạy ở
+  component render phía client (đi qua CSSOM) và thành thuộc tính `style=` bị CSP chặn nếu lọt vào
+  HTML prerender.
+- **Dữ liệu nặng tính lúc build** (N21): JSON tĩnh trong `/public`, tải lười theo level, không tính
+  vào bundle. Vector của chỉ mục không bao giờ xuống trình duyệt, chỉ toạ độ 2D, bảng điểm và offset.
+  Không bao giờ xuất điểm, hạng hay prompt của câu ẩn và câu bẫy. File tĩnh chạy cả khi API trên
+  Render đang ngủ. **Lượt đã ghi tĩnh** ([roadmap-v0.4](roadmap-v0.4.md) B0, B5; sửa 2026-10-08, rà soát
+  vòng 5) là file duy nhất trong `/public` có ca ẩn và ca bẫy, và với chúng chỉ mang đạt/trượt theo tiêu
+  chí, nhãn, vai, tổng token của thùng và `cite_unknown` (các trích bịa đã bật nhãn đó, cho áp phích
+  của L1; không bao giờ có mã trích hợp lệ, vì mã đó chỉ vào đoạn gold; thêm 2026-10-08, rà soát
+  vòng 6): không `retrieved`, `pack.included`, chữ trả lời, hạng, điểm hay gold. Cổng CI của B6 kiểm
+  ca ẩn, ca bẫy chỉ có các trường này. Vì thế truy vết của lượt đã ghi chỉ có hạng và sao vàng ở ca thấy được.
+
+### 8.2 Khả năng tiếp cận
+
+- Mỗi biểu đồ nằm trong `<figure>` với `<figcaption>` nêu điều rút ra bằng một câu tiếng Việt, kèm
+  nút "Xem dạng bảng" mở một `<table>` cùng dữ liệu. Với ma trận nhầm lẫn và bảng hạng, bảng là
+  giao diện chính, màu là lớp phụ. Ở 375 px, dạng bảng là mặc định.
+- Không truyền thông tin chỉ bằng màu: mỗi trạng thái có màu, icon và chữ.
+- Mọi thứ kéo được (vạch ngưỡng, vạch k, vạch ngân sách) là `<input type="range">` gốc đặt lên biểu
+  đồ, có `aria-valuetext` như "0,80, còn 4 đoạn". Không tự viết thanh kéo bằng pointer event.
+- Cả trang chỉ có một vùng `aria-live="polite"`, thông báo tối đa một lần mỗi 2 giây: bước xong, tóm
+  tắt câu đã chấm, điểm cuối. Không đặt live region riêng trong từng biểu đồ.
+- Tập điểm (bản đồ sao) có một điểm dừng Tab; phím mũi tên đi qua các điểm theo hạng.
+- Màu phân loại là tập con Okabe-Ito ánh xạ vào token ngữ nghĩa, luôn kèm nhãn trực tiếp hoặc hình
+  dạng. Tỉ lệ tương phản trong báo cáo (xanh dương 5,2:1, đỏ son 3,9:1, xanh lục 3,4:1, tím đỏ 3,1:1
+  trên nền trắng) chưa được kiểm: đo lại trên nền của cả hai theme trước khi dùng, ngưỡng ≥ 3:1 cho
+  nét và vùng.
+
+### 8.3 Chuyển động và SSE
+
+- Chỉ animate `transform` và `opacity`, bằng CSS transition hoặc Web Animations API. Thanh đầy dùng
+  `scaleX` với `origin-left`, không đổi `width`. Hàng trong bảng hạng định vị bằng
+  `translateY = hạng × chiều cao hàng` cộng transition 300 ms, không cần FLIP.
+- Mọi chuyển động nằm trong `motion-safe:`; trong JS, khi `useMediaQuery` (đã có ở `app/lib`) báo
+  `prefers-reduced-motion: reduce` thì nhảy thẳng tới trạng thái cuối.
+- Sự kiện SSE được đẩy vào một mảng và gộp bằng một `requestAnimationFrame` thành một lần `setState`
+  mỗi khung; `run.finished` và `run.failed` xả ngay. Tab ẩn thì rAF dừng: hàng đợi vẫn được xả khi
+  `run.finished` tới hoặc khi tab hiện lại. Đây là cùng kỷ luật "không có state React theo frame"
+  của `/play` (§2).
+- Vòng rAF chỉ chạy khi có hoạt cảnh và tự dừng khi xong, như `frameloop="demand"`. Không vòng lặp idle.
+
+### 8.4 Tem nguồn và trung thực số liệu
+
+- **Mọi trực quan mang một tem nguồn** bằng chữ. Danh sách tem là cố định; tài liệu và UI dùng đúng chữ này,
+  không tự đặt tem mới:
+
+  | Tem | Dùng khi | Ở đâu |
+  |---|---|---|
+  | "Đo từ lượt của bạn" | số liệu từ fact của lượt người chơi vừa chạy | trên hình |
+  | "Đo từ nhãn của bạn" | số đếm từ nhãn người chơi vừa gắn trên dữ liệu ghi sẵn, không từ lượt chạy (Phòng chấm; thêm 2026-10-08) | trên hình |
+  | "Tính sẵn từ chỉ mục" | tính lúc build từ chỉ mục hoặc vector tính sẵn (N21) | trên hình |
+  | "Minh hoạ" | soạn tay hoặc lấy từ model khác, không phải hành vi của engine | trên hình |
+  | "Lượt chạy đã ghi" | phát lại một lượt chạy thật đã ghi (N4, kết quả đã lưu). Lượt đã ghi không phải của cấu hình đang trên bàn thợ (Thư viện L2, L3) thì cạnh tem có dòng mô tả nói là của ai, ví dụ "Lời giải mẫu L1, không phải cấu hình của bạn" (sửa 2026-10-08, rà soát vòng 5) | trên hình hoặc màn phát lại |
+  | "Mô phỏng" | level loại `simulation`, số đến từ mô phỏng có seed | tiêu đề level; và trên hình, màn phát lại của chính level đó (sửa 2026-10-08), vì ở đó không số nào đo từ lượt chạy thật |
+  | "Dữ liệu ghi sẵn" | level loại `precomputed`, trace hoặc output ghi một lần lúc build | tiêu đề level |
+
+- **Có hai số token.** Thùng đếm bằng `regex-v1` (chia đoạn, đóng thùng); sao 2 tính bằng usage của
+  Gemini, gồm cả token suy nghĩ ([engine-v0.2](engine-v0.2.md) E2, E3, E8). Mọi thanh token ghi rõ
+  đang dùng số nào. Token suy nghĩ dao động mạnh (cùng prompt L3: 74 và 528 token output); cho người
+  học thấy điều đó, không làm phẳng.
+- **Cosine của `multilingual-e5-large` dồn ở 0,7–1,0**, chỉ thứ tự có nghĩa: thanh trượt ngưỡng phải
+  có histogram điểm đi kèm.
+- **Bản đồ 2D chỉ gần đúng.** Hạng và "sao sáng" tính bằng cosine 1024 chiều thật; luôn in hạng và
+  cosine thật cạnh hình chiếu.
+- Không trình bày "lost in the middle" như sự thật của game khi chưa đo trên thùng 3.000 token.
+- Engine không gửi temperature: mọi thẻ nói về temperature mang tem "Minh hoạ".
+- Kết quả phát lại và kết quả đã lưu không bao giờ vào số liệu độ trễ.
+- Tem "Lượt chạy đã ghi" chỉ dành cho cả một lượt đã ghi được phát lại. Một ca trúng kết quả đã lưu giữa
+  một lượt chạy thật không đổi tem của lượt: ca đó mang dòng chữ "Kết quả đã lưu" (đúng chữ `summary`
+  của engine), là chữ mô tả chứ không phải tem (sửa 2026-10-08, rà soát vòng 3).
+
+### 8.5 CSP đã đo trên site thật
+
+Header của `https://v-game-theta.vercel.app/` và `/play` (đọc bằng `curl -sI`, 2026-10-08), giống
+nhau ở hai route:
+
+```text
+default-src 'self'; script-src 'self' 'sha256-…' (8 hash, theo từng bản build); style-src 'self';
+img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self';
+form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+```
+
+Không có `worker-src`, `'unsafe-eval'`, `'wasm-unsafe-eval'` hay `'unsafe-inline'`. Hành vi đo bằng mã
+chạy trong trang trên Chrome 152 (2026-10-08), ghi kèm chỉ thị bị vi phạm:
+
+| Cách làm | Kết quả | Chỉ thị |
+|---|---|---|
+| `el.setAttribute('style', …)` | chặn | `style-src-attr` |
+| `innerHTML` có `style="…"` | chặn | `style-src-attr` |
+| `<style>` chèn vào `<head>` hoặc bên trong `<svg>` | chặn | `style-src-elem` |
+| CSSOM: `el.style.transform = …`, `el.style.setProperty(…)` | chạy | |
+| `el.style.cssText = …` | chạy trên Chrome 152; MDN ghi là bị chặn và chưa kiểm Firefox, Safari, nên không dùng | |
+| Thuộc tính trình bày của SVG (`fill="…"`, `width`) | chạy | |
+| Web Animations API (`el.animate`) | chạy | |
+| `setTimeout("chuỗi")`; `eval` và `new Function` cùng luật | chặn | `script-src` (eval) |
+| `WebAssembly.compile` | chặn | `script-src` (wasm-eval) |
+| `new Worker(blob:…)` | chặn | `worker-src` (blob) |
+
+Lưu ý khi đo lại: mã chạy từ DevTools console được miễn kiểm `eval`, nên phải đo bằng đường của
+trang (ví dụ `setTimeout` với chuỗi). `connect-src 'self'` nghĩa là mọi fetch và SSE đi qua
+`/api/*` cùng origin (Vercel chuyển tiếp sang Render), như hiện nay.
+
+**Gói bị loại cho route bàn thợ** (gzip đo bằng esbuild trên đúng các import cần dùng; trần route
+120 kB):
+
+| Gói | gzip (kB) | Lý do loại |
+|---|---|---|
+| `@observablehq/plot` | 88,4 | chèn `<style>` trong SVG, mất style |
+| `recharts` | 100,9–104,5 | gần hết trần route |
+| `echarts` (modular) | 166,2–188,0 | vượt trần; tooltip dùng `innerHTML` |
+| `@xyflow/react` (React Flow) | 58,2 | pipeline 5–15 bước cố định không cần; chế độ Bản vẽ (ADR 0001) nếu làm thì tải lười riêng |
+| `motion/react` đầy đủ | 42,3 | `popLayout` chèn `<style>`; `motion/mini` (3,3) chạy được qua WAAPI nếu thật cần API khai báo |
+| `lottie-web` đầy đủ / `lottie_light` | 77,1 / 48,0 | bản đầy đủ cần `eval`; cả hai quá nặng cho hoạt cảnh phản hồi |
+| Rive, dotLottie | 13,5–61,6 cộng 365–810 kB WASM | cần `'wasm-unsafe-eval'` |
+| `elkjs`, `@dagrejs/dagre` | 430,3 / 16,4 | chỉ chạy lúc build (bố cục pipeline tính sẵn) |
+
+Hoạt cảnh nhân vật và khối đạt/trượt làm bằng CSS keyframes trên sprite SVG hoặc PNG, chỉ đổi
+`transform` và `opacity`, tốn 0 kB.
+
+### 8.6 Cách ép
+
+| Luật | Ép bằng |
+|---|---|
+| Trần route bàn thợ, không thư viện biểu đồ | `scripts/check-bundle.mjs` (thêm ngân sách route bàn thợ) |
+| `<figure>` có `<figcaption>`, tem nguồn và nút "Xem dạng bảng" | e2e: mọi phần tử `[data-vg-viz]` có đủ ba thứ |
+| axe sạch ở 375 và 1280 px | `e2e/a11y.spec.ts` |
+| Không `style=` trong HTML prerender | CSP thật: vi phạm hiện trong console của e2e |
+| Một live region | e2e đếm `[aria-live]` trên route bàn thợ = 1 |

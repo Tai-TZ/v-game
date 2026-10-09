@@ -13,7 +13,8 @@ Architecture and budgets: [`docs/design/frontend-architecture.md`](../docs/desig
 | `/play/:zoneId` | Zone page: levels from `GET /api/zones/:id`; locked / not found / error |
 
 `/play?at=<library|watchtower|market>` puts the player at that building's door.
-`/play?debug=frames` counts rendered frames in `<html data-frames>` (used by e2e).
+`/play?debug=frames` counts rendered frames in `<html data-frames>` and sets `<html data-scene-busy>`
+while the scene still has something to move (used by e2e).
 
 ## Commands
 

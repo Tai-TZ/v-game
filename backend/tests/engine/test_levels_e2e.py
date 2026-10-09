@@ -1,7 +1,7 @@
 """End-to-end over the shipped level files: validator -> compiler -> runtime -> evaluator.
 
-Fast tests use offline doubles. ``needs_real_models`` expectations and the real-model reference
-runs are ``slow``: they need ``uv run vgame-build-index`` first (no Gemini call: Oracle LLM).
+Offline doubles, or the shipped index: e5 vectors and the jina rerank table that
+``vgame-build-index`` computed with the real models (no model loaded, no Gemini call: Oracle).
 """
 
 import asyncio
@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from tests.engine.fakes_llm import FakeLLM
 from tests.engine.fakes_oracle import (
     LEVEL_IDS,
     OracleReranker,
@@ -20,17 +21,16 @@ from tests.engine.fakes_oracle import (
     spec,
 )
 from tests.engine.fakes_retrieval import OverlapReranker
-from vgame.config import Settings
+from vgame.config import SHIPPED_INDEX_DIR
 from vgame.engine.blocks import EngineDeps
 from vgame.engine.budget import RunBudget
 from vgame.engine.compiler import compile_graph
 from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import GraphPayload
-from vgame.engine.index import IndexNotBuiltError, IndexStore
+from vgame.engine.index import IndexStore, RerankTable
 from vgame.engine.levels import Expectation, LevelSpec, load_level
-from vgame.engine.retrieval import FastReranker, RerankerUnavailableError
 from vgame.engine.runtime import run_level
-from vgame.engine.types import EngineEvent, Reranker
+from vgame.engine.types import EngineEvent, LLMClient, Reranker
 from vgame.engine.validator import validate
 
 LEVELS = [load_level(level_id) for level_id in LEVEL_IDS]
@@ -53,11 +53,15 @@ DIAGNOSIS_KEYS = {
 
 
 def run_graph(
-    level: LevelSpec, graph: GraphPayload, store: IndexStore, reranker: Reranker
+    level: LevelSpec,
+    graph: GraphPayload,
+    store: IndexStore,
+    reranker: Reranker,
+    llm: LLMClient | None = None,
 ) -> list[EngineEvent]:
     validated, issues = validate(graph.model_dump_json(by_alias=True).encode(), level)
     assert validated is not None, issues
-    deps = EngineDeps(store, oracle_llm(), reranker, RunBudget())
+    deps = EngineDeps(store, llm or oracle_llm(), reranker, RunBudget())
     events: list[EngineEvent] = []
     cases = public_cases(spec(level.id))
     evaluator = LevelEvaluator(spec(level.id), level.rules, store)
@@ -177,21 +181,16 @@ def test_gold_appears_only_in_run_finished() -> None:
             assert not any(cid in text for cid in gold_ids)
 
 
-# --- Real models (slow; needs `uv run vgame-build-index`) ----------------------------------
+# --- Real models, precomputed: the shipped index (what the server runs) ----------------------
 
 
 @pytest.fixture(scope="module")
 def real_models() -> tuple[IndexStore, Reranker]:
-    settings = Settings(_env_file=None)
-    try:
-        store = IndexStore.load(settings.engine_cache_dir / "index")
-        reranker = FastReranker(settings.rerank_model, settings.engine_cache_dir / "models")
-    except (IndexNotBuiltError, RerankerUnavailableError):
-        pytest.skip("run `uv run vgame-build-index` first")
-    return store, reranker
+    store = IndexStore.load(SHIPPED_INDEX_DIR)
+    assert store.rerank is not None
+    return store, store.rerank
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize("level", LEVELS, ids=LEVEL_IDS)
 def test_reference_graph_earns_three_stars_with_real_models(
     level: LevelSpec, real_models: tuple[IndexStore, Reranker]
@@ -201,7 +200,6 @@ def test_reference_graph_earns_three_stars_with_real_models(
     assert score["stars"] == 3, (score, events[-1])
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize(("level", "graph", "expect"), expectations(real=True))
 def test_naive_graph_produces_its_model_dependent_flags(
     level: LevelSpec,
@@ -213,3 +211,65 @@ def test_naive_graph_produces_its_model_dependent_flags(
     for x in expect:
         if x.mechanism == "T" and x.needs_real_models:
             assert_expectation(x, events)
+
+
+def test_l3_rerank_ms_is_the_build_timing_times_the_candidates(
+    real_models: tuple[IndexStore, Reranker],
+) -> None:
+    # §14 (2026-10-09): a lookup in the shipped table took ~10-20 ms whatever it scored, so
+    # L3's "Kính lúp tốn {ms} ms" showed the slow-but-sure block as nearly free.
+    store, shipped = real_models
+    assert isinstance(shipped, RerankTable)
+    assert shipped.ms_per_pair > 50  # live jina: ~120 ms per pair
+    # The same scores with another build's timing: a constant equal to the shipped one fails.
+    table = RerankTable(
+        shipped.model_id,
+        shipped.questions,
+        shipped.texts,
+        shipped.scores,
+        shipped.regime,
+        {"ms_per_pair": 37.5},
+    )
+    level = load_level("article-number-lookup")
+    totals = []
+    for top_k in (3, 10):
+        nodes = [
+            n.model_copy(update={"params": {**n.params, "top_k": top_k}}) if n.id == "fu" else n
+            for n in level.reference_graph.nodes
+        ]
+        graph = level.reference_graph.model_copy(update={"nodes": nodes})
+        steps = [e for e in run_graph(level, graph, store, table) if e["type"] == "step.finished"]
+        scored = {
+            e["case"]: len(f["items"])
+            for e in steps
+            if e["node"] == "fu"
+            for f in e["facts"]
+            if f["kind"] == "retrieved"
+        }
+        ms = {e["case"]: e["ms"] for e in steps if e["node"] == "rr"}
+        assert ms == {case: round(n * 37.5) for case, n in scored.items()}
+        totals.append(sum(ms.values()))
+    assert totals[0] < totals[1]
+
+
+def every_graph() -> list[Any]:
+    return [
+        pytest.param(level, graph, id=f"{level.id}-{name}")
+        for level in LEVELS
+        for name, graph in (
+            ("reference", level.reference_graph),
+            *((naive.id, naive.graph) for naive in level.naive_graphs),
+        )
+    ]
+
+
+@pytest.mark.parametrize(("level", "graph"), every_graph())
+def test_no_diagnosis_shows_an_unfilled_placeholder(
+    level: LevelSpec, graph: GraphPayload, real_models: tuple[IndexStore, Reranker]
+) -> None:
+    # L3 N6 (no rerank node) showed "Kính lúp đưa nó lên {r_rr}, mất {ms} ms." to players.
+    # An answer that cites nothing fails every case, so every case gets its diagnosis line.
+    report = run_graph(level, graph, *real_models, FakeLLM("Tôi chưa rõ."))[-1]
+    assert report["type"] == "run.finished"
+    messages = [d["message_vi"] for d in report["report"]["diagnosis"]]
+    assert not [m for m in messages if "{" in m or "}" in m]
