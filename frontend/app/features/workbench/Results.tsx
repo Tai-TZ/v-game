@@ -12,6 +12,7 @@ import {
   flagWords,
   fmt,
   groupDiagnosis,
+  knobName,
   LABEL_VI,
   LEVEL_COPY,
   lowerFirst,
@@ -217,7 +218,9 @@ export function Results({
                         onClick={() => onFocusSlot(target.slot, target.param)}
                         className={buttonClass("inline")}
                       >
-                        {attached ? "Xem ở" : "Thử gắn"} {TOY[target.slot].name}
+                        {attached
+                          ? `Xem ở ${knobName(target.slot, target.param)}`
+                          : `Thử gắn ${TOY[target.slot].name}`}
                       </button>
                     )}
                   </div>
@@ -349,7 +352,8 @@ function GoldTrace({
     const toy = toyName(type, own);
     if (type === "vector_search" || type === "bm25_search") {
       const hook = TOY[type].params?.top_k ?? "Móc kéo";
-      const where = rank === null ? "không có trong toàn kho" : `hạng ${rank} trên toàn kho`;
+      // Same verb as the diagnosis ("Tủ ngăn kéo không tìm thấy"): the passage is in the corpus.
+      const where = rank === null ? "không tìm thấy đoạn đáp án" : `hạng ${rank} trên toàn kho`;
       const d = domain(env, type, "top_k");
       const max = d?.kind === "range" ? `, tối đa ${d.max}` : "";
       return [
@@ -364,16 +368,28 @@ function GoldTrace({
         : `${toy}: hạng ${rank} trong ${size} đoạn giữ lại`,
     ];
   });
+  // A case with two answer passages: `in_pack` is true once one is in, each rank is the best
+  // passage's, and the missing one has its own flag (grading.py).
+  const partial =
+    gold.in_pack && gold.flags.some((f) => f === "ret.gold_missing" || f === "ctx.gold_dropped");
   return (
     <div className="mt-2 space-y-1 text-sm">
       <p>
         {split
           ? "Không đoạn nào của cách chia này chứa trọn câu đáp án."
-          : `Đoạn đáp án: ${gold.in_pack ? "đã vào thùng" : "không vào thùng"}.`}
+          : partial
+            ? "Đoạn đáp án: mới vào thùng một phần, còn thiếu đoạn khác."
+            : `Đoạn đáp án: ${gold.in_pack ? "đã vào thùng" : "không vào thùng"}.`}
       </p>
       {lines.length > 0 && (
         <>
-          <p>{split ? "Hạng của mảnh đứng cao nhất qua từng khối:" : "Hạng qua từng khối:"}</p>
+          <p>
+            {split
+              ? "Hạng của mảnh đứng cao nhất qua từng khối:"
+              : gold.gold_chunks.length > 1
+                ? "Hạng của đoạn đáp án đứng cao nhất qua từng khối:"
+                : "Hạng qua từng khối:"}
+          </p>
           <ul className="list-inside list-disc">
             {lines.map((line) => (
               <li key={line}>{line}</li>

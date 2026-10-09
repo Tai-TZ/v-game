@@ -31,11 +31,11 @@ function finishedRun(gold: Record<string, GoldReveal>, diagnosis: object[] = [])
   return run;
 }
 
-function show(run: RunView, graph: Graph = dense) {
+function show(run: RunView, graph: Graph = dense, env = l1) {
   render(
     <MemoryRouter>
       <Results
-        env={l1}
+        env={env}
         run={run}
         changed={false}
         runGraph={dense}
@@ -79,6 +79,55 @@ describe("Results", () => {
     show(finishedRun({ "lib-l1-v01": whole, "lib-l1-t01": trap }));
     expect(card(1)).toContain("Đoạn đáp án: không vào thùng.");
     expect(card(1)).toContain("Vòm Sao: hạng 4 trên toàn kho, Móc kéo lấy 3, tối đa 10");
+  });
+
+  it("says when only part of a two-passage answer reached the box", () => {
+    // L2 #8 "Gộp nhiều khoản": khoản 1 is in the box, khoản 3 stopped at rank 5 (grading.py:
+    // in_pack is any(), each rank the best passage's).
+    const partial: GoldReveal = {
+      gold_chunks: ["k1", "k3"],
+      ranks: { vs: 1 },
+      in_pack: true,
+      flags: ["ret.gold_missing", "ret.gold_rank"],
+    };
+    show(finishedRun({ "lib-l1-v01": partial, "lib-l1-t01": trap }));
+    expect(card(1)).not.toContain("đã vào thùng");
+    expect(card(1)).toContain("Đoạn đáp án: mới vào thùng một phần, còn thiếu đoạn khác.");
+    expect(card(1)).toContain("Hạng của đoạn đáp án đứng cao nhất qua từng khối:");
+  });
+
+  it("says a search did not find the answer passage, not that the corpus lacks it", () => {
+    const unfound: GoldReveal = {
+      gold_chunks: ["a1"],
+      ranks: { vs: null },
+      in_pack: false,
+      flags: [],
+    };
+    show(finishedRun({ "lib-l1-v01": unfound, "lib-l1-t01": trap }));
+    expect(card(1)).toContain("Vòm Sao: không tìm thấy đoạn đáp án, Móc kéo lấy 3, tối đa 10");
+    expect(card(1)).not.toContain("không có trong toàn kho");
+  });
+
+  it("names the knob a lesson opens when its slot has several", () => {
+    const l2 = testEnv("chunk-tuning");
+    const lessons = [
+      { case: "lib-l1-v01", flag: "ret.boundary_split", message_vi: "Câu #1 bị cắt đôi." },
+      { case: "lib-l1-v01", flag: "ret.stale_doc", message_vi: "Thùng có giấy 2019." },
+    ];
+    show(finishedRun({ "lib-l1-v01": trap, "lib-l1-t01": trap }, lessons), dense, l2);
+    expect(screen.getByRole("button", { name: "Xem ở Nam châm bám Điều" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Xem ở Kính lọc hiệu lực" })).toBeDefined();
+  });
+
+  it("shows no missing-citation chip on a trap answered with a correct 'không có'", () => {
+    const run = replay(parseSse(readText("e2e", "data", "run-l1-reference.sse")));
+    if (!run) throw new Error("no run");
+    const t01 = run.cases.find((c) => c.id === "lib-l1-t01");
+    expect(t01?.graded?.passed).toBe(true);
+    expect(t01?.graded?.labels).toContain("cite_missing");
+    show(run);
+    expect(card(t01?.n ?? 0)).toContain('Đã nói "không có"');
+    expect(card(t01?.n ?? 0)).not.toContain("Không trích nguồn");
   });
 
   it("says the move when the lesson's slot is detached on the bench", () => {

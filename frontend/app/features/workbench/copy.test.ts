@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, starterBench, type Bench, type Env } from "./bench";
-import { diagnosisTarget, flagWords, groupDiagnosis, lowerFirst, sameGraphNote } from "./copy";
+import {
+  diagnosisTarget,
+  flagWords,
+  groupDiagnosis,
+  liveMessage,
+  lowerFirst,
+  sameGraphNote,
+} from "./copy";
 import type { Graph } from "./schema";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
 
@@ -159,6 +166,19 @@ describe("diagnosis copy", () => {
     expect(retry && sameGraphNote(retry)).toBe(
       "Mở ca lại sau ít phút: các câu đã chạy xong dùng kết quả đã lưu, chỉ câu chưa chạy xong gọi AI lại.",
     );
+  });
+
+  it("announces a correct 'không có' as passed, with no fault after it", () => {
+    const frames = parseSse(readText("e2e", "data", "run-l1-reference.sse"));
+    const run = replay(
+      frames.slice(
+        0,
+        frames.findIndex((f) => f.event === "run.scored"),
+      ),
+    );
+    const t01 = run?.cases.find((c) => c.id === "lib-l1-t01");
+    expect(t01?.graded?.labels).toContain("cite_missing");
+    expect(liveMessage(run ?? null, "lib-l1-t01")).toBe(`Câu ${t01?.n}: Đạt.`);
   });
 
   it("lowers the first letter, but not an acronym", () => {

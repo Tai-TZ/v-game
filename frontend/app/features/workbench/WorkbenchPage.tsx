@@ -9,7 +9,7 @@ import { cancelRun, eventsUrl, newKey, postRun, type LevelPageData } from "./api
 import { graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
-import { BACK_TO_LEVELS, LABEL_VI, lowerFirst } from "./copy";
+import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { Results } from "./Results";
 import { frameAction, isActive, runReducer, type RunAction, type RunView } from "./run";
 import { RunPanel, type RequestState, type StopState, type Summary } from "./RunPanel";
@@ -408,19 +408,4 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       </p>
     </>
   );
-}
-
-/** One polite message: run start, the followed case's grade, the stars (§9). */
-function liveMessage(run: RunView | null, followedId: string | null): string {
-  if (!run) return "";
-  if (run.score) return `Kết quả ca tối nay: ${run.score.stars}/3 sao.`;
-  const followed = run.cases.find((c) => c.id === followedId);
-  if (followed?.graded) {
-    const label = followed.graded.labels[0];
-    const outcome = followed.graded.passed ? "Đạt" : "Trượt";
-    const why = label ? `, ${lowerFirst(LABEL_VI[label] ?? label)}` : "";
-    return `Câu ${followed.n}: ${outcome}${why}.`;
-  }
-  if (run.cases.length > 0) return `Bắt đầu ca: ${run.cases.length} câu.`;
-  return "";
 }

@@ -32,6 +32,7 @@ import {
   fmtValue,
   LABEL_VI,
   outcomeText,
+  shownLabels,
   stepStatusText,
   TOY,
   toyName,
@@ -388,7 +389,7 @@ export function Grade({ c }: { c: CaseView }) {
               {CRITERIA_VI[name] ?? name}
             </li>
           ))}
-          {graded.labels.map((label) => (
+          {shownLabels(graded.labels).map((label) => (
             <li key={label} className="rounded-sm bg-subtle px-2 py-0.5 text-xs">
               {LABEL_VI[label] ?? label}
             </li>

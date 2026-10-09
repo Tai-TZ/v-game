@@ -36,6 +36,14 @@ export const TOY: Readonly<Record<BlockType, { name: string; params?: Record<str
   output: { name: "Bảng trả lời" },
 };
 
+/**
+ * The toy a diagnosis opens: the knob's own where the slot's knobs are toys of their own (the
+ * chunker's Nam châm, Kính lọc), so two lessons on one slot read differently.
+ */
+export function knobName(type: BlockType, param?: string): string {
+  return (type === "chunker" && param ? TOY.chunker.params?.[param] : undefined) ?? TOY[type].name;
+}
+
 /** Toy of a node: the fusion toy depends on its method (Phễu for rrf, Bập bênh for alpha). */
 export function toyName(type: BlockType, params?: Readonly<Record<string, JsonValue>>): string {
   if (type === "fusion" && params?.method === "alpha") return "Bập bênh";
@@ -185,6 +193,14 @@ export const FLAG_VI: Readonly<Record<string, string>> = {
 export const lowerFirst = (text: string) =>
   /^\p{Lu}\p{Lu}/u.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1);
 
+/**
+ * Labels worth showing on a graded case. A correct "không có" cites nothing by design, so it
+ * drops `cite_missing`, as the server's diagnosis does (grading.py).
+ */
+export function shownLabels(labels: readonly string[]): readonly string[] {
+  return labels.includes("abstained") ? labels.filter((l) => l !== "cite_missing") : labels;
+}
+
 /** Flag keys the server can leave in a message (the regression and fallback templates). */
 const FLAG_KEY = /\b(?:ret|llm|ctx|trap)\.[a-z_]+(?::[a-z0-9_]+)?/g;
 
@@ -325,6 +341,21 @@ export function outcomeText(c: CaseView): string {
   if (!graded.counted) parts.unshift("Không tính sao");
   if (graded.status !== "ok") parts.push(STATUS_VI[graded.status] ?? graded.status);
   return parts.join(" · ");
+}
+
+/** One polite message: run start, the followed case's grade (why, if it failed), the stars (§9). */
+export function liveMessage(run: RunView | null, followedId: string | null): string {
+  if (!run) return "";
+  if (run.score) return `Kết quả ca tối nay: ${run.score.stars}/3 sao.`;
+  const followed = run.cases.find((c) => c.id === followedId);
+  if (followed?.graded) {
+    const { passed, labels } = followed.graded;
+    const label = passed ? undefined : shownLabels(labels)[0];
+    const why = label ? `, ${lowerFirst(LABEL_VI[label] ?? label)}` : "";
+    return `Câu ${followed.n}: ${passed ? "Đạt" : "Trượt"}${why}.`;
+  }
+  if (run.cases.length > 0) return `Bắt đầu ca: ${run.cases.length} câu.`;
+  return "";
 }
 
 /** Run failure titles by `run.failed.code` (§8.6). */
