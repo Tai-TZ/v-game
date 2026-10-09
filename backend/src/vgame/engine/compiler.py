@@ -144,6 +144,8 @@ def instrumented(
             raise
         finally:
             ms = round((time.perf_counter() - started) * 1000)
+            if result is not None and result.ms is not None:
+                ms = result.ms
             usage = result.usage if result else Usage()
             facts = result.facts if result else ()
             summary = result.summary if result else message or _FAILED_SUMMARY[status]

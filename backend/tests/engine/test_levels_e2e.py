@@ -27,7 +27,7 @@ from vgame.engine.budget import RunBudget
 from vgame.engine.compiler import compile_graph
 from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import GraphPayload
-from vgame.engine.index import IndexStore
+from vgame.engine.index import IndexStore, RerankTable
 from vgame.engine.levels import Expectation, LevelSpec, load_level
 from vgame.engine.runtime import run_level
 from vgame.engine.types import EngineEvent, LLMClient, Reranker
@@ -211,6 +211,45 @@ def test_naive_graph_produces_its_model_dependent_flags(
     for x in expect:
         if x.mechanism == "T" and x.needs_real_models:
             assert_expectation(x, events)
+
+
+def test_l3_rerank_ms_is_the_build_timing_times_the_candidates(
+    real_models: tuple[IndexStore, Reranker],
+) -> None:
+    # §14 (2026-10-09): a lookup in the shipped table took ~10-20 ms whatever it scored, so
+    # L3's "Kính lúp tốn {ms} ms" showed the slow-but-sure block as nearly free.
+    store, shipped = real_models
+    assert isinstance(shipped, RerankTable)
+    assert shipped.ms_per_pair > 50  # live jina: ~120 ms per pair
+    # The same scores with another build's timing: a constant equal to the shipped one fails.
+    table = RerankTable(
+        shipped.model_id,
+        shipped.questions,
+        shipped.texts,
+        shipped.scores,
+        shipped.regime,
+        {"ms_per_pair": 37.5},
+    )
+    level = load_level("article-number-lookup")
+    totals = []
+    for top_k in (3, 10):
+        nodes = [
+            n.model_copy(update={"params": {**n.params, "top_k": top_k}}) if n.id == "fu" else n
+            for n in level.reference_graph.nodes
+        ]
+        graph = level.reference_graph.model_copy(update={"nodes": nodes})
+        steps = [e for e in run_graph(level, graph, store, table) if e["type"] == "step.finished"]
+        scored = {
+            e["case"]: len(f["items"])
+            for e in steps
+            if e["node"] == "fu"
+            for f in e["facts"]
+            if f["kind"] == "retrieved"
+        }
+        ms = {e["case"]: e["ms"] for e in steps if e["node"] == "rr"}
+        assert ms == {case: round(n * 37.5) for case, n in scored.items()}
+        totals.append(sum(ms.values()))
+    assert totals[0] < totals[1]
 
 
 def every_graph() -> list[Any]:

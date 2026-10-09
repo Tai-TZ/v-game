@@ -7,7 +7,7 @@ deterministic, gold-free, never contain the question, and use Vietnamese numbers
 
 import asyncio
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,7 +23,7 @@ from vgame.engine.constants import (
     Strategy,
     count_tokens,
 )
-from vgame.engine.index import IndexNotBuiltError, IndexStore
+from vgame.engine.index import IndexNotBuiltError, IndexStore, RerankTable
 from vgame.engine.packing import pack, pack_fact
 from vgame.engine.prompt import build_request, parse_citations
 from vgame.engine.retrieval import retrieved_fact, summarize_docs, vi_number
@@ -93,6 +93,7 @@ class StepResult:
     usage: Usage = field(default_factory=Usage)
     status: StepStatus = "ok"
     answer: Answer | None = None  # set by the output block only
+    ms: int | None = None  # simulated duration, replaces the measured one (rerank only)
 
 
 # --- Params models + behaviour -----------------------------------------------------------
@@ -197,7 +198,10 @@ class RerankParams(BlockParams):
         docs = await asyncio.to_thread(
             retrieval.rerank, call.store(), reranker, case.question, before, top_n=self.top_n
         )
-        return _docs_result(docs, n_in=len(before.hits))
+        result = _docs_result(docs, n_in=len(before.hits))
+        if isinstance(reranker, RerankTable):  # L3 teaches rerank's cost: report the live one
+            return replace(result, ms=round(len(before.hits) * reranker.ms_per_pair))
+        return result
 
 
 class ContextPackerParams(BlockParams):

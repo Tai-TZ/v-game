@@ -21,6 +21,7 @@ from vgame.engine.constants import ALL_VARIANTS, TOKENIZER_ID, IndexVariant
 from vgame.engine.corpus import load_documents
 from vgame.engine.grading import load_grading_spec, public_cases
 from vgame.engine.index import (
+    RERANK_TIMING_FALLBACK,
     IndexNotBuiltError,
     IndexStaleError,
     IndexStore,
@@ -194,6 +195,8 @@ def test_cli_builds_artifacts_with_injected_models(
     assert loaded.manifest["variants"] == ["theo_dieu-512-10"]
     assert loaded.rerank is not None
     assert loaded.rerank.model_id == OverlapReranker.model_id
+    scored = int(np.count_nonzero(~np.isnan(loaded.rerank.scores)))
+    assert loaded.rerank.timing["pairs"] == scored  # this build timed its own scoring
     content = settings.content_dir
     loaded.check_fresh(
         load_documents(content), golden_questions(content), rerank_questions(content)
@@ -361,6 +364,32 @@ def test_build_rerank_table_scores_only_new_pairs(one_variant: IndexStore) -> No
     assert len(other.batches[0]) == len(set(l1))
 
 
+def test_rerank_table_keeps_the_scoring_time_per_pair(one_variant: IndexStore) -> None:
+    # §14 (2026-10-09): rerank steps over the table report this x the candidates they score.
+    empty = RerankTable("m", [], [], np.zeros((0, 0), dtype=np.float32))
+    assert empty.timing == RERANK_TIMING_FALLBACK  # a table saved before the timing existed
+    assert empty.ms_per_pair == RERANK_TIMING_FALLBACK["ms_per_pair"]
+    table = build_rerank_table(one_variant, OverlapReranker(), {QUESTION: L1_DOCS}, log=_quiet)
+    assert table.timing["pairs"] == len(set(_texts(one_variant, L1_DOCS)))
+    again = build_rerank_table(
+        one_variant, CountingReranker(), {QUESTION: L1_DOCS}, reuse=table, log=_quiet
+    )
+    assert again.timing == table.timing  # nothing scored: the measured value stays
+    big = {"ms_per_pair": 100.0, "pairs": 100_000}  # e.g. a full rebuild on an idle machine
+    timed = RerankTable(
+        table.model_id, table.questions, table.texts, table.scores, table.regime, big
+    )
+    edit = build_rerank_table(  # a corpus edit: a few new pairs, timed on any machine
+        one_variant,
+        CountingReranker(),
+        {QUESTION: L1_DOCS, OTHER: L1_DOCS},
+        reuse=timed,
+        log=_quiet,
+    )
+    assert edit.timing["pairs"] == 100_000 + len(set(_texts(one_variant, L1_DOCS)))
+    assert edit.ms_per_pair == pytest.approx(100.0, abs=0.5)  # weighted by pairs, not replaced
+
+
 def test_rerank_scores_of_other_scoring_settings_are_not_reused(
     one_variant: IndexStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -406,8 +435,16 @@ def test_save_load_keeps_the_rerank_table(one_variant: IndexStore, tmp_path: Pat
     assert loaded.rerank is not None
     assert loaded.rerank.model_id == table.model_id
     assert loaded.rerank.regime == table.regime  # the next build's reuse check reads it
+    assert loaded.rerank.timing == table.timing
     l1 = _texts(store, L1_DOCS)
     assert loaded.rerank.score(QUESTION, l1) == table.score(QUESTION, l1)
+    meta_path = tmp_path / "rerank.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    for bad in ({"source": "x"}, {"ms_per_pair": "nan"}, {"ms_per_pair": 0}, {"ms_per_pair": -1}):
+        # A broken timing failed every L3 rerank step as run.failed{internal}, not at startup.
+        meta_path.write_text(json.dumps({**meta, "timing": bad}), encoding="utf-8")
+        with pytest.raises(IndexNotBuiltError):
+            IndexStore.load(tmp_path)
     store.rerank = None  # saving without a table removes the old one
     store.save(tmp_path)
     assert IndexStore.load(tmp_path).rerank is None
@@ -440,6 +477,7 @@ def test_shipped_index_is_fresh_and_complete() -> None:
     assert shipped.rerank is not None
     assert shipped.rerank.model_id == settings.rerank_model
     assert shipped.rerank.regime["max_tokens"] == retrieval.RERANK_MAX_TOKENS
+    assert shipped.rerank.timing["pairs"] >= 873  # a corpus edit's few pairs barely move it
     data = SHIPPED_INDEX_DIR.parent
     assert sum(p.stat().st_size for p in data.rglob("*") if p.is_file()) < 10_000_000
 
