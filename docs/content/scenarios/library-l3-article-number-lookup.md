@@ -9,7 +9,7 @@
 |---|---|
 | Mã level | `article-number-lookup` (order 3, khu `library`) |
 | Kind | `incident` · type Phần 3: `rag`, sự cố |
-| Khái niệm (zones.json) | Tìm kiếm lai · Tìm theo từ khoá · Xếp hạng lại |
+| Khái niệm (zones.json) | Tìm kiếm lai · Tìm theo từ khóa · Xếp hạng lại |
 | Slide gốc | **Ngày 8:** slide 12/46 "Hai trường phái tìm kiếm cốt lõi" (dense / sparse), 13/46 "Semantic search" (bỏ lỡ mã lỗi, tên riêng, số ticket), 14/46 "Lexical search (BM25)" (bỏ lỡ paraphrase; hợp với luật, mã), 15/46 "Hybrid search", 16/46 "RRF vs Alpha weighting" (k = 60; luật α 0,2–0,4), 17/46 "Reranking: vì sao top-k chưa đủ", 42/46 "Case study: hybrid lên bàn cân", 43/46 "ROI của RAG" (rerank: latency 1 s → 4 s), 44/46 "CI/CD cho RAG evaluation". **Ngày 14:** slide 10/42 "Khi nào chạy evaluation" (regression check mỗi lần đổi) |
 | Điều kiện vào | Đã có sao 1 ở L2 |
 | Kho | chỉ `qcdt-2024`; **không** có bản 2019 (D7) |

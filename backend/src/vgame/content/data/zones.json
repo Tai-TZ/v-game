@@ -29,7 +29,7 @@
           "order": 3,
           "title": "Hỏi bằng số điều",
           "brief": "Sự cố: người dùng hỏi theo số hiệu điều luật và tìm theo nghĩa trả về sai điều. Kết hợp tìm theo từ khóa với tìm theo nghĩa, rồi xếp hạng lại kết quả.",
-          "concepts": ["Tìm kiếm lai", "Tìm theo từ khoá", "Xếp hạng lại"],
+          "concepts": ["Tìm kiếm lai", "Tìm theo từ khóa", "Xếp hạng lại"],
           "kind": "incident"
         }
       ]

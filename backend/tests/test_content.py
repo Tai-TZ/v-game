@@ -35,6 +35,13 @@ def test_level_briefs_call_the_assistant_tro_ly() -> None:
             assert not re.search(r"\bagent\b", level.brief, re.IGNORECASE), level.id
 
 
+def test_level_cards_spell_khoa_like_the_ui() -> None:
+    """The zone page shows the brief and concepts side by side: one spelling, "khóa"."""
+    for zone in load_catalog().zones:
+        for level in zone.levels:
+            assert "khoá" not in " ".join([level.brief, *level.concepts]), level.id
+
+
 def _level(level_id: str, order: int) -> dict[str, Any]:
     return {
         "id": level_id,
