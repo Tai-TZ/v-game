@@ -302,6 +302,18 @@ def test_concurrent_run_cap_answers_429(
     assert busy.json() == {"detail": "Máy chủ miễn phí chạy một lượt mỗi lúc và đang bận."}
 
 
+def test_cross_origin_client_can_read_retry_after(
+    make_client: Callable[[EngineServices], TestClient], allowed_origin: str
+) -> None:
+    """Retry-After is not a CORS-safelisted response header: without Expose-Headers a client on
+    another origin (VITE_API_BASE_URL) never sees it."""
+    client = make_client(engine(FakeLLM("x", delay_s=5), max_runs=1))
+    assert post_run(client, reference()).status_code == 202
+    busy = post_run(client, reference(), Origin=allowed_origin)
+    assert busy.status_code == 429
+    assert "retry-after" in busy.headers["access-control-expose-headers"].lower()
+
+
 def test_cancel_ends_the_run_with_run_failed(
     make_client: Callable[[EngineServices], TestClient],
 ) -> None:

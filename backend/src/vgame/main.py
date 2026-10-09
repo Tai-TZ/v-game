@@ -121,6 +121,8 @@ def create_app(
         # POST only for /api/runs; JSON bodies and SSE reconnects need these request headers.
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type", "Idempotency-Key", "Last-Event-ID"],
+        # Not CORS-safelisted: the workbench words a 429's wait from it.
+        expose_headers=["Retry-After"],
         allow_credentials=False,
     )
     app.add_middleware(
