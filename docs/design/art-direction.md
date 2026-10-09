@@ -167,7 +167,7 @@ Unit test (`scene.test.ts`, mỗi theme): ngày `shade(+y)` đúng bằng `(1, 1
 - **Sương mù:** không. Đế mô hình nổi trên nền trời phẳng; cạnh đế là đường viền rõ ràng.
 - **Manifest additions: không có.** Đã cân nhắc `sky`, `signal`, `skin`, `glass` và bỏ cả bốn: trời đã có trong `theme.css`; vòng tương tác dùng `player`, huy hiệu "!" dùng token CSS `accent`; tượng người không có da; kính và đèn phái sinh được. Vì vậy D8 không kích hoạt: coder **không** sửa `schema.ts` hay hai `manifest.json` cho art.
 - **Sửa 2026-10-08, D8 kích hoạt một lần:** thêm `campus.lights = { default, day, dusk }`. Mỗi preset gồm `sky`, `ground`, `hemisphere`, `sun`, `sunIntensity`, `sunDirection`, `rim`, tức tham số của hai đèn three.js cộng hệ số rim. Preset là dữ liệu theme vì đó là chỗ một theme chọn giờ mặc định và chỉnh tông; công thức vẫn ở code và có test. Hai theme hiện dùng cùng giá trị, `default: "day"`.
-- **Sửa 2026-10-09 (§14), D8 lần hai:** `campus.lights` có đủ bốn preset `dawn`, `day`, `dusk`, `night`, bỏ `default` (pha đến từ mặt trời, không còn nút chọn); manifest thêm `place = { name, lat, lon, timeZone }`. Trời theo pha × mây: `theme.css` khai `--vg-scene-dawn`, `--vg-scene-night`, `--vg-scene-cloud`, `--vg-scene-cloud-night` (cùng `--vg-scene-sky`, `--vg-scene-dusk`); `<main data-sky data-clouds>` đặt `--vg-sky`, `--color-scene: var(--vg-sky, var(--vg-scene-sky))`. Token `bg-scene-dusk` bỏ.
+- **Sửa 2026-10-09 (§14), D8 lần hai:** `campus.lights` có đủ bốn preset `dawn`, `day`, `dusk`, `night`, bỏ `default` (pha đến từ mặt trời, không còn nút chọn); manifest thêm `place = { name, lat, lon, timeZone }`. Trời theo pha × mây: `theme.css` khai `--vg-scene-dawn`, `--vg-scene-night`, `--vg-scene-cloud`, `--vg-scene-cloud-night` (cùng `--vg-scene-sky`, `--vg-scene-dusk`); `<main data-sky data-clouds>` đặt `--vg-sky`, `--color-scene: var(--vg-sky, var(--vg-scene-sky))`; `[data-sky]` khai lại `--color-scene: var(--vg-sky)` vì biến khai ở `:root` đã giải `--vg-sky` tại `:root` (chưa có), nên sương và đất bản vẽ luôn lấy trời ban ngày. Trước khi hydrate, script bootstrap theme đặt `<html data-sky="night">` theo giờ ở `place.timeZone` (trước 06:00, từ 18:00; bỏ qua khi "Cố định ban ngày"), `useSkyClock` gỡ nó khi `<main>` có pha chính xác. Token `bg-scene-dusk` bỏ.
 
 ---
 
@@ -587,7 +587,7 @@ Vòng lặp duy nhất được phép là khối logo đang chờ trong màn ch�
 | Độ nổi | viền, không bóng: panel trên cảnh dùng `bg-surface border border-line-strong`; thẻ trong trang dùng `border-line` |
 | Nền panel | `bg-surface` đặc. Không trong suốt, không blur. Chữ trên panel đạt ≥ 4.5:1 bất kể cảnh phía sau |
 | Lớp phủ modal | `bg-ink/20` (token có alpha), click vào thì đóng |
-| Focus | luật toàn cục `:focus-visible` (2 px `brand`, offset 2 px) đã có. `brand` trên trời: 7.0:1 / 5.35:1. Sửa 2026-10-09 (§14): điều khiển nằm trên cảnh (`.on-scene` và con trực tiếp: cụm nút trên, la bàn, khung cảnh) dùng vòng `surface` khi `data-sky="night"` |
+| Focus | luật toàn cục `:focus-visible` (2 px `brand`, offset 2 px) đã có. `brand` trên trời: 7.0:1 / 5.35:1. Sửa 2026-10-09 (§14): điều khiển nằm trên cảnh (`.on-scene` và con trực tiếp: cụm nút trên, khung cảnh) dùng vòng `surface` khi `data-sky="night"`; nút Góc nhìn dùng vòng `brand` lõm vào trong (offset -4 px), luôn nằm trên `surface` |
 | Vùng chạm | mọi nút `h-11` (44 px) và `min-w-11`; gợi ý tương tác `h-12`; dòng trong danh sách khu `min-h-12` |
 | z-index | canvas `z-0` → nhãn thế giới `z-10` → cụm nút `z-20` → gợi ý, panel `z-30` → lớp phủ + hội thoại `z-40` → danh sách khu `z-50` |
 
