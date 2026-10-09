@@ -174,7 +174,7 @@ function LiveLoader() {
   if (gone || (leaving && !seen)) return null;
   // ?debug=loader keeps the diorama alone at 50% over the live scene, to check the alignment.
   const state = leaving
-    ? "bg-scene opacity-0 transition-opacity duration-200 ease-in"
+    ? "bg-scene animate-leave"
     : done
       ? "opacity-50"
       : `bg-scene ${delay > 0 ? "animate-appear" : ""}`;
@@ -185,7 +185,7 @@ function LiveLoader() {
       data-scene-loader=""
       className={`${ROOT} ${state}`}
       // Client-only (CSSOM, allowed by style-src 'self'); never in pre-rendered HTML.
-      style={delay > 0 ? { animationDelay: `${delay}ms` } : undefined}
+      style={delay > 0 && !leaving ? { animationDelay: `${delay}ms` } : undefined}
     >
       {box && (
         <svg

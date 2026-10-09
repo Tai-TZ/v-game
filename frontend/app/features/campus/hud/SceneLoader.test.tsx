@@ -125,7 +125,7 @@ describe("SceneLoader", () => {
     renderLoader();
     run(() => vi.advanceTimersByTime(500));
     run(() => advanceScene(STAGE.done));
-    expect(loader()?.className).toContain("opacity-0");
+    expect(loader()?.className).toContain("animate-leave");
     expect(screen.getByText(LABELS[STAGE.done])).toBeDefined();
     run(() => vi.advanceTimersByTime(220));
     expect(loader()).toBeNull();

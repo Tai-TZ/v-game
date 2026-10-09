@@ -250,6 +250,22 @@ test.describe("scene loader", () => {
     });
   }
 
+  test("fades out on an entry from the landing page instead of cutting", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/");
+    await page.getByRole("link", { name: "Vào khuôn viên" }).first().click();
+    // Read on the animation frame where the last step shows: a fade starts near opacity 1.
+    const opacity = await page.waitForFunction(
+      () => {
+        const element = document.querySelector("[data-scene-loader]");
+        return element?.textContent.includes("Xong rồi") ? getComputedStyle(element).opacity : "";
+      },
+      undefined,
+      { polling: "raf", timeout: 30_000 },
+    );
+    expect(Number(await opacity.jsonValue())).toBeGreaterThan(0.5);
+  });
+
   test.describe("before any JS runs", () => {
     test.use({ javaScriptEnabled: false });
 

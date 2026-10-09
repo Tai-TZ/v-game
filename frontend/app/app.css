@@ -11,6 +11,8 @@
   /* HUD motion (art §7). The global reduced-motion rule below cuts these to ~0 ms. */
   --animate-enter: vg-enter 200ms ease-out both;
   --animate-appear: vg-appear 1ms 150ms both;
+  /* An animation, not a transition: swapped in for animate-appear, a transition never starts. */
+  --animate-leave: vg-leave 200ms ease-in forwards;
   /* The scene loader's waited logo block: the only loop, and only while loading (art §7). */
   --animate-hover: vg-hover 1.2s ease-in-out infinite alternate;
 
@@ -22,6 +24,11 @@
   }
   @keyframes vg-appear {
     from {
+      opacity: 0;
+    }
+  }
+  @keyframes vg-leave {
+    to {
       opacity: 0;
     }
   }
