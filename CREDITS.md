@@ -2,7 +2,7 @@
 
 Third-party art in V-Game. Every asset below is **CC0 1.0** (public domain): credit is not
 required, we give it anyway. Nothing is credited inside the game; no logo of any author is used
-anywhere (the Kenney FAQ only asks that its logo is not used).
+anywhere (Kenney's support page, <https://kenney.nl/support>, asks that its logo is not used).
 
 | What                                    | Author     | Source                                                                                                | Licence                                                                        | Used as                                                                                             |
 | --------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
@@ -12,12 +12,14 @@ anywhere (the Kenney FAQ only asks that its logo is not used).
 | 7 single models on Poly Pizza           | Quaternius | <https://quaternius.com>, pages listed in [the notice](frontend/public/models/LICENSE-quaternius.txt) | CC0 1.0                                                                        | `frontend/public/models/props.json`                                                                 |
 
 All files were downloaded on 2026-10-09. The raw downloads are not in the repository:
-`tools/assets-sources.json` lists every source file with its URL and SHA-256. To re-bake, put the
-files of a pack in one directory under their `as` names, then run from the repo root:
+`tools/assets-sources.json` lists every source file with its URL and SHA-256. To re-bake, use one
+directory per baker holding the files of every pack it lists (its `bake` command) under their
+`as` names: the Mini Characters pack for `bake-cast`; the Nature Kit, City Kit Commercial and
+Quaternius files for `bake-props`. Then run (the output path defaults to frontend/public/models/):
 
 ```sh
-node tools/characters/bake-cast.mjs <dir> frontend/public/models/cast.json
-node tools/props/bake-props.mjs <dir> frontend/public/models/props.json
+node tools/characters/bake-cast.mjs <dir>
+node tools/props/bake-props.mjs <dir>
 ```
 
 Add `--check` to prove the committed JSON is byte-identical to a fresh bake.
