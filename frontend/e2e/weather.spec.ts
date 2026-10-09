@@ -163,6 +163,7 @@ test.describe("live sky", () => {
     page,
     consoleErrors,
   }) => {
+    test.slow(); // a re-bake, a reload and a walk to Lan on software WebGL
     await page.clock.setFixedTime(hanoi("21:00"));
     await mockApi(page);
     await weather(page, "rain");
@@ -196,7 +197,9 @@ test.describe("live sky", () => {
     // A conversation closes the popover (it would sit over the dialog in the top layer).
     await chip(page).click();
     await expect(popover).toBeVisible();
-    await page.getByText("!", { exact: true }).click();
+    // No pointerdown: a real click outside light-dismisses the popover, and below sm the open
+    // popover covers the badge. This proves the store's dialog closes it, on both projects.
+    await page.locator('[data-badge="lan"]').dispatchEvent("click");
     await expect(page.getByRole("dialog", { name: "Cô Lan" })).toBeVisible();
     await expect(popover).toBeHidden();
     expect(consoleErrors).toEqual([]);
