@@ -3,6 +3,7 @@ import { CompassIcon, RotateCcwIcon, RotateCwIcon } from "~/components/ui/icons"
 import { HOME_YAW } from "../camera";
 import { viewNeedle } from "../scene/labels";
 import { hubStore, useHub } from "../store";
+import { STAGE, useSceneLoad } from "./sceneLoad";
 
 const BUTTON = "grid size-11 place-items-center text-fg";
 const LIVE = "cursor-pointer hover:bg-subtle";
@@ -25,11 +26,14 @@ const registerNeedle = (element: SVGGElement | null) => {
 /**
  * "Góc nhìn" (orbit-camera §2.3): turn the campus 90° either way or back to the home view, the
  * path that needs no dragging (WCAG 2.2, 2.5.7). Lives in CampusScene, so it shows only with a
- * scene; a modal dialog makes it inert. The compass is `aria-disabled` at home, not `disabled`,
+ * scene, and only from its first frame on; a modal dialog makes it inert. The compass is `aria-disabled` at home, not `disabled`,
  * so focus stays on it after it brings the view home.
  */
 export function ViewControls() {
   const rotated = useHub((state) => state.rotated);
+  // Not over the loader card, and no turn before the first frame lands on its home blueprint.
+  const ready = useSceneLoad((s) => s.stage >= STAGE.done);
+  if (!ready) return null;
   const rotate = (dir: -1 | 0 | 1) => () => hubStore.getState().rotateView(dir);
   return (
     <div

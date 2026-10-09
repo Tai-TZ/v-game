@@ -26,6 +26,7 @@ import {
   viewFor,
   wrapAngle,
 } from "../camera";
+import { sceneLoad, STAGE } from "../hud/sceneLoad";
 import {
   INTERACT_RADIUS,
   NPC_SPOT,
@@ -73,6 +74,9 @@ function ringScale(t: number): number {
   const phase = ((t - RING_INTRO) % RING_PULSE) / RING_PULSE;
   return 1 + 0.1 * (0.5 - 0.5 * Math.cos(2 * Math.PI * phase));
 }
+
+/** No turn until the first frame is drawn at HOME_YAW, on the loader's blueprint. */
+const painted = () => sceneLoad.getState().stage >= STAGE.paint;
 
 /** Keys reach the scene only when focus is on the page itself or on the scene container. */
 function sceneHasFocus(): boolean {
@@ -213,7 +217,9 @@ export function useHubFrame(options: {
       if (event.code === "Comma" || event.code === "Period") {
         event.preventDefault();
         // A drag owns the yaw until it ends; one press is one 90° step.
-        if (event.repeat || (drag.current.id !== null && drag.current.dragged)) return;
+        if (event.repeat || !painted() || (drag.current.id !== null && drag.current.dragged)) {
+          return;
+        }
         hubStore.getState().rotateView(event.code === "Period" ? 1 : -1);
       } else if (isMovementKey(event.code)) {
         event.preventDefault();
@@ -252,7 +258,9 @@ export function useHubFrame(options: {
   useEffect(() => {
     const d = drag.current;
     const onDown = (event: PointerEvent) => {
-      if (!event.isPrimary || event.button !== 0 || hubStore.getState().dialog) return;
+      if (!event.isPrimary || event.button !== 0 || hubStore.getState().dialog || !painted()) {
+        return;
+      }
       Object.assign(d, {
         id: event.pointerId,
         x0: event.clientX,
