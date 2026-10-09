@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -25,6 +26,13 @@ def test_bundled_catalog_satisfies_invariants() -> None:
         "watchtower": "coming_soon",
         "market": "coming_soon",
     }
+
+
+def test_level_briefs_call_the_assistant_tro_ly() -> None:
+    """The brief is the first line a player reads under the title; the workbench says "trợ lý"."""
+    for zone in load_catalog().zones:
+        for level in zone.levels:
+            assert not re.search(r"\bagent\b", level.brief, re.IGNORECASE), level.id
 
 
 def _level(level_id: str, order: int) -> dict[str, Any]:
