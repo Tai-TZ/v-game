@@ -42,7 +42,10 @@ test.describe("hub NPCs", () => {
     const names = await npcNames(page);
     for (const { id } of NPCS) {
       await openZoneList(page);
-      const row = page.getByRole("button", { name: `Nói chuyện với ${names[id].name}` });
+      // Scoped to the list: once the walk ends, the interact hint offers the same words.
+      const row = page
+        .locator("#hub-zone-list")
+        .getByRole("button", { name: `Nói chuyện với ${names[id].name}`, exact: true });
       await row.click();
       const dialog = page.getByRole("dialog", { name: titleOf(names[id].name) });
       await expect(dialog).toBeVisible();
@@ -58,7 +61,11 @@ test.describe("hub NPCs", () => {
     // A second visit says one line of the "not open yet" set.
     const [first] = NPCS;
     if (!first) throw new Error("No NPC.");
-    await page.getByRole("button", { name: `Nói chuyện với ${names[first.id].name}` }).click();
+    await openZoneList(page);
+    await page
+      .locator("#hub-zone-list")
+      .getByRole("button", { name: `Nói chuyện với ${names[first.id].name}`, exact: true })
+      .click();
     await expect(
       page.getByText(NPC_ROLES[first.id].coming_soon[0] ?? "", { exact: true }),
     ).toBeVisible();
