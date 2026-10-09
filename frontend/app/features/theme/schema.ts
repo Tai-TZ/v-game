@@ -48,7 +48,7 @@ export const TimeOfDaySchema = v.picklist(["dawn", "day", "dusk", "night"]);
 
 /**
  * Where the campus stands: the hub's time of day comes from the sun here, and the weather chip
- * names it. Never the viewer's location. Must match the backend's WEATHER_LATITUDE/LONGITUDE.
+ * names it; the browser fetches Open-Meteo's weather for it. Never the viewer's location.
  */
 const PlaceSchema = v.strictObject({
   name: v.pipe(v.string(), v.nonEmpty()),

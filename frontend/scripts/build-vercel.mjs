@@ -5,7 +5,8 @@
 // - Public deploys ship only the neutral town theme unless VITE_THEME_PACKS/VITE_DEFAULT_THEME
 //   say otherwise, so a brand-licensed pack is never published by forgetting an env var.
 // - Security headers (including the per-build CSP hashes) come from build/security-headers.json.
-// - /api/* is proxied to VG_API_ORIGIN, so the browser stays same-origin (CSP connect-src 'self').
+// - /api/* is proxied to VG_API_ORIGIN, so the API stays same-origin (CSP connect-src 'self'; the
+//   only other source is Open-Meteo, which the browser calls for the campus weather).
 // - Theme packs not listed in VITE_THEME_PACKS are left out of the deployment.
 // - /play gets its pre-rendered page; unknown /assets and /themes paths answer 404; every other
 //   path gets the SPA fallback.

@@ -41,7 +41,8 @@ function inlineScriptHashes(html) {
 }
 
 function connectSources() {
-  const sources = ["'self'"];
+  // The campus weather: the browser fetches Open-Meteo itself (useSkyClock).
+  const sources = ["'self'", "https://api.open-meteo.com"];
   const apiBase = process.env.VITE_API_BASE_URL;
   if (apiBase) sources.push(new URL(apiBase).origin);
   return sources.join(" ");

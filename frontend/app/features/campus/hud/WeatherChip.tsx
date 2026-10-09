@@ -56,7 +56,8 @@ const degrees = (celsius: number) => `${Math.round(celsius) || 0}°C`;
  * Today's weather and hour at the theme's place, in the top-left HUD group (campus v0.4 W6): icon
  * and "27°C" from `sm`, the icon alone (44 px) below. A native popover holds the details, the
  * display mode ("Cố định ban ngày" also stops the rain, WCAG 2.2.2) and the data credit next to
- * the data (Open-Meteo, CC BY 4.0). Old browsers without popover never show its content.
+ * the data (Open-Meteo, CC BY 4.0), with a note that the browser fetches it there. Old browsers
+ * without popover never show its content.
  */
 export function WeatherChip({ place }: { place: Place }) {
   const { phase, weather, failed, display } = useHub((state) => state.sky);
@@ -170,6 +171,9 @@ export function WeatherChip({ place }: { place: Place }) {
             CC BY 4.0<span className="sr-only"> (mở thẻ mới)</span>
           </a>
           ), đã quy về nhóm và làm tròn
+        </p>
+        <p className="mt-1 text-xs text-fg-muted">
+          Trình duyệt của bạn tải thẳng từ Open-Meteo, nên họ thấy địa chỉ IP của bạn.
         </p>
       </div>
     </>

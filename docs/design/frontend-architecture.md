@@ -21,9 +21,9 @@ app/
 │  │  ├─ sites.ts         DEFAULT_STATUS, tên dự phòng, INTERACT_POINTS, chữ gợi ý §4
 │  │  ├─ store.ts         zustand: nearby, dialog, metLan, sheetInset, sky + `motion` (mutable)
 │  │  ├─ sky.ts           thuần, không three: độ cao mặt trời, pha (±6°), buổi theo múi giờ
-│  │  │                   của `place`, 7 nhóm thời tiết → 5 lớp nướng, WeatherSchema,
+│  │  │                   của `place`, mã WMO → 7 nhóm → 5 lớp nướng, URL và parse Open-Meteo,
 │  │  │                   sceneLook, chế độ hiển thị (`vg-hub-display`)
-│  │  ├─ useSkyClock.ts   gọi một lần ở route: pha mỗi 60 s, /api/weather 30 phút/lần
+│  │  ├─ useSkyClock.ts   gọi một lần ở route: pha mỗi 60 s, Open-Meteo 30 phút/lần
 │  │  │                   (2 phút sau lỗi) khi tab hiện; ghi store khi đổi
 │  │  ├─ hud/             HubTopBar (+ danh sách "Các khu"), InteractHint, LanDialog,
 │  │  │                   SceneLoader + sceneLoad + blueprint (màn chờ), SceneBoundary,
@@ -60,7 +60,8 @@ app/
   trực tiếp; chỉ ghi `nearby`/`dialog` khi đổi (React render lại HUD). Không có state React theo
   frame. Nhãn DOM được đặt `style.transform` qua ref trong frame đã render.
 - **Trời và thời tiết (campus v0.4, art §14):** `useSkyClock(theme.place)` ở route tính pha từ
-  mặt trời tại `place` (không mạng, đúng khi API ngủ) và gọi `getJson("/api/weather")` không
+  mặt trời tại `place` (không mạng, đúng khi API ngủ) và tự `fetch` Open-Meteo (không qua backend:
+  IP chung của Render bị 429; timeout 60 s, `parseForecast` kiểm schema, giờ lệch quá 3 h là lỗi) không
   await; mọi lỗi im lặng (thời tiết là trang trí), chip ghi "Chưa có thời tiết". Store giữ
   `sky = { phase, weather, failed, display, look }`, chỉ ghi khi đổi; `look` chỉ thay khi
   (hiển thị, pha, nhóm thời tiết) đổi và lúc đó gọi `wake()`. Route đặt
@@ -77,7 +78,7 @@ app/
 | `/play` ≤ 300 kB gzip ¹ | 292,8 kB (2026-10-09, sau giờ thật và thời tiết: +3,8 kB cho `sky.ts`, chip, lớp phủ, 9 icon; trước đó khoảng 289 kB) | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
 | ≤ 40 draw call, ≤ 60k tam giác | v0.4: 14 khi còn tượng, 17 khi bộ nhân vật Kenney đã tải (6 SkinnedMesh + x-ray người chơi); ban ngày 22 177 / 19 032 (tượng) và 26 112 (campus) / 22 967 (town) (bộ nhân vật), đo bằng `sceneBudget()` | `scene.test.ts` (fail nếu > 20 hoặc > 28 000; trước v0.4 là 16 và 23 000). Xoay 360° (v0.4) không thêm draw call hay tam giác; `scene.test.ts` còn kiểm khung `ORBIT_FRAME` và góc HUD ở mọi yaw |
 | `frameloop="demand"` | không frame khi đứng yên, kể cả lúc mưa dông ban đêm (mưa và chớp là CSS) | `e2e/play.spec.ts`, `e2e/weather.spec.ts` với `?debug=frames` |
-| Thời tiết | +0 draw call, +0 program, +0 tam giác trên cả 20 look; dựng lại khoảng 6 lần/ngày; 1 GET cùng origin khi vào hub rồi 30 phút/lần khi tab hiện; `rain.svg` < 1 kB nhúng `data:` | `scene.test.ts` (trần 18 draw call / 34 500 tam giác, tường orbit trên mọi look), `useSkyClock.test.ts`, `weather.spec.ts` |
+| Thời tiết | +0 draw call, +0 program, +0 tam giác trên cả 20 look; dựng lại khoảng 6 lần/ngày; 1 GET tới api.open-meteo.com khi vào hub rồi 30 phút/lần khi tab hiện; `rain.svg` < 1 kB nhúng `data:` | `scene.test.ts` (trần 18 draw call / 34 500 tam giác, tường orbit trên mọi look), `useSkyClock.test.ts`, `weather.spec.ts` |
 | Không shadow map / postprocessing | — | `scene.test.ts` grep `app/features/campus` |
 | DPR | `dpr={[1, 2]}`, `[1, 1.5]` khi `(pointer: coarse)` hoặc < 768 px | xem dưới |
 | Dispose khi đổi theme | — | `scene.test.ts` |
@@ -252,7 +253,8 @@ chạy trong trang trên Chrome 152 (2026-10-08), ghi kèm chỉ thị bị vi p
 
 Lưu ý khi đo lại: mã chạy từ DevTools console được miễn kiểm `eval`, nên phải đo bằng đường của
 trang (ví dụ `setTimeout` với chuỗi). `connect-src 'self'` nghĩa là mọi fetch và SSE đi qua
-`/api/*` cùng origin (Vercel chuyển tiếp sang Render), như hiện nay.
+`/api/*` cùng origin (Vercel chuyển tiếp sang Render). Từ 2026-10-09 `connect-src` thêm
+`https://api.open-meteo.com` (thời tiết khuôn viên do trình duyệt gọi; `scripts/postbuild-csp.mjs`).
 
 **Gói bị loại cho route bàn thợ** (gzip đo bằng esbuild trên đúng các import cần dùng; trần route
 120 kB):

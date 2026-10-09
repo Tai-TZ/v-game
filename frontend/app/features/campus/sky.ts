@@ -5,7 +5,8 @@ import type { Place, TimeOfDay } from "~/features/theme/schema";
 /*
  * The hub's sky (campus v0.4 "Thời tiết và giờ thật"): the phase of the day from the sun at the
  * theme's place and the visitor's clock (one source, no network, right while the API sleeps),
- * plus today's weather from GET /api/weather on top. Pure; no three.js.
+ * plus today's weather on top, which the browser fetches from Open-Meteo itself (Render's shared
+ * IP is rate-limited there; each visitor's own IP is not). Pure; no three.js.
  */
 
 export type Phase = TimeOfDay;
@@ -60,7 +61,7 @@ export function partOfDay(phase: Phase, ms: number, timeZone: string): string {
   return hour < 11 ? "Sáng" : hour < 13 ? "Trưa" : "Chiều";
 }
 
-/** The API's seven groups (backend routes/weather.py WMO_GROUP). */
+/** The seven weather groups (WMO_GROUP). */
 export const CONDITIONS = [
   "clear",
   "partly_cloudy",
@@ -94,12 +95,69 @@ export const BAKE: Record<Condition, Bake> = {
   thunderstorm: "wet",
 };
 
-export const WeatherSchema = v.object({
-  condition: v.picklist(CONDITIONS),
-  temperature_c: v.number(),
-  updated_at: v.pipe(v.string(), v.isoTimestamp()),
+/** Open-Meteo's WMO table (docs "WMO Weather interpretation codes"), all 29 codes. */
+// ponytail: no snow group (lowland Hanoi); snow codes show as rain. Add "snow" with a snowy place.
+// prettier-ignore
+export const WMO_GROUP: Readonly<Partial<Record<number, Condition>>> = {
+  0: "clear", 1: "clear",
+  2: "partly_cloudy",
+  3: "cloudy",
+  45: "fog", 48: "fog",
+  51: "drizzle", 53: "drizzle", 55: "drizzle", 56: "drizzle", 57: "drizzle",
+  61: "rain", 63: "rain", 65: "rain", 66: "rain", 67: "rain", 80: "rain", 81: "rain", 82: "rain",
+  71: "rain", 73: "rain", 75: "rain", 77: "rain", 85: "rain", 86: "rain",
+  95: "thunderstorm", 96: "thunderstorm", 97: "thunderstorm", 99: "thunderstorm",
+};
+
+/** What the chip and the scene read: the group, °C to 0.1, and when the values are valid (UTC). */
+export interface Weather {
+  condition: Condition;
+  temperature_c: number;
+  updated_at: string;
+}
+
+/**
+ * The one request: 2 variables for 1 day (1 API call); 4 decimals (~11 m) keep the URL stable.
+ * No `timezone`, so `current.time` is GMT without an offset.
+ */
+export function forecastUrl(place: Pick<Place, "lat" | "lon">): string {
+  const query = new URLSearchParams({
+    latitude: place.lat.toFixed(4),
+    longitude: place.lon.toFixed(4),
+    current: "temperature_2m,weather_code",
+    forecast_days: "1",
+  });
+  return `https://api.open-meteo.com/v1/forecast?${query}`;
+}
+
+const ISO_TIME = /^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?(Z|[+-]\d\d:\d\d)?$/;
+
+/** The subset of Open-Meteo's reply we read, checked at the boundary. */
+const ForecastSchema = v.object({
+  current: v.object({
+    time: v.pipe(v.string(), v.regex(ISO_TIME)),
+    temperature_2m: v.pipe(v.number(), v.minValue(-90), v.maxValue(60)),
+    weather_code: v.pipe(v.number(), v.integer()),
+  }),
 });
-export type Weather = v.InferOutput<typeof WeatherSchema>;
+
+/** Served as "now", so it must be within 3 h of the visitor's clock. */
+const MAX_SKEW_MS = 3 * 3_600_000;
+
+/** Open-Meteo's reply as the hub's weather; null for anything off-contract or implausible. */
+export function parseForecast(json: unknown, now: number): Weather | null {
+  const result = v.safeParse(ForecastSchema, json);
+  if (!result.success) return null;
+  const { time, temperature_2m, weather_code } = result.output.current;
+  // No offset means GMT (Date.parse would read it as local time); an offset is converted.
+  const ms = Date.parse(ISO_TIME.exec(time)?.[1] ? time : `${time}Z`);
+  if (!(Math.abs(now - ms) <= MAX_SKEW_MS)) return null; // NaN fails too
+  return {
+    condition: WMO_GROUP[weather_code] ?? "cloudy",
+    temperature_c: Math.round(temperature_2m * 10) / 10,
+    updated_at: new Date(ms).toISOString(),
+  };
+}
 
 /** "live": the real hour and weather. "day": the fixed daytime look (projectors; WCAG 2.2.2). */
 export type Display = "live" | "day";

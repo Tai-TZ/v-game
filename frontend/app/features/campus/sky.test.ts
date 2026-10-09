@@ -1,4 +1,3 @@
-import * as v from "valibot";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -6,12 +5,14 @@ import {
   CONDITION_TEXT,
   CONDITIONS,
   clockText,
+  forecastUrl,
+  parseForecast,
   partOfDay,
   phaseAt,
   readDisplay,
   sceneLook,
   sunElevation,
-  WeatherSchema,
+  WMO_GROUP,
   writeDisplay,
 } from "./sky";
 
@@ -119,11 +120,85 @@ describe("weather groups", () => {
     });
   });
 
-  it("reads the API body and nothing else", () => {
-    const body = { condition: "drizzle", temperature_c: 26.6, updated_at: "2026-10-08T16:30:00Z" };
-    expect(v.parse(WeatherSchema, body)).toEqual(body);
-    expect(v.safeParse(WeatherSchema, { ...body, condition: "snow" }).success).toBe(false);
-    expect(v.safeParse(WeatherSchema, { ...body, updated_at: "yesterday" }).success).toBe(false);
+  it("groups every WMO code exactly", () => {
+    // Every code in Open-Meteo's "WMO Weather interpretation codes" table (checked 2026-10-08).
+    const expected = {
+      clear: [0, 1],
+      partly_cloudy: [2],
+      cloudy: [3],
+      fog: [45, 48],
+      drizzle: [51, 53, 55, 56, 57],
+      rain: [61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86],
+      thunderstorm: [95, 96, 97, 99],
+    };
+    expect(WMO_GROUP).toEqual(
+      Object.fromEntries(
+        Object.entries(expected).flatMap(([group, codes]) => codes.map((c) => [c, group])),
+      ),
+    );
+  });
+});
+
+describe("Open-Meteo forecast", () => {
+  // Shape of the live reply to forecastUrl(HANOI) (2026-10-08), changed to code 63 (rain).
+  const reply = (current: Record<string, unknown> = {}) => ({
+    latitude: 21.05448,
+    longitude: 105.898476,
+    utc_offset_seconds: 0,
+    timezone: "GMT",
+    current: {
+      time: "2026-10-08T07:00",
+      interval: 900,
+      temperature_2m: 27.36,
+      weather_code: 63,
+      ...current,
+    },
+  });
+  const NOW = Date.parse("2026-10-08T07:00:00Z"); // 14:00 in Hanoi
+
+  it("asks for the place's current temperature and code only, in GMT", () => {
+    const url = new URL(forecastUrl(HANOI));
+    expect(url.origin + url.pathname).toBe("https://api.open-meteo.com/v1/forecast");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      latitude: "21.0285",
+      longitude: "105.8542",
+      current: "temperature_2m,weather_code",
+      forecast_days: "1",
+    });
+  });
+
+  it("maps the reply to a group, °C to 0.1 and a UTC time", () => {
+    expect(parseForecast(reply(), NOW)).toEqual({
+      condition: "rain",
+      temperature_c: 27.4,
+      updated_at: "2026-10-08T07:00:00.000Z",
+    });
+  });
+
+  it("converts a time with an offset instead of relabelling it", () => {
+    expect(parseForecast(reply({ time: "2026-10-08T14:00+07:00" }), NOW)?.updated_at).toBe(
+      "2026-10-08T07:00:00.000Z",
+    );
+  });
+
+  it("shows an unknown WMO code as cloudy", () => {
+    expect(parseForecast(reply({ weather_code: 4 }), NOW)?.condition).toBe("cloudy");
+  });
+
+  it.each([
+    ["an out-of-range temperature", reply({ temperature_2m: 999 })],
+    ["a fractional code", reply({ weather_code: 63.5 })],
+    ["a time that is not ISO", reply({ time: "yesterday" })],
+    ["a time over 3 h old", reply({ time: "2020-01-01T00:00" })],
+    ["a time over 3 h ahead", reply({ time: "2026-10-08T10:01" })],
+    ["no current values", { ...reply(), current: {} }],
+    ["an HTML page", "<html>"],
+  ])("rejects %s", (_, json) => {
+    expect(parseForecast(json, NOW)).toBeNull();
+  });
+
+  it("accepts a time exactly 3 h away", () => {
+    expect(parseForecast(reply({ time: "2026-10-08T10:00" }), NOW)).not.toBeNull();
   });
 });
 

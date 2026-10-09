@@ -56,6 +56,7 @@ describe("WeatherChip", () => {
     expect(
       screen.getByRole("link", { name: /CC BY 4\.0/, hidden: true }).getAttribute("href"),
     ).toBe("https://creativecommons.org/licenses/by/4.0/");
+    expect(screen.getByText(/tải thẳng từ Open-Meteo.*địa chỉ IP/)).toBeTruthy();
   });
 
   it("closes its popover when a conversation opens", () => {

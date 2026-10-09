@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { test as base, expect, type Page, type Request } from "@playwright/test";
+import { test as base, expect, type Page, type Request, type Route } from "@playwright/test";
 
 import type { NpcId } from "../app/features/campus/layout";
 import { blocksJson, publicLevelJson, readText } from "../app/features/workbench/test-fixtures";
@@ -80,20 +80,58 @@ export async function mockApi(
   });
 }
 
-/** What GET /api/weather answers unless a test routes it itself: a clear 30 °C. */
-export const WEATHER = {
-  condition: "clear",
-  temperature_c: 30,
-  updated_at: "2026-10-08T03:00:00Z",
+/** The browser fetches the weather from Open-Meteo itself (useSkyClock). */
+export const OPEN_METEO = "**/api.open-meteo.com/**";
+/** Open-Meteo allows any origin; a mocked cross-origin reply needs the same header to be read. */
+export const OPEN_METEO_CORS = { "Access-Control-Allow-Origin": "*" } as const;
+
+/** One WMO code per weather group (sky.ts WMO_GROUP). */
+export const WMO = {
+  clear: 0,
+  partly_cloudy: 2,
+  cloudy: 3,
+  fog: 45,
+  drizzle: 53,
+  rain: 63,
+  thunderstorm: 95,
 } as const;
+
+/**
+ * Answers an Open-Meteo request like the real API: `current` observed at the page's now (its
+ * clock may be pinned; the app rejects a time over 3 h away), in GMT without an offset.
+ */
+export async function fulfillWeather(
+  route: Route,
+  condition: keyof typeof WMO = "clear",
+  temperature = 30,
+) {
+  const now = await route
+    .request()
+    .frame()
+    .evaluate(() => Date.now())
+    .catch(() => Date.now());
+  await route.fulfill({
+    headers: OPEN_METEO_CORS,
+    json: {
+      utc_offset_seconds: 0,
+      timezone: "GMT",
+      current: {
+        time: new Date(now).toISOString().slice(0, 16),
+        interval: 900,
+        temperature_2m: temperature,
+        weather_code: WMO[condition],
+      },
+    },
+  });
+}
 
 /**
  * Collects console errors, uncaught exceptions and CSP violations. Failed API responses that
  * a test mocks on purpose are expected and filtered out.
  *
- * Every test also gets /api/weather mocked (no backend runs in e2e; a 502 would be a console
- * error) and the hub's display mode pinned to "Cố định ban ngày", so no test depends on the hour
- * CI runs at (campus v0.4 W0.5). `hubDisplay: "live"` (test.use) follows the clock instead; the
+ * Every test also gets Open-Meteo mocked to a clear 30 °C (e2e never reaches the network) and
+ * the hub's display mode pinned to "Cố định ban ngày", so no test depends on the hour CI runs at
+ * (campus v0.4 W0.5). `hubDisplay: "live"` (test.use) follows the clock instead; the
  * init script only fills an empty slot, so a choice made in the test survives a reload.
  */
 export const test = base.extend<{
@@ -104,7 +142,7 @@ export const test = base.extend<{
   hubDisplay: ["day", { option: true }],
   hubSky: [
     async ({ page, hubDisplay }, provide) => {
-      await page.route("**/api/weather", (route) => route.fulfill({ json: WEATHER }));
+      await page.route(OPEN_METEO, (route) => fulfillWeather(route));
       await page.addInitScript((display) => {
         if (localStorage.getItem("vg-hub-display") === null) {
           localStorage.setItem("vg-hub-display", display);
@@ -131,10 +169,12 @@ export const test = base.extend<{
     });
     page.on("pageerror", (error) => errors.push(error.message));
     // The console filter above cannot tell a mocked API failure from a missing asset, so any
-    // non-API resource that fails is reported here by URL.
+    // resource that fails, other than the API and Open-Meteo (weather.spec mocks a 429), is
+    // reported here by URL.
     page.on("response", (response) => {
-      const { pathname } = new URL(response.url());
-      if (response.status() >= 400 && !pathname.startsWith("/api/")) {
+      const { hostname, pathname } = new URL(response.url());
+      const mockable = pathname.startsWith("/api/") || hostname === "api.open-meteo.com";
+      if (response.status() >= 400 && !mockable) {
         errors.push(`${response.status()} ${pathname}`);
       }
     });
