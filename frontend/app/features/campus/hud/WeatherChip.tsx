@@ -83,19 +83,21 @@ export function WeatherChip({ place }: { place: Place }) {
       <button
         type="button"
         popoverTarget={POPOVER_ID}
-        className={buttonClass("secondary", "px-3 max-sm:w-11 max-sm:px-0")}
+        // On the button, not in sr-only spans: browsers pad an absolutely positioned span with
+        // spaces ("27°C , Mưa"). It still starts with the visible text (WCAG 2.5.3).
+        aria-label={
+          weather
+            ? `${degrees(weather.temperature_c)}, ${CONDITION_TEXT[weather.condition]}, ${place.name}`
+            : `Thời tiết ${place.name}`
+        }
+        // sm:px-3, not px-3: only a variant is emitted after the base px-5 and beats it.
+        className={buttonClass("secondary", "max-sm:w-11 max-sm:px-0 sm:px-3")}
       >
         <WeatherIcon condition={condition} phase={phase} />
-        {/* The name starts with the visible text (WCAG 2.5.3). */}
-        {weather ? (
-          <>
-            <span className="max-sm:sr-only">{degrees(weather.temperature_c)}</span>
-            <span className="sr-only">
-              , {CONDITION_TEXT[weather.condition]}, {place.name}
-            </span>
-          </>
-        ) : (
-          <span className="sr-only">Thời tiết {place.name}</span>
+        {weather && (
+          <span aria-hidden="true" className="max-sm:hidden">
+            {degrees(weather.temperature_c)}
+          </span>
         )}
       </button>
       <div

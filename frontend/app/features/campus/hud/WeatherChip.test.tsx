@@ -31,7 +31,11 @@ describe("WeatherChip", () => {
         updated_at: "2026-10-08T09:15:00Z",
       });
     });
-    expect(screen.getByRole("button", { name: "27°C, Mưa phùn, Hà Nội" })).toBeTruthy();
+    // The name is the button's own label: an sr-only span (position: absolute, so display
+    // block) gets padded with spaces in browsers ("27°C , Mưa phùn"), not in jsdom.
+    const button = screen.getByRole("button", { name: "27°C, Mưa phùn, Hà Nội" });
+    expect(button.getAttribute("aria-label")).toBe("27°C, Mưa phùn, Hà Nội");
+    expect(button.querySelector(".sr-only")).toBeNull();
     expect(screen.getByText("27°C · Mưa phùn · Cập nhật 16:15")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("radio", { name: "Cố định ban ngày", hidden: true }));
