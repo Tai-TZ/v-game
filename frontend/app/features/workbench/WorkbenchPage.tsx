@@ -4,6 +4,7 @@ import * as v from "valibot";
 
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
+import { recordStars, type Stars } from "~/features/progress/progress";
 
 import { cancelRun, eventsUrl, newKey, postRun, type LevelPageData } from "./api";
 import { graphFromBench, type Bench, type Env } from "./bench";
@@ -13,7 +14,14 @@ import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { Results } from "./Results";
 import { frameAction, isActive, runReducer, type RunAction, type RunView } from "./run";
 import { RunPanel, type RequestState, type StopState, type Summary } from "./RunPanel";
-import { EVENT_TYPES, GraphSchema, type BlockType, type Graph, type Issue } from "./schema";
+import {
+  EVENT_TYPES,
+  GraphSchema,
+  type BlockType,
+  type Graph,
+  type Issue,
+  type PublicLevel,
+} from "./schema";
 import { loadSaved, save } from "./storage";
 import { errorsOf, validateGraph } from "./validate";
 
@@ -178,6 +186,23 @@ function useFocusLater() {
     }));
 }
 
+/**
+ * Saves each scored run's stars for the campus (N9, campus-scene v0.3 §13.5), once per run.
+ * Best effort: a blocked storage or a bad id must never cost the player the results on screen.
+ */
+export function useRecordStars(level: PublicLevel, run: RunView | null) {
+  const scoredRun = run?.score ? run.runId : null;
+  const stars = run?.score?.stars;
+  useEffect(() => {
+    if (!scoredRun || stars === undefined) return;
+    try {
+      recordStars(level.zone, level.id, stars as Stars); // validates; throws on a bad entry
+    } catch (error) {
+      console.warn("Không lưu được số sao của màn.", error);
+    }
+  }, [scoredRun, stars, level.zone, level.id]);
+}
+
 /** The graph of the run on show; ours, so it parses, but checked like any other JSON. */
 function parseGraph(body: string | null): Graph | null {
   if (body === null) return null;
@@ -208,6 +233,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const focusLater = useFocusLater();
 
   useRunStream(run?.runId ?? null, attempt, dispatch);
+  useRecordStars(level, run);
   const left = useCancelOnLeave(run);
 
   const issues = serverIssues ?? clientIssues;

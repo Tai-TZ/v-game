@@ -15,12 +15,11 @@
 export const PROGRESS_KEY = "vg-progress-v1";
 
 /**
- * Whether anything saves stars yet. False until the workbench calls `recordStars` on a scored
- * run: until then no player can earn a star, so `siteLooks` keeps every open zone lit as in v0.3
- * instead of showing dark windows nobody can light (QA r2, 2026-10-08). Flip it in the change
- * that adds that call (open handoff: campus-scene v0.3 §13.5).
+ * Whether anything saves stars yet. The workbench calls `recordStars` on every scored run
+ * (`useRecordStars`), so open zones without a star show dark windows. Set it back to false to
+ * keep every open zone lit as in v0.3 (QA r2, 2026-10-08; campus-scene v0.3 §13.5).
  */
-export const STARS_SAVED = false as boolean; // a switch: typed for both values
+export const STARS_SAVED = true as boolean; // a switch: typed for both values
 
 export type Stars = 0 | 1 | 2 | 3;
 export type Progress = Readonly<Record<string, Readonly<Record<string, Stars>>>>;
