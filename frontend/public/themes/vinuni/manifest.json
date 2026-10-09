@@ -66,6 +66,22 @@
         "sunDirection": [-0.62, 0.55, 0.6],
         "rim": 0.6
       }
+    },
+    "npcs": {
+      "guard": { "name": "chú bảo vệ", "top": "#f3f2ee", "bottom": "#23262b", "accent": "#1e2b45" },
+      "registrar": {
+        "name": "chị Diệp",
+        "top": "#c72127",
+        "bottom": "#2a2a2e",
+        "accent": "#134d8b"
+      },
+      "operator": { "name": "cô Thục", "top": "#6f8f7a", "bottom": "#2f3640", "accent": "#2f3640" },
+      "examiner": {
+        "name": "thầy Khải",
+        "top": "#a8bbd0",
+        "bottom": "#3b3f46",
+        "accent": "#d9b46a"
+      }
     }
   }
 }

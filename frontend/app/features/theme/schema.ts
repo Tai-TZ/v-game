@@ -34,6 +34,15 @@ const LightPresetSchema = v.strictObject({
   rim: v.pipe(v.number(), v.minValue(0), v.maxValue(1)),
 });
 
+/** A hub NPC's display name and outfit (npc-cast v0.4 §8); the role's code stays in layout.ts. */
+const NpcLook = v.strictObject({
+  /** How the hint, the zone list and the dialog name them, honorific first, in lower case. */
+  name: v.pipe(v.string(), v.nonEmpty(), v.maxLength(32)),
+  top: HexColor,
+  bottom: HexColor,
+  accent: HexColor,
+});
+
 export const TimeOfDaySchema = v.picklist(["day", "dusk"]);
 
 export const ThemeSummarySchema = v.strictObject({
@@ -94,6 +103,12 @@ export const ThemeManifestSchema = v.strictObject({
       day: LightPresetSchema,
       dusk: LightPresetSchema,
     }),
+    npcs: v.strictObject({
+      guard: NpcLook,
+      registrar: NpcLook,
+      operator: NpcLook,
+      examiner: NpcLook,
+    }),
   }),
 });
 
@@ -103,6 +118,7 @@ export type CampusTheme = ThemeManifest["campus"];
 export type LandmarkArchetype = CampusTheme["landmark"]["archetype"];
 export type TimeOfDay = v.InferOutput<typeof TimeOfDaySchema>;
 export type LightPreset = CampusTheme["lights"]["day"];
+export type NpcLook = CampusTheme["npcs"]["guard"];
 
 export function parseThemeIndex(data: unknown): ThemeSummary[] {
   return v.parse(ThemeIndexSchema, data).themes;
