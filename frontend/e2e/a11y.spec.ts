@@ -1,7 +1,16 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
-import { expect, mockApi, mockWorkbenchApi, npcNames, test, titleOf, WEATHER } from "./fixtures";
+import {
+  expect,
+  fulfillWeather,
+  mockApi,
+  mockWorkbenchApi,
+  npcNames,
+  OPEN_METEO,
+  test,
+  titleOf,
+} from "./fixtures";
 
 const VIEWPORTS = [
   { width: 375, height: 812 },
@@ -106,9 +115,7 @@ test.describe("axe on the live night sky (campus v0.4 W7)", () => {
     test.slow();
     await page.clock.setFixedTime(new Date("2026-10-08T21:00:00+07:00"));
     await mockApi(page);
-    await page.route("**/api/weather", (route) =>
-      route.fulfill({ json: { ...WEATHER, condition: "rain" } }),
-    );
+    await page.route(OPEN_METEO, (route) => fulfillWeather(route, "rain"));
     await page.goto("/play");
     await expect(page.locator("main")).toHaveAttribute("data-sky", "night");
     await expect(page.locator(".weather-rain")).toHaveCount(1);

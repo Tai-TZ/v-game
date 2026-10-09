@@ -1,25 +1,35 @@
 import type { Page } from "@playwright/test";
 
 import { HUD_CORNER } from "../app/features/campus/camera";
-import { expect, mockApi, test, waitForIdleScene, WEATHER } from "./fixtures";
+import {
+  expect,
+  fulfillWeather,
+  mockApi,
+  OPEN_METEO,
+  OPEN_METEO_CORS,
+  test,
+  waitForIdleScene,
+  type WMO,
+} from "./fixtures";
 
 /*
  * Live sky and weather on /play (campus v0.4 W7). The fixture's "Cố định ban ngày" is off here:
- * the clock is pinned (Date only; timers run) and each test answers /api/weather itself.
+ * the clock is pinned (Date only; timers run) and each test answers Open-Meteo itself.
  */
 test.use({ hubDisplay: "live" });
 
 /** A moment in Hanoi (+07:00 all year). */
 const hanoi = (hm: string) => new Date(`2026-10-08T${hm}:00+07:00`);
 
-async function weather(page: Page, condition: string, status = 200) {
-  await page.route("**/api/weather", (route) =>
+async function weather(page: Page, condition: keyof typeof WMO, status = 200) {
+  await page.route(OPEN_METEO, (route) =>
     status === 200
-      ? route.fulfill({ json: { ...WEATHER, condition, temperature_c: 24.6 } })
-      : route.fulfill({
+      ? fulfillWeather(route, condition, 24.6)
+      : // Open-Meteo's per-IP limit (what Render's shared IP hit every time).
+        route.fulfill({
           status,
-          headers: { "Retry-After": "120" },
-          json: { detail: "Chưa lấy được thời tiết, thử lại sau." },
+          headers: OPEN_METEO_CORS,
+          json: { error: true, reason: "Minutely API request limit exceeded." },
         }),
   );
 }
@@ -176,7 +186,8 @@ test.describe("live sky", () => {
     const popover = page.locator("#hub-weather");
     await expect(popover.getByRole("heading", { name: "Thời tiết ở Hà Nội" })).toBeVisible();
     await expect(popover.getByText("21:00 · Tối")).toBeVisible();
-    await expect(popover.getByText("25°C · Mưa · Cập nhật 10:00")).toBeVisible();
+    await expect(popover.getByText("25°C · Mưa · Cập nhật 21:00")).toBeVisible();
+    await expect(popover.getByText(/tải thẳng từ Open-Meteo/)).toBeVisible();
     await expect(popover.getByRole("link", { name: /Open-Meteo\.com/ })).toBeVisible();
 
     await popover.getByRole("radio", { name: "Cố định ban ngày" }).focus();
@@ -205,13 +216,10 @@ test.describe("live sky", () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test("shows the hour's sky when the API is down, and the weather once it answers", async ({
-    page,
-    consoleErrors,
-  }) => {
+  test("shows the hour's sky when Open-Meteo refuses (429)", async ({ page, consoleErrors }) => {
     await page.clock.setFixedTime(hanoi("21:00"));
     await mockApi(page);
-    await weather(page, "rain", 503);
+    await weather(page, "rain", 429);
     await page.goto("/play?debug=frames");
     const main = page.locator("main");
     await expect(main).toHaveAttribute("data-sky", "night");
@@ -231,12 +239,12 @@ test.describe("live sky", () => {
     test.slow();
     await page.clock.setFixedTime(hanoi("21:00"));
     await mockApi(page);
-    // Held until the scene is idle: a sleeping API answers about a minute late.
+    // Held until the scene is idle: a slow network answers late (within FETCH_TIMEOUT_MS, 60 s).
     let answer: () => void = () => undefined;
     const held = new Promise<void>((resolve) => (answer = resolve));
-    await page.route("**/api/weather", async (route) => {
+    await page.route(OPEN_METEO, async (route) => {
       await held;
-      await route.fulfill({ json: { ...WEATHER, condition: "rain" } });
+      await fulfillWeather(route, "rain");
     });
     await page.goto("/play?debug=frames");
     const frames = await waitForIdleScene(page);
@@ -255,6 +263,17 @@ test.describe("live sky", () => {
     expect(await frames()).toBe(after);
     expect(consoleErrors).toEqual([]);
   });
+});
+
+test("lets the page fetch Open-Meteo and nothing else outside the site (CSP)", async ({ page }) => {
+  const response = await page.goto("/");
+  const csp = (await response?.headerValue("content-security-policy")) ?? "";
+  const connect = csp
+    .split(";")
+    .map((directive) => directive.trim().split(/\s+/))
+    .find(([name]) => name === "connect-src");
+  // An API on another origin (VITE_API_BASE_URL) may be listed too; e2e builds without one.
+  expect(connect?.slice(1)).toEqual(["'self'", "https://api.open-meteo.com"]);
 });
 
 test.describe("weather chip in the HUD", () => {
