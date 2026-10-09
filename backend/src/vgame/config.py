@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     max_concurrent_runs: int = Field(default=1, ge=1, le=20)
     # Server-wide cap on real (non-replayed) LLM calls per UTC day; protects the owner's key.
     daily_llm_call_cap: int = Field(default=500, ge=0)
+    # GET /api/quota (daily-shift §3.1, pilot class of 30 on a cap of 500): the shared reserve R
+    # for refunds, and P, each learner's calls per day, which the workbench reads instead of
+    # hard-coding it. Both count per UTC day in RAM, like the cap.
+    quota_reserve_calls: int = Field(default=17, ge=0)
+    quota_learner_calls: int = Field(default=13, ge=0)
 
     @field_validator("cors_origins", "gemini_fallback_models", mode="before")
     @classmethod

@@ -30,6 +30,7 @@ class _RunLog:
     idem: tuple[str, str] | None
     events: list[EngineEvent] = field(default_factory=list)
     finished: bool = False
+    refunded: bool = False
     changed: asyncio.Event = field(default_factory=asyncio.Event)
 
 
@@ -65,6 +66,16 @@ class RunStore:
 
     def __contains__(self, run_id: object) -> bool:
         return run_id in self._runs
+
+    def events(self, run_id: str) -> list[EngineEvent]:
+        """A copy of the run's events so far. Raises KeyError for an unknown (or evicted) run."""
+        return list(self._runs[run_id].events)
+
+    def refunded(self, run_id: str) -> bool:
+        return self._runs[run_id].refunded
+
+    def mark_refunded(self, run_id: str) -> None:
+        self._runs[run_id].refunded = True
 
     def append(self, run_id: str, event: EngineEvent) -> int:
         """Store the event and wake subscribers; returns its SSE id (1-based)."""

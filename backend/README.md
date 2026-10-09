@@ -89,6 +89,8 @@ answered. Star 2 budgets are calibrated on the primary model only. Rotate the ke
 | `POST /api/runs?level={level_id}`  | body = graph JSON; `202 {run_id, created, issues}`                      |
 | `GET /api/runs/{run_id}/events`    | SSE stream; send `Last-Event-ID: n` to replay events after `n`          |
 | `POST /api/runs/{run_id}/cancel`   | `202`; the run ends with `run.failed` (`cancelled`)                     |
+| `GET /api/quota`                   | `{cap, used, remaining, resets_at, estimate, reserve_left, learner_daily}` |
+| `POST /api/quota/refund`           | body `{run_id}`; `200 {run_id, refunded, reserve_left}`                 |
 
 `POST /api/runs` needs `Content-Type: application/json` (415 otherwise) and accepts an optional
 `Idempotency-Key` header, 16-64 chars of `[A-Za-z0-9_-]` (same key, level and graph returns the
@@ -102,6 +104,16 @@ run whose every LLM call failed (provider outage or daily cap) ends with `run.fa
 `step.started`/`step.finished`, `case.graded` per case, `run.scored`, then `run.finished`
 (with gold, diagnosis and LLM calls per model) or `run.failed`. After 15 s without an event the
 stream sends a `: ping` comment line so proxies keep it open.
+
+`POST /api/runs?level=...&scope=mau` is "Thử 3 câu mẫu": only the level's 3 visible cases run,
+`run.started` and `run.finished` carry `scope: "mau"`, and there is no `run.scored` (never a
+star attempt). A case skipped because `DAILY_LLM_CALL_CAP` ran out has `reason: "daily_cap"` in
+its `case.graded`. `GET /api/quota` reads the cap, the shared reserve R and the learner share P
+(daily-shift §3); every counter lives in RAM per UTC day, so `estimate` is always `true`.
+`POST /api/quota/refund` takes up to 3 calls from R, once per run, only for a finished
+`scope=mau` run whose 3 samples all passed, and never more than its non-replayed calls; any
+other run gets `409 {detail, code}` (`not_finished`, `not_sample_run`, `samples_not_passed`,
+`already_refunded`, `reserve_empty`), an unknown run `404`.
 
 Content: zones in `src/vgame/content/data/zones.json`, levels in `src/vgame/engine/levels/*.json`
 (validated at load), corpus and golden cases in `docs/content`.
@@ -130,6 +142,8 @@ Read from the process environment, or from `backend/.env` (see `.env.example`).
 | `GEMINI_RPM`          | free-tier table in `engine/llm.py`          | `model=rpm,...` overrides; unknown models get 5       |
 | `DAILY_LLM_CALL_CAP`  | `500`                                       | real Gemini calls per UTC day, whole server (Render: 200) |
 | `MAX_CONCURRENT_RUNS` | `1`                                         | more answers 429; 3 x this = Gemini calls in flight   |
+| `QUOTA_RESERVE_CALLS` | `17`                                        | shared reserve R per UTC day (refunds), daily-shift §3.1 |
+| `QUOTA_LEARNER_CALLS` | `13`                                        | P, each learner's calls per day, read by the workbench |
 | `INDEX_DIR`           | `src/vgame/engine/data/index`               | shipped index, vectors and rerank table (committed)   |
 | `ENGINE_CACHE_DIR`    | `backend/.cache/engine`                     | model files (build tool only), replay cache (gitignored) |
 | `CONTENT_DIR`         | `<repo>/docs/content`                       | corpus and golden files                               |
