@@ -110,15 +110,19 @@ describe("SceneLoader", () => {
     expect(document.querySelectorAll(".bp-pc:not(.is-set)")).toHaveLength(0);
   });
 
-  it("draws everything a signal owes in the same render, before any tick", () => {
+  it("draws everything a signal owes in the same render and final state, before any tick", () => {
     renderLoader();
     run(() => advanceScene(STAGE.build));
     // No timer has run: the main thread may be frozen right after this signal.
-    expect(
-      document.querySelectorAll(".k-tile:not(.is-built), .k-flat:not(.is-built)"),
-    ).toHaveLength(0);
-    expect(document.querySelectorAll(".k-tree.is-built").length).toBeGreaterThan(0);
-    expect(document.querySelectorAll(".k-bldg.is-built")).toHaveLength(0);
+    expect(document.querySelectorAll(".k-tile:not(.is-set), .k-flat:not(.is-set)")).toHaveLength(0);
+    expect(document.querySelectorAll(".k-tree.is-set").length).toBeGreaterThan(0);
+    expect(document.querySelectorAll(".k-bldg.is-set, .k-bldg.is-built")).toHaveLength(0);
+
+    // The first frame is being drawn: no building may sit on the first keyframe of its rise.
+    run(() => advanceScene(STAGE.paint));
+    const buildings = document.querySelectorAll(".k-bldg");
+    expect(buildings.length).toBeGreaterThan(0);
+    expect(document.querySelectorAll(".k-bldg.is-set")).toHaveLength(buildings.length);
   });
 
   it("fades out after the first frame and then unmounts", () => {

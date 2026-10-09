@@ -111,9 +111,11 @@ function LiveLoader({ onGone }: { onGone: () => void }) {
     [pieces],
   );
   const [ticked, setTicked] = useState(0);
-  // A signal draws everything owed to it in the same render: the main thread may freeze right
-  // after (the scene builds its geometry), before the ticker runs again.
-  const level = Math.max(ticked, thresholds.findLast((at) => at <= progress(stage, 0, false)) ?? 0);
+  // A signal draws everything owed to it in the same render, in its final state: the main
+  // thread may freeze right after (the scene builds its geometry, then its first frame), and
+  // SVG animations would stay on their first keyframe meanwhile (buildings flat, trees dots).
+  // Only pieces the ticker reveals within a stage animate.
+  const floor = thresholds.findLast((at) => at <= progress(stage, 0, false)) ?? 0;
   const complete = done || reduced;
   useEffect(() => {
     if (complete) return;
@@ -205,7 +207,11 @@ function LiveLoader({ onGone }: { onGone: () => void }) {
               key={i}
               piece={piece}
               state={
-                piece.kind === "base" || complete ? "is-set" : piece.at <= level ? "is-built" : ""
+                piece.kind === "base" || complete || piece.at <= floor
+                  ? "is-set"
+                  : piece.at <= ticked
+                    ? "is-built"
+                    : ""
               }
             />
           ))}
