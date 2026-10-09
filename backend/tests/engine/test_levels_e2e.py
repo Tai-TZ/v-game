@@ -27,7 +27,7 @@ from vgame.engine.budget import RunBudget
 from vgame.engine.compiler import compile_graph
 from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import GraphPayload
-from vgame.engine.index import IndexStore
+from vgame.engine.index import IndexStore, RerankTable
 from vgame.engine.levels import Expectation, LevelSpec, load_level
 from vgame.engine.runtime import run_level
 from vgame.engine.types import EngineEvent, LLMClient, Reranker
@@ -218,10 +218,18 @@ def test_l3_rerank_ms_is_the_build_timing_times_the_candidates(
 ) -> None:
     # §14 (2026-10-09): a lookup in the shipped table took ~10-20 ms whatever it scored, so
     # L3's "Kính lúp tốn {ms} ms" showed the slow-but-sure block as nearly free.
-    store, _ = real_models
-    table = store.rerank
-    assert table is not None
-    assert table.ms_per_pair > 50  # live jina: ~120 ms per pair
+    store, shipped = real_models
+    assert isinstance(shipped, RerankTable)
+    assert shipped.ms_per_pair > 50  # live jina: ~120 ms per pair
+    # The same scores with another build's timing: a constant equal to the shipped one fails.
+    table = RerankTable(
+        shipped.model_id,
+        shipped.questions,
+        shipped.texts,
+        shipped.scores,
+        shipped.regime,
+        {"ms_per_pair": 37.5},
+    )
     level = load_level("article-number-lookup")
     totals = []
     for top_k in (3, 10):
@@ -239,7 +247,7 @@ def test_l3_rerank_ms_is_the_build_timing_times_the_candidates(
             if f["kind"] == "retrieved"
         }
         ms = {e["case"]: e["ms"] for e in steps if e["node"] == "rr"}
-        assert ms == {case: round(n * table.ms_per_pair) for case, n in scored.items()}
+        assert ms == {case: round(n * 37.5) for case, n in scored.items()}
         totals.append(sum(ms.values()))
     assert totals[0] < totals[1]
 
