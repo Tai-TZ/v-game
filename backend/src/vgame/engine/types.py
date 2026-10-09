@@ -300,6 +300,9 @@ class CaseGrade:
     criteria: dict[str, bool]  # e.g. points, cited, no_fabrication, no_forbidden, refusal
     labels: tuple[str, ...]  # no-gold labels: cite_unknown, cite_missing, abstained, stale_doc,
     # skipped_budget, timeout, llm_error, index_error, refusal
+    # What turned on cite_unknown: "[id]" outside the pack, "Điều N" outside it. Not in
+    # case.graded; the recorded static runs carry it for the L1 poster (frontend-arch §8.1).
+    cite_unknown: tuple[str, ...] = ()
 
 
 class StaleRule(TypedDict):

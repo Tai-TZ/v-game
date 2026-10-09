@@ -55,6 +55,17 @@ there win), so those runs cost no Gemini call. A change to one of those graphs, 
 the packer, the corpus or the index makes `tests/engine/test_replay_seed.py` fail until the seed
 is regenerated (command in `scripts/spike_llm.py`, at most 72 calls; replayed answers cost none).
 
+### Recorded static runs
+
+`uv run vgame-export-recorded-runs` runs the starter graph of L1-L3 through the engine on the
+shipped index and the replay seed only (a call the seed does not answer fails the export; no
+key is read) and writes `frontend/public/runs/<level>.json`, which the workbench plays while the
+API sleeps. Visible cases keep every event and fact; hidden and trap cases keep only their
+`case.graded` verdict, `cite_unknown` (fabricated citations) and `pack_tokens` (frontend
+architecture §8.1): no steps, retrieved lists, pack contents, answers, ranks, scores or gold.
+`tests/engine/test_recorded_runs.py` checks those fields and that the committed files equal a
+fresh export (`ms` aside) with the index's `corpus_sha256`, so rerun the export after the seed.
+
 ### Gemini key
 
 Put `GEMINI_API_KEY=...` in `backend/.env` (gitignored; tests never read it). One run is at most
