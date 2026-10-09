@@ -23,6 +23,8 @@ const FOCUSABLE = "a[href], button:not([disabled])";
 interface LanDialogProps {
   lines: DialogLines;
   library: SiteInfo;
+  /** "Dạy trợ lý tra sách": straight to the first Library level. */
+  onTeach: () => void;
   onEnter: () => void;
   onClose: () => void;
   /** The zone list failed to load: show the error notice instead of `zoneCard`. */
@@ -34,12 +36,13 @@ interface LanDialogProps {
 
 /**
  * Conversation with the librarian: a modal `<dialog>` (the rest of the page is inert), a
- * side panel from `lg`, a bottom sheet below it. Focus starts on "Vào Thư viện", Tab is
+ * side panel from `lg`, a bottom sheet below it. Focus starts on "Dạy trợ lý tra sách", Tab is
  * trapped, Esc or a click on the backdrop closes, and focus goes back where it came from.
  */
 export function LanDialog({
   lines,
   library,
+  onTeach,
   onEnter,
   onClose,
   zonesFailed,
@@ -47,14 +50,14 @@ export function LanDialog({
   zoneCard,
 }: LanDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const enterRef = useRef<HTMLButtonElement>(null);
+  const teachRef = useRef<HTMLButtonElement>(null);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     const opener = document.activeElement;
     if (!dialog.open) dialog.showModal();
-    enterRef.current?.focus();
+    teachRef.current?.focus();
     return () => {
       if (dialog.open) dialog.close();
       // After the commit (the hint button is back by then). Skipped when the dialog is still
@@ -96,7 +99,7 @@ export function LanDialog({
 
   // The notice unmounts on retry; keep focus in the dialog instead of letting it fall to <body>.
   const retryKeepingFocus = () => {
-    enterRef.current?.focus();
+    teachRef.current?.focus();
     onRetry();
   };
 
@@ -142,11 +145,14 @@ export function LanDialog({
             <p key={line}>{line}</p>
           ))}
         </div>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-          <button ref={enterRef} type="button" onClick={onEnter} className={buttonClass("primary")}>
+        <div className="mt-5 flex flex-col gap-2">
+          <button ref={teachRef} type="button" onClick={onTeach} className={buttonClass("primary")}>
+            Dạy trợ lý tra sách
+          </button>
+          <button type="button" onClick={onEnter} className={buttonClass("secondary")}>
             Vào {library.name}
           </button>
-          <button type="button" onClick={onClose} className={buttonClass("secondary")}>
+          <button type="button" onClick={onClose} className={buttonClass("quiet")}>
             Để sau
           </button>
         </div>

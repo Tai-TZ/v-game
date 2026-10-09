@@ -7,7 +7,7 @@ import { InteractHint } from "~/features/campus/hud/InteractHint";
 import { LanDialog } from "~/features/campus/hud/LanDialog";
 import { SceneBoundary } from "~/features/campus/hud/SceneBoundary";
 import { ScenePoster } from "~/features/campus/hud/ScenePoster";
-import { siteInfo, type InteractTarget } from "~/features/campus/sites";
+import { FIRST_LIBRARY_LEVEL, siteInfo, type InteractTarget } from "~/features/campus/sites";
 import { hubStore, useHub } from "~/features/campus/store";
 import { loadZoneList } from "~/features/zones/api";
 import { ZoneCard } from "~/features/zones/ZoneCard";
@@ -110,6 +110,10 @@ export default function Play({ loaderData }: Route.ComponentProps) {
         <LanDialog
           lines={dialog}
           library={library}
+          onTeach={() => {
+            hubStore.getState().closeDialog();
+            void navigate(`/play/${library.zoneId}/${FIRST_LIBRARY_LEVEL}`);
+          }}
           onEnter={() => enterZone(library.zoneId)}
           onClose={() => hubStore.getState().closeDialog()}
           zonesFailed={zones?.ok === false}
