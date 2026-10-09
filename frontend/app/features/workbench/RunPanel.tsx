@@ -289,6 +289,8 @@ function Editing({
                 setRestoring(false);
                 onRestore();
               }}
+              // Restoring mid-POST would reset the request and let a second POST out.
+              disabled={sending}
               className={buttonClass("primary")}
             >
               Khôi phục
@@ -296,6 +298,7 @@ function Editing({
             <button
               type="button"
               onClick={() => setRestoring(false)}
+              disabled={sending}
               className={buttonClass("secondary")}
             >
               Giữ cấu hình
