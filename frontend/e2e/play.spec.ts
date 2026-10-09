@@ -149,6 +149,35 @@ test.describe("campus hub", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("counts a walk as busy through a stalled frame", async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      "Checks the e2e idle signal; one project is enough.",
+    );
+    test.slow();
+    await mockApi(page);
+    await page.goto("/play?debug=frames");
+    await waitForIdleScene(page);
+    // Every 8th animation frame comes 700 ms late, as on a starved CI runner (software WebGL):
+    // a walk then has gaps between frames longer than any quiet spell an idle check could use.
+    await page.evaluate(() => {
+      const raf = window.requestAnimationFrame.bind(window);
+      let n = 0;
+      window.requestAnimationFrame = (callback) =>
+        (n += 1) % 8 ? raf(callback) : window.setTimeout(() => raf(callback), 700);
+    });
+    const zonesButton = page.getByRole("button", { name: "Các khu" });
+    const list = page.locator("#hub-zone-list");
+    await zonesButton.click();
+    await list.getByRole("button", { name: "Đi tới khuôn viên phía sau", exact: true }).click();
+    await waitForIdleScene(page, 45_000);
+    // The list names the way back only once the player stands behind the main building.
+    await zonesButton.click();
+    await expect(list.getByRole("button", { name: "Về mặt trước", exact: true })).toBeVisible({
+      timeout: 1000,
+    });
+  });
+
   test("walks to what the market's awning, a zone label and the librarian's badge name", async ({
     page,
     consoleErrors,
