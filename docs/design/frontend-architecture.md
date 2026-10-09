@@ -56,8 +56,8 @@ app/
 | Ngân sách | Thực tế | Ép bằng |
 |---|---|---|
 | Trang chủ không có three | 0 chunk | `scripts/check-bundle.mjs` (manifest + dò chuỗi `THREE.WebGLRenderer`) và `e2e/landing.spec.ts` (danh sách chunk từ `build/bundle-report.json`) |
-| `/play` ≤ 300 kB gzip ¹ | 266,4 kB | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
-| ≤ 40 draw call, ≤ 60k tam giác | 13; 19 248 (campus) / 16 186 (town), đo bằng `sceneBudget()` sau campus-scene v0.3 | `scene.test.ts` (fail nếu > 16 hoặc > 23 000) |
+| `/play` ≤ 300 kB gzip ¹ | 268,9 kB (sau N8/N9 và QA vòng 2, campus-scene v0.3 §13.4) | `check-bundle.mjs` trong `npm run build`, fail nếu vượt |
+| ≤ 40 draw call, ≤ 60k tam giác | 14 (lớp bóng nắng riêng, QA vòng 1 2026-10-08); 20 185 (campus) / 17 108 (town) ban ngày với Thư viện `lit`, đo bằng `sceneBudget()` sau QA vòng 2 (campus-scene v0.3 §13.4) | `scene.test.ts` (fail nếu > 16 hoặc > 23 000) |
 | `frameloop="demand"` | không frame khi đứng yên | `e2e/play.spec.ts` với `?debug=frames` |
 | Không shadow map / postprocessing | — | `scene.test.ts` grep `app/features/campus` |
 | DPR | `dpr={[1, 2]}`, `[1, 1.5]` khi `(pointer: coarse)` hoặc < 768 px | xem dưới |
@@ -78,14 +78,15 @@ cần sort) thì hạ một bậc 2 → 1,5 → 1. (Brief §5 ghi drei; lệch c
 1. `layout.ts`: thêm `Site` (footprint, door, facing) vào `SITES`; chạy `layout.test.ts`.
 2. `zones/schema.ts` + backend: thêm `location` mới (backend là nguồn nội dung).
 3. `sites.ts`: `DEFAULT_STATUS` và tên dự phòng.
-4. `scene/campus.ts`: viết `buildX(pal, status)` theo quy ước §5.0 (dùng `part`/`merge`).
+4. `scene/campus.ts`: viết `buildX(pal, look)` theo quy ước §5.0 (dùng `paint(pal)` và `merge`; `look` là `SiteLook`, campus-scene v0.3 §13.5).
 5. `useCampusGeometry.ts` + `CampusScene.tsx`: thêm nhóm (một draw call); cập nhật
    `sceneBudget`. `labels.ts`: neo nhãn. `zones/ui.tsx`: màu thanh khu.
 
 ## 5. Thêm một theme
 
-Chỉ là dữ liệu: thư mục `public/themes/<id>/` (manifest.json đúng `schema.ts`, theme.css có
-`--vg-scene-sky`, font) và một dòng trong `public/themes/index.json`. Không sửa code;
+Chỉ là dữ liệu: thư mục `public/themes/<id>/` (manifest.json đúng `schema.ts`, kể cả
+`campus.lights` với hai preset ngày và hoàng hôn; theme.css có `--vg-scene-sky`,
+`--vg-scene-dusk`, font) và một dòng trong `public/themes/index.json`. Không sửa code;
 `scene.test.ts` tự kiểm tra mọi theme trong index (parse, ngân sách, dispose). Muốn trường
 manifest mới: theo D8.
 

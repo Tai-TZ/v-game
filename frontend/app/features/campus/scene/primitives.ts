@@ -1,5 +1,6 @@
 import {
   BoxGeometry,
+  type BufferAttribute,
   BufferGeometry,
   CircleGeometry,
   Color,
@@ -18,7 +19,7 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import { PLAZA } from "../layout";
-import { shade } from "./palette";
+import { shade, type Light } from "./palette";
 
 /*
  * Shape helpers with the argument order of art-direction §5.0, and the part pipeline that
@@ -151,25 +152,33 @@ export function groundTriangles(
 }
 
 export interface PartStyle {
-  /** One colour, or `top` for faces with n.y > 0.5 and `side` for the rest. */
-  color: Color | { top: Color; side: Color };
+  /**
+   * One colour, or `top` for faces with n.y > 0.5 and `side` for the rest. Omitted: keep the
+   * source's own vertex colours (ground triangles).
+   */
+  color?: Color | { top: Color; side: Color } | undefined;
   /** Darken the foot of vertical faces (fake ambient occlusion, art §2.4). */
   ao?: boolean;
-  /** Lit from inside: skip baked shading (windows, lamps, clock face). */
+  /** Lit from inside: skip the bake (windows, lamps, clock face). */
   emissive?: boolean;
-  /** Distance haze: after shading, pull this far towards white (back of campus, v0.3 §5.2). */
+  /** Distance haze: after shading, pull this far towards the top-face light (v0.3 §5.2). */
   haze?: number;
 }
 
 const normal = new Vector3();
+const UP = new Vector3(0, 1, 0);
+const base = new Color();
+const k = new Color();
 
 /**
  * Converts a primitive into a flat-shaded, non-indexed part with a `color` attribute.
- * `baked` multiplies in the light (MeshBasicMaterial groups); `lit` keeps plain colours and
- * normals for MeshLambertMaterial (figures, trees).
+ * With a `light`, bakes it into the colours (MeshBasicMaterial groups); with `null`, keeps plain
+ * colours and normals for MeshLambertMaterial (figures, trees), which the scene lights shade.
  */
-export function part(source: BufferGeometry, style: PartStyle, mode: "baked" | "lit" = "baked") {
+export function part(source: BufferGeometry, style: PartStyle, light: Light | null) {
   const geometry = source.index ? source.toNonIndexed() : source;
+  const own = geometry.getAttribute("color") as BufferAttribute | undefined;
+  if (!style.color && !own) throw new Error("part() needs a colour or vertex colours");
   geometry.deleteAttribute("uv");
   geometry.deleteAttribute("normal");
   geometry.computeVertexNormals();
@@ -179,27 +188,28 @@ export function part(source: BufferGeometry, style: PartStyle, mode: "baked" | "
   geometry.computeBoundingBox();
   const minY = geometry.boundingBox?.min.y ?? 0;
   const colors = new Float32Array(position.count * 3);
+  const haze = style.haze ?? 0;
+  const hazeTo = light ? shade(UP, light) : new Color(1, 1, 1);
 
   for (let i = 0; i < position.count; i += 1) {
     normal.fromBufferAttribute(normals, i);
-    const base =
-      style.color instanceof Color
-        ? style.color
-        : normal.y > 0.5
-          ? style.color.top
-          : style.color.side;
-    let k = 1;
-    if (mode === "baked" && !style.emissive) {
-      k = shade(normal);
-      if (style.ao && Math.abs(normal.y) < 0.5 && position.getY(i) <= minY + 0.001) k *= 0.82;
+    const color = style.color;
+    if (color) base.copy(color instanceof Color ? color : normal.y > 0.5 ? color.top : color.side);
+    else if (own) base.fromBufferAttribute(own, i);
+    k.setRGB(1, 1, 1);
+    if (light && !style.emissive) {
+      shade(normal, light, k);
+      if (style.ao && Math.abs(normal.y) < 0.5 && position.getY(i) <= minY + 0.001) {
+        k.multiplyScalar(0.82);
+      }
     }
-    const haze = style.haze ?? 0;
-    colors[i * 3] = base.r * k + (1 - base.r * k) * haze;
-    colors[i * 3 + 1] = base.g * k + (1 - base.g * k) * haze;
-    colors[i * 3 + 2] = base.b * k + (1 - base.b * k) * haze;
+    base.multiply(k).lerp(hazeTo, haze);
+    colors[i * 3] = base.r;
+    colors[i * 3 + 1] = base.g;
+    colors[i * 3 + 2] = base.b;
   }
   geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
-  if (mode === "baked") geometry.deleteAttribute("normal");
+  if (light) geometry.deleteAttribute("normal");
   return geometry;
 }
 

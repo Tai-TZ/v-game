@@ -7,7 +7,13 @@ import { describe, expect, it } from "vitest";
 import { parseThemeIndex, parseThemeManifest, type ThemeManifest } from "~/features/theme/schema";
 
 import { BACK, BASE, SITES, SPAWN, TREES, type Box } from "../layout";
-import { buildLandmark, buildLibrary, buildMarket, buildWatchtower } from "../scene/campus";
+import {
+  buildLandmark,
+  buildLibrary,
+  buildMarket,
+  buildWatchtower,
+  entranceLampSpots,
+} from "../scene/campus";
 import { palette } from "../scene/palette";
 import {
   blueprintPieces,
@@ -65,6 +71,16 @@ const expectClose = (
       `${label} bound ${k}`,
     ).toBeLessThanOrEqual(0.15);
   }
+};
+/**
+ * Keeps a zone building's vertices, not its entrance lamps (the blueprint draws no lamps): the
+ * post (r 0.055) below 1.6, the head and cap (r ≤ 0.17) above. The market's side roof has a
+ * corner 0.15 from a lamp, so the radius splits by height.
+ */
+const noLamps = (id: Parameters<typeof entranceLampSpots>[0]) => {
+  const spots = entranceLampSpots(id);
+  return (x: number, y: number, z: number) =>
+    spots.every((spot) => Math.hypot(x - spot.x, z - spot.z) > (y < 1.59 ? 0.06 : 0.18));
 };
 const fromBox = (f: Box) => [f.x - f.halfX, f.x + f.halfX, f.z - f.halfZ, f.z + f.halfZ];
 
@@ -152,12 +168,12 @@ describe("blueprintPieces", () => {
 
         expectClose(
           massBounds(MIRROR.library),
-          geometryBounds(buildLibrary(pal, "open"), () => true),
+          geometryBounds(buildLibrary(pal, "open"), noLamps("library")),
           "library",
         );
         expectClose(
           massBounds(MIRROR.watchtower),
-          geometryBounds(buildWatchtower(pal, "open"), () => true),
+          geometryBounds(buildWatchtower(pal, "open"), noLamps("watchtower")),
           "watchtower",
         );
         const { y, south, east } = MIRROR.awnings;
@@ -167,7 +183,7 @@ describe("blueprintPieces", () => {
         ];
         expectClose(
           massBounds([...MIRROR.market, ...awnings]),
-          geometryBounds(buildMarket(pal, "open"), () => true),
+          geometryBounds(buildMarket(pal, "open"), noLamps("market")),
           "market",
         );
       });

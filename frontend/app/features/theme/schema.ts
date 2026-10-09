@@ -14,6 +14,28 @@ const BuildingColors = v.strictObject({
   roof: HexColor,
 });
 
+const Positive = v.pipe(v.number(), v.minValue(0), v.maxValue(10));
+
+/**
+ * One time of day for the hub (art §3, rev. 2026-10-08): the two three.js lights the figures
+ * use, which are also baked into the static vertex colours, plus a rim term for baked faces.
+ */
+const LightPresetSchema = v.strictObject({
+  sky: HexColor,
+  ground: HexColor,
+  hemisphere: Positive,
+  sun: HexColor,
+  sunIntensity: Positive,
+  /** Towards the sun; y must stay above the ground. */
+  sunDirection: v.pipe(
+    v.tuple([v.number(), v.number(), v.number()]),
+    v.check(([, y]) => y > 0.1, "The sun must be above the horizon"),
+  ),
+  rim: v.pipe(v.number(), v.minValue(0), v.maxValue(1)),
+});
+
+export const TimeOfDaySchema = v.picklist(["day", "dusk"]);
+
 export const ThemeSummarySchema = v.strictObject({
   id: ThemeId,
   name: v.pipe(v.string(), v.nonEmpty()),
@@ -67,6 +89,11 @@ export const ThemeManifestSchema = v.strictObject({
       watchtower: BuildingColors,
       market: BuildingColors,
     }),
+    lights: v.strictObject({
+      default: TimeOfDaySchema,
+      day: LightPresetSchema,
+      dusk: LightPresetSchema,
+    }),
   }),
 });
 
@@ -74,6 +101,8 @@ export type ThemeSummary = v.InferOutput<typeof ThemeSummarySchema>;
 export type ThemeManifest = v.InferOutput<typeof ThemeManifestSchema>;
 export type CampusTheme = ThemeManifest["campus"];
 export type LandmarkArchetype = CampusTheme["landmark"]["archetype"];
+export type TimeOfDay = v.InferOutput<typeof TimeOfDaySchema>;
+export type LightPreset = CampusTheme["lights"]["day"];
 
 export function parseThemeIndex(data: unknown): ThemeSummary[] {
   return v.parse(ThemeIndexSchema, data).themes;

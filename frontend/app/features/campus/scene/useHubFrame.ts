@@ -101,6 +101,8 @@ export function clickGoal(ray: Raycaster, statics: Object3D | null): Vec2 | null
 export function useHubFrame(options: {
   reducedMotion: boolean;
   countFrames: boolean;
+  /** A new light preset is picked but not baked yet: e2e must not see the scene as idle. */
+  rebaking: boolean;
   onInteract: (target: InteractTarget) => void;
 }) {
   const camera = useThree((state) => state.camera);
@@ -113,9 +115,11 @@ export function useHubFrame(options: {
   const statics = useRef<Group>(null);
   const onInteract = useRef(options.onInteract);
   const reducedMotion = useRef(options.reducedMotion);
+  const rebaking = useRef(options.rebaking);
   useEffect(() => {
     onInteract.current = options.onInteract;
     reducedMotion.current = options.reducedMotion;
+    rebaking.current = options.rebaking;
   });
 
   const anim = useRef({
@@ -148,7 +152,7 @@ export function useHubFrame(options: {
 
   useEffect(() => {
     hubStore.getState().setWake(wake);
-    return () => hubStore.getState().setWake(() => undefined);
+    return () => hubStore.getState().setWake(null);
   }, [wake]);
 
   // Keyboard: movement keys and E. Ignored while focus is in a button, input or dialog.
@@ -370,7 +374,8 @@ export function useHubFrame(options: {
     if (countFrames) {
       const root = document.documentElement;
       root.dataset.frames = String(Number(root.dataset.frames ?? "0") + 1);
-      if (busy) root.dataset.sceneBusy = "";
+      // The re-bake's own commit wakes the scene again (Campus), so the flag spans the gap.
+      if (busy || rebaking.current) root.dataset.sceneBusy = "";
       else delete root.dataset.sceneBusy;
     }
 
@@ -378,5 +383,5 @@ export function useHubFrame(options: {
     if (busy) three.invalidate();
   });
 
-  return { player, playerBlob, lan, ring, statics };
+  return { player, playerBlob, lan, ring, statics, wake };
 }

@@ -164,4 +164,6 @@
 
   --vg-footer-image: none;
   --vg-scene-sky: #e3efec;
+  /* Flat dusk sky behind the hub at "Hoàng hôn" (art §2.5, rev. 2026-10-08). */
+  --vg-scene-dusk: #e7cfc3;
 }
