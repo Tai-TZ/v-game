@@ -19,7 +19,7 @@ app/
 │  │  ├─ sites.ts         DEFAULT_STATUS, tên dự phòng, INTERACT_POINTS, chữ gợi ý §4
 │  │  ├─ store.ts         zustand: nearby, dialog, metLan, sheetInset + `motion` (mutable)
 │  │  ├─ hud/             HubTopBar (+ danh sách "Các khu"), InteractHint, LanDialog,
-│  │  │                   ScenePoster, SceneBoundary
+│  │  │                   SceneLoader + sceneLoad + blueprint (màn chờ), SceneBoundary
 │  │  └─ scene/           chunk lazy: three + r3f
 │  │     ├─ palette.ts    màu manifest + màu phái sinh §2.2, shade §2.3
 │  │     ├─ primitives.ts box/cyl/quad/prismX/arcSlab… + part() nướng sáng vào vertex colour
