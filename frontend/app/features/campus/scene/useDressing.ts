@@ -9,7 +9,10 @@ import { buildProp, paintProp, parseProps, type PropsJson } from "./props";
 
 export const PROPS_URL = "/models/props.json";
 
-/** The props file, or null when it cannot be had: the campus then simply has no props. */
+/**
+ * The props file, or null when it cannot be had: the campus then has no props, though the bulky
+ * ones' collision boxes (layout OBSTACLES) and sun shade (buildShadows) are constant and stay.
+ */
 export async function fetchProps(load: typeof fetch = fetch): Promise<PropsJson | null> {
   try {
     const response = await load(PROPS_URL);

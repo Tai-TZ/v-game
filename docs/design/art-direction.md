@@ -807,8 +807,8 @@ Nguồn: báo cáo "Insight edtech nâng cấp V-Game", mục "Đẹp hơn với
 
 Chủ dự án thấy xung quanh các toà còn trống và duyệt dùng props CC0 có sẵn thay vì tự dựng (Kenney Nature Kit, Kenney City Kit Commercial, Quaternius qua Poly Pizza; nguồn ở `CREDITS.md`). Chỗ đặt nằm trong `frontend/app/features/campus/dressing.ts`, ghi chú dựng ở campus-scene v0.3 §14.
 
-1. **Màu vẫn chỉ từ manifest.** Props bỏ màu và texture gốc: mỗi material được gán một ô màu của `palette.ts` (`hedge`, `trunk`, `lm.wall`, `mk.roof`…), nên hai theme tự đổi màu props như mọi thứ khác. Ô kẻ của bàn ô dù (texture) được chia theo độ cao: tán → `mk.roof`, chân và mặt bàn → `lm.wall`.
+1. **Màu vẫn chỉ từ manifest.** Props bỏ màu và texture gốc: mỗi material được gán một ô màu của `palette.ts` (`hedge`, `trunk`, `lm.wall`, `mk.roof`…), nên hai theme tự đổi màu props như mọi thứ khác. Ô kẻ của bàn ô dù (texture): tán → `mk.roof`, cột → `dark`, khung và chân → `trunk`, mặt bàn → `lm.trim`. Cột trắng dưới tán đỏ hay cam đọc như cây nấm (review vòng 1).
 2. **Bụi cây màu hàng rào, không hồng.** Ô `bloom` trên `plant_bush` ra màu hồng kẹo, nên mọi bụi cây lấy `hedge` (chủ dự án, 2026-10-09). `bloom` chỉ còn ở hoa sen.
-3. **Nướng như phần tĩnh.** Tô bóng theo pháp tuyến thế giới và preset giờ (§2.3), không đèn, không Lambert; tán dù hở được nướng thêm mặt sau. Một mesh, một draw call, không chuyển động idle (§1.2 nguyên tắc 6).
+3. **Nướng như phần tĩnh.** Tô bóng theo pháp tuyến thế giới và preset giờ (§2.3), không đèn, không Lambert; tán dù hở được nướng thêm mặt sau. Một mesh, một draw call, không chuyển động idle (§1.2 nguyên tắc 6). Gazebo, quầy hàng ăn, bảng tin, dừa và dù đổ bóng nắng trong lớp bóng có sẵn (§2.2), như cây.
 4. **Không làm:** xe máy (khoảng 3 000 tam giác, quá ngân sách 8k), xe đạp, rổ bóng, nhà chờ xe buýt (không có bản CC0 dùng được). Đèn thêm dùng lại `lamp()` có sẵn, không thêm kiểu đèn thứ hai.
-5. **Đá vách đế** là mỏm đá thấp trên bốn mặt đất, dưới mặt cỏ, cách góc đế ít nhất 3,8 để góc HUD sạch ở mọi góc xoay.
+5. **Không đặt đá vách đế.** Bản đầu có 12 mỏm đá trên bốn vách đất; chúng đọc như tấm bê tông xếp đều, thêm một nhịp nhân tạo cho sa bàn, nên đã bỏ (review vòng 1). Nếu muốn lại: tỉ lệ x không đều, không thẳng hàng với bó vỉa phía trước, ô `dark` hoặc `trunk`.

@@ -690,8 +690,8 @@ Kế hoạch đặt: `scratchpad/dressing/placement-plan.md`. Màu và quyết �
 
 ### 14.1 Dữ liệu và dựng
 
-- `campus/dressing.ts` (chỉ dữ liệu, không three): 21 props, 77 bản, ô màu theo tên material (`PROP_COLOURS`), `PROP_YAW0` (quầy hàng ăn −90°), 10 hộp chặn (`DRESSING_BLOCKS`, `layout.ts` thêm vào `OBSTACLES`) và 6 đèn (`DRESSING_LAMPS`, `buildTerrain` thêm vào mảng đèn).
-- `scene/useDressing.ts`: `fetchProps` đọc `/models/props.json` khi bộ nạp tới `done` (khung đầu đã lên màn hình), nên props không giữ khung đầu và tới trong lúc bộ nạp mờ đi. Lỗi mạng, HTTP hay file hỏng: không có props, cảnh vẫn như cũ. `buildDressing` dựng từng bản (`buildProp`, `paintProp`, ma trận đặt), nướng qua `part()` như các nhóm tĩnh rồi gộp thành một geometry; dựng lại khi đổi theme hay giờ, `dispose` khi thay và khi unmount.
+- `campus/dressing.ts` (chỉ dữ liệu, không three): 20 props, 65 bản, ô màu theo tên material (`PROP_COLOURS`), `PROP_YAW0` (quầy hàng ăn −90°), 10 hộp chặn (`DRESSING_BLOCKS`, `layout.ts` thêm vào `OBSTACLES`), bóng nắng của 9 bản cồng kềnh (`shade`: hộp, hoặc bát giác cho tán dừa và tán dù; `buildShadows` thêm vào lớp bóng có sẵn, 56 tam giác, không thêm draw call) và 6 đèn (`DRESSING_LAMPS`, `buildTerrain` thêm vào mảng đèn). `cliff` (đá vách) vẫn nằm trong `props.json` nhưng không còn được đặt (§14.7).
+- `scene/useDressing.ts`: `fetchProps` đọc `/models/props.json` khi bộ nạp tới `done` (khung đầu đã lên màn hình), nên props không giữ khung đầu và tới trong lúc bộ nạp mờ đi. Lỗi mạng, HTTP hay file hỏng: không có props; cảnh vẫn như cũ, trừ 10 hộp chặn của props lớn (lớn nhất 1,56 × 0,76) và bóng nắng của chúng, vì `OBSTACLES` và lớp bóng là hằng số (không đáng làm phản ứng cho một đường lỗi). File đúng schema nhưng không khớp `DRESSING` (thiếu prop, đổi tên material, do lệch deploy hay cache vì `/models/` không có tên băm): `tryBuildDressing` trả `null` như không có props, không ném lỗi vào `SceneBoundary`. `buildDressing` dựng từng bản (`buildProp`, `paintProp`, ma trận đặt), nướng qua `part()` như các nhóm tĩnh rồi gộp thành một geometry; dựng lại khi đổi theme hay giờ, `dispose` khi thay và khi unmount.
 - `CampusScene`: mesh props nằm trong nhóm `statics` (click lên props đi tới chỗ đứng gần đó, như cây). Khi props tới, `wake()` vẽ đúng một khung. Trong lúc props chưa xong, `?debug=frames` giữ `data-scene-busy`, để e2e không coi khoảng giữa khung đầu và khung props là đứng yên.
 
 ### 14.2 Lệch so với kế hoạch (do `layout.test.ts` bắt)
@@ -706,24 +706,32 @@ Kiểm lưới 0,1 của kế hoạch không thấy các khe hẹp mà `routeTo`
 | | Trước | Sau |
 |---|---|---|
 | Draw call | 14 | 15 (14 tới khi props tới) |
-| Tam giác ngày, spire-hall / clock-tower | 21 413 / 18 268 | 29 879 / 26 734 (mọi khu sáng: 30 051) |
-| Trong đó props / đèn mới | | 8 202 (7 914 + 288 mặt sau tán dù) / 264 |
+| Tam giác ngày, spire-hall / clock-tower | 21 413 / 18 268 | 29 551 / 26 406 (mọi khu sáng: 29 723) |
+| Trong đó props / đèn mới / bóng props | | 7 818 (7 914 − 384 đá vách + 288 mặt sau tán dù) / 264 / 56 |
 | Trần test | 23 000 | 31 500 (thêm chỗ cho dàn NPC v0.4, khoảng 1 020) |
 | `props.json` | | 84,8 kB, gzip ≤ 24 kB, tải sau khung đầu |
-| JS `/play` (gzip) | | 281,4 kB (trần 300 kB) |
+| JS `/play` (gzip) | | 281,6 kB (trần 300 kB) |
 | Khung khi đứng yên | 0 | 0 |
 
 ### 14.4 Test
 
-- `campus/dressing.test.ts`: mọi prop của `props.json` được đặt và mọi material có ô màu; trên đế, dải hàng rào và trong hồ; không đè toà, đường, quảng trường, cây, đèn, tượng; cách cửa, chỗ đứng và chỗ nói của cả 5 NPC (gồm dàn v0.4), `SPAWN`, `BACK_SPOT`; không chồng nhau; không che người hay cửa ở góc mặc định; không lấn khung nhãn DOM; luật elip `r + √2·h ≤ 22,58` (góc HUD và cụm "Góc nhìn" ở mọi yaw); đá vách nằm trên vách; quét lưới 0,1 không có túi kín; `routeTo` tới 3 cửa, 5 chỗ nói và `BACK_SPOT`.
-- `scene/useDressing.test.ts`: `fetchProps` trả `null` khi lỗi; mesh chỉ có `position` và `color`, đúng 8 202 tam giác, màu trong [0, 1]; hàng rào đúng màu `hedge` đã nướng; mọi đỉnh trong elip quỹ đạo; đổi theme chỉ đổi màu.
-- `scene.test.ts`: ngân sách với props, góc HUD trên 1280×800 có cả props.
+- `campus/dressing.test.ts`: mọi prop của `props.json` được đặt và mọi material có ô màu; trên đế, dải hàng rào và trong hồ; không đè toà, đường, quảng trường, cây, đèn, tượng; cách cửa, chỗ đứng và chỗ nói của cả 5 NPC (gồm dàn v0.4), `SPAWN`, `BACK_SPOT`; không chồng nhau; không che người hay cửa ở góc mặc định; không lấn khung nhãn DOM; luật elip `r + √2·h ≤ 22,58` (góc HUD và cụm "Góc nhìn" ở mọi yaw); sàn cầu tàu cao 0,15–0,35 trên mặt nước; dù không có chân trắng; mỗi hộp chặn phủ chân prop đã xoay (`yaw` + `PROP_YAW0`, sai lệch ≤ 0,2); quét lưới 0,1 không có túi kín; `routeTo` tới 3 cửa, 5 chỗ nói và `BACK_SPOT`.
+- `scene/useDressing.test.ts`: `fetchProps` trả `null` khi lỗi; `tryBuildDressing` trả `null` khi thiếu prop hay material; mesh chỉ có `position` và `color`, đúng 7 818 tam giác, màu trong [0, 1]; hàng rào đúng màu `hedge` đã nướng; mọi đỉnh trong elip quỹ đạo, chỉ chân cầu tàu xuống dưới mặt đất (trong đế, cạnh hồ); đổi theme chỉ đổi màu.
+- `scene.test.ts`: ngân sách với props, góc HUD trên 1280×800 có cả props, mặt đất sau gazebo, quầy, bảng tin, dừa và dù nằm trong bóng.
 
 ### 14.5 Ảnh
 
-`scratchpad/dressing/shots-v1/`: `/play` mặc định 1280×800, 375×812 và 2× của hai theme, bản build (`dressing/tools/shots-v1.mjs`). Ở cả sáu ảnh `props.json` trả 200 và cảnh đứng yên sau khung props.
+`scratchpad/dressing/shots-v1/`: `/play` mặc định 1280×800, 375×812 và 2× của hai theme, bản build (`dressing/tools/shots-v1.mjs`). Ở cả sáu ảnh `props.json` trả 200 và cảnh đứng yên sau khung props. Sau review vòng 1: `scratchpad/dressing/shots-v2/` (`dressing/tools/shots-v2.mjs`), cùng sáu ảnh cộng ảnh cận 2× `crop-<theme>-<cafe|gazebo|track>.png`.
 
 ### 14.6 Mở
 
-- Cầu tàu đứng trên cột, sàn cao khoảng 0,9 trên mặt nước (cao đúng như kế hoạch). Nếu thấy cao, hạ `y` xuống khoảng −0,6: cột chìm vào đế, sàn còn khoảng 0,3.
-- Hộp chặn không xoay theo `yaw`; mọi bản chặn hiện là hình gần vuông hoặc đặt ở 0°.
+- Hộp chặn và bóng không xoay theo `yaw`: nửa cạnh cho theo trục thế giới. Hộp của quầy hàng ăn đã cho sẵn theo hướng xoay `PROP_YAW0` (0,78 × 0,38); test chân prop đã xoay bắt khi đổi `yaw` mà quên đổi hộp.
+- `cliff` còn trong `props.json` (32 tam giác, không đặt). Bỏ khỏi `tools/props/bake-props.mjs` ở lần nướng sau.
+
+### 14.7 Sửa sau review vòng 1 (2026-10-09)
+
+- Cầu tàu: chân ở `y` −0,75, sàn còn khoảng 0,15 trên mặt nước (trước khoảng 0,9, như cầu trên cột cao); cột chìm vào đế.
+- Bàn ô dù: cột `dark`, khung và chân `trunk`, mặt bàn `lm.trim` (trước đều `lm.wall`, trắng dưới tán đỏ đọc như nấm); kéo cao thành [2,3; 2,9; 2,3] để tán tách khỏi bàn.
+- Bỏ 12 đá vách: đọc như tấm bê tông xếp đều trên vách đất; bớt 384 tam giác.
+- Bóng nắng cho props cồng kềnh (§14.1), như cây.
+- `tryBuildDressing` (§14.1); ghi rõ hộp chặn và bóng còn lại khi `props.json` lỗi.
