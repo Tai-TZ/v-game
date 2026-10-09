@@ -268,7 +268,7 @@ class StepRecord:
     node: str
     block: BlockType
     status: StepStatus
-    ms: int
+    ms: int  # wall ms; rerank over the precomputed table: simulated live cost (engine-v0.2 §14)
     usage: Usage
     facts: tuple[Fact, ...]
 
@@ -409,7 +409,7 @@ class StepFinishedEvent(TypedDict):
     status: StepStatus
     summary: str  # <= SUMMARY_MAX_CHARS, deterministic, gold-free
     tokens: TokensInOut
-    ms: int
+    ms: int  # wall ms; rerank over the precomputed table: simulated live cost (engine-v0.2 §14)
     facts: list[Fact]
 
 

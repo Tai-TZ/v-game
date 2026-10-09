@@ -38,11 +38,13 @@ only new passages, questions and pairs: a question edit takes about 2 minutes pl
 a full rebuild 1-1.5 hours (~5 GB of RAM). `--variant theo_dieu-512-10` adds one variant to the index already in `INDEX_DIR` (it never
 shrinks it). Scores are reused only when the model, `RERANK_MAX_TOKENS`, fastembed and
 onnxruntime versions match (`rerank.json` `regime`). The build also writes `rerank.json` `timing`:
-the mean ms per pair it spent scoring new pairs, with the pair count, CPU and date (a build that
-scores nothing keeps the old timing; a table without one uses 120 ms, engine-spike-report §3.4).
+the mean ms per pair spent scoring, weighted by pairs with the old table's timing (a corpus edit
+barely moves it), the pair count, CPU and date; a table without one uses 120 ms
+(engine-spike-report §3.4), and a missing, zero or NaN value fails the index load.
 A rerank step over the table reports a simulated `round(candidates x ms_per_pair)` ms, the live
 model's cost, not the ~10-20 ms lookup, so L3's cost numbers stay honest (engine-v0.2 §14). Build
-on an idle machine: load inflates the value.
+on an idle machine: load inflates the value. To re-time, delete `rerank.json` and `rerank.npy` and
+rebuild (25-60 minutes).
 
 ### Replay seed
 
