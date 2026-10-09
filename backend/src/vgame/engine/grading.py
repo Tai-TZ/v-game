@@ -205,6 +205,7 @@ _TEMPLATE_KEY = {
     "cite_missing": "llm.cite_missing",
 }
 _FALLBACK_TEMPLATE = "Câu #{n} chưa đạt: {flag}."
+_ANSWER_WRONG = "nội dung câu trả lời sai hoặc thiếu ý"
 # {flag} in the regression and fallback lines: words, never the machine key.
 _FLAG_VI = {
     "ret.gold_missing": "đoạn đáp án không vào tới thùng",
@@ -214,7 +215,8 @@ _FLAG_VI = {
     "ret.stale_doc": "thùng có văn bản hết hiệu lực",
     "llm.cite_missing": "không trích nguồn",
     "llm.cite_unknown": "trích nguồn không có trong thùng",
-    "trap.failed": "câu trả lời chưa đạt",
+    # No retrieval or citation flag: the answer text itself misses a point or says a wrong one.
+    "trap.failed": _ANSWER_WRONG,
 }
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+")
 
@@ -465,7 +467,7 @@ class LevelEvaluator:
                     trace.answer.cited_ids if trace.answer else (),
                     pack["included"] if pack else [],
                 )[0]
-            v["flag"] = _FLAG_VI.get(key.partition(":")[0], "câu trả lời chưa đạt")
+            v["flag"] = _FLAG_VI.get(key.partition(":")[0], _ANSWER_WRONG)
             flag = "regression" if case.trap == "regression" else key
             message = self._message(flag, v, trap=case.role == "trap")
             item: Diagnosis = {"case": case.id, "flag": flag, "message_vi": message}

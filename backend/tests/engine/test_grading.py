@@ -575,6 +575,18 @@ def test_fallback_template_names_the_flag_in_words(store: IndexStore) -> None:
     )
 
 
+def test_l2_trap_without_a_flag_says_what_failed(store: IndexStore) -> None:
+    """L2 has no trap.failed line: the fallback must not read "chưa đạt: … chưa đạt"."""
+    l2_diag = {k: v for k, v in DIAG.items() if k != "trap.failed"}
+    gold = gold_chunk(store, L2, "lib-l2-t01")
+    # Cited, current pack, no retriever flags: only the answer's content fails.
+    t = trace(L2, "lib-l2-t01", f"Không rõ [{gold.chunk_id}].", included=[gold])
+    _, diag, _ = run_report(LevelEvaluator(L2, rules(diagnosis=l2_diag), store), [t], {})
+    flag, message = diag["lib-l2-t01"]
+    assert flag == "trap.failed"
+    assert message.endswith(" chưa đạt: nội dung câu trả lời sai hoặc thiếu ý.")
+
+
 def test_budget_exceeded_is_a_run_level_diagnosis(store: IndexStore) -> None:
     gold = gold_chunk(store, L1, "lib-l1-v01")
     text = GOOD.replace("{gold}", gold.chunk_id)
