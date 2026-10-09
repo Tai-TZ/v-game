@@ -70,7 +70,7 @@ deploy: [Kỹ thuật › Deploy](#deploy).
 <p align="center">
   <img src="docs/media/workbench.gif" width="960" alt="Bàn thợ của level Thôi bịa điều luật: gắn Vòm Sao, kéo Móc kéo lên 3 đoạn, bật Máy đóng tem, chọn ba thẻ dặn dò G1, G2, G3 rồi bấm Mở ca; bảng câu bên phải chuyển dần từ Chờ sang Đạt trong lúc lượt chạy phát về; cuối cùng là Kết quả ca tối nay với 3/3 sao và mục Cô Lan chẩn đoán.">
   <br>
-  <sub><b>Bàn thợ, level 1.</b> Lắp lời giải (tìm theo nghĩa, lấy 3 đoạn, đóng tem mã đoạn, dặn trích nguồn), mở ca và xem mười câu chạy trực tiếp qua SSE, rồi nhận sao, kết quả từng câu và lời chẩn đoán của cô Lan. Lượt chạy trong hình là luồng sự kiện thật đã ghi lại, phát lại nhanh hơn thật.</sub>
+  <sub><b>Bàn thợ, level 1.</b> Lắp lời giải (tìm theo nghĩa, lấy 3 đoạn, đóng tem mã đoạn, dặn trích nguồn), mở ca và xem mười câu chạy trực tiếp qua SSE, rồi nhận 3/3 sao, kết quả từng câu và mục chẩn đoán của cô Lan (lời giải đúng nên không câu nào cần chẩn đoán). Lượt chạy trong hình là luồng sự kiện thật đã ghi lại, phát lại nhanh hơn thật.</sub>
 </p>
 
 <p align="center">
@@ -99,7 +99,7 @@ deploy: [Kỹ thuật › Deploy](#deploy).
     </td>
     <td width="40%" valign="top" align="center">
       <img src="docs/media/mobile.png" width="265" alt="Hub theme town trên điện thoại: nút quay lại, chip thời tiết và nút Các khu ở trên cùng; cảnh 3D với nhân vật giữa quảng trường, cô Lan trước Thư viện, nhà chính có tháp đồng hồ, đài phun, Chợ model và hồ nước; ba nút xoay góc nhìn ở dưới.">
-      <br><sub><b>Chạy trên điện thoại.</b> Chạm để đi, một ngón để xoay, không tràn ngang ở 375 px.</sub>
+      <br><sub><b>Chạy trên điện thoại.</b> Chạm để đi, kéo một ngón để xoay, không tràn ngang ở 375 px.</sub>
     </td>
   </tr>
 </table>
@@ -200,16 +200,16 @@ Danh sách endpoint, mã lỗi và biến môi trường: [backend/README.md](ba
 - [x] Trang chủ pre-render, hub 3D, trang khu, hai theme pack
 - [x] Hub v0.3: cổng ở mép trước, khuôn viên phía sau nhà chính, nhấp để đi theo đường ngắn nhất
 - [x] Hub v0.4: màn chờ "Sa bàn đang dựng", ánh sáng theo giờ thật và thời tiết Hà Nội, toà đủ bốn mặt, xoay 360°, props và nhân vật CC0, cô Lan và bốn NPC có lời thoại
-- [x] Bàn thợ v0.1: lắp khối, mở ca và theo dõi lượt chạy qua SSE; kết quả với sao, từng câu và chẩn đoán của cô Lan
+- [x] Bàn thợ v0.1: lắp khối, mở ca và theo dõi lượt chạy qua SSE; kết quả với sao, từng câu và chẩn đoán của cô Lan; sao tốt nhất của từng level lưu trong trình duyệt, khu có sao sáng đèn cửa sổ
 - [x] Bản chạy thử công khai: Vercel cho frontend, Render free cho API, chỉ theme town
-- [ ] Bước đoán kết quả trong game; lưu tiến trình và mở khoá level
+- [ ] Bước đoán kết quả trong game; mở khoá level theo sao
 - [ ] Ba gợi ý tăng dần trên màn kết quả
 - [ ] Chạy agent trên bản deploy: chỗ chạy index truy xuất và reranker (gói free không đủ RAM)
 - [ ] Chốt nội dung và ngân sách token của level 2, 3 qua thêm lượt chạy với model thật
 - [ ] Tháp canh (guardrails) và Chợ model (token, context, chọn model)
 - [ ] Lưu bền và giám sát theo [ADR 0003](docs/adr/0003-backend-stack.md): PostgreSQL/pgvector, Redis, Langfuse; đăng nhập và vai trò giáo viên
 
-Thứ tự tiếp theo: dựng bàn thợ và chỗ chạy agent cho bản chạy thử để giảng viên chơi trọn khu Thư viện →
+Thứ tự tiếp theo: dựng chỗ chạy agent cho bản chạy thử để giảng viên chơi trọn khu Thư viện →
 mở rộng tới MVP 3 khu × 3 level → pilot với một lớp, đo trước và sau → đề xuất đưa vào toàn chương trình.
 
 ## Một lượt chạy diễn ra thế nào
@@ -330,8 +330,8 @@ flowchart LR
 | API | Render gói free, vùng Singapore, khai báo trong [`render.yaml`](render.yaml) | 512 MB RAM, health check `/api/health`. Ngủ sau 15 phút không có truy cập; lần mở đầu có thể chờ khoảng một phút, trang chủ tự gọi `/api/health` để đánh thức sớm |
 
 Merge vào `main` thì Vercel tự deploy lại; Render chỉ deploy khi CI xanh và `backend/`, `docs/content/`
-hoặc `render.yaml` đổi, để API giữ ở mức 0 đồng. Chưa chạy agent trên bản deploy: ngoài việc chưa có bàn
-thợ, index truy xuất và model embedding (khoảng 2,2 GB) không vừa gói free. Từng bước dựng lại, biến môi
+hoặc `render.yaml` đổi, để API giữ ở mức 0 đồng. Chưa chạy agent trên bản deploy: index truy xuất và
+model embedding (khoảng 2,2 GB) không vừa gói free. Từng bước dựng lại, biến môi
 trường và tên miền: [docs/deploy.md](docs/deploy.md).
 
 ### Chất lượng và bảo mật
@@ -400,7 +400,7 @@ v-game/
 │   │       └── zones/         schema (valibot), API, trang khu
 │   ├── public/themes/         theme pack: chỉ dữ liệu (manifest, CSS token, font, ảnh)
 │   ├── public/models/         props và nhân vật CC0 nướng sẵn (JSON), kèm giấy phép
-│   ├── e2e/                   Playwright: landing, play, loader, orbit, NPC, thời tiết, bàn thợ, a11y, qa-regressions
+│   ├── e2e/                   Playwright: landing, play, play-zone, loader, orbit, NPC, thời tiết, bàn thợ, a11y, qa-regressions
 │   ├── scripts/               check-bundle, postbuild-csp, serve-build, build-vercel
 │   └── vercel.json            cấu hình project Vercel
 ├── backend/
