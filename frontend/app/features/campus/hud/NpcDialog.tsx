@@ -58,7 +58,8 @@ export function NpcDialog({ who, name, visits, site, onEnter, onClose, zoneCard 
           Để sau
         </button>
       </div>
-      {site && <div className="mt-5 border-t border-line pt-5">{zoneCard}</div>}
+      {/* No card yet (zones loading or failed): no empty divider either. */}
+      {site && zoneCard && <div className="mt-5 border-t border-line pt-5">{zoneCard}</div>}
     </HubDialog>
   );
 }
