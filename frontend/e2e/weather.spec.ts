@@ -64,6 +64,30 @@ test.describe("live sky", () => {
     });
   }
 
+  test("tints the night fog with the night cloud, not the day sky", async ({ page }) => {
+    await page.clock.setFixedTime(hanoi("21:00"));
+    await mockApi(page);
+    await weather(page, "fog");
+    await page.goto("/play");
+    await expect(page.locator("main")).toHaveAttribute("data-sky", "night");
+    // --color-scene declared on :root resolved there, so the fog always mixed the day sky.
+    const { fog, cloud } = await page.locator(".weather-fog").evaluate((el) => {
+      const paint = (parent: Element, colour: string) => {
+        const probe = document.createElement("div");
+        probe.style.backgroundColor = colour;
+        parent.append(probe);
+        const value = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return value;
+      };
+      return {
+        fog: paint(el, "var(--color-scene)"),
+        cloud: paint(document.body, "var(--vg-scene-cloud-night)"),
+      };
+    });
+    expect(fog).toBe(cloud);
+  });
+
   test("draws no WebGL frame while a night storm rains", async ({ page, consoleErrors }) => {
     await page.clock.setFixedTime(hanoi("21:00"));
     await mockApi(page);

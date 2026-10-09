@@ -144,11 +144,14 @@
   /*
    * The hub's flat sky (art §2.5, campus v0.4 W5): <main data-sky data-clouds> picks the phase's
    * colour, then mixes in the cloud grey (30 % for a few clouds; full cover: all of it by day and
-   * night, 60 % at dawn and dusk). bg-scene reads --vg-sky.
+   * night, 60 % at dawn and dusk). bg-scene reads --vg-sky. --color-scene is declared again here:
+   * the :root one resolved --vg-sky at :root (unset), so var(--color-scene) below (fog, soil)
+   * always meant the day sky.
    */
   [data-sky] {
     --vg-phase-sky: var(--vg-scene-sky);
     --vg-sky: var(--vg-phase-sky);
+    --color-scene: var(--vg-sky);
   }
   [data-sky="dawn"] {
     --vg-phase-sky: var(--vg-scene-dawn);
