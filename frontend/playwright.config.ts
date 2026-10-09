@@ -8,7 +8,9 @@ export default defineConfig({
   fullyParallel: true,
   // Each page renders WebGL in software (SwiftShader); too many at once starve each other.
   workers: 4,
-  expect: { timeout: 15_000 },
+  // CI renders WebGL in software: with the skinned cast a walk across the campus can take
+  // longer than 15 s there, so assertions that wait for an arrival get more room on CI.
+  expect: { timeout: process.env.CI ? 30_000 : 15_000 },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
