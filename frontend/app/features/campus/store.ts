@@ -1,8 +1,6 @@
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
 
-import type { TimeOfDay } from "~/features/theme/schema";
-
 import { HOME_YAW, nextIsoYaw, wrapAngle } from "./camera";
 import {
   INTERACT_RADIUS,
@@ -17,6 +15,7 @@ import {
 } from "./layout";
 import { nearestWithin } from "./movement";
 import { INTERACT_POINTS, type InteractTarget } from "./sites";
+import { sceneLook, type Display, type Phase, type SceneLook, type Weather } from "./sky";
 
 /**
  * Per-frame player data. Mutated in place by the scene's frame loop and input handlers;
@@ -69,6 +68,16 @@ export interface HubDialog {
   lines: DialogLines;
 }
 
+/** The hub's sky (campus v0.4 W3): written only on change, never per frame. */
+export interface HubSky {
+  phase: Phase;
+  /** The last good /api/weather body; null until one arrives. */
+  weather: Weather | null;
+  display: Display;
+  /** Replaced only when (display, phase, weather group) changes: the scene re-bakes on it. */
+  look: SceneLook;
+}
+
 export interface HubState {
   /** Coarse state for the HUD: the interaction point the player stands next to. */
   nearby: InteractTarget | null;
@@ -78,8 +87,7 @@ export interface HubState {
   met: Partial<Record<Speaker, number>>;
   /** Height (px) of the bottom sheet covering the scene, for the follow camera. */
   sheetInset: number;
-  /** Light preset the player picked (N8); null follows the theme's default. */
-  time: TimeOfDay | null;
+  sky: HubSky;
   motion: Motion;
   /**
    * Camera azimuth. Lasts for the current scene, revalidations included (a `?at=` change, a zone
@@ -91,7 +99,7 @@ export interface HubState {
   rotated: boolean;
   /** Requests a frame from the scene (`invalidate`); a no-op until the scene mounts. */
   wake: () => void;
-  /** True while the 3D scene is mounted: scene-only controls (the dusk toggle) show only then. */
+  /** True while the 3D scene is mounted. */
   sceneUp: boolean;
 
   setNearby: (target: InteractTarget | null) => void;
@@ -103,7 +111,9 @@ export interface HubState {
   /** Click-to-move to `goal`, through the lane waypoints when it is in another part of campus. */
   walkTo: (goal: Vec2) => void;
   setSheetInset: (px: number) => void;
-  setTime: (time: TimeOfDay) => void;
+  setPhase: (phase: Phase) => void;
+  setWeather: (weather: Weather) => void;
+  setDisplay: (display: Display) => void;
   /** Turn to the next diagonal, clockwise for +1; 0 goes back to HOME_YAW. */
   rotateView: (dir: -1 | 0 | 1) => void;
   setRotated: (rotated: boolean) => void;
@@ -119,97 +129,116 @@ export interface HubState {
 const noop = () => undefined;
 
 export function createHubStore() {
-  return createStore<HubState>()((set, get) => ({
-    nearby: null,
-    dialog: null,
-    met: {},
-    sheetInset: 0,
-    time: null,
-    motion: {
-      position: { ...SPAWN },
-      heading: SPAWN_HEADING,
-      target: null,
-      route: [],
-      talkOnArrival: null,
-      keys: new Set(),
-    },
-    view: { yaw: HOME_YAW, from: HOME_YAW, to: null, t: 0, duration: 0 },
-    rotated: false,
-    wake: noop,
-    sceneUp: false,
-
-    setNearby: (nearby) => {
-      if (nearby !== get().nearby) set({ nearby });
-    },
-    openDialog: (who) => {
-      if (get().dialog) return;
-      set({ dialog: { who, lines: get().met[who] ? "again" : "first" } });
-      // The camera turns to the speaker and they start talking (useHubFrame).
-      get().wake();
-    },
-    closeDialog: () => {
-      const { dialog, met } = get();
-      if (dialog) {
-        set({
-          dialog: null,
-          met: { ...met, [dialog.who]: (met[dialog.who] ?? 0) + 1 },
-          sheetInset: 0,
-        });
-      }
-      get().wake();
-    },
-    talkTo: (who) => {
-      const spot = speakerSpot(who);
-      const talk = talkSpot(who);
-      get().placePlayer(talk, Math.atan2(spot.x - talk.x, spot.z - talk.z));
-      get().openDialog(who);
-    },
-    placePlayer: (position, heading) => {
-      const { motion } = get();
-      motion.position = { ...position };
-      motion.heading = heading;
-      motion.target = null;
-      motion.route = [];
-      motion.talkOnArrival = null;
-      motion.keys.clear();
-      get().setNearby(nearestWithin(position, INTERACT_POINTS, INTERACT_RADIUS)?.id ?? null);
-      get().wake();
-    },
-    walkTo: (goal) => {
-      const { motion } = get();
-      const [next, ...rest] = routeTo(motion.position, goal, towardFor(get().view.yaw));
-      motion.target = next ?? null;
-      motion.route = rest;
-      motion.talkOnArrival = null;
-      motion.keys.clear();
-      get().wake();
-    },
-    setSheetInset: (sheetInset) => {
-      if (sheetInset !== get().sheetInset) {
-        set({ sheetInset });
-        get().wake();
-      }
-    },
-    setTime: (time) => {
-      set({ time });
+  return createStore<HubState>()((set, get) => {
+    /** Writes the sky only when it changed; a new look wakes the scene, whose re-bake follows. */
+    const setSky = (change: Partial<Omit<HubSky, "look">>) => {
+      const sky = get().sky;
+      const next = { ...sky, ...change };
+      if (next.phase === sky.phase && next.weather === sky.weather && next.display === sky.display)
+        return;
+      const look = sceneLook(next.display, next.phase, next.weather?.condition ?? null);
+      const same = (Object.keys(look) as (keyof SceneLook)[]).every((k) => look[k] === sky.look[k]);
+      set({ sky: { ...next, look: same ? sky.look : look } });
       // Flags the scene busy at once (?debug=frames); the re-bake's commit wakes it again.
-      get().wake();
-    },
-    rotateView: (dir) => {
-      const { view } = get();
-      const target = dir === 0 ? HOME_YAW : nextIsoYaw(view.to ?? view.yaw, dir);
-      easeView(view, target, TURN_SECONDS, dir);
-      get().wake();
-    },
-    setRotated: (rotated) => {
-      if (rotated !== get().rotated) set({ rotated });
-    },
-    resetView: () => {
-      Object.assign(get().view, { yaw: HOME_YAW, to: null });
-      get().setRotated(false);
-    },
-    setWake: (wake) => set({ wake: wake ?? noop, sceneUp: wake !== null }),
-  }));
+      if (!same) get().wake();
+    };
+    return {
+      nearby: null,
+      dialog: null,
+      met: {},
+      sheetInset: 0,
+      sky: { phase: "day", weather: null, display: "live", look: sceneLook("live", "day", null) },
+      motion: {
+        position: { ...SPAWN },
+        heading: SPAWN_HEADING,
+        target: null,
+        route: [],
+        talkOnArrival: null,
+        keys: new Set(),
+      },
+      view: { yaw: HOME_YAW, from: HOME_YAW, to: null, t: 0, duration: 0 },
+      rotated: false,
+      wake: noop,
+      sceneUp: false,
+
+      setNearby: (nearby) => {
+        if (nearby !== get().nearby) set({ nearby });
+      },
+      openDialog: (who) => {
+        if (get().dialog) return;
+        set({ dialog: { who, lines: get().met[who] ? "again" : "first" } });
+        // The camera turns to the speaker and they start talking (useHubFrame).
+        get().wake();
+      },
+      closeDialog: () => {
+        const { dialog, met } = get();
+        if (dialog) {
+          set({
+            dialog: null,
+            met: { ...met, [dialog.who]: (met[dialog.who] ?? 0) + 1 },
+            sheetInset: 0,
+          });
+        }
+        get().wake();
+      },
+      talkTo: (who) => {
+        const spot = speakerSpot(who);
+        const talk = talkSpot(who);
+        get().placePlayer(talk, Math.atan2(spot.x - talk.x, spot.z - talk.z));
+        get().openDialog(who);
+      },
+      placePlayer: (position, heading) => {
+        const { motion } = get();
+        motion.position = { ...position };
+        motion.heading = heading;
+        motion.target = null;
+        motion.route = [];
+        motion.talkOnArrival = null;
+        motion.keys.clear();
+        get().setNearby(nearestWithin(position, INTERACT_POINTS, INTERACT_RADIUS)?.id ?? null);
+        get().wake();
+      },
+      walkTo: (goal) => {
+        const { motion } = get();
+        const [next, ...rest] = routeTo(motion.position, goal, towardFor(get().view.yaw));
+        motion.target = next ?? null;
+        motion.route = rest;
+        motion.talkOnArrival = null;
+        motion.keys.clear();
+        get().wake();
+      },
+      setSheetInset: (sheetInset) => {
+        if (sheetInset !== get().sheetInset) {
+          set({ sheetInset });
+          get().wake();
+        }
+      },
+      setPhase: (phase) => setSky({ phase }),
+      setWeather: (weather) => {
+        const old = get().sky.weather;
+        const same =
+          old?.condition === weather.condition &&
+          old.temperature_c === weather.temperature_c &&
+          old.updated_at === weather.updated_at;
+        if (!same) setSky({ weather });
+      },
+      setDisplay: (display) => setSky({ display }),
+      rotateView: (dir) => {
+        const { view } = get();
+        const target = dir === 0 ? HOME_YAW : nextIsoYaw(view.to ?? view.yaw, dir);
+        easeView(view, target, TURN_SECONDS, dir);
+        get().wake();
+      },
+      setRotated: (rotated) => {
+        if (rotated !== get().rotated) set({ rotated });
+      },
+      resetView: () => {
+        Object.assign(get().view, { yaw: HOME_YAW, to: null });
+        get().setRotated(false);
+      },
+      setWake: (wake) => set({ wake: wake ?? noop, sceneUp: wake !== null }),
+    };
+  });
 }
 
 export type HubStore = ReturnType<typeof createHubStore>;

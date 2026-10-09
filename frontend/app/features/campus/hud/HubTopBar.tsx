@@ -11,7 +11,7 @@ import { AUTHOR } from "~/lib/site";
 import { useDelayedFlag } from "~/lib/useSettled";
 
 import { BACK_SPOT, BACK_Z, NPCS, SPAWN, type Speaker } from "../layout";
-import { hubStore, useHub } from "../store";
+import { hubStore } from "../store";
 
 const PANEL_ID = "hub-zone-list";
 
@@ -36,11 +36,6 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const showSkeleton = useDelayedFlag(zones === undefined, 300);
   const { npcs } = useActiveTheme().campus;
-  const defaultTime = "day";
-  const dusk = (useHub((state) => state.time) ?? defaultTime) === "dusk";
-  // The light preset lives in the scene; while it is down (no WebGL, failed) the button would
-  // do nothing.
-  const sceneUp = useHub((state) => state.sceneUp);
 
   useEffect(() => {
     if (!open) return;
@@ -78,29 +73,6 @@ export function HubTopBar({ zones, onTalk, onRetry }: HubTopBarProps) {
           <ChevronLeftIcon />
           <span className="sr-only sm:not-sr-only">Về trang chủ</span>
         </Link>
-        {/* Light preset (N8): pressed is dusk, released is day. Icon only below md, so the
-            two corner groups stay apart at 640–767 px. */}
-        {sceneUp && (
-          <button
-            type="button"
-            aria-pressed={dusk}
-            onClick={() => hubStore.getState().setTime(dusk ? "day" : "dusk")}
-            className={buttonClass(
-              "secondary",
-              "px-3 aria-pressed:border-brand aria-pressed:bg-brand-tint max-md:w-11 max-md:px-0",
-            )}
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 shrink-0" fill="none">
-              <path
-                d="M5 13a5 5 0 0 1 10 0M2 13h16M4 16.5h12M10 3v3M4.3 6.3l1.4 1.4M15.7 6.3l-1.4 1.4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="sr-only md:not-sr-only">Hoàng hôn</span>
-          </button>
-        )}
       </div>
 
       <div className="absolute top-4 right-4 z-20 flex gap-2 lg:top-6 lg:right-6">
