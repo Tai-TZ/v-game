@@ -1,5 +1,5 @@
 > **Trạng thái:** v0.1. Mọi nhân vật đều hư cấu, không dựa trên người thật, kể cả giảng viên của chương trình. Không tên trường thật nào xuất hiện; trường trong truyện là **Trường Đại học Sao Mai** (D6), nơi chốn gọi chung là "khuôn viên".
-> **Liên quan:** [Thư viện](library.md) · [Sáu level còn lại](other-levels-outline.md)
+> **Liên quan:** [Thư viện](library.md) · [Sáu level còn lại](other-levels-outline.md) · [Phòng chấm](grading-room.md) · [Giờ cao điểm](rush-hour.md)
 
 # Dàn nhân vật
 
@@ -78,8 +78,27 @@
 - **Giọng:** vui tính, kỷ luật, coi tấn công thử là việc có trách nhiệm (Ngày 11).
 - **Câu mẫu:** "Ghi lại mọi phát, kể cả phát trượt." · "Phá được là xong một nửa. Nửa còn lại là chỉ ra lớp nào thủng."
 
+## Phòng chấm (khu 4, thêm 2026-10-08)
+
+### Chị Nhi: cán bộ khảo thí
+
+- **Vai:** chủ Phòng chấm ([grading-room.md](grading-room.md)); người giữ nhãn người và nghi ngờ mọi con số chưa được kiểm.
+- **Giọng:** tỉ mỉ, bình tĩnh, mê bảng đếm. Xưng "chị", gọi "em". Không bao giờ nói một con số mà không kèm "trên bao nhiêu câu".
+- **Câu mẫu:** "Bảng nói 4,1 điểm. Hòm thư góp ý nói khác, và mình chưa biết tin bên nào." · "Giám khảo cũng phải thi, em ạ. Chị chưa thấy ai được miễn." · "Hai mươi trace thật nói nhiều hơn một điểm trung bình."
+- **Không nói:** khen chung chung; "con số này chắc đúng".
+
+## Trạm vận hành (ứng viên khu 5, thêm 2026-10-08)
+
+### Anh Tùng: trực vận hành
+
+- **Vai:** chủ Trạm vận hành ([rush-hour.md](rush-hour.md)); người đọc bảng đèn.
+- **Giọng:** bình thản, nói bằng giây và phần trăm, ghét "bấm lại cho chắc". Xưng "anh", gọi "em".
+- **Câu mẫu:** "Máy không sập vì đông người. Máy sập vì ai cũng bấm lại cùng một lúc." · "Chậm mà trả lời còn hơn nhanh mà im." · "Trung bình đẹp không cứu được người chờ lâu nhất."
+- **Không nói:** đổ lỗi cho người dùng; "cứ thử lại là được".
+
 ## Kiểm tra tên
 
 - Tên dùng chung kiểu Việt phổ biến, không trùng tên giảng viên hay nhân vật có thật được nêu trong slide của chương trình.
 - Đã đối chiếu với slide hiện có (2026-10-07): sinh viên L3 đổi từ "Tuấn" thành "Khang" vì trùng tên một giảng viên.
+- Đối chiếu 2026-10-08: "Nhi" và "Tùng" không xuất hiện trong bản trích slide của 15 ngày.
 - Trước mỗi lần phát hành, QA grep danh sách tên giảng viên trong slide để chắc không trùng.
