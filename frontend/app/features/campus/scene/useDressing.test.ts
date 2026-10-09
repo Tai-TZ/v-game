@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { parseThemeIndex, parseThemeManifest, type ThemeManifest } from "~/features/theme/schema";
 
 import { DRESSING } from "../dressing";
-import { BASE } from "../layout";
+import { BASE, LAKE } from "../layout";
 import { palette, shade } from "./palette";
 import { triangleCount } from "./primitives";
 import type { PropsJson } from "./props";
@@ -17,6 +17,8 @@ const readJson = (...parts: string[]): unknown =>
   JSON.parse(readFileSync(path.resolve(process.cwd(), "public", ...parts), "utf8"));
 const text = readFileSync(path.resolve(process.cwd(), "public", "models", "props.json"), "utf8");
 const json = JSON.parse(text) as PropsJson;
+const inLake = (x: number, z: number, grow = 0) =>
+  ((x - LAKE.x) / (LAKE.rx + grow)) ** 2 + ((z - LAKE.z) / (LAKE.rz + grow)) ** 2 < 1;
 const manifests: ThemeManifest[] = parseThemeIndex(readJson("themes", "index.json")).map((t) =>
   parseThemeManifest(readJson("themes", t.id, "manifest.json")),
 );
@@ -80,7 +82,7 @@ describe.each(manifests.map((m) => [m.id, m] as const))("dressing mesh, theme %s
     geometry.dispose();
   });
 
-  it("keeps every vertex inside the slab corners' orbit ellipse and above the ground", () => {
+  it("keeps every vertex inside the slab corners' orbit ellipse, above ground but the dock's posts", () => {
     const geometry = buildDressing(json, palette(m.campus, "day"));
     const position = geometry.getAttribute("position");
     const zc = (BASE.minZ + BASE.maxZ) / 2;
@@ -90,10 +92,16 @@ describe.each(manifests.map((m) => [m.id, m] as const))("dressing mesh, theme %s
     for (let i = 0; i < position.count; i += 1) {
       const [x, y, z] = [position.getX(i), position.getY(i), position.getZ(i)];
       worst = Math.min(worst, reach - (Math.hypot(x, z - zc) + Math.SQRT2 * Math.max(0, y)));
-      if (y < -0.01) below += 1;
+      if (y < -0.01) {
+        below += 1;
+        // Only the dock goes below the ground: its posts and shore end, hidden in the slab and
+        // its plate (down to -0.8), within the dock's half length (1.34) of the lake.
+        const hidden = inLake(x, z, 1.4) && y > -0.8 && x < BASE.maxX && z < BASE.maxZ;
+        expect(hidden, `${x}, ${y}, ${z}`).toBe(true);
+      }
     }
     expect(worst).toBeGreaterThan(0);
-    expect(below).toBe(0);
+    expect(below).toBeGreaterThan(0);
     geometry.dispose();
   });
 });

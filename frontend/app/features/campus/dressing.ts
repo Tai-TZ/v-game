@@ -137,7 +137,8 @@ export const DRESSING: readonly Dressing[] = [
     ],
   },
   { prop: "bench", scale: 2, kind: "ground", at: [[12.9, 4.9, 14]] },
-  { prop: "dock", scale: 2.2, kind: "pier", at: [[11.24, 7.64, 36]] },
+  // Deck about 0.15 over the water (y 0.008); the posts sink into the opaque slab.
+  { prop: "dock", scale: 2.2, y: -0.75, kind: "pier", at: [[11.24, 7.64, 36]] },
   { prop: "boat", scale: 0.12, kind: "water", at: [[12.44, 7.78, 36]] },
   {
     prop: "lily-large",

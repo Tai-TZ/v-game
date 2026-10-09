@@ -260,6 +260,16 @@ describe("dressing placement (placement plan §1)", () => {
     expect(worst).toBeGreaterThan(0);
   });
 
+  it("lays the dock's deck just over the water, its posts sunk into the slab", () => {
+    // The water is at the slab top (y 0.008): a deck at the plan's 0.9 read as a jetty on stilts.
+    const dock = DRESSING.find((r) => r.prop === "dock");
+    if (!dock) throw new Error("no dock");
+    const { h } = extent(dock);
+    expect(dock.y ?? 0).toBeLessThan(0);
+    expect(h).toBeGreaterThan(0.15);
+    expect(h).toBeLessThan(0.35);
+  });
+
   it("hides no person and no door in the home view", () => {
     const tan = Math.tan(Math.asin(1 / Math.sqrt(3))); // the camera's elevation, 35.26°
     const bad: string[] = [];
