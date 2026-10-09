@@ -25,8 +25,9 @@ export type ColourSlot =
 
 /**
  * Material name → colour slot, per prop. Shrubs take the hedge green: the plan's rose-pink
- * `bloom` read as pink candy floss (owner, 2026-10-09). The parasol's palette swatches split at
- * 0.55 of its height: canopy → market roof, frame and table → landmark wall.
+ * `bloom` read as pink candy floss (owner, 2026-10-09). The parasol's palette swatches: canopy →
+ * market roof, pole → dark, table frame and foot → trunk, table top → landmark trim; a white pole
+ * under the red cap read as a toadstool (review r1).
  */
 export const PROP_COLOURS: Readonly<Record<string, Readonly<Record<string, ColourSlot>>>> = {
   "bush-large": { grass: "hedge" },
@@ -45,11 +46,11 @@ export const PROP_COLOURS: Readonly<Record<string, Readonly<Record<string, Colou
     "colormap:339c75": "mk.roof",
     "colormap:20896b": "mk.roof",
     "colormap:5ac487": "mk.roof",
-    "colormap:3d3f4b": "mk.roof",
-    "colormap:505463": "lm.wall",
-    "colormap:eaeaf2": "lm.wall",
-    "colormap:646981": "lm.wall",
-    "colormap:777c93": "lm.wall",
+    "colormap:3d3f4b": "dark",
+    "colormap:505463": "dark",
+    "colormap:eaeaf2": "lm.trim",
+    "colormap:646981": "trunk",
+    "colormap:777c93": "trunk",
   },
   bench: { Wood: "trunk" },
   "food-stall": { Wood: "trunk", RoofTiles_Red: "mk.roof", Beige: "mk.wall" },
@@ -127,7 +128,8 @@ export const DRESSING: readonly Dressing[] = [
   { prop: "food-stall", scale: 1.3, block: [0.78, 0.38], kind: "ground", at: [[8.3, 6.5]] },
   {
     prop: "parasol-table",
-    scale: 2.5,
+    // Taller than the plan's 2.5, so the canopy clears the table.
+    scale: [2.3, 2.9, 2.3],
     block: [0.4, 0.4],
     kind: "ground",
     at: [

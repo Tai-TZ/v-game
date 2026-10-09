@@ -151,6 +151,14 @@ describe("dressing data", () => {
     for (const id of ["bush", "bush-large"]) expect(PROP_COLOURS[id]?.grass).toBe("hedge");
   });
 
+  it("paints no parasol a toadstool: dark pole, wooden frame, no white under the canopy", () => {
+    // A white stem under a red or orange cap read as an Amanita (review r1).
+    const parasol = PROP_COLOURS["parasol-table"] ?? {};
+    for (const swatch of ["3d3f4b", "505463"]) expect(parasol[`colormap:${swatch}`]).toBe("dark");
+    for (const swatch of ["646981", "777c93"]) expect(parasol[`colormap:${swatch}`]).toBe("trunk");
+    expect(parasol["colormap:eaeaf2"]).toBe("lm.trim");
+  });
+
   it("adds one OBSTACLES box per blocking prop, at the prop", () => {
     const blocking = DRESSING.flatMap((row) =>
       row.block
