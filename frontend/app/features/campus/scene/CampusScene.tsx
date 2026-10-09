@@ -1,22 +1,27 @@
 import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Color,
   GreaterDepth,
   MeshBasicMaterial,
   MeshLambertMaterial,
+  MultiplyBlending,
+  NotEqualStencilFunc,
+  ReplaceStencilOp,
   type BufferGeometry,
   type InstancedMesh,
   type Material,
 } from "three";
 
 import { REDUCED_MOTION, useMediaQuery } from "~/lib/useMediaQuery";
+import { readProgress } from "~/features/progress/progress";
 import { useActiveTheme } from "~/features/theme/context";
-import type { CampusTheme } from "~/features/theme/schema";
+import type { CampusTheme, TimeOfDay } from "~/features/theme/schema";
 
 import { CAMERA_OFFSET } from "../camera";
 import { NPC_SPOT, SITES } from "../layout";
-import type { InteractTarget, SiteInfoMap } from "../sites";
+import { siteLooks, type InteractTarget, type SiteInfoMap } from "../sites";
+import { useHub } from "../store";
 import {
   BLOB_SEGMENTS,
   RING_SEGMENTS,
@@ -24,8 +29,7 @@ import {
   treeMatrix,
   type TreeInstance,
 } from "./campus";
-import { SUN_DIRECTION } from "./palette";
-import { useCampusGeometry } from "./useCampusGeometry";
+import { useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
 import { useHubFrame } from "./useHubFrame";
 import { WorldLabels } from "./WorldLabels";
 
@@ -34,7 +38,6 @@ export interface CampusSceneProps {
   onInteract: (target: InteractTarget) => void;
 }
 
-const SUN_POSITION = SUN_DIRECTION.clone().multiplyScalar(30).toArray();
 const ROUND = TREE_INSTANCES.filter((tree) => tree.kind === "round");
 const CYPRESS = TREE_INSTANCES.filter((tree) => tree.kind === "cypress");
 const FLAT = -Math.PI / 2;
@@ -50,16 +53,24 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
   const [countFrames] = useState(
     () => new URLSearchParams(window.location.search).get("debug") === "frames",
   );
+  // Deferred: the click paints the pressed button first, then the scene re-bakes every group in
+  // a background render, a long task on slow CPUs (QA r2; campus-scene v0.3 §13.1).
+  const time = useDeferredValue(useHub((state) => state.time) ?? campus.lights.default);
 
   return (
     <>
-      <div aria-hidden="true" className="absolute inset-0 z-0 touch-manipulation">
+      {/* Dusk paints its own flat sky over the page's day sky (art §2.5). */}
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 z-0 touch-manipulation ${time === "dusk" ? "bg-scene-dusk" : ""}`}
+      >
         <Canvas
           orthographic
           flat
           frameloop="demand"
           dpr={[1, smallOrTouch ? 1.5 : 2]}
-          gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+          // The stencil buffer keeps overlapping sun-shadow polygons from darkening twice.
+          gl={{ antialias: true, alpha: true, stencil: true, powerPreference: "high-performance" }}
           camera={{
             near: 0.1,
             far: 200,
@@ -67,10 +78,9 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
             position: [CAMERA_OFFSET, CAMERA_OFFSET, CAMERA_OFFSET],
           }}
         >
-          <hemisphereLight args={["#ffffff", "#d1d1d1", 2.306]} />
-          <directionalLight position={SUN_POSITION} intensity={1.087} />
           <Campus
             campus={campus}
+            time={time}
             sites={sites}
             options={{ reducedMotion, countFrames, onInteract }}
           />
@@ -83,17 +93,20 @@ export default function CampusScene({ sites, onInteract }: CampusSceneProps) {
 
 interface CampusProps {
   campus: CampusTheme;
+  time: TimeOfDay;
   sites: SiteInfoMap;
   options: Parameters<typeof useHubFrame>[0];
 }
 
-function Campus({ campus, sites, options }: CampusProps) {
-  const g = useCampusGeometry(
-    campus,
-    sites.library.status,
-    sites.watchtower.status,
-    sites.market.status,
-  );
+function Campus({ campus, time, sites, options }: CampusProps) {
+  // Read once per visit: the workbench saves stars on a sibling route, so going back remounts
+  // this (N9). If /play ever stays mounted under the workbench, re-read on a progress version
+  // from the hub store instead (campus-scene v0.3 §13.5).
+  const [progress] = useState(readProgress);
+  const looks = siteLooks(sites, progress);
+  const g = useCampusGeometry(campus, time, looks.library, looks.watchtower, looks.market);
+  const preset = campus.lights[time];
+  const sunPosition = useMemo(() => g.palette.light.sun.clone().multiplyScalar(30), [g.palette]);
   const invalidate = useThree((state) => state.invalidate);
   const materials = useMemo(
     () => ({
@@ -107,6 +120,18 @@ function Campus({ campus, sites, options }: CampusProps) {
       }),
       xray: new MeshBasicMaterial({ depthFunc: GreaterDepth, depthWrite: false }),
       ring: new MeshBasicMaterial(),
+      // Multiplies the ground under it (N8); the stencil lets each pixel darken only once.
+      shadow: new MeshBasicMaterial({
+        vertexColors: true,
+        blending: MultiplyBlending,
+        premultipliedAlpha: true,
+        transparent: true,
+        depthWrite: false,
+        stencilWrite: true,
+        stencilRef: 1,
+        stencilFunc: NotEqualStencilFunc,
+        stencilZPass: ReplaceStencilOp,
+      }),
     }),
     [],
   );
@@ -122,8 +147,19 @@ function Campus({ campus, sites, options }: CampusProps) {
 
   const { player, playerBlob, lan, ring, statics } = useHubFrame(options);
 
+  // `?debug=frames` also exposes the building looks, so e2e can check the stars reach the scene.
+  const looksKey = Object.entries(looks)
+    .map(([id, look]) => `${id}:${look}`)
+    .join(" ");
+  useEffect(() => {
+    if (options.countFrames) document.documentElement.dataset.looks = looksKey;
+  }, [options.countFrames, looksKey]);
+
   return (
     <>
+      {/* The lights shade the Lambert figures and trees exactly as the statics are baked. */}
+      <hemisphereLight args={[preset.sky, preset.ground, preset.hemisphere]} />
+      <directionalLight args={[preset.sun, preset.sunIntensity]} position={sunPosition} />
       {/* Everything a click can land on (clickGoal); the figures, blobs and ring stay out. */}
       <group ref={statics}>
         <mesh geometry={g.terrain} material={materials.baked} />
@@ -131,9 +167,10 @@ function Campus({ campus, sites, options }: CampusProps) {
         {SITES.map(({ id }) => (
           <mesh key={id} geometry={g[id]} material={materials.baked} userData={{ site: id }} />
         ))}
-        <Trees geometry={g.roundTree} material={materials.figure} trees={ROUND} />
-        <Trees geometry={g.cypress} material={materials.figure} trees={CYPRESS} />
+        <Trees geometry={g.roundTree} material={materials.figure} trees={ROUND} g={g} />
+        <Trees geometry={g.cypress} material={materials.figure} trees={CYPRESS} g={g} />
       </group>
+      <mesh geometry={g.shadow} material={materials.shadow} />
 
       <group ref={player}>
         <mesh geometry={g.player} material={materials.xray} renderOrder={1} />
@@ -163,19 +200,24 @@ function Trees(props: {
   geometry: BufferGeometry;
   material: Material;
   trees: readonly TreeInstance[];
+  g: Pick<CampusGeometry, "palette" | "shadedTrees">;
 }) {
   const { geometry, material, trees } = props;
+  const { palette, shadedTrees } = props.g;
   const ref = useRef<InstancedMesh>(null);
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
     trees.forEach((tree, i) => {
       mesh.setMatrixAt(i, treeMatrix(tree));
-      mesh.setColorAt(i, shadeColour.setScalar(tree.brightness));
+      shadeColour.setScalar(tree.brightness);
+      // Lambert takes no shadow: a tree in a building's shadow gets the ground's factor (QA r3).
+      if (shadedTrees.has(tree)) shadeColour.multiply(palette.shadow);
+      mesh.setColorAt(i, shadeColour);
     });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [geometry, trees]);
+  }, [geometry, trees, palette, shadedTrees]);
   return (
     <instancedMesh ref={ref} args={[geometry, material, trees.length]} frustumCulled={false} />
   );

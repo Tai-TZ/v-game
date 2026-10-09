@@ -32,9 +32,10 @@ export const CAMERA_OFFSET = 34.641;
 export const CONTENT = { minX: -19.73, maxX: 26.03, minY: -12.05, maxY: 14.82 } as const;
 /**
  * Pixels kept free of scenery at both top corners in overview: HubTopBar lg:top-6 + h-11 + 8
- * high; wide enough for "Các khu" plus the theme switch with the longest theme name (≈ 315 px).
+ * high; wide enough for "Các khu" plus the theme switch with the longest theme name (≈ 315 px),
+ * and on the left for "Về trang chủ" plus the "Hoàng hôn" switch (≈ 337 px, N8 2026-10-08).
  */
-export const HUD_CORNER = { width: 320, height: 76 } as const;
+export const HUD_CORNER = { width: 344, height: 76 } as const;
 
 const PAD = 24;
 const FOLLOW_INSET_TOP = 72;
