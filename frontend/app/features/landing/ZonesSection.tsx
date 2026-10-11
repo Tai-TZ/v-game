@@ -5,7 +5,7 @@ import { SectionHeading } from "./SectionHeading";
 
 export function ZonesSection({ zones }: { zones: readonly Zone[] }) {
   return (
-    <section id="khu-hoc" className="scroll-mt-20 bg-subtle py-20">
+    <section id="khu-hoc" className="scroll-mt-20 bg-subtle py-16 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading title="Ba khu đầu tiên">
           Mỗi khu là một nhóm bài học gồm ba màn. Màn thứ ba là một sự cố làm hỏng chính giải pháp
@@ -20,7 +20,7 @@ export function ZonesSection({ zones }: { zones: readonly Zone[] }) {
             >
               <div className="space-y-2">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h3 className="text-xl font-bold">{zone.name}</h3>
+                  <h3 className="text-lg font-semibold">{zone.name}</h3>
                   <span
                     className={
                       zone.status === "open"

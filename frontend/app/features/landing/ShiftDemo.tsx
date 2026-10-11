@@ -42,7 +42,7 @@ export function ShiftDemo() {
   };
 
   return (
-    <section id="ca-truc" className="scroll-mt-20 py-20">
+    <section id="ca-truc" className="scroll-mt-20 py-16 sm:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading title="Một ca trực ở Thư viện">
           Trợ lý tra cứu của thư viện vừa trả lời một sinh viên. Đoán xem nó làm đúng không, chạy
@@ -121,7 +121,7 @@ export function ShiftDemo() {
           </div>
         </div>
 
-        <p className="mt-4 text-sm text-fg-muted">
+        <p className="mt-4 max-w-measure text-sm text-fg-muted">
           Minh hoạ với một quy chế hư cấu. Trong game, agent bạn lắp chạy thật trên bộ câu hỏi của
           NPC.
         </p>
