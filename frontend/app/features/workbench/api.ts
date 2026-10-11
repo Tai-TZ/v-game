@@ -7,11 +7,13 @@ import { fmt } from "./copy";
 import {
   BLOCK_TYPES,
   BlocksResponseSchema,
+  FactSchema,
   IssueSchema,
   PostRunResponseSchema,
   PublicLevelSchema,
   type BlockSpec,
   type BlockType,
+  type Fact,
   type Issue,
 } from "./schema";
 
@@ -194,6 +196,49 @@ export async function postRun(levelId: string, body: string, key: string): Promi
  * Never rejects. True when nothing is left running: 202 ends the stream with
  * run.failed{cancelled}; 404 (gone) and 409 (already over) need nothing.
  */
+const PreviewSchema = v.object({
+  case: v.string(),
+  nodes: v.record(v.string(), FactSchema),
+});
+
+export type PreviewResult =
+  | { ok: true; nodes: Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>> }
+  | { ok: false };
+
+/**
+ * What the bench would pull right now, from the shipped index alone (backend README,
+ * vom-sao-v0.1 §4). No AI call and no quota, so a knob can answer in well under a second.
+ *
+ * Every failure is the same `{ ok: false }`: a preview is a convenience beside the real run,
+ * and nothing about it should ever stop the player editing the bench.
+ */
+export async function previewRetrieval(
+  levelId: string,
+  caseId: string,
+  body: string,
+): Promise<PreviewResult> {
+  const url = `${API_BASE}/api/preview/retrieval?level=${encodeURIComponent(levelId)}&case=${encodeURIComponent(caseId)}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body,
+    });
+  } catch {
+    return { ok: false };
+  }
+  if (!response.ok) return { ok: false };
+  const json: unknown = await response.json().catch(() => null);
+  const parsed = v.safeParse(PreviewSchema, json);
+  if (!parsed.success) return { ok: false };
+  const nodes: Record<string, Extract<Fact, { kind: "retrieved" }>> = {};
+  for (const [node, fact] of Object.entries(parsed.output.nodes)) {
+    if (fact.kind === "retrieved") nodes[node] = fact;
+  }
+  return { ok: true, nodes };
+}
+
 export function cancelRun(runId: string, options: { keepalive?: boolean } = {}): Promise<boolean> {
   return fetch(`${API_BASE}/api/runs/${runId}/cancel`, {
     method: "POST",

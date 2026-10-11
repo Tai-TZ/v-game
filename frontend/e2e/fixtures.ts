@@ -234,6 +234,8 @@ export interface WorkbenchMock {
   cancels: string[];
   /** GET /api/runs/{id}/events requests so far. */
   streams: number;
+  /** POST /api/preview/retrieval requests so far. */
+  previews: number;
 }
 
 /**
@@ -254,10 +256,12 @@ export async function mockWorkbenchApi(
     events?: (n: number) => string | Promise<string>;
     /** Status of the n-th cancel (202 unless it says otherwise); a promise holds it open. */
     cancel?: (n: number) => number | Promise<number>;
+    /** Reply to the n-th retrieval preview; the default is an empty, successful one. */
+    preview?: (n: number) => WorkbenchReply | undefined;
   } = {},
 ): Promise<WorkbenchMock> {
   await mockApi(page);
-  const mock: WorkbenchMock = { posts: [], cancels: [], streams: 0 };
+  const mock: WorkbenchMock = { posts: [], cancels: [], streams: 0, previews: 0 };
   await page.route("**/api/blocks", (route) => route.fulfill({ json: blocksJson() }));
   await page.route("**/api/levels/*", (route) => {
     const id = new URL(route.request().url()).pathname.split("/").at(-1) ?? "";
@@ -267,6 +271,21 @@ export async function mockWorkbenchApi(
       return route.fulfill({ status: 404, json: { detail: "Không tìm thấy level." } });
     }
   });
+  // The dome previews on every bench edit. Unmocked it leaves the page, 502s, and lands in
+  // consoleErrors — which several specs assert is empty.
+  await page.route(
+    (url) => url.pathname === "/api/preview/retrieval",
+    async (route) => {
+      mock.previews += 1;
+      const reply = options.preview?.(mock.previews);
+      if (reply === undefined) {
+        return route.fulfill({
+          json: { case: new URL(route.request().url()).searchParams.get("case"), nodes: {} },
+        });
+      }
+      return route.fulfill({ status: reply.status, json: reply.body ?? {} });
+    },
+  );
   await page.route(
     (url) => url.pathname === "/api/runs",
     async (route) => {

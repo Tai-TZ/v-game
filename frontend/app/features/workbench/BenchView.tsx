@@ -13,6 +13,8 @@ import {
   StarIcon,
 } from "~/components/ui/icons";
 
+import { Blade } from "./Blade";
+import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
 import {
   domain,
@@ -44,7 +46,6 @@ import {
   TOY,
   toyName,
   vaiVi,
-  variantVi,
 } from "./copy";
 import {
   blockState,
@@ -91,6 +92,8 @@ export interface SlotGold {
   chunks: readonly string[];
   /** Node id -> rank of the best answer passage in that block's full ranking. */
   ranks: Readonly<Record<string, number | null>>;
+  /** ret.gold_missing, ret.gold_rank, ret.boundary_split, ctx.gold_dropped. */
+  flags: readonly string[];
   /** False for a hidden or trap case: a live run sends their gold too, and it stays unshown. */
   visible: boolean;
 }
@@ -101,6 +104,9 @@ export interface BenchRunView {
   /** report.gold[followed] after run.finished, plus whether the case may show it. */
   gold: SlotGold | null;
 }
+
+/** Retrieved facts by node id, from the deterministic preview rather than from a run. */
+export type Preview = Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>>;
 
 interface BenchProps {
   env: Env;
@@ -114,6 +120,8 @@ interface BenchProps {
   view: BenchRunView | null;
   /** The bench against the run on show (N6 slot states). */
   benchRun: BenchRun;
+  /** What the bench would pull right now; drawn when no run step covers the slot. */
+  preview: Preview | null;
   saved: boolean;
   discarded: boolean;
 }
@@ -274,6 +282,7 @@ function Slot({
   highlight,
   view,
   benchRun,
+  preview,
 }: BenchProps & { type: BlockType }) {
   const { level, blocks } = env;
   const id = nodeIds(level)[type];
@@ -379,9 +388,14 @@ function Slot({
         {type === "llm" && !locked && <Prism env={env} bench={bench} onChange={onChange} />}
       </div>
 
-      {type === "chunker" && view && <Ingestion run={view.run} node={id} />}
+      {type === "chunker" && view && <Ingestion run={view.run} node={id} gold={view.gold} />}
       <SlotIssues env={env} graph={graph} issues={own} />
       {step && <StepState step={step} node={id} toy={toy} gold={view?.gold ?? null} />}
+      {/* No step for this slot yet, or the bench has moved on from the run: the dome follows
+          the bench. */}
+      {!step && preview?.[id] && (
+        <StarDome items={preview[id].items} goldChunks={[]} goldRank={null} showGold={false} />
+      )}
     </section>
   );
 }
@@ -674,14 +688,13 @@ function Prism({
 
 // --- Run state of a slot (§7) ---------------------------------------------------------------
 
-function Ingestion({ run, node }: { run: RunView; node: string }) {
+function Ingestion({ run, node, gold }: { run: RunView; node: string; gold: SlotGold | null }) {
   const info = run.ingestion.find((item) => item.node === node);
   if (!info) return null;
+  // Only a case allowed to show its gold may show that its gold was cut in half.
+  const split = (gold?.visible && gold.flags.includes("ret.boundary_split")) ?? false;
   return (
-    <p className="mt-3 text-sm">
-      Chỉ mục <code className="font-mono text-xs">{info.variant}</code> ({variantVi(info.variant)}):{" "}
-      {fmt(info.chunks)} đoạn, trung bình {fmt(info.avg_tokens)} token mỗi đoạn.
-    </p>
+    <Blade variant={info.variant} chunks={info.chunks} avgTokens={info.avg_tokens} split={split} />
   );
 }
 
@@ -699,10 +712,14 @@ function StepState({
   const retrieved = step.facts?.find(
     (f): f is Extract<Fact, { kind: "retrieved" }> => f.kind === "retrieved",
   );
+  const packed = step.facts?.find((f): f is Extract<Fact, { kind: "pack" }> => f.kind === "pack");
   return (
     <div className="mt-3 border-t border-line pt-3 text-sm">
       <p className="font-semibold">{stepStatusText(step.status, step.ms)}</p>
       {step.summary && <p className="mt-1 max-w-prose text-fg-muted">{step.summary}</p>}
+      {packed && (
+        <ContextBin tokens={packed.tokens} included={packed.included} dropped={packed.dropped} />
+      )}
       {retrieved && (
         <StarDome
           items={retrieved.items}

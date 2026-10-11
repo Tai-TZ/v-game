@@ -8,7 +8,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    include: ["app/**/*.test.{ts,tsx}"],
+    // scripts/ too: the deploy config is code, and until now nothing checked it.
+    include: ["app/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs"],
     restoreMocks: true,
   },
 });

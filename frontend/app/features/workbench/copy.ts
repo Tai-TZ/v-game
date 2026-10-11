@@ -73,6 +73,18 @@ const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 /** Vietnamese number: 15.000, 0,83. */
 export const fmt = (value: number) => number.format(value);
 
+/** Thùng Context (gameplay-direction §3): the bin says what it measured and what it did not. */
+export const BIN_VI = {
+  overflow: "Nắp không đóng được: thùng xin nhiều hơn ngân sách cho phép.",
+  counted: "Thùng đo tổng token; mỗi khối là một đoạn, không theo cỡ của đoạn đó.",
+} as const;
+
+/** Lược dao (L2's lesson): the blade says when it cut through the thing being looked for. */
+export const BLADE_VI = {
+  split: "lượt này cắt đứt câu đáp án",
+  splitLine: "Lược dao cắt đứt câu đáp án: đoạn đúng nằm vắt qua hai mảnh.",
+} as const;
+
 const cosine = new Intl.NumberFormat("vi-VN", {
   minimumFractionDigits: 3,
   maximumFractionDigits: 3,

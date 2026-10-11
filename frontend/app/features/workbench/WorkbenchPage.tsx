@@ -6,12 +6,13 @@ import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
 import { recordStars, type Stars } from "~/features/progress/progress";
 
-import { cancelRun, eventsUrl, newKey, postRun, type LevelPageData } from "./api";
+import { cancelRun, eventsUrl, newKey, postRun, previewRetrieval, type LevelPageData } from "./api";
 import { graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
 import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
+import { shouldPreview } from "./preview";
 import { Results } from "./Results";
 import {
   frameAction,
@@ -22,6 +23,7 @@ import {
   type RunView,
 } from "./run";
 import { RunPanel, type RequestState, type StopState, type Summary } from "./RunPanel";
+import type { Fact } from "./schema";
 import {
   EVENT_TYPES,
   GraphSchema,
@@ -218,6 +220,41 @@ function parseGraph(body: string | null): Graph | null {
   return parsed.success ? parsed.output : null;
 }
 
+/** A range drag fires per step; one picture per settled knob is the point. */
+const PREVIEW_DEBOUNCE_MS = 250;
+
+/**
+ * The retrieval preview behind the dome (vom-sao-v0.1 §4 phase 2). Debounced, because a range
+ * input fires on every step of a drag and the point is one picture per settled knob, not sixty.
+ * A failed preview is simply no preview: the bench never waits on it and never reports it.
+ */
+function usePreview(
+  levelId: string,
+  caseId: string | null,
+  body: string,
+  wanted: boolean,
+): Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>> | null {
+  const [nodes, setNodes] = useState<Readonly<
+    Record<string, Extract<Fact, { kind: "retrieved" }>>
+  > | null>(null);
+  useEffect(() => {
+    if (!wanted || !caseId) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      void previewRetrieval(levelId, caseId, body).then((result) => {
+        if (live) setNodes(result.ok ? result.nodes : null);
+      });
+    }, PREVIEW_DEBOUNCE_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [levelId, caseId, body, wanted]);
+  // Derived, not cleared in the effect: setting state synchronously there cascades renders,
+  // and a preview nobody wants simply is not returned.
+  return wanted ? nodes : null;
+}
+
 export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench; back: string }) {
   const { level } = env;
   const [initial] = useState(() => loadSaved(env));
@@ -254,6 +291,11 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const runGraph = useMemo(() => parseGraph(lastBody), [lastBody]);
   const benchRun: BenchRun = !run ? "none" : changed ? "stale" : isActive(run) ? "active" : "done";
 
+  // The dome previews the sample case the player follows, or the level's first sample before a
+  // run exists to follow one.
+  const previewCase = followed ?? level.visible_cases[0]?.id ?? null;
+  const previewNodes = usePreview(level.id, previewCase, body, shouldPreview(benchRun));
+
   const firstVisible = run?.cases.find((c) => c.role === "visible") ?? run?.cases[0];
   const followedCase = run?.cases.find((c) => c.id === followed) ?? firstVisible ?? null;
   const reveal = run?.report?.gold[followedCase?.id ?? ""];
@@ -268,6 +310,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             ? {
                 chunks: reveal.gold_chunks,
                 ranks: reveal.ranks,
+                flags: reveal.flags,
                 visible: followedCase.role === "visible",
               }
             : null,
@@ -385,6 +428,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           highlight={highlight}
           view={benchView}
           benchRun={benchRun}
+          preview={previewNodes}
           saved={saved}
           // Gone once an edit is saved: the two notices would contradict each other.
           discarded={initial.discarded && !saved}
