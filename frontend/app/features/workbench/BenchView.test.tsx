@@ -3,12 +3,21 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
 import { BenchSection } from "./BenchView";
+import type { BenchRun } from "./run";
 import { testEnv } from "./test-fixtures";
 import { validateGraph } from "./validate";
 
 const l3 = testEnv("article-number-lookup");
 
-function Bench({ bench, highlight = null }: { bench: Bench; highlight?: "chunker" | null }) {
+function Bench({
+  bench,
+  highlight = null,
+  benchRun = "none",
+}: {
+  bench: Bench;
+  highlight?: "chunker" | null;
+  benchRun?: BenchRun;
+}) {
   const graph = graphFromBench(l3, bench);
   return (
     <BenchSection
@@ -20,6 +29,7 @@ function Bench({ bench, highlight = null }: { bench: Bench; highlight?: "chunker
       issues={validateGraph(l3, graph)}
       highlight={highlight}
       view={null}
+      benchRun={benchRun}
       saved={false}
       discarded={false}
     />
@@ -68,5 +78,28 @@ describe("BenchSection", () => {
     const { container } = render(<Bench bench={start} highlight="chunker" />);
     const frame = container.querySelector("#slot-ix");
     expect(frame?.className).toContain("bg-brand-tint");
+  });
+});
+
+describe("slot states (N6)", () => {
+  const states = (container: HTMLElement) =>
+    [...container.querySelectorAll("[data-state]")].map((chip) => chip.textContent);
+
+  it("marks every attached slot 'not run' before a run, and 'run again' once a knob changed", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    const { container, rerender } = render(<Bench bench={start} />);
+    const before = states(container);
+    expect(before.length).toBeGreaterThan(3);
+    expect(new Set(before)).toEqual(new Set(["Trạng thái khối: Chưa chạy"]));
+    // Detached slots are not on the graph: no state.
+    expect(container.querySelector("#slot-bm [data-state]")).toBeNull();
+
+    rerender(<Bench bench={start} benchRun="stale" />);
+    expect(new Set(states(container))).toEqual(new Set(["Trạng thái khối: Cần chạy lại"]));
+    // Words, a colour token and an icon for each state.
+    const chip = container.querySelector("[data-state='stale']");
+    expect(chip?.className).toContain("border-warning");
+    expect(chip?.querySelector("svg")).not.toBeNull();
   });
 });

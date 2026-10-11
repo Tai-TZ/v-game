@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { frameAction, isActive, llmCalls, runningNodes, runReducer } from "./run";
+import {
+  blockState,
+  frameAction,
+  isActive,
+  llmCalls,
+  runningNodes,
+  runReducer,
+  type StepView,
+} from "./run";
 import { parseEvent, type EventType } from "./schema";
 import { frame, parseSse, readText, replay, RUN } from "./test-fixtures";
 
@@ -170,5 +178,37 @@ describe("frameAction", () => {
       expect(run?.stream).toBe("closed");
       expect(isActive(run ?? null)).toBe(false);
     }
+  });
+});
+
+describe("blockState (N6)", () => {
+  const ran: StepView = { block: "llm", state: "done", status: "ok", ms: 5 };
+  const going: StepView = { block: "llm", state: "running" };
+  const base = { started: true, ingest: false, failedAnswer: false };
+
+  it("says 'not run' before any run and 'run again' once a knob changed", () => {
+    expect(blockState("none", undefined, base)).toBe("idle");
+    expect(blockState("none", ran, base)).toBe("idle");
+    expect(blockState("stale", ran, base)).toBe("stale");
+    expect(blockState("stale", undefined, { ...base, ingest: true })).toBe("stale");
+  });
+
+  it("follows a step: waiting, running, passed, error", () => {
+    expect(blockState("active", undefined, base)).toBe("queued");
+    expect(blockState("active", going, base)).toBe("running");
+    expect(blockState("active", ran, base)).toBe("passed");
+    expect(blockState("done", { ...ran, status: "timeout" }, base)).toBe("error");
+    // The answer board of a failed case: the step finished, the answer is wrong.
+    expect(blockState("done", ran, { ...base, failedAnswer: true })).toBe("error");
+    // A finished run never reached this step (cancelled, or skipped by the server).
+    expect(blockState("done", undefined, base)).toBe("idle");
+  });
+
+  it("reads ingestion blocks (corpus, chunker) from run.started: they have no step", () => {
+    const ingest = { ...base, ingest: true };
+    expect(blockState("active", undefined, { ...ingest, started: false })).toBe("queued");
+    expect(blockState("active", undefined, ingest)).toBe("passed");
+    expect(blockState("done", undefined, ingest)).toBe("passed");
+    expect(blockState("done", undefined, { ...ingest, started: false })).toBe("idle");
   });
 });

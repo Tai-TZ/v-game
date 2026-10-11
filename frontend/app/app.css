@@ -24,13 +24,6 @@
   --text-title--line-height: 1.26;
   --text-title--letter-spacing: -0.012em;
 
-  /*
-   * Reading measure for running text. 36rem is about 62-66 characters of Be Vietnam Pro at
-   * 16 px, inside the 80 the eye can track without losing the line start. The page grid stays
-   * max-w-6xl; only prose is capped.
-   */
-  --container-measure: 36rem;
-
   /* HUD motion (art §7). The global reduced-motion rule below cuts these to ~0 ms. */
   --animate-enter: vg-enter 200ms ease-out both;
   --animate-appear: vg-appear 1ms 150ms both;
@@ -40,6 +33,8 @@
   --animate-hover: vg-hover 1.2s ease-in-out infinite alternate;
   /* The page-loading bar of PageFrame and the bench (workbench); also only while loading. */
   --animate-poster-bar: vg-poster-bar 1.2s linear infinite;
+  /* A case row turning over as its case.graded arrives (workbench N18); motion-safe only. */
+  --animate-flip: vg-flip 300ms ease-out both;
 
   @keyframes vg-enter {
     from {
@@ -60,6 +55,12 @@
   @keyframes vg-hover {
     to {
       transform: translateY(-2px);
+    }
+  }
+  @keyframes vg-flip {
+    from {
+      opacity: 0;
+      transform: perspective(600px) rotateX(-90deg);
     }
   }
   @keyframes vg-poster-bar {

@@ -41,6 +41,7 @@ function show(run: RunView, graph: Graph = dense, env = l1) {
         runGraph={dense}
         graph={graph}
         backTo="/play/library"
+        slip={null}
         onEdit={() => undefined}
         onFocusSlot={() => undefined}
       />

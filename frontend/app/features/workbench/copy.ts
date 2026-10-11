@@ -1,5 +1,6 @@
 import { domain, isAllowed, nodeIds, type Env } from "./bench";
-import { unfinished, type CaseView, type RunView } from "./run";
+import type { Confidence, Why } from "./guess";
+import { unfinished, type BlockState, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, JsonValue, RunReport } from "./schema";
 
 /**
@@ -366,3 +367,79 @@ export function variantVi(key: string): string {
 }
 
 export const BACK_TO_LEVELS = "Về danh sách màn";
+
+/** Evidence of a graded case from its case.graded: outcome, missed criteria, labels. */
+export function evidenceText(c: CaseView): string {
+  const graded = c.graded;
+  if (!graded) return outcomeText(c);
+  const missed = Object.entries(graded.criteria)
+    .filter(([, ok]) => !ok)
+    .map(([name]) => CRITERIA_VI[name] ?? name);
+  const labels = shownLabels(graded.labels).map((label) => LABEL_VI[label] ?? label);
+  const parts = [
+    outcomeText(c),
+    ...(missed.length > 0 ? [`chưa đạt: ${missed.join(", ")}`] : []),
+    ...labels,
+  ];
+  return [...new Set(parts)].join(" · ");
+}
+
+/** Confidence of a bet (N19); "Chắc" is the sure bet of the refund rule (ca trực §3.1). */
+export const CONFIDENCE_VI: Readonly<Record<Confidence, string>> = {
+  low: "Đoán",
+  medium: "Hơi chắc",
+  high: "Chắc",
+};
+
+/** N6 slot states, each also with its own colour token and icon (BenchView). */
+export const BLOCK_STATE_VI: Readonly<Record<BlockState, string>> = {
+  idle: "Chưa chạy",
+  stale: "Cần chạy lại",
+  queued: "Đang chờ",
+  running: "Đang chạy",
+  passed: "Đạt",
+  error: "Lỗi",
+};
+
+export interface WhyMenu {
+  /** The answer first; the menu rotates the order per case so it is not always first. */
+  options: readonly [string, ...string[]];
+}
+
+/** "Vì sao câu #N sai?" per level, verbatim from the scenario (L1 §11). */
+export const WHY_MENU: Readonly<Record<string, Readonly<Partial<Record<Why, WhyMenu>>>>> = {
+  "grounded-citation": {
+    no_docs: {
+      options: [
+        "Không có đoạn tài liệu nào trong thùng, model tự lấp chỗ trống",
+        "Model quá yếu",
+        "Câu hỏi của Minh mơ hồ",
+        "top_k quá thấp",
+      ],
+    },
+    cite: {
+      options: [
+        "Các đoạn trong thùng không mang mã, nên không có gì để trích",
+        "Model quên trích dẫn",
+        "Vòm Sao lấy sai đoạn",
+        "Thùng bị cắt",
+      ],
+    },
+    trap: {
+      options: [
+        'Không có lệnh "không thấy thì nói không có", lại có lệnh "cứ suy đoán"',
+        "top_k quá thấp",
+        "Kho thiếu điều đó nên phải thêm vào",
+        "Model không đọc được số",
+      ],
+    },
+    budget: {
+      options: [
+        "Kéo nhiều đoạn quá và dặn trả lời dài, nên thùng gần đầy ở mọi câu",
+        "Model chọn sai",
+        "Câu hỏi dài",
+        "Có ca timeout",
+      ],
+    },
+  },
+};

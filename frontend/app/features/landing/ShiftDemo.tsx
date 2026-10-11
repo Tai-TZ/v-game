@@ -121,7 +121,7 @@ export function ShiftDemo() {
           </div>
         </div>
 
-        <p className="mt-4 max-w-measure text-sm text-fg-muted">
+        <p className="mt-4 max-w-prose text-sm text-fg-muted">
           Minh hoạ với một quy chế hư cấu. Trong game, agent bạn lắp chạy thật trên bộ câu hỏi của
           NPC.
         </p>

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { graphFromBench, setParam, starterBench } from "./bench";
-import { loadSaved, save } from "./storage";
+import { EMPTY_SLIP, type Slip } from "./guess";
+import { loadSaved, loadSlip, save, saveSlip } from "./storage";
 import { testEnv } from "./test-fixtures";
 
 const env = testEnv("chunk-tuning");
@@ -43,5 +44,43 @@ describe("bench storage", () => {
     });
     expect(loadSaved(env)).toEqual({ bench: null, discarded: false });
     expect(save(env.level.id, 1, env.level.starter_graph)).toBe(false);
+  });
+});
+
+describe("guess slip storage", () => {
+  const slip: Slip = {
+    passed: 7,
+    failing: [4, 9],
+    bets: { "lib-l2-v01": { pass: false, confidence: "high" } },
+  };
+
+  it("keeps a draft per level and forgets it once cleared", () => {
+    saveSlip("chunk-tuning", slip);
+    expect(loadSlip("chunk-tuning")).toEqual(slip);
+    expect(loadSlip("grounded-citation")).toEqual(EMPTY_SLIP);
+    saveSlip("chunk-tuning", EMPTY_SLIP);
+    expect(window.localStorage.getItem("vg.guess.v1.chunk-tuning")).toBeNull();
+  });
+
+  it("starts empty on a broken or foreign draft", () => {
+    window.localStorage.setItem("vg.guess.v1.chunk-tuning", "{broken");
+    expect(loadSlip("chunk-tuning")).toEqual(EMPTY_SLIP);
+    window.localStorage.setItem(
+      "vg.guess.v1.chunk-tuning",
+      JSON.stringify({ ...slip, bets: { x: { pass: true, confidence: "very" } } }),
+    );
+    expect(loadSlip("chunk-tuning")).toEqual(EMPTY_SLIP);
+  });
+
+  it("keeps working when storage throws", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    expect(loadSlip("chunk-tuning")).toEqual(EMPTY_SLIP);
+    expect(() => saveSlip("chunk-tuning", slip)).not.toThrow();
+    vi.restoreAllMocks();
   });
 });

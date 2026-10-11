@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { buttonClass } from "~/components/ui/button";
@@ -18,7 +19,10 @@ import {
   stepStatusText,
   TOY,
   toyName,
+  WHY_MENU,
 } from "./copy";
+import { SlipResult, WhyMenu } from "./GuessSlip";
+import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
 import { llmCalls, unfinished, type CaseView, type RunView } from "./run";
 import { BLOCK_TYPES, type BlockType, type GoldReveal, type Graph } from "./schema";
@@ -33,6 +37,8 @@ interface ResultsProps {
   /** The bench now: a lesson on a detached slot says the move ("Thử gắn …"). */
   graph: Graph;
   backTo: string;
+  /** The guess slip that went with this run, if the player filled one (B1). */
+  slip: Slip | null;
   onEdit: () => void;
   onFocusSlot: (type: BlockType, param?: string) => void;
 }
@@ -53,12 +59,21 @@ export function Results({
   runGraph,
   graph,
   backTo,
+  slip,
   onEdit,
   onFocusSlot,
 }: ResultsProps) {
   const { level } = env;
+  // The reason menu comes before the diagnosis (L1 §11); one per run (the parent keys by run).
+  const [why, setWhy] = useState<"ask" | "answered" | "skipped">("ask");
+  useEffect(() => {
+    if (why === "skipped") document.getElementById("wb-diagnosis-title")?.focus();
+  }, [why]);
   const score = run.score;
   if (!score) return null;
+  const asked = whyCase(run);
+  const menu = asked && WHY_MENU[level.id]?.[asked.why];
+  const ask = asked && menu && why !== "skipped" ? { c: asked.c, menu } : null;
   const copy = LEVEL_COPY[level.id];
   const first = run.cases.find((c) => c.id === level.s1_required[0]);
   const skipped = unfinished(run).length;
@@ -157,10 +172,24 @@ export function Results({
           : `Lượt này gọi AI thật ${calls.real} lần${calls.replayed > 0 ? `, ${calls.replayed} câu lấy kết quả đã lưu` : ""}.`}
       </p>
 
-      <h3 id="wb-diagnosis-title" className="mt-8 text-lg font-bold">
+      {slip && <SlipResult slip={slip} run={run} />}
+
+      <h3 id="wb-diagnosis-title" tabIndex={-1} className="mt-8 text-lg font-bold">
         Cô Lan chẩn đoán
       </h3>
-      {run.phase === "failed" ? (
+      {ask && (
+        <WhyMenu
+          c={ask.c}
+          menu={ask.menu}
+          // The failed case's number, or the run's case count for the budget menu, which has
+          // no case of its own. +1 so a seed divisible by the option count cannot land the
+          // answer first.
+          turn={(ask.c?.n ?? run.cases.length) + 1}
+          onAnswer={() => setWhy("answered")}
+          onSkip={() => setWhy("skipped")}
+        />
+      )}
+      {ask && why === "ask" ? null : run.phase === "failed" ? (
         // The stars came, then the run failed before its gold reveal (§8.6).
         <p className="mt-2 max-w-prose text-sm">
           Máy chủ đã chấm sao nhưng phần chẩn đoán chưa tới được. Chạy lại cùng cấu hình để xem: các

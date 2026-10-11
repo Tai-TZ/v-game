@@ -11,8 +11,16 @@ import { graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
 import { BACK_TO_LEVELS, liveMessage } from "./copy";
+import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { Results } from "./Results";
-import { frameAction, isActive, runReducer, type RunAction, type RunView } from "./run";
+import {
+  frameAction,
+  isActive,
+  runReducer,
+  type BenchRun,
+  type RunAction,
+  type RunView,
+} from "./run";
 import { RunPanel, type RequestState, type StopState, type Summary } from "./RunPanel";
 import {
   EVENT_TYPES,
@@ -22,7 +30,7 @@ import {
   type Issue,
   type PublicLevel,
 } from "./schema";
-import { loadSaved, save } from "./storage";
+import { loadSaved, loadSlip, save, saveSlip } from "./storage";
 import { errorsOf, validateGraph } from "./validate";
 
 const levelsUrl = (zoneId: string | null) => (zoneId ? `/play/${zoneId}` : "/play");
@@ -230,6 +238,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [stopping, setStopping] = useState<{ runId: string; state: "pending" | "failed" } | null>(
     null,
   );
+  const [slip, setSlip] = useState(() => loadSlip(level.id));
+  /** The slip that went with a run, graded once that run finishes. */
+  const [ranSlip, setRanSlip] = useState<{ runId: string; slip: Slip } | null>(null);
   const focusLater = useFocusLater();
 
   useRunStream(run?.runId ?? null, attempt, dispatch);
@@ -241,6 +252,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const locked = active || request.state === "sending";
   const changed = lastBody !== null && body !== lastBody;
   const runGraph = useMemo(() => parseGraph(lastBody), [lastBody]);
+  const benchRun: BenchRun = !run ? "none" : changed ? "stale" : isActive(run) ? "active" : "done";
 
   const firstVisible = run?.cases.find((c) => c.role === "visible") ?? run?.cases[0];
   const followedCase = run?.cases.find((c) => c.id === followed) ?? firstVisible ?? null;
@@ -291,6 +303,11 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     setHighlight(null);
   }
 
+  function editSlip(next: Slip) {
+    setSlip(next);
+    saveSlip(level.id, next);
+  }
+
   /** `before`: the cancel of a lost run, so the server's single run slot is free first. */
   async function send(sendBody: string, key: string, before?: Promise<unknown>) {
     // A function, not `left.current`: TS would narrow it to false across the awaits.
@@ -317,6 +334,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       return;
     }
     setNotes(result.issues.filter((issue) => issue.severity === "info"));
+    // The slip goes with this run; the next run starts from a blank one.
+    setRanSlip(isEmptySlip(slip) ? null : { runId: result.runId, slip });
+    editSlip(EMPTY_SLIP);
     setLastBody(sendBody);
     setFollowed(null);
     setAttempt(0);
@@ -355,6 +375,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           issues={issues}
           highlight={highlight}
           view={benchView}
+          benchRun={benchRun}
           saved={saved}
           // Gone once an edit is saved: the two notices would contradict each other.
           discarded={initial.discarded && !saved}
@@ -378,6 +399,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             stop={stop}
             followedId={followedCase?.id ?? null}
             backTo={back}
+            slip={slip}
+            onSlip={editSlip}
             onOpen={openShift}
             onRetry={() => {
               if (request.state === "failed") void send(request.body, request.key);
@@ -420,12 +443,14 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       </div>
       {run?.score && (
         <Results
+          key={run.runId}
           env={env}
           run={run}
           changed={changed}
           runGraph={runGraph}
           graph={graph}
           backTo={back}
+          slip={ranSlip?.runId === run.runId ? ranSlip.slip : null}
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}
         />

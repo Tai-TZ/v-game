@@ -38,7 +38,7 @@ export function LearningLoop() {
           ))}
         </ol>
 
-        <p className="mt-10 max-w-measure text-fg-muted">
+        <p className="mt-10 max-w-prose text-fg-muted">
           Khu nào lâu không ôn sẽ tối dần trên bản đồ. Ca trực năm phút mỗi ngày trộn lại các sự cố
           cũ để kiến thức không trôi đi sau buổi học.
         </p>
