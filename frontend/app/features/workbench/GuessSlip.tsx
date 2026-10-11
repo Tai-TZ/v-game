@@ -70,9 +70,12 @@ export function GuessSlip({
     onChange({ ...slip, bets: { ...slip.bets, [caseId]: next } });
 
   return (
-    // The <details> summary that opens this is its heading (RunPanel), so the slip itself
-    // repeats neither the title nor an aria-label: two identical headings read twice.
-    <section className="mt-2 space-y-4 rounded-md border border-line p-4">
+    // The <details> summary that opens this is its visible heading (RunPanel), so the name
+    // comes from aria-label: a second visible copy of the words would be read twice.
+    <section
+      aria-label="Đoán trước khi mở ca"
+      className="mt-2 space-y-4 rounded-md border border-line p-4"
+    >
       <p className="text-sm text-fg-muted">
         Không bắt buộc, không tính sao. Phiếu được chấm khi lượt chạy xong.
       </p>

@@ -755,7 +755,10 @@ test.describe("workbench", () => {
     // N6: before any run every slot says so, in words beside its icon.
     await expect(page.locator("#slot-vs [data-state]")).toHaveText("Trạng thái khối: Chưa chạy");
 
-    // N1 + N19: one click per answer, nothing required.
+    // N1 + N19: one click per answer, nothing required. The slip ships collapsed so the aside
+    // keeps Mở ca on the first screen at 1280x800 (workbench-v0.1 §2.1, §19.1).
+    const openSlip = () => page.locator("summary", { hasText: "Đoán trước khi mở ca" }).click();
+    await openSlip();
     const slip = page.getByRole("region", { name: "Đoán trước khi mở ca" });
     await slip.getByRole("group", { name: "Đạt mấy/10?" }).getByText("2", { exact: true }).click();
     const first = slip.getByRole("group", { name: "Câu #1 · Câu mẫu" });
@@ -764,6 +767,7 @@ test.describe("workbench", () => {
     await slip.getByRole("group", { name: "Câu nào trượt?" }).getByText("#9").click();
     // The draft survives a reload, per level.
     await page.reload();
+    await openSlip();
     await expect(first.getByRole("radio", { name: "Chắc" })).toBeChecked();
     await expect(slip.getByRole("checkbox", { name: "Câu #9" })).toBeChecked();
 
