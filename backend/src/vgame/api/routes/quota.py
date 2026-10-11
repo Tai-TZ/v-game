@@ -46,7 +46,7 @@ def _next_utc_midnight() -> datetime:
 
 
 @router.get("")
-def get_quota(engine: Annotated[EngineServices, Depends(get_engine)]) -> JSONResponse:
+async def get_quota(engine: Annotated[EngineServices, Depends(get_engine)]) -> JSONResponse:
     """``estimate`` stays true until T1: every counter lives in RAM and resets on restart."""
     cap = engine.daily_cap
     body = {
@@ -88,7 +88,7 @@ def _refundable_calls(events: Sequence[EngineEvent]) -> int | str:
         status.HTTP_409_CONFLICT: {"description": " / ".join(REFUSED_VI.values())},
     },
 )
-def refund(
+async def refund(
     body: RefundRequest, engine: Annotated[EngineServices, Depends(get_engine)]
 ) -> JSONResponse:
     """Refunds a sample run's fresh calls from R, at most 3, once per run. A run that replayed

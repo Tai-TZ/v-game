@@ -1,6 +1,7 @@
 """Wave B engine prerequisites (roadmap-v0.4 §5 B0, §5.1): the sample scope of POST /api/runs,
 GET /api/quota and the reserve refund. Offline: Oracle LLM, fake models."""
 
+import inspect
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -12,6 +13,8 @@ from tests.engine.fakes_llm import FakeLLM
 from tests.engine.fakes_oracle import LEVEL_IDS, oracle_llm, spec
 from tests.test_api_runs import JSON, L1, engine, post_run, read_events, reference
 from vgame.api.engine import EngineServices
+from vgame.api.routes.quota import get_quota
+from vgame.api.routes.quota import refund as refund_route
 from vgame.config import Settings
 from vgame.engine.budget import DailyCap
 from vgame.engine.llm import ReplayingLLM
@@ -264,3 +267,15 @@ def test_malformed_refund_is_a_422(
 def test_every_library_level_has_three_sample_cases(level_id: str) -> None:
     # The refund rule "all 3 samples passed" assumes three visible cases per level.
     assert sum(c.role == "visible" for c in spec(level_id).cases) == 3
+
+
+# --- the event loop --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("handler", [get_quota, refund_route])
+def test_quota_handlers_run_on_the_event_loop(handler: Callable[..., Any]) -> None:
+    # A plain "def" endpoint runs in anyio's worker threadpool, where RunStore, DailyCap and the
+    # reserve lose the "no method awaits, so each is atomic" guarantee their docstrings rely on:
+    # two refunds of one run can both pass the refunded() check and each take from R. Coroutine
+    # handlers run in one event-loop turn, so the check and the write cannot be interleaved.
+    assert inspect.iscoroutinefunction(handler), f"{handler.__name__} must be an async def"
