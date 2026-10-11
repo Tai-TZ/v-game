@@ -13,6 +13,7 @@ import {
   StarIcon,
 } from "~/components/ui/icons";
 
+import { StarDome } from "./StarDome";
 import {
   domain,
   isAllowed,
@@ -85,11 +86,20 @@ export function hasControls(env: Env, type: BlockType): boolean {
   return paramNames(env.blocks, type).some((name) => domain(env, type, name)?.kind !== "fixed");
 }
 
+/** What a slot may say about the answer passage of the case being followed. */
+export interface SlotGold {
+  chunks: readonly string[];
+  /** Node id -> rank of the best answer passage in that block's full ranking. */
+  ranks: Readonly<Record<string, number | null>>;
+  /** False for a hidden or trap case: a live run sends their gold too, and it stays unshown. */
+  visible: boolean;
+}
+
 export interface BenchRunView {
   run: RunView;
   followed: CaseView;
-  /** report.gold[followed].gold_chunks, after run.finished. */
-  gold: readonly string[] | null;
+  /** report.gold[followed] after run.finished, plus whether the case may show it. */
+  gold: SlotGold | null;
 }
 
 interface BenchProps {
@@ -371,7 +381,7 @@ function Slot({
 
       {type === "chunker" && view && <Ingestion run={view.run} node={id} />}
       <SlotIssues env={env} graph={graph} issues={own} />
-      {step && <StepState step={step} toy={toy} gold={view?.gold ?? null} />}
+      {step && <StepState step={step} node={id} toy={toy} gold={view?.gold ?? null} />}
     </section>
   );
 }
@@ -677,12 +687,14 @@ function Ingestion({ run, node }: { run: RunView; node: string }) {
 
 function StepState({
   step,
+  node,
   toy,
   gold,
 }: {
   step: StepView;
+  node: string;
   toy: string;
-  gold: readonly string[] | null;
+  gold: SlotGold | null;
 }) {
   return (
     <div className="mt-3 border-t border-line pt-3 text-sm">
@@ -696,7 +708,7 @@ function StepState({
           </summary>
           <div className="space-y-3">
             {step.facts.map((fact, index) => (
-              <FactView key={index} fact={fact} step={step} gold={gold} />
+              <FactView key={index} fact={fact} node={node} step={step} gold={gold} />
             ))}
           </div>
         </details>
@@ -707,16 +719,24 @@ function StepState({
 
 function FactView({
   fact,
+  node,
   step,
   gold,
 }: {
   fact: Fact;
+  node: string;
   step: StepView;
-  gold: readonly string[] | null;
+  gold: SlotGold | null;
 }) {
   if (fact.kind === "retrieved") {
     return (
       <div className="overflow-x-auto">
+        <StarDome
+          items={fact.items}
+          goldChunks={gold?.chunks ?? []}
+          goldRank={gold?.ranks[node] ?? null}
+          showGold={gold?.visible ?? false}
+        />
         <table className="w-full text-left text-xs">
           <thead className="text-fg-muted">
             <tr>
@@ -736,7 +756,7 @@ function FactView({
           </thead>
           <tbody>
             {fact.items.map((item) => {
-              const isGold = gold?.includes(item.chunk_id) ?? false;
+              const isGold = (gold?.visible && gold.chunks.includes(item.chunk_id)) ?? false;
               return (
                 <tr key={item.chunk_id} className="border-t border-line">
                   <td className="py-1 pr-3 tabular-nums">{item.rank}</td>
