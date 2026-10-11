@@ -21,7 +21,7 @@ const STEPS: readonly { title: string; body: string }[] = [
 
 export function LearningLoop() {
   return (
-    <section id="cach-hoc" className="scroll-mt-20 py-20">
+    <section id="cach-hoc" className="scroll-mt-20 py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading title="Mỗi lần chạy là một thí nghiệm nhỏ">
           Game không chấm đúng sai ngay. Nó cho bạn đặt giả thuyết, kiểm chứng trên dữ liệu thật,
@@ -32,13 +32,13 @@ export function LearningLoop() {
           {STEPS.map((step, index) => (
             <li key={step.title} className="space-y-2 border-t-2 border-brand pt-4">
               <p className="text-sm font-bold text-brand tabular-nums">Bước {index + 1}</p>
-              <h3 className="text-lg font-bold">{step.title}</h3>
+              <h3 className="text-lg font-semibold">{step.title}</h3>
               <p className="text-fg-muted">{step.body}</p>
             </li>
           ))}
         </ol>
 
-        <p className="mt-10 max-w-2xl text-fg-muted">
+        <p className="mt-10 max-w-measure text-fg-muted">
           Khu nào lâu không ôn sẽ tối dần trên bản đồ. Ca trực năm phút mỗi ngày trộn lại các sự cố
           cũ để kiến thức không trôi đi sau buổi học.
         </p>
