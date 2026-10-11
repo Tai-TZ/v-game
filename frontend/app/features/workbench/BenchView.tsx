@@ -130,10 +130,10 @@ export function BenchSection(props: BenchProps) {
       <h2 id="wb-bench-title" tabIndex={-1} className="text-2xl font-bold tracking-tight">
         Bàn thợ
       </h2>
-      <p className="mt-1 text-fg-muted">
+      <p className="mt-1 max-w-prose text-fg-muted">
         Gắn, tháo và chỉnh từng món. Mỗi lần mở ca, trợ lý chạy thật trên mọi câu của tối nay.
       </p>
-      <div className="mt-2 space-y-1 text-sm text-fg-muted">
+      <div className="mt-2 max-w-prose space-y-1 text-sm text-fg-muted">
         {notOpened.length > 0 && <p>Chưa mở ở màn này: {notOpened.join(", ")}.</p>}
         {discarded && (
           <p>Cấu hình đã lưu không còn hợp với màn này nên bàn thợ dùng cấu hình khởi đầu.</p>
@@ -302,7 +302,7 @@ function Slot({
           on={false}
           onToggle={() => onChange(setAttached(bench, type, true))}
         />
-        <p className="mt-1 text-sm text-fg-muted">{fact}</p>
+        <p className="mt-1 max-w-prose text-sm text-fg-muted">{fact}</p>
         <SlotIssues env={env} graph={graph} issues={own} />
       </section>
     );
@@ -462,7 +462,7 @@ export function Grade({ c }: { c: CaseView }) {
 function SlotIssues({ env, graph, issues }: { env: Env; graph: Graph; issues: readonly Issue[] }) {
   if (issues.length === 0) return null;
   return (
-    <ul className="mt-3 space-y-1">
+    <ul className="mt-3 max-w-prose space-y-1">
       {/* Keyed by position: the validator repeats a line once per list (two G06 "5 > 3"), and
           duplicate keys leave ghost rows behind. The rows hold no state. */}
       {issues.map((issue, index) => (
@@ -541,7 +541,7 @@ function Control({
             <span>{label}</span>
           </label>
           {inert && (
-            <p id={`${id}-inert`} className="text-xs text-fg-muted">
+            <p id={`${id}-inert`} className="max-w-prose text-xs text-fg-muted">
               {inert}
             </p>
           )}
@@ -647,7 +647,9 @@ function Prism({
                 ))}
               </select>
               {chosen && (
-                <p className="mt-1 text-sm text-fg-muted">{env.level.prompt_cards[chosen]}</p>
+                <p className="mt-1 max-w-prose text-sm text-fg-muted">
+                  {env.level.prompt_cards[chosen]}
+                </p>
               )}
             </div>
           );
@@ -685,7 +687,7 @@ function StepState({
   return (
     <div className="mt-3 border-t border-line pt-3 text-sm">
       <p className="font-semibold">{stepStatusText(step.status, step.ms)}</p>
-      {step.summary && <p className="mt-1 text-fg-muted">{step.summary}</p>}
+      {step.summary && <p className="mt-1 max-w-prose text-fg-muted">{step.summary}</p>}
       {step.facts && step.facts.length > 0 && (
         <details className="group mt-2">
           <summary className="flex min-h-11 cursor-pointer items-center gap-1 font-semibold text-brand">
