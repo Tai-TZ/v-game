@@ -171,12 +171,23 @@ def test_refund_is_capped_by_the_runs_fresh_calls(
     assert replayed.json()["reserve_left"] == 14
 
 
-def test_refund_takes_at_most_what_the_reserve_has_left(
+def test_a_reserve_too_small_for_the_whole_refund_keeps_the_claim(
     make_client: Callable[[EngineServices], TestClient],
 ) -> None:
-    client = make_client(services(reserve=1))
-    run_id = mau_run(client)
-    assert refund(client, run_id).json() == {"run_id": run_id, "refunded": 1, "reserve_left": 0}
+    # daily-shift §3.1 refunds the run's fresh calls, capped at 3, and "R hết thì thôi hoàn" —
+    # there is no partial payout. Paying 1 of 3 would mark the run refunded and destroy the rest,
+    # because the claim is one-shot and R only refills the next UTC day.
+    built = services(reserve=1)
+    client = make_client(built)
+    run_id = mau_run(client)  # Oracle: 3 fresh calls
+
+    short = refund(client, run_id)
+    assert short.status_code == 409
+    assert short.json()["code"] == "reserve_empty"
+    assert client.get("/api/quota").json()["reserve_left"] == 1  # nothing taken
+
+    built.reserve = DailyCap(17)  # e.g. the next UTC day
+    assert refund(client, run_id).json() == {"run_id": run_id, "refunded": 3, "reserve_left": 14}
 
 
 def test_an_empty_reserve_refuses_without_using_up_the_runs_refund(

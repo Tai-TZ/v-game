@@ -100,7 +100,8 @@ async def refund(
     calls = _refundable_calls(events)
     if isinstance(calls, int) and engine.runs.refunded(body.run_id):
         calls = "already_refunded"
-    if isinstance(calls, int) and calls > 0 and engine.reserve.exhausted:
+    if isinstance(calls, int) and calls > engine.reserve.remaining:
+        # All or nothing: the claim is one-shot, so paying part of it would destroy the rest.
         calls = "reserve_empty"  # the run keeps its refund for when R refills
     if isinstance(calls, str):
         return JSONResponse({"detail": REFUSED_VI[calls], "code": calls}, status.HTTP_409_CONFLICT)

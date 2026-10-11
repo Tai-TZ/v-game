@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, PositiveInt, SecretStr, field_validator
+from pydantic import Field, PositiveInt, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Environment = Literal["development", "test", "production"]
@@ -88,6 +88,22 @@ class Settings(BaseSettings):
         if "*" in origins:
             raise ValueError("CORS_ORIGINS must list explicit origins, not '*'")
         return origins
+
+    @model_validator(mode="after")
+    def _quota_fits_the_cap(self) -> "Settings":
+        """daily-shift §3.1 gives the class 90 % of the cap, and out of that share every learner
+        gets P while the reserve R is set aside, so one learner plus R has to fit inside it.
+        Class size lives in the lesson plan, not here, so this is the strongest size-free check:
+        it catches the 13/17 defaults left behind on a smaller cap."""
+        share = self.daily_llm_call_cap * 9 // 10
+        if self.quota_learner_calls + self.quota_reserve_calls > share:
+            raise ValueError(
+                f"QUOTA_LEARNER_CALLS ({self.quota_learner_calls}) + QUOTA_RESERVE_CALLS "
+                f"({self.quota_reserve_calls}) exceed the class share {share} of "
+                f"DAILY_LLM_CALL_CAP ({self.daily_llm_call_cap}); recompute them with the "
+                f"formula in docs/content/scenarios/daily-shift.md §3.1"
+            )
+        return self
 
     @property
     def docs_enabled(self) -> bool:
