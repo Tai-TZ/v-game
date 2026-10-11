@@ -16,8 +16,9 @@ from tests.engine.fakes_oracle import CONTENT_DIR, LEVEL_IDS, spec
 from vgame.config import SHIPPED_INDEX_DIR, Settings
 from vgame.engine.index import IndexStore
 from vgame.engine.levels import load_level
-from vgame.engine.recorded import OUT_DIR, RecordError, main, record_level
+from vgame.engine.recorded import OUT_DIR, RecordError, main, record_level, redact
 from vgame.engine.replay import ReplayStore
+from vgame.engine.types import CaseGrade
 
 # frontend-architecture §8.1: a hidden or trap case shows pass/fail per criterion, labels, role
 # (in run.started), the pack's total tokens and cite_unknown. Nothing else.
@@ -66,6 +67,10 @@ def test_committed_run_matches_the_shipped_index_and_level(level_id: str) -> Non
     assert kinds[-2:] == ["run.scored", "run.finished"]
 
 
+def _case(level_id: str, case_id: str) -> Any:
+    return next(c for c in spec(level_id).cases if c.id == case_id)
+
+
 @pytest.mark.parametrize("level_id", LEVEL_IDS)
 def test_hidden_and_trap_cases_carry_only_the_allowed_fields(level_id: str) -> None:
     run = _committed(level_id)
@@ -81,6 +86,10 @@ def test_hidden_and_trap_cases_carry_only_the_allowed_fields(level_id: str) -> N
             # Fabricated citations only: an id outside the pack or "Điều N" outside it.
             assert all(c.startswith(("[", "Điều ")) for c in event["cite_unknown"])
             assert bool(event["cite_unknown"]) == ("cite_unknown" in event["labels"])
+            # ...and never the case's own gold article: "Điều N" enters cite_unknown when no
+            # packed chunk touches N, which is exactly what a case with unretrieved gold has.
+            gold_dieus = {q.dieu for q in _case(level_id, event["case"]).gold}
+            assert not {c for c in event["cite_unknown"]} & {f"Điều {d}" for d in gold_dieus}
             graded.add(event["case"])
     assert graded == secret
     report = events[-1]["report"]
@@ -111,3 +120,47 @@ def test_export_refuses_any_call_the_replay_seed_does_not_answer() -> None:
     empty = ReplayStore(":memory:")  # no seed: every answer would be a live Gemini call
     with pytest.raises(RecordError, match="replay seed"):
         record_level(LEVEL_IDS[0], _shipped(), empty, models, CONTENT_DIR)
+
+
+# --- a hidden case never publishes its own gold article -------------------------------------
+
+
+def _graded(case_id: str, role: str, cite_unknown: tuple[str, ...]) -> list[Any]:
+    """``redact`` over a one-case run whose cite_unknown names the case's gold article."""
+    events: list[Any] = [
+        {
+            "type": "run.started",
+            "run": "r",
+            "level": "l",
+            "cases": [{"id": case_id, "role": role, "vai": "su-kien"}],
+            "ingestion": [],
+        },
+        {
+            "type": "case.graded",
+            "run": "r",
+            "case": case_id,
+            "status": "ok",
+            "passed": False,
+            "counted": True,
+            "criteria": {"cited": False},
+            "labels": ["cite_unknown"],
+        },
+    ]
+    grades = {
+        case_id: CaseGrade(case_id, False, True, {"cited": False}, ("cite_unknown",), cite_unknown)
+    }
+    return redact(events, grades, {case_id: frozenset({47})})
+
+
+@pytest.mark.parametrize("role", ["hidden", "trap"])
+def test_a_secret_case_drops_its_own_gold_article_from_cite_unknown(role: str) -> None:
+    # "Điều N" enters cite_unknown when no packed chunk touches article N, so a case whose gold
+    # was never retrieved would publish the article its own answer lives in (§8.1: no gold).
+    out = _graded("c1", role, ("[deadbeef]", "Điều 47", "Điều 74"))
+    assert out[1]["cite_unknown"] == ["[deadbeef]", "Điều 74"]
+
+
+def test_a_visible_case_keeps_every_fabricated_citation() -> None:
+    # Visible cases publish the answer, the retrieved list and the pack: nothing to protect.
+    out = _graded("c1", "visible", ("Điều 47", "Điều 74"))
+    assert out[1]["cite_unknown"] == ["Điều 47", "Điều 74"]

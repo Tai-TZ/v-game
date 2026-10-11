@@ -7,10 +7,11 @@ the export: no Gemini call, no key read), redacts the events and writes
 
 Visible cases keep every event and fact. Hidden and trap cases keep only their
 ``case.graded`` verdict plus ``cite_unknown`` (the fabricated citations that turned that label
-on) and ``pack_tokens`` (the pack's total): never their steps, so no retrieved list,
-``pack.included``, answer text, prompt, rank or score, and no gold or diagnosis in
-``run.finished``. Every ``case.graded`` gets the two extra fields. ``ms`` is the wall time of
-this export (replayed answers take ~0 ms), not of the original live call.
+on, minus any that name the case's own gold article) and ``pack_tokens`` (the pack's total):
+never their steps, so no retrieved list, ``pack.included``, answer text, prompt, rank or score,
+and no gold or diagnosis in ``run.finished``. Every ``case.graded`` gets the two extra fields.
+``ms`` is the wall time of this export (replayed answers take ~0 ms), not of the original live
+call.
 """
 
 import argparse
@@ -97,8 +98,23 @@ class _KeepGrades:
         return self.inner.report(traces, grades, retrievers)
 
 
-def redact(events: Sequence[EngineEvent], grades: Mapping[str, CaseGrade]) -> list[Any]:
-    """The events as the static file shows them (module docstring)."""
+def _without_gold_articles(cite_unknown: Sequence[str], gold_dieus: frozenset[int]) -> list[str]:
+    """``cite_unknown`` entries that do not name one of the case's own gold articles.
+
+    ``Điều N`` lands in ``cite_unknown`` whenever no packed chunk touches article N
+    (grading.py ``_unknown_citations``). A case whose gold was never retrieved therefore
+    publishes its own answer's article number, which §8.1 keeps out of a hidden case.
+    """
+    return [c for c in cite_unknown if c not in {f"Điều {dieu}" for dieu in gold_dieus}]
+
+
+def redact(
+    events: Sequence[EngineEvent],
+    grades: Mapping[str, CaseGrade],
+    gold_dieus: Mapping[str, frozenset[int]] = {},
+) -> list[Any]:
+    """The events as the static file shows them (module docstring). ``gold_dieus`` maps a case
+    id to its gold article numbers, which a hidden or trap case never publishes."""
     started = events[0]
     if started["type"] != "run.started":
         raise RecordError("a run starts with run.started")
@@ -117,9 +133,13 @@ def redact(events: Sequence[EngineEvent], grades: Mapping[str, CaseGrade]) -> li
         shown: dict[str, Any] = dict(event)
         if event["type"] == "case.graded":
             case_id = event["case"]
+            cite_unknown = list(grades[case_id].cite_unknown)
             if case_id in secret:
                 shown = {k: v for k, v in shown.items() if k in _HIDDEN_GRADED_KEYS}
-            shown["cite_unknown"] = list(grades[case_id].cite_unknown)
+                cite_unknown = _without_gold_articles(
+                    cite_unknown, gold_dieus.get(case_id, frozenset())
+                )
+            shown["cite_unknown"] = cite_unknown
             shown["pack_tokens"] = pack_tokens.get(case_id)
         elif event["type"] == "run.finished":
             report = event["report"]
@@ -163,7 +183,11 @@ def record_level(
         "level_version": level.version,
         "graph": "starter",
         "corpus_sha256": store.manifest["corpus_sha256"],
-        "events": redact(events, evaluator.grades),
+        "events": redact(
+            events,
+            evaluator.grades,
+            {c.id: frozenset(q.dieu for q in c.gold) for c in spec.cases},
+        ),
     }
 
 
