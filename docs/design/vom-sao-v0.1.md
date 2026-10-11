@@ -96,8 +96,18 @@ Theo hướng gameplay §4 và art direction §1.3:
 - Danh sách DOM và canvas luôn cùng số sao.
 - Ngân sách: `npm run build` giữ bàn thợ dưới 120 kB và không có three.js trong chunk của nó.
 
+## 9b. Sửa sau vòng soát cả nhánh (2026-10-11)
+
+Mục 5 trước đây cho **góc** mang cosine, chuẩn hoá theo khoảng của chính lượt đó. Vòng soát chỉ ra điều đó nói dối trên đúng dữ liệu duy nhất đang có: ba cosine của bản ghi L3 là 0,8032 / 0,8004 / 0,7984, chênh 0,005, mà phép chuẩn hoá trải chúng thành quạt 70° — trong khi cả ba in ra "0,8" vì `fmt` làm tròn hai chữ số. Bức tranh nói ngược lại con số của chính nó.
+
+**Chốt:** vị trí mang **hạng**, trải đều, vì đó là đại lượng cái quạt biểu diễn được chính xác. Cosine là con số, và được in ba chữ số thập phân (`fmtCosine`). Luật ở mục 7 thắng cơ chế ở mục 5. Trải đều cũng khiến hai đoạn không bao giờ chung một chấm, nên canvas và danh sách DOM luôn cùng số sao như mục 9 đòi.
+
 ## 10. Chưa làm ở v0.1
 
 - Vặn núm để vòm vẽ lại (cần endpoint pha 2).
 - Vòm cho khối `bm25_search`, `fusion`, `rerank` — L3 có ba khối cùng xếp hạng, nên "đường đời hạng" đi qua nhiều khối là việc sau. `GoldReveal.ranks` đã sẵn khoá theo node nên không cần đổi dữ liệu.
 - Chín món đồ chơi còn lại.
+- **Chọn một sao để làm nổi dòng tương ứng ở bảng** (mục 6). Chưa nối, nên các sao trong danh sách `sr-only` là chữ thường, không phải nút: một nút không làm gì, lại bị `sr-only` cắt mất vòng focus, tệ hơn là không có nút.
+- **Dòng "còn {n} đoạn nữa trong kho"** (mục 5). Client không biết số đoạn của kho; cần endpoint xem trước của pha 2.
+- **Chùm đèn pin chưa được vẽ**, mới có cung vòm. Vì vị trí giờ mang hạng chứ không mang cosine, chùm sáng không còn là thứ để so góc; vẽ lại nó cùng pha 2, khi vặn núm làm vòm đổi.
+- `in_pack` và `flags` của `GoldReveal` (mục 3) chưa dùng tới.
