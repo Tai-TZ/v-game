@@ -138,7 +138,7 @@ describe("the star dome in the search slot", () => {
       <Bench
         bench={start}
         benchRun="done"
-        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, visible: true })}
+        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, flags: [], visible: true })}
       />,
     );
     expect(domeLabel(container)).toContain("đoạn đáp án ở hạng 72");
@@ -154,7 +154,7 @@ describe("the star dome in the search slot", () => {
       <Bench
         bench={start}
         benchRun="done"
-        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, visible: true })}
+        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, flags: [], visible: true })}
       />,
     );
     const dome = container.querySelector('[role="img"]');
@@ -188,6 +188,44 @@ describe("the star dome in the search slot", () => {
     expect(screen.getByText(/Điều 47.*hạng 1.*0,910/)).toBeDefined();
   });
 
+  it("marks the blade when the followed case had its answer sentence cut", () => {
+    // The committed L2 run at co_dinh-128-0 raises ret.boundary_split on v02; that flag is the
+    // whole lesson of L2, and it has to reach the blade rather than stop at the diagnosis.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(
+      <Bench
+        bench={start}
+        benchRun="done"
+        view={recordedView({
+          chunks: [],
+          ranks: RANKS,
+          flags: ["ret.boundary_split"],
+          visible: true,
+        })}
+      />,
+    );
+    expect(screen.getByText(/cắt đứt câu đáp án/)).toBeDefined();
+  });
+
+  it("never says a hidden case had its answer cut, even when the run says so", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(
+      <Bench
+        bench={start}
+        benchRun="done"
+        view={recordedView({
+          chunks: [],
+          ranks: RANKS,
+          flags: ["ret.boundary_split"],
+          visible: false,
+        })}
+      />,
+    );
+    expect(screen.queryByText(/cắt đứt câu đáp án/)).toBeNull();
+  });
+
   it("shows the context bin for the packer slot, with the run's own token numbers", () => {
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
@@ -195,7 +233,7 @@ describe("the star dome in the search slot", () => {
       <Bench
         bench={start}
         benchRun="done"
-        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, visible: true })}
+        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, flags: [], visible: true })}
       />,
     );
     const bin = [...container.querySelectorAll('[role="img"]')].find((el) =>
@@ -213,7 +251,7 @@ describe("the star dome in the search slot", () => {
       <Bench
         bench={start}
         benchRun="done"
-        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, visible: false })}
+        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, flags: [], visible: false })}
       />,
     );
     expect(domeLabel(container)).toBe("3 đoạn đã kéo");

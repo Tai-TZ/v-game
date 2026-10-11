@@ -13,6 +13,7 @@ import {
   StarIcon,
 } from "~/components/ui/icons";
 
+import { Blade } from "./Blade";
 import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
 import {
@@ -45,7 +46,6 @@ import {
   TOY,
   toyName,
   vaiVi,
-  variantVi,
 } from "./copy";
 import {
   blockState,
@@ -92,6 +92,8 @@ export interface SlotGold {
   chunks: readonly string[];
   /** Node id -> rank of the best answer passage in that block's full ranking. */
   ranks: Readonly<Record<string, number | null>>;
+  /** ret.gold_missing, ret.gold_rank, ret.boundary_split, ctx.gold_dropped. */
+  flags: readonly string[];
   /** False for a hidden or trap case: a live run sends their gold too, and it stays unshown. */
   visible: boolean;
 }
@@ -386,7 +388,7 @@ function Slot({
         {type === "llm" && !locked && <Prism env={env} bench={bench} onChange={onChange} />}
       </div>
 
-      {type === "chunker" && view && <Ingestion run={view.run} node={id} />}
+      {type === "chunker" && view && <Ingestion run={view.run} node={id} gold={view.gold} />}
       <SlotIssues env={env} graph={graph} issues={own} />
       {step && <StepState step={step} node={id} toy={toy} gold={view?.gold ?? null} />}
       {/* No step for this slot yet, or the bench has moved on from the run: the dome follows
@@ -686,14 +688,13 @@ function Prism({
 
 // --- Run state of a slot (§7) ---------------------------------------------------------------
 
-function Ingestion({ run, node }: { run: RunView; node: string }) {
+function Ingestion({ run, node, gold }: { run: RunView; node: string; gold: SlotGold | null }) {
   const info = run.ingestion.find((item) => item.node === node);
   if (!info) return null;
+  // Only a case allowed to show its gold may show that its gold was cut in half.
+  const split = (gold?.visible && gold.flags.includes("ret.boundary_split")) ?? false;
   return (
-    <p className="mt-3 text-sm">
-      Chỉ mục <code className="font-mono text-xs">{info.variant}</code> ({variantVi(info.variant)}):{" "}
-      {fmt(info.chunks)} đoạn, trung bình {fmt(info.avg_tokens)} token mỗi đoạn.
-    </p>
+    <Blade variant={info.variant} chunks={info.chunks} avgTokens={info.avg_tokens} split={split} />
   );
 }
 

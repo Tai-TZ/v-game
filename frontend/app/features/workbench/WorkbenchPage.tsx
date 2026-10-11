@@ -310,6 +310,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             ? {
                 chunks: reveal.gold_chunks,
                 ranks: reveal.ranks,
+                flags: reveal.flags,
                 visible: followedCase.role === "visible",
               }
             : null,
