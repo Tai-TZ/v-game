@@ -15,6 +15,8 @@ import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { buildRoutes } from "./vercel-routes.mjs";
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const clientDir = path.join(root, "build", "client");
 const outDir = path.join(root, ".vercel", "output");
@@ -63,32 +65,7 @@ if (packs.length > 0) {
 const security = JSON.parse(
   await readFile(path.join(root, "build", "security-headers.json"), "utf8"),
 );
-const config = {
-  version: 3,
-  routes: [
-    {
-      src: "^/assets/(.*)$",
-      headers: { "Cache-Control": "public, max-age=31536000, immutable" },
-      continue: true,
-    },
-    {
-      src: "^/themes/(.*)$",
-      headers: { "Cache-Control": "public, max-age=86400" },
-      continue: true,
-    },
-    {
-      src: "^/(.*)$",
-      headers: { ...security, "Strict-Transport-Security": "max-age=63072000; includeSubDomains" },
-      continue: true,
-    },
-    { src: "^/api/(.*)$", dest: `${api.origin}/api/$1` },
-    { handle: "filesystem" },
-    // Pre-rendered page with the scene loader, whatever Vercel does with directory indexes.
-    { src: "^/play/?$", dest: "/play/index.html" },
-    { src: "^/(assets|themes)/(.*)$", status: 404 },
-    { src: "^/(.*)$", dest: "/__spa-fallback.html" },
-  ],
-};
+const config = { version: 3, routes: buildRoutes({ apiOrigin: api.origin, security }) };
 await writeFile(path.join(outDir, "config.json"), `${JSON.stringify(config, null, 2)}\n`);
 
 console.warn(
