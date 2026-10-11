@@ -756,8 +756,14 @@ test.describe("workbench", () => {
     await expect(page.locator("#slot-vs [data-state]")).toHaveText("Trạng thái khối: Chưa chạy");
 
     // N1 + N19: one click per answer, nothing required. The slip ships collapsed so the aside
-    // keeps Mở ca on the first screen at 1280x800 (workbench-v0.1 §2.1, §19.1).
-    const openSlip = () => page.locator("summary", { hasText: "Đoán trước khi mở ca" }).click();
+    // keeps Mở ca on the first screen at 1280x800 (workbench-v0.1 §2.1, §19.1), and a closed
+    // <details> is hidden from the accessibility tree, so getByRole cannot see inside it.
+    const disclosure = page.locator("details", {
+      has: page.locator("summary", { hasText: "Đoán trước khi mở ca" }),
+    });
+    await expect(disclosure).not.toHaveAttribute("open", "");
+    // Set rather than clicked: clicking toggles, so calling this twice would close it again.
+    const openSlip = () => disclosure.evaluate((d) => d.setAttribute("open", ""));
     await openSlip();
     const slip = page.getByRole("region", { name: "Đoán trước khi mở ca" });
     await slip.getByRole("group", { name: "Đạt mấy/10?" }).getByText("2", { exact: true }).click();
@@ -768,7 +774,7 @@ test.describe("workbench", () => {
     // The draft survives a reload, per level.
     await page.reload();
     await openSlip();
-    await expect(first.getByRole("radio", { name: "Chắc" })).toBeChecked();
+    await expect(first.getByRole("radio", { name: "Chắc", exact: true })).toBeChecked();
     await expect(slip.getByRole("checkbox", { name: "Câu #9" })).toBeChecked();
 
     await page.getByRole("button", { name: "Mở ca" }).click();
@@ -783,6 +789,7 @@ test.describe("workbench", () => {
       "#cau-1",
     );
     // The slip left with the run: the next one starts blank.
+    await openSlip();
     await expect(slip.getByRole("radio", { name: "2", exact: true })).not.toBeChecked();
     await expect(slip.getByRole("radio", { name: "Chắc" })).toHaveCount(0);
     expect(
