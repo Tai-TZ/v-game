@@ -154,7 +154,12 @@ Read from the process environment, or from `backend/.env` (see `.env.example`).
 | `DAILY_LLM_CALL_CAP`  | `500`                                       | real Gemini calls per UTC day, whole server (Render: 200) |
 | `MAX_CONCURRENT_RUNS` | `1`                                         | more answers 429; 3 x this = Gemini calls in flight   |
 | `QUOTA_RESERVE_CALLS` | `17`                                        | shared reserve R per UTC day (refunds), daily-shift §3.1 |
-| `QUOTA_LEARNER_CALLS` | `13`                                        | P, each learner's calls per day, read by the workbench |
+| `QUOTA_LEARNER_CALLS` | `13`                                        | P, each learner's calls per day, read by the workbench (Render: 4) |
+
+Both defaults are derived from `DAILY_LLM_CALL_CAP` = 500 for a class of 30, so changing the cap
+means recomputing them with the formula in `docs/content/scenarios/daily-shift.md` §3.1 — copying
+`13` onto a smaller cap hands out more calls than the cap can serve. `render.yaml` carries the
+worked example for its own cap, and `test_deploy_config` re-derives it.
 | `INDEX_DIR`           | `src/vgame/engine/data/index`               | shipped index, vectors and rerank table (committed)   |
 | `ENGINE_CACHE_DIR`    | `backend/.cache/engine`                     | model files (build tool only), replay cache (gitignored) |
 | `CONTENT_DIR`         | `<repo>/docs/content`                       | corpus and golden files                               |

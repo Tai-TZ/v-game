@@ -51,6 +51,20 @@ services:
       # minute per model come from engine/llm.py DEFAULT_RPM (GEMINI_RPM overrides).
       - key: DAILY_LLM_CALL_CAP
         value: "200"
+      # The learner share P and the shared reserve R are derived from the cap above, so all three
+      # move together (docs/content/scenarios/daily-shift.md §3.1). For a pilot class of 30:
+      #   class share = 0.9 x cap                     = 180   (10 % is left for retries/fallbacks)
+      #   spare       = class share - 40 - 3          = 137   (projector pool, common-incident fix)
+      #   P           = (spare - 15) // 30            = 4     (15 is the floor kept for R)
+      #   R           = spare - 30 x P                = 17    (the division's remainder joins R)
+      # test_deploy_config re-derives these; raising the cap without recomputing them fails CI.
+      # At P = 4 a learner can afford one "Thử 3 câu mẫu" (3 calls) but no star run (L1 7, L2/L3
+      # 10), so on this deploy "Mở ca" degrades to the sample run and the recorded run by design
+      # (daily-shift §3.2). Raise the cap to 500 for P = 13 once the key's daily quota allows it.
+      - key: QUOTA_LEARNER_CALLS
+        value: "4"
+      - key: QUOTA_RESERVE_CALLS
+        value: "17"
       # numpy's BLAS would reserve a buffer per idle thread; the server needs none.
       - key: OPENBLAS_NUM_THREADS
         value: "1"
