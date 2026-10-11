@@ -117,7 +117,11 @@
     --vg-font: "Segoe UI", Arial, sans-serif;
     --vg-canvas: #ffffff;
     --vg-text: #1f2328;
+    --vg-text-muted: #55625f;
     --vg-brand: #1f4e79;
+    --vg-accent: #8a4f00;
+    --vg-warning: #8a4f00;
+    --vg-border: #dfe5e3;
     --vg-scene-sky: #eef2f5;
     --vg-scene-dawn: #ece2e6;
     --vg-scene-dusk: #dcd7e4;

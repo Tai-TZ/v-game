@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, type ReactElement } from "react";
+import { useEffect, useId, useMemo, useRef, type ReactElement } from "react";
 
-import { DOME_VI, fmt } from "./copy";
+import { DOME_VI, fmtCosine } from "./copy";
 import type { Fact } from "./schema";
 import { starField, type Star } from "./stardome";
 
@@ -14,7 +14,7 @@ function label(star: Star): string {
   const khoan = star.khoan.length > 0 ? ` khoản ${star.khoan.join(", ")}` : "";
   const stale = star.stale ? ", văn bản hết hiệu lực" : "";
   const gold = star.gold ? ", đoạn đáp án" : "";
-  return `Điều ${star.dieu}${khoan}, hạng ${star.rank}, cosine ${fmt(star.score)}${gold}${stale}`;
+  return `Điều ${star.dieu}${khoan}, hạng ${star.rank}, cosine ${fmtCosine(star.score)}${gold}${stale}`;
 }
 
 /**
@@ -28,28 +28,40 @@ export function StarDome({
   goldChunks,
   goldRank,
   showGold,
-  onSelect,
 }: {
   items: readonly RetrievedItem[];
   goldChunks: readonly string[];
   goldRank: number | null;
   /** False for a hidden or trap case: no gold star, whatever the payload carries. */
   showGold: boolean;
-  onSelect?: (chunkId: string) => void;
 }): ReactElement | null {
   const id = useId();
   const canvas = useRef<HTMLCanvasElement>(null);
-  const dome = starField(items, showGold ? goldChunks : [], showGold ? goldRank : null);
+  const dome = useMemo(
+    () => starField(items, showGold ? goldChunks : [], showGold ? goldRank : null),
+    [items, goldChunks, goldRank, showGold],
+  );
 
   useEffect(() => {
     const ctx = canvas.current?.getContext("2d");
     if (!ctx) return; // jsdom has no 2D context; the sr-only list is still the record.
+    // The element is laid out in CSS pixels but the backing store is device pixels, or the
+    // 1px arc and the 11px rank labels blur on any 2x screen.
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    if (canvas.current && canvas.current.width !== W * dpr) {
+      canvas.current.width = W * dpr;
+      canvas.current.height = H * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Every colour comes from the active theme pack; app.css carries the no-theme fallbacks,
+    // so no palette value is written down inside app/ (CLAUDE.md: brand data lives in themes).
     const css = getComputedStyle(canvas.current as Element);
-    const ink = css.getPropertyValue("--vg-text").trim() || "#1f2a2c";
-    const muted = css.getPropertyValue("--vg-text-muted").trim() || "#55625f";
-    const accent = css.getPropertyValue("--vg-accent").trim() || "#b85f12";
-    const warning = css.getPropertyValue("--vg-warning").trim() || "#8a4f00";
-    const line = css.getPropertyValue("--vg-border").trim() || "#dfe5e3";
+    const token = (name: string) => css.getPropertyValue(name).trim();
+    const ink = token("--vg-text");
+    const muted = token("--vg-text-muted");
+    const accent = token("--vg-accent");
+    const warning = token("--vg-warning");
+    const line = token("--vg-border");
 
     ctx.clearRect(0, 0, W, H);
     const px = (s: Star) => [s.x * W, H - s.y * H] as const;
@@ -96,6 +108,8 @@ export function StarDome({
 
   if (items.length === 0) return null;
 
+  // The answer passage exists but this block's ranking never reached it.
+  const unranked = showGold && goldChunks.length > 0 && goldRank === null;
   const name =
     dome.missingGold || dome.stars.some((s) => s.gold)
       ? `${dome.stars.length} đoạn đã kéo, đoạn đáp án ở hạng ${
@@ -113,17 +127,16 @@ export function StarDome({
           width={W}
           height={H}
           aria-hidden="true"
-          className="w-full max-w-80 rounded-sm border border-line bg-subtle"
+          className="aspect-[32/17] h-auto w-full max-w-80 rounded-sm border border-line bg-subtle"
         />
       </div>
-      <p className="mt-1 max-w-prose text-xs text-fg-muted">{DOME_VI}</p>
+      <p className="mt-1 max-w-prose text-xs text-fg-muted">
+        {DOME_VI.projection}
+        {unranked ? ` ${DOME_VI.unranked}` : ""}
+      </p>
       <ul id={`${id}-stars`} className="sr-only">
         {dome.stars.map((star) => (
-          <li key={star.chunkId}>
-            <button type="button" onClick={() => onSelect?.(star.chunkId)}>
-              {label(star)}
-            </button>
-          </li>
+          <li key={star.chunkId}>{label(star)}</li>
         ))}
       </ul>
     </div>

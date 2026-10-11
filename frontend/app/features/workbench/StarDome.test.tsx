@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { Fact } from "./schema";
@@ -27,10 +27,13 @@ const GOLD = "f22a1df7";
 afterEach(cleanup);
 
 describe("StarDome", () => {
-  it("renders one keyboard-reachable star per retrieved passage", () => {
+  it("lists every retrieved passage with its real numbers for a screen reader", () => {
     render(<StarDome items={items()} goldChunks={[]} goldRank={null} showGold />);
-    expect(screen.getAllByRole("button")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: /Điều 53.*hạng 1.*0,8/ })).toBeDefined();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    // Three decimals: the L3 cosines differ by 0,005, and at two they all read "0,8", so the
+    // numbers could not contradict the picture even when the picture was wrong.
+    expect(screen.getByText(/Điều 53.*hạng 1.*0,803/)).toBeDefined();
+    expect(screen.getByText(/Điều 13.*0,800/)).toBeDefined();
   });
 
   it("names the picture by what it shows", () => {
@@ -49,7 +52,7 @@ describe("StarDome", () => {
   it("says a passage is out of force", () => {
     const stale = items().map((i, n) => (n === 0 ? { ...i, hieu_luc: false } : i));
     render(<StarDome items={stale} goldChunks={[]} goldRank={null} showGold />);
-    expect(screen.getByRole("button", { name: /hết hiệu lực/ })).toBeDefined();
+    expect(screen.getByText(/hết hiệu lực/)).toBeDefined();
   });
 
   it("renders nothing without a retrieved fact", () => {
@@ -57,23 +60,15 @@ describe("StarDome", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("reports the passage the player picked", () => {
-    const picked: string[] = [];
-    render(
-      <StarDome
-        items={items()}
-        goldChunks={[]}
-        goldRank={null}
-        showGold
-        onSelect={(id) => picked.push(id)}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Điều 13/ }));
-    expect(picked).toEqual([items()[1]?.chunk_id]);
+  it("says so when this block never ranked the answer passage", () => {
+    // ranks[node] is null: the passage exists, this block's ranking does not contain it.
+    // Drawing nothing and saying nothing leaves the player to guess which it was.
+    render(<StarDome items={items()} goldChunks={[GOLD]} goldRank={null} showGold />);
+    expect(screen.getByText(/không tìm thấy đoạn đáp án/)).toBeDefined();
   });
 
-  it("says the positions are a projection, not real coordinates", () => {
+  it("says what the positions mean, so the drawing is not read as a measurement", () => {
     render(<StarDome items={items()} goldChunks={[]} goldRank={null} showGold />);
-    expect(screen.getByText(/hình chiếu/)).toBeDefined();
+    expect(screen.getByText(/Vị trí sao theo hạng/)).toBeDefined();
   });
 });

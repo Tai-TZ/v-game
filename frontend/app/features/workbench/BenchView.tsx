@@ -696,10 +696,21 @@ function StepState({
   toy: string;
   gold: SlotGold | null;
 }) {
+  const retrieved = step.facts?.find(
+    (f): f is Extract<Fact, { kind: "retrieved" }> => f.kind === "retrieved",
+  );
   return (
     <div className="mt-3 border-t border-line pt-3 text-sm">
       <p className="font-semibold">{stepStatusText(step.status, step.ms)}</p>
       {step.summary && <p className="mt-1 max-w-prose text-fg-muted">{step.summary}</p>}
+      {retrieved && (
+        <StarDome
+          items={retrieved.items}
+          goldChunks={gold?.chunks ?? []}
+          goldRank={gold?.ranks[node] ?? null}
+          showGold={gold?.visible ?? false}
+        />
+      )}
       {step.facts && step.facts.length > 0 && (
         <details className="group mt-2">
           <summary className="flex min-h-11 cursor-pointer items-center gap-1 font-semibold text-brand">
@@ -708,7 +719,7 @@ function StepState({
           </summary>
           <div className="space-y-3">
             {step.facts.map((fact, index) => (
-              <FactView key={index} fact={fact} node={node} step={step} gold={gold} />
+              <FactView key={index} fact={fact} step={step} gold={gold} />
             ))}
           </div>
         </details>
@@ -717,26 +728,10 @@ function StepState({
   );
 }
 
-function FactView({
-  fact,
-  node,
-  step,
-  gold,
-}: {
-  fact: Fact;
-  node: string;
-  step: StepView;
-  gold: SlotGold | null;
-}) {
+function FactView({ fact, step, gold }: { fact: Fact; step: StepView; gold: SlotGold | null }) {
   if (fact.kind === "retrieved") {
     return (
       <div className="overflow-x-auto">
-        <StarDome
-          items={fact.items}
-          goldChunks={gold?.chunks ?? []}
-          goldRank={gold?.ranks[node] ?? null}
-          showGold={gold?.visible ?? false}
-        />
         <table className="w-full text-left text-xs">
           <thead className="text-fg-muted">
             <tr>

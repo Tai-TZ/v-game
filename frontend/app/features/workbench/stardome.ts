@@ -3,10 +3,15 @@ import type { Fact } from "./schema";
 /**
  * Projection behind the Vòm Sao (vom-sao-v0.1 §5). Pure: no DOM, no clock.
  *
- * Position is a drawing, not a coordinate: the dome shows angular distance from the beam as
- * `1 − score` normalised across the passages this call was given, because that is the only
- * distance the run actually measured. The real rank and cosine travel on every star so the
- * component can print them, which §7 requires it to do.
+ * Position carries RANK, evenly spaced across the fan, and nothing else.
+ *
+ * It used to carry `1 − score` normalised across this call's own range, which the review
+ * showed to be a lie on the only data that exists: the committed L3 run's cosines differ by
+ * 0,005 and that became a 70-degree spread, while all three printed as "0,8". A projection
+ * that exaggerates a near-tie into a chasm teaches the opposite of the lesson. Rank is a
+ * quantity the fan can hold exactly, so it holds that; the cosine is a number, and
+ * `StarDome` prints it. Even spacing also means two passages never share a dot — the canvas
+ * and the sr-only list always show the same count (§9).
  */
 
 type RetrievedItem = Extract<Fact, { kind: "retrieved" }>["items"][number];
@@ -32,7 +37,7 @@ export interface Dome {
 }
 
 /** Half-angle of the fan, in radians: wide enough to separate ranks, inside the dome's arc. */
-const SPREAD = (70 * Math.PI) / 180;
+const SPREAD = (62 * Math.PI) / 180;
 const RADIUS = 0.42;
 const ORIGIN_X = 0.5;
 const ORIGIN_Y = 0.05;
@@ -42,16 +47,15 @@ export function starField(
   goldChunks: readonly string[],
   goldRank: number | null,
 ): Dome {
-  const scores = items.map((i) => i.score);
-  const best = Math.max(...scores);
-  const worst = Math.min(...scores);
-  const span = best - worst;
+  if (items.length === 0) return { stars: [], missingGold: null };
 
   const stars = items.map((item, index) => {
-    // A tie carries no information about distance, so every star sits on the axis rather than
-    // being spread by a division by zero.
-    const away = span === 0 ? 0 : (best - item.score) / span;
-    const angle = away * SPREAD * (index % 2 === 0 ? -1 : 1);
+    // Best rank on the axis, then alternating out to either side: -1, +1, -2, +2 ... so the
+    // fan stays balanced and no two passages land on the same dot.
+    const step = Math.ceil(index / 2);
+    const side = index % 2 === 1 ? 1 : -1;
+    const reach = items.length <= 1 ? 0 : step / Math.ceil((items.length - 1) / 2);
+    const angle = reach * SPREAD * side;
     return {
       chunkId: item.chunk_id,
       rank: item.rank,

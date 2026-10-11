@@ -134,6 +134,24 @@ describe("the star dome in the search slot", () => {
     expect(screen.getByRole("img").getAttribute("aria-label")).toContain("đoạn đáp án ở hạng 72");
   });
 
+  it("shows the dome without opening the numbers disclosure", () => {
+    // A closed <details> is content-visibility: hidden in a real browser, so anything inside it
+    // is out of the accessibility tree and off the tab order. jsdom does not implement that, so
+    // querying by role would pass either way: assert the DOM position instead.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    const { container } = render(
+      <Bench
+        bench={start}
+        benchRun="done"
+        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, visible: true })}
+      />,
+    );
+    const dome = container.querySelector('[role="img"]');
+    expect(dome).not.toBeNull();
+    expect(dome?.closest("details")).toBeNull();
+  });
+
   it("draws no dome gold for a followed trap case even when the run sends it", () => {
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
