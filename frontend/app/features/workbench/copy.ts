@@ -62,9 +62,27 @@ export const ENUM_VI: Readonly<Record<string, string>> = {
   cat_duoi: "cắt đuôi",
 };
 
+/** Vòm Sao (vom-sao-v0.1 §7): the drawing never passes itself off as a measurement. */
+export const DOME_VI = {
+  projection: "Vị trí sao theo hạng, không theo khoảng cách thật. Cosine là số đo.",
+  /** ranks[node] is null: the passage exists, this block's ranking does not reach it. */
+  unranked: "Khối này không tìm thấy đoạn đáp án trong xếp hạng của nó.",
+} as const;
+
 const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 /** Vietnamese number: 15.000, 0,83. */
 export const fmt = (value: number) => number.format(value);
+
+const cosine = new Intl.NumberFormat("vi-VN", {
+  minimumFractionDigits: 3,
+  maximumFractionDigits: 3,
+});
+/**
+ * A retrieval score: 0,803. Three decimals, not `fmt`'s two, because neighbouring passages
+ * routinely differ in the third — the committed L3 run's top three are 0,8032 / 0,8004 /
+ * 0,7984, and at two decimals all three read "0,8".
+ */
+export const fmtCosine = (value: number) => cosine.format(value);
 
 const UNIT: Readonly<Record<string, string>> = {
   top_k: "đoạn",

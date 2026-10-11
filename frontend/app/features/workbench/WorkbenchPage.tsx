@@ -256,12 +256,21 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
 
   const firstVisible = run?.cases.find((c) => c.role === "visible") ?? run?.cases[0];
   const followedCase = run?.cases.find((c) => c.id === followed) ?? firstVisible ?? null;
+  const reveal = run?.report?.gold[followedCase?.id ?? ""];
   const benchView =
     run && followedCase && !changed
       ? {
           run,
           followed: followedCase,
-          gold: run.report?.gold[followedCase.id]?.gold_chunks ?? null,
+          // The whole reveal, not just the chunk ids: the dome needs ranks[node]. `visible`
+          // is read here because a live run sends gold for hidden and trap cases too.
+          gold: reveal
+            ? {
+                chunks: reveal.gold_chunks,
+                ranks: reveal.ranks,
+                visible: followedCase.role === "visible",
+              }
+            : null,
         }
       : null;
 
