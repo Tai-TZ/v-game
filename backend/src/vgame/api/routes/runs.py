@@ -50,7 +50,7 @@ HEARTBEAT_S: Final = 15.0
 router = APIRouter(prefix="/runs", tags=["runs"])
 
 
-async def _read_capped(request: Request) -> bytes:
+async def read_capped(request: Request) -> bytes:
     """At most MAX_PAYLOAD_BYTES + 1 bytes: enough for the validator to report P01."""
     body = bytearray()
     async for chunk in request.stream():
@@ -98,7 +98,7 @@ async def create_run(
     except KeyError:
         return _error(status.HTTP_404_NOT_FOUND, LEVEL_NOT_FOUND)
 
-    graph, issues = validate(await _read_capped(request), spec_level)
+    graph, issues = validate(await read_capped(request), spec_level)
     if graph is None:
         return _error(status.HTTP_422_UNPROCESSABLE_CONTENT, GRAPH_INVALID, issues=issues)
 
