@@ -71,4 +71,9 @@ describe("StarDome", () => {
     fireEvent.click(screen.getByRole("button", { name: /Điều 13/ }));
     expect(picked).toEqual([items()[1]?.chunk_id]);
   });
+
+  it("says the positions are a projection, not real coordinates", () => {
+    render(<StarDome items={items()} goldChunks={[]} goldRank={null} showGold />);
+    expect(screen.getByText(/hình chiếu/)).toBeDefined();
+  });
 });

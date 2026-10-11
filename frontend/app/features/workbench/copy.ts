@@ -62,6 +62,9 @@ export const ENUM_VI: Readonly<Record<string, string>> = {
   cat_duoi: "cắt đuôi",
 };
 
+/** Vòm Sao (vom-sao-v0.1 §7): the drawing never passes itself off as a measurement. */
+export const DOME_VI = "Vị trí sao là hình chiếu. Hạng và cosine bên dưới là số thật.";
+
 const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 /** Vietnamese number: 15.000, 0,83. */
 export const fmt = (value: number) => number.format(value);

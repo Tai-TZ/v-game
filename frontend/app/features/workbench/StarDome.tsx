@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type ReactElement } from "react";
 
-import { fmt } from "./copy";
+import { DOME_VI, fmt } from "./copy";
 import type { Fact } from "./schema";
 import { starField, type Star } from "./stardome";
 
@@ -116,6 +116,7 @@ export function StarDome({
           className="w-full max-w-80 rounded-sm border border-line bg-subtle"
         />
       </div>
+      <p className="mt-1 max-w-prose text-xs text-fg-muted">{DOME_VI}</p>
       <ul id={`${id}-stars`} className="sr-only">
         {dome.stars.map((star) => (
           <li key={star.chunkId}>
