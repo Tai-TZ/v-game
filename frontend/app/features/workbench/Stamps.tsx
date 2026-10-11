@@ -35,7 +35,10 @@ export function Stamps({
 
   return (
     <div className="mt-3">
-      <ul role="img" aria-label={label} className="max-w-prose space-y-1">
+      {/* Not role="img": these are the assistant's own sentences, read as text. Giving the
+          list that role also orphaned every <li>, which axe caught on the workbench page. */}
+      <p className="sr-only">{label}</p>
+      <ul className="max-w-prose space-y-1">
         {parts.map((part, index) => (
           <li key={index} className={`rounded-sm border px-2 py-1 text-sm ${LOOK[part.kind]}`}>
             {part.text}

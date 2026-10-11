@@ -231,18 +231,17 @@ describe("the star dome in the search slot", () => {
     // bin. Looking for both on one step makes every citation read as fabricated.
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
-    const { container } = render(
+    render(
       <Bench
         bench={start}
         benchRun="done"
         view={recordedView({ chunks: [], ranks: RANKS, flags: [], visible: true }, "lib-l3-v03")}
       />,
     );
-    const stamps = [...container.querySelectorAll('[role="img"]')]
-      .map((el) => el.getAttribute("aria-label"))
-      .find((label) => label?.includes("câu"));
-    // lib-l3-v03 cites 8b5bf36c, which its packer really did put in the bin.
-    expect(stamps ?? "").not.toContain("bịa");
+    // lib-l3-v03 cites 8b5bf36c, which its packer really did put in the bin, so the stamp
+    // summary says sourced and nothing else. ("bịa" also appears in a grading criterion, so
+    // the whole page's text is too blunt an instrument here.)
+    expect(screen.getByText(/^\d+ câu có nguồn$/)).toBeDefined();
   });
 
   it("shows the context bin for the packer slot, with the run's own token numbers", () => {

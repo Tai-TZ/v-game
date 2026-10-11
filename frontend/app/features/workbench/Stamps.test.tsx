@@ -6,16 +6,14 @@ import { Stamps } from "./Stamps";
 afterEach(cleanup);
 
 describe("Stamps", () => {
-  it("counts the sourced and the unsourced sentences for a screen reader", () => {
+  it("summarises the sentence kinds for a screen reader, without posing as a picture", () => {
     render(<Stamps answer="Nộp đơn [ab12cd34]. Bạn nên hỏi thêm." included={["ab12cd34"]} />);
-    expect(screen.getByRole("img").getAttribute("aria-label")).toBe(
-      "1 câu có nguồn, 1 câu không nguồn",
-    );
+    expect(screen.getByText("1 câu có nguồn, 1 câu không nguồn")).toBeDefined();
   });
 
   it("names a fabricated citation as such, with the id the model invented", () => {
     render(<Stamps answer="Theo Điều 47 [zz99zz99]." included={[]} />);
-    expect(screen.getByRole("img").getAttribute("aria-label")).toContain("1 câu trích nguồn bịa");
+    expect(screen.getByText(/1 câu trích nguồn bịa/)).toBeDefined();
     expect(screen.getByText(/zz99zz99/)).toBeDefined();
   });
 
