@@ -37,6 +37,34 @@ function citeMissingRun(diagnosis: object[] = []): RunView {
   return run;
 }
 
+/** The short L1 run, every case passing, but over the token budget: whyCase asks about it. */
+function overBudgetRun(): RunView {
+  const frames = short.slice(0, finishedAt).map((f) =>
+    f.event === "run.scored"
+      ? frame(f.id, "run.scored", {
+          score: {
+            stars: 1,
+            s1: true,
+            s2: false,
+            s3: false,
+            normal_passed: 1,
+            normal_total: 1,
+            traps_passed: 1,
+            traps_total: 1,
+            tokens: 99000,
+            budget: 15000,
+          },
+        })
+      : f,
+  );
+  const run = replay([
+    ...frames,
+    frame(99, "run.finished", { report: { gold: {}, diagnosis: [] }, models: {} }),
+  ]);
+  if (!run) throw new Error("no run");
+  return run;
+}
+
 function show(run: RunView, slip: Slip | null) {
   const bench = starterBench(l1);
   if (!bench) throw new Error("starter");
@@ -101,9 +129,14 @@ describe("GuessSlip", () => {
       failing: [5, 9],
       bets: { "lib-l1-v01": { pass: false, confidence: "high" } },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Xóa phiếu" }));
+    const clear = screen.getByRole("button", { name: "Xóa phiếu" });
+    clear.focus();
+    fireEvent.click(clear);
     expect(last).toEqual(EMPTY_SLIP);
-    expect(screen.queryByRole("button", { name: "Xóa phiếu" })).toBeNull();
+    // Goes disabled instead of unmounting, so the keyboard does not fall back to <body> and
+    // have to tab through the whole brief and bench again to reach Mở ca.
+    expect(clear).toHaveProperty("disabled", true);
+    expect(document.activeElement).toBe(clear);
   });
 });
 
@@ -152,6 +185,20 @@ describe("Results with the guess loop", () => {
       "disabled",
       true,
     );
+  });
+
+  it("does not leave the right reason first in the budget menu", () => {
+    // The menu exists because picking a reason from a list transfers better than reading one
+    // (Johnson & Mayer 2010, L1 §11), and that only holds while the answer's position is not a
+    // tell. The budget menu has no case to rotate with, so seeding the rotation with the case
+    // number alone left its answer first every single time.
+    show(overBudgetRun(), null);
+    const menu = screen.getByRole("group", { name: "Vì sao lượt này vượt ngân sách?" });
+    const answer = "Kéo nhiều đoạn quá và dặn trả lời dài, nên thùng gần đầy ở mọi câu";
+    // The radio itself is sr-only inside its label, so read the labels in DOM order.
+    const shown = [...menu.querySelectorAll("label")].map((l) => l.textContent.trim());
+    expect(shown).toContain(answer);
+    expect(shown[0]).not.toBe(answer);
   });
 
   it("lets the player skip the menu straight to the diagnosis", () => {

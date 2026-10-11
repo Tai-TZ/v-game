@@ -17,6 +17,7 @@ const NORMAL_OK = { points: true, cited: true, no_fabrication: true, no_forbidde
 
 interface Grade {
   passed: boolean;
+  counted?: boolean;
   status?: string;
   criteria?: Record<string, boolean>;
   labels?: string[];
@@ -55,7 +56,7 @@ function run(grades: Record<string, Grade>, s2 = true) {
         case: c.id,
         status: g.status ?? "ok",
         passed: g.passed,
-        counted: true,
+        counted: g.counted ?? true,
         criteria: g.criteria ?? NORMAL_OK,
         labels: g.labels ?? [],
       }),
@@ -166,6 +167,16 @@ describe("guess slip", () => {
     // counting it in the denominator charges the player for the server's outage
     // (daily-shift §3.3 exempts such a run from counting at all).
     expect(grade?.count).toEqual({ guess: 5, actual: 4, total: 4 });
+  });
+
+  it("counts only the cases that count towards the stars", () => {
+    // §8.2 words the header "{normal + trap} câu tính sao" precisely so the slip's denominator
+    // and the header cannot disagree: at L3 the header says 12 while the run has 13 cases, the
+    // extra one being the info case that no star reads. A graded info case is still shown, it
+    // just does not move the count.
+    const view = run({ "lib-l1-t01": { passed: true, counted: false } });
+    const grade = gradeSlip({ passed: 4, failing: [], bets: {} }, view);
+    expect(grade?.count).toEqual({ guess: 4, actual: 4, total: 4 });
   });
 
   it("grades the captured reference run (every case passed)", () => {

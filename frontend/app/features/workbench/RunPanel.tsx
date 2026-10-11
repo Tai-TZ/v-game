@@ -251,10 +251,16 @@ function Editing({
         </div>
       )}
 
-      {/* Locked while the graph is out: the slip leaves with this run. */}
-      <fieldset disabled={sending} className="min-w-0">
-        <GuessSlip env={env} slip={slip} onChange={onSlip} />
-      </fieldset>
+      {/* Collapsed so the aside's resting height keeps Mở ca on the first screen at 1280x800
+          (§2.1). Locked while the graph is out: the slip leaves with this run. */}
+      <details className="min-w-0">
+        <summary className="min-h-11 cursor-pointer list-none text-sm font-semibold underline underline-offset-4">
+          Đoán trước khi mở ca
+        </summary>
+        <fieldset disabled={sending} className="min-w-0">
+          <GuessSlip env={env} slip={slip} onChange={onSlip} />
+        </fieldset>
+      </details>
 
       <button
         type="button"

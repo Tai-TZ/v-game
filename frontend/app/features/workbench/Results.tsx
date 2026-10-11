@@ -181,6 +181,10 @@ export function Results({
         <WhyMenu
           c={ask.c}
           menu={ask.menu}
+          // The failed case's number, or the run's case count for the budget menu, which has
+          // no case of its own. +1 so a seed divisible by the option count cannot land the
+          // answer first.
+          turn={(ask.c?.n ?? run.cases.length) + 1}
           onAnswer={() => setWhy("answered")}
           onSkip={() => setWhy("skipped")}
         />

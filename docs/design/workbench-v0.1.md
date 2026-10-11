@@ -587,7 +587,7 @@ Lệnh: `npm run check`, `npm run build`, `npm run test:e2e` (trong `frontend/`)
 | Mục | v0.1 | Thêm khi |
 |---|---|---|
 | Xem trước tất định (đèn pin 3 câu mẫu, dải đoạn, thanh thùng ước tính) | không có | backend có endpoint xem trước không gọi AI |
-| Phiếu đoán, menu "Vì sao câu #N sai?", 3 gợi ý tăng dần | chẩn đoán hiện thẳng | sau khi chơi thử thấy người chơi không đọc chẩn đoán |
+| ~~Phiếu đoán, menu "Vì sao câu #N sai?"~~, 3 gợi ý tăng dần | ~~chẩn đoán hiện thẳng~~ · **phiếu đoán và menu đã làm ở đợt B1, xem §19 (sửa 2026-10-11)**; 3 gợi ý vẫn chưa có | 3 gợi ý: đợt B4 (roadmap-v0.4 §5) |
 | Hiện trường, Tua lại, cờ thế giới (áp phích, tờ đơn, hàng người), chú Bảy | không có | có cảnh 3D cho Thư viện |
 | Bàn thợ 3D, camera bám, giữ Space tua nhanh | DOM | sau khi bản DOM được duyệt |
 | Lật mặt sau: đoạn LangGraph, X-quang prompt, tải JSON/Python | chỉ "Xem cấu hình JSON" | backend trả đoạn compiler sinh và prompt đã ghép |
@@ -733,3 +733,47 @@ Lỗi thật có test hỏng trước rồi mới sửa: unit `Results.test.tsx`
 Không gọi Gemini thật ở vòng này: mọi thay đổi là logic và chữ phía client, kiểm bằng unit, e2e mock và ảnh chụp bản build với API mock (luồng tổng hợp theo hình của `grading.py`).
 
 Ảnh chụp lại ở `scratchpad/workbench/fix3/shots/` (1280 và 375: thẻ câu L2 bị cắt đôi, chẩn đoán L3 hai khe tìm với "Xem ở Lược dao", ghi chú aside sau câu `llm_error`, "Thử gắn Tủ ngăn kéo", bước sửa của Kính lúp, vị trí sau Back, hộp `lost`, thanh tải trên trang khu, dòng "đã chấm sao nhưng…", link bảng câu, cancel hỏng), nhật ký ở `fix3/log.txt`; axe sạch trên trang kết quả L3 ở cả hai viewport, không cuộn ngang.
+
+---
+
+## 19. Đợt B1: phiếu đoán, cược tự tin, menu lý do (2026-10-11)
+
+Roadmap-v0.4 §5 hàng **B1** (N1 phiếu đoán, N19 cược tự tin, N6 trạng thái khối, menu "Vì sao câu #N sai?" của [L1 §11](../content/scenarios/library-l1-grounded-citation.md#11-chẩn-đoán-và-gợi-ý)). §12 trước đây xếp hai mục đầu vào "Cắt khỏi v0.1"; hàng đó đã sửa.
+
+### 19.1 Chỗ đặt
+
+Phiếu nằm trong `<details>` **đóng sẵn** ngay trên nút **Mở ca**, nhãn "Đoán trước khi mở ca". Đóng sẵn vì aside có `lg:max-h-[calc(100dvh-3rem)]`: mở sẵn thì phiếu cao thêm khoảng 600 px và nút **Mở ca** rơi khỏi màn đầu ở 1280×800, tức mất đúng điều §2.1 cam kết. Cùng khuôn với "Xem cấu hình JSON" mà aside đã dùng. `<summary>` là tiêu đề của phiếu, nên bên trong phiếu không lặp lại tiêu đề đó.
+
+Phiếu bị khoá (`<fieldset disabled>`) trong lúc đồ thị đang gửi: phiếu đi cùng lượt chạy đó.
+
+### 19.2 Chữ
+
+| Chỗ | Chữ |
+|---|---|
+| Nhãn mở phiếu | "Đoán trước khi mở ca" |
+| Dòng dưới | "Không bắt buộc, không tính sao. Phiếu được chấm khi lượt chạy xong." |
+| Nhóm đếm | "Đạt mấy/{normal + trap}?" — **không** cộng `case_counts.info`, để con số này và "{n} câu tính sao" ở §8.2 không vênh nhau (L3: phiếu hỏi /12, lượt chạy 13 ca) |
+| Nhóm câu mẫu | "Câu #{n} · Câu mẫu", rồi câu hỏi (`line-clamp-2`), chip "Đạt" / "Trượt" |
+| Mức tự tin | "Mức chắc", ba mức `CONFIDENCE_VI` |
+| Nhóm câu còn lại | "Câu nào trượt?", dòng "Câu ẩn và câu bẫy chỉ hiện số.", chip "#{n}" (có `sr-only` "Câu") |
+| Xoá | "Xóa phiếu" — luôn hiện, `disabled` khi phiếu trống (tháo nút ra sẽ làm rơi focus về `<body>`) |
+| Kết quả | "Phiếu đoán của bạn"; "Bạn đoán {guess} câu đạt; thực tế {actual}/{total} câu đạt." + "Khớp." hoặc "Lệch {n} câu."; "Đoán đúng {right}/{n} câu đã đoán."; "{n} câu không chạy xong vì phía máy chủ nên không chấm." |
+| Thẻ Bất ngờ | "Bất ngờ ở câu #{n}"; "Bạn chắc câu này sẽ {đạt\|trượt}, nhưng nó {trượt\|đạt}."; "Bằng chứng từ lượt chạy: …"; link "Xem bằng chứng ở câu #{n}" |
+| Menu lý do | legend "Vì sao câu #{n} sai?" hoặc "Vì sao lượt này vượt ngân sách?"; nút "Xem chẩn đoán luôn"; `WHY_MENU` trong `copy.ts` |
+
+`actual`/`total` đếm các ca **tính sao đã chạy xong**: bỏ ca `info` (như §8.2) và bỏ ca máy chủ không chạy xong ([ca trực §3.3](../content/scenarios/daily-shift.md#33-ánh-xạ-sang-engine) miễn cả lượt đó).
+
+Thứ tự lựa chọn trong menu xoay theo `turn` do chỗ gọi truyền: số câu trượt, hoặc số ca của lượt chạy cho menu ngân sách (menu này không có câu nào), cộng 1 để hạt giống chia hết cho số lựa chọn không đẩy đáp án lên đầu. Đáp án luôn là `options[0]`; nếu nó đứng đầu mọi lần thì menu mất tác dụng mà Johnson & Mayer 2010 nói tới.
+
+### 19.3 Điểm lệch với kịch bản, chờ chủ dự án chốt
+
+1. **Ba mức tự tin** thay cho "Chắc / Đoán" hai mức của [L1 §7](../content/scenarios/library-l1-grounded-citation.md#7-bước-đoán-1-click-trước-mở-ca). Nhãn là superset, nhưng chỉ mức cao nhất bật thẻ Bất ngờ, nên mức giữa im lặng. Luật hoàn quỹ của L1 §7 lại đọc **một** cờ "Chắc" cho cả phiếu, trong khi ở đây mức tự tin gắn theo từng câu mẫu — hai hình dạng khác nhau, và hình dạng này đã được lưu xuống `localStorage`.
+2. **Một phiếu chung** thay cho bốn phiếu riêng theo nhịp mà L1 §7 ghi nguyên văn; hai trong bốn phiếu chưa có.
+3. **Chưa có điểm hiệu chỉnh theo thời gian**, chỉ có số đoán đúng mỗi lượt. Cần lịch sử của B3.
+
+### 19.4 Chưa làm
+
+- Thanh việc vô định trong khe (§7, §8.7, §9) đã bỏ cùng đợt này nhưng ba mục đó vẫn mô tả nó; chưa có affordance thay thế trong khe.
+- `WHY_MENU` là chữ chép từ L1 §11, nên thuộc diện §13.4 (chữ chép có thể lệch khi kịch bản đổi).
+- Lượt chạy mất kết nối rồi bấm "Chạy lại" thì phiếu của lượt đó mất, không có cảnh báo.
+

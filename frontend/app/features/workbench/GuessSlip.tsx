@@ -61,25 +61,21 @@ export function GuessSlip({
 }) {
   const id = useId();
   const { level } = env;
-  const total = level.case_counts.normal + level.case_counts.trap + level.case_counts.info;
+  // normal + trap, not + info: workbench-v0.1 §8.2 words the header the same way so the
+  // slip's denominator and "{n} câu tính sao" cannot disagree (L3: header 12, run 13).
+  const total = level.case_counts.normal + level.case_counts.trap;
   const samples = level.visible_cases;
   const others = Array.from({ length: total - samples.length }, (_, i) => samples.length + i + 1);
   const bet = (caseId: string, next: Bet) =>
     onChange({ ...slip, bets: { ...slip.bets, [caseId]: next } });
 
   return (
-    <section
-      aria-labelledby={`${id}-title`}
-      className="space-y-4 rounded-md border border-line p-4"
-    >
-      <div>
-        <h3 id={`${id}-title`} className="text-base font-bold">
-          Đoán trước khi mở ca
-        </h3>
-        <p className="mt-1 text-sm text-fg-muted">
-          Không bắt buộc, không tính sao. Phiếu được chấm khi lượt chạy xong.
-        </p>
-      </div>
+    // The <details> summary that opens this is its heading (RunPanel), so the slip itself
+    // repeats neither the title nor an aria-label: two identical headings read twice.
+    <section className="mt-2 space-y-4 rounded-md border border-line p-4">
+      <p className="text-sm text-fg-muted">
+        Không bắt buộc, không tính sao. Phiếu được chấm khi lượt chạy xong.
+      </p>
 
       <fieldset>
         <legend className="text-sm font-medium">Đạt mấy/{total}?</legend>
@@ -168,15 +164,16 @@ export function GuessSlip({
         </fieldset>
       )}
 
-      {!isEmptySlip(slip) && (
-        <button
-          type="button"
-          onClick={() => onChange(EMPTY_SLIP)}
-          className={buttonClass("inline")}
-        >
-          Xóa phiếu
-        </button>
-      )}
+      {/* Stays mounted and goes disabled rather than unmounting: its own click used to remove
+          the element holding focus, dropping the keyboard back to <body>. */}
+      <button
+        type="button"
+        onClick={() => onChange(EMPTY_SLIP)}
+        disabled={isEmptySlip(slip)}
+        className={buttonClass("inline")}
+      >
+        Xóa phiếu
+      </button>
     </section>
   );
 }
@@ -270,16 +267,21 @@ function Surprise({ p }: { p: Prediction }) {
 
 /**
  * "Vì sao câu #N sai?" (L1 §11): a choice before the diagnosis; a wrong one costs nothing.
- * The answer is `options[0]`; the order turns with the case number so it is not always first.
+ * The answer is `options[0]`; `turn` rotates the order so it is not always in the same place.
+ * The caller passes the seed because the budget menu has no case to turn with: seeded with 0
+ * it left the answer first every single time, which is the one thing the menu must not do.
  */
 export function WhyMenu({
   c,
   menu,
+  turn,
   onAnswer,
   onSkip,
 }: {
   c: CaseView | null;
   menu: Menu;
+  /** Rotation seed; any non-negative integer that varies between menus. */
+  turn: number;
   onAnswer: () => void;
   onSkip: () => void;
 }) {
@@ -290,7 +292,7 @@ export function WhyMenu({
     if (choice !== null) feedback.current?.focus();
   }, [choice]);
   const size = menu.options.length;
-  const order = menu.options.map((_, i) => (i + (c?.n ?? 0)) % size);
+  const order = menu.options.map((_, i) => (i + turn) % size);
   return (
     <fieldset className="mt-3 max-w-prose rounded-md border border-line p-4">
       <legend className="px-1 font-semibold">

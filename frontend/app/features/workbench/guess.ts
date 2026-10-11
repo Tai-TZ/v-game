@@ -65,10 +65,12 @@ export function gradeSlip(slip: Slip, run: RunView): SlipGrade | null {
       ...(bet && { confidence: bet.confidence }),
     });
   }
-  // The count is scored over the cases that actually ran. A case the daily cap or an outage
-  // left unanswered cannot have passed, so keeping it in the denominator would charge the
-  // player for the server's trouble — daily-shift §3.3 exempts such a run entirely.
-  const graded = run.cases.filter((c) => c.graded && !skipped.has(c.id));
+  // The count is scored over the cases the stars read: those that ran, minus the info cases.
+  // A case the daily cap or an outage left unanswered cannot have passed, so keeping it in the
+  // denominator would charge the player for the server's trouble (daily-shift §3.3 exempts
+  // such a run entirely); and workbench-v0.1 §8.2 words the header "{normal + trap} câu tính
+  // sao" precisely so this denominator cannot disagree with it.
+  const graded = run.cases.filter((c) => c.graded?.counted && !skipped.has(c.id));
   const actual = graded.filter((c) => c.graded?.passed).length;
   return {
     count: slip.passed === null ? null : { guess: slip.passed, actual, total: graded.length },

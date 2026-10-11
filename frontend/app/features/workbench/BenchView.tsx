@@ -206,7 +206,7 @@ function Connector({ label }: { label: string }) {
 
 /** A radio drawn as a chip: the span after a `peer sr-only` input. */
 export const CHIP =
-  "flex h-11 items-center rounded-sm border border-fg-muted bg-surface px-3 text-sm peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand peer-disabled:cursor-not-allowed peer-disabled:opacity-60";
+  "flex h-11 min-w-11 items-center justify-center rounded-sm border border-fg-muted bg-surface px-3 text-sm peer-checked:border-brand peer-checked:bg-brand peer-checked:text-on-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand peer-disabled:cursor-not-allowed peer-disabled:opacity-60";
 
 /** Each N6 state has its own icon and colour token besides its words. */
 const STATE_LOOK: Readonly<
