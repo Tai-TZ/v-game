@@ -100,6 +100,7 @@ answered. Star 2 budgets are calibrated on the primary model only. Rotate the ke
 | `POST /api/runs?level={level_id}`  | body = graph JSON; `202 {run_id, created, issues}`                      |
 | `GET /api/runs/{run_id}/events`    | SSE stream; send `Last-Event-ID: n` to replay events after `n`          |
 | `POST /api/runs/{run_id}/cancel`   | `202`; the run ends with `run.failed` (`cancelled`)                     |
+| `POST /api/preview/retrieval`      | body = graph JSON; what the retrievers would pull for one sample case   |
 | `GET /api/quota`                   | `{cap, used, remaining, resets_at, estimate, reserve_left, learner_daily}` |
 | `POST /api/quota/refund`           | body `{run_id}`; `200 {run_id, refunded, reserve_left}`                 |
 
@@ -125,6 +126,14 @@ its `case.graded`. `GET /api/quota` reads the cap, the shared reserve R and the 
 `scope=mau` run whose 3 samples all passed, and never more than its non-replayed calls; any
 other run gets `409 {detail, code}` (`not_finished`, `not_sample_run`, `samples_not_passed`,
 `already_refunded`, `reserve_empty`), an unknown run `404`.
+
+`POST /api/preview/retrieval?level={id}&case={case_id}` answers "what would this bench pull?"
+from the shipped index alone: no Gemini call, no `DailyCap`, no run, no quota. The body is the
+same graph `POST /api/runs` takes and goes through the same validator and compiler, so a preview
+can never use a configuration the level forbids. Only a **sample** case may be previewed (404
+otherwise): previewing a hidden case would hand the player a way to tune against the hidden set.
+Returns one `retrieved` fact per retriever node, keyed by node id; `fusion` and `rerank` need the
+upstream lists and are not covered yet.
 
 Content: zones in `src/vgame/content/data/zones.json`, levels in `src/vgame/engine/levels/*.json`
 (validated at load), corpus and golden cases in `docs/content`.
