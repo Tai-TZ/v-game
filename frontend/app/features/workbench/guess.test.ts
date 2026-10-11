@@ -162,6 +162,10 @@ describe("guess slip", () => {
     const grade = gradeSlip({ passed: 5, failing: [3], bets: {} }, view);
     expect(grade?.unfinished).toBe(1);
     expect(grade?.predictions.some((p) => p.c.n === 3)).toBe(false);
+    // ...including out of the count: a case the daily cap never ran cannot have passed, so
+    // counting it in the denominator charges the player for the server's outage
+    // (daily-shift §3.3 exempts such a run from counting at all).
+    expect(grade?.count).toEqual({ guess: 5, actual: 4, total: 4 });
   });
 
   it("grades the captured reference run (every case passed)", () => {

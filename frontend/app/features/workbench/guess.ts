@@ -65,9 +65,13 @@ export function gradeSlip(slip: Slip, run: RunView): SlipGrade | null {
       ...(bet && { confidence: bet.confidence }),
     });
   }
-  const actual = run.cases.filter((c) => c.graded?.passed).length;
+  // The count is scored over the cases that actually ran. A case the daily cap or an outage
+  // left unanswered cannot have passed, so keeping it in the denominator would charge the
+  // player for the server's trouble — daily-shift §3.3 exempts such a run entirely.
+  const graded = run.cases.filter((c) => c.graded && !skipped.has(c.id));
+  const actual = graded.filter((c) => c.graded?.passed).length;
   return {
-    count: slip.passed === null ? null : { guess: slip.passed, actual, total: run.cases.length },
+    count: slip.passed === null ? null : { guess: slip.passed, actual, total: graded.length },
     predictions,
     surprises: predictions.filter((p) => p.confidence === "high" && !p.right),
     unfinished: skipped.size,
