@@ -13,6 +13,7 @@ import {
   StarIcon,
 } from "~/components/ui/icons";
 
+import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
 import {
   domain,
@@ -710,10 +711,14 @@ function StepState({
   const retrieved = step.facts?.find(
     (f): f is Extract<Fact, { kind: "retrieved" }> => f.kind === "retrieved",
   );
+  const packed = step.facts?.find((f): f is Extract<Fact, { kind: "pack" }> => f.kind === "pack");
   return (
     <div className="mt-3 border-t border-line pt-3 text-sm">
       <p className="font-semibold">{stepStatusText(step.status, step.ms)}</p>
       {step.summary && <p className="mt-1 max-w-prose text-fg-muted">{step.summary}</p>}
+      {packed && (
+        <ContextBin tokens={packed.tokens} included={packed.included} dropped={packed.dropped} />
+      )}
       {retrieved && (
         <StarDome
           items={retrieved.items}

@@ -122,20 +122,26 @@ describe("slot states (N6)", () => {
   });
 });
 
+/** The slot now holds two pictures: the bin and the dome. Pick the dome by what it says. */
+const domeLabel = (container: HTMLElement) =>
+  [...container.querySelectorAll('[role="img"]')]
+    .map((el) => el.getAttribute("aria-label"))
+    .find((label) => label?.includes("đoạn đã kéo"));
+
 describe("the star dome in the search slot", () => {
   const RANKS = { vs: 72 };
 
   it("shows the answer passage's rank on the dome of the block that ranked it", () => {
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
-    render(
+    const { container } = render(
       <Bench
         bench={start}
         benchRun="done"
         view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, visible: true })}
       />,
     );
-    expect(screen.getByRole("img").getAttribute("aria-label")).toContain("đoạn đáp án ở hạng 72");
+    expect(domeLabel(container)).toContain("đoạn đáp án ở hạng 72");
   });
 
   it("shows the dome without opening the numbers disclosure", () => {
@@ -177,21 +183,39 @@ describe("the star dome in the search slot", () => {
         ],
       },
     };
-    render(<Bench bench={start} benchRun="stale" preview={preview} />);
-    expect(screen.getByRole("img").getAttribute("aria-label")).toBe("1 đoạn đã kéo");
+    const { container } = render(<Bench bench={start} benchRun="stale" preview={preview} />);
+    expect(domeLabel(container)).toBe("1 đoạn đã kéo");
     expect(screen.getByText(/Điều 47.*hạng 1.*0,910/)).toBeDefined();
+  });
+
+  it("shows the context bin for the packer slot, with the run's own token numbers", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    const { container } = render(
+      <Bench
+        bench={start}
+        benchRun="done"
+        view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, visible: true })}
+      />,
+    );
+    const bin = [...container.querySelectorAll('[role="img"]')].find((el) =>
+      el.getAttribute("aria-label")?.startsWith("Thùng chứa"),
+    );
+    expect(bin).toBeDefined();
+    // The recorded L3 run packs into a 3.000-token budget.
+    expect(bin?.getAttribute("aria-label")).toMatch(/trên 3\.000 token/);
   });
 
   it("draws no dome gold for a followed trap case even when the run sends it", () => {
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
-    render(
+    const { container } = render(
       <Bench
         bench={start}
         benchRun="done"
         view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, visible: false })}
       />,
     );
-    expect(screen.getByRole("img").getAttribute("aria-label")).toBe("3 đoạn đã kéo");
+    expect(domeLabel(container)).toBe("3 đoạn đã kéo");
   });
 });

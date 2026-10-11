@@ -73,6 +73,12 @@ const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 /** Vietnamese number: 15.000, 0,83. */
 export const fmt = (value: number) => number.format(value);
 
+/** Thùng Context (gameplay-direction §3): the bin says what it measured and what it did not. */
+export const BIN_VI = {
+  overflow: "Nắp không đóng được: thùng xin nhiều hơn ngân sách cho phép.",
+  counted: "Thùng đo tổng token; mỗi khối là một đoạn, không theo cỡ của đoạn đó.",
+} as const;
+
 const cosine = new Intl.NumberFormat("vi-VN", {
   minimumFractionDigits: 3,
   maximumFractionDigits: 3,
