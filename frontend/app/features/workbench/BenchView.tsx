@@ -102,6 +102,9 @@ export interface BenchRunView {
   gold: SlotGold | null;
 }
 
+/** Retrieved facts by node id, from the deterministic preview rather than from a run. */
+export type Preview = Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>>;
+
 interface BenchProps {
   env: Env;
   bench: Bench;
@@ -114,6 +117,8 @@ interface BenchProps {
   view: BenchRunView | null;
   /** The bench against the run on show (N6 slot states). */
   benchRun: BenchRun;
+  /** What the bench would pull right now; drawn when no run step covers the slot. */
+  preview: Preview | null;
   saved: boolean;
   discarded: boolean;
 }
@@ -274,6 +279,7 @@ function Slot({
   highlight,
   view,
   benchRun,
+  preview,
 }: BenchProps & { type: BlockType }) {
   const { level, blocks } = env;
   const id = nodeIds(level)[type];
@@ -382,6 +388,11 @@ function Slot({
       {type === "chunker" && view && <Ingestion run={view.run} node={id} />}
       <SlotIssues env={env} graph={graph} issues={own} />
       {step && <StepState step={step} node={id} toy={toy} gold={view?.gold ?? null} />}
+      {/* No step for this slot yet, or the bench has moved on from the run: the dome follows
+          the bench. */}
+      {!step && preview?.[id] && (
+        <StarDome items={preview[id].items} goldChunks={[]} goldRank={null} showGold={false} />
+      )}
     </section>
   );
 }

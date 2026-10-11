@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
 import { BenchSection, type BenchRunView, type SlotGold } from "./BenchView";
 import type { BenchRun } from "./run";
+import type { Fact } from "./schema";
 import type { EventType } from "./schema";
 import { frame, readText, replay, testEnv } from "./test-fixtures";
 import { validateGraph } from "./validate";
@@ -26,11 +27,13 @@ function Bench({
   highlight = null,
   benchRun = "none",
   view = null,
+  preview = null,
 }: {
   bench: Bench;
   highlight?: "chunker" | null;
   benchRun?: BenchRun;
   view?: BenchRunView | null;
+  preview?: Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>> | null;
 }) {
   const graph = graphFromBench(l3, bench);
   return (
@@ -43,6 +46,7 @@ function Bench({
       issues={validateGraph(l3, graph)}
       highlight={highlight}
       view={view}
+      preview={preview}
       benchRun={benchRun}
       saved={false}
       discarded={false}
@@ -150,6 +154,32 @@ describe("the star dome in the search slot", () => {
     const dome = container.querySelector('[role="img"]');
     expect(dome).not.toBeNull();
     expect(dome?.closest("details")).toBeNull();
+  });
+
+  it("draws the preview when the bench no longer matches the run on show", () => {
+    // Editing the bench makes the last run's facts describe a configuration that is not on
+    // screen any more. The dome follows the bench, not the stale run.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    const preview = {
+      vs: {
+        kind: "retrieved" as const,
+        items: [
+          {
+            chunk_id: "aaaa1111",
+            rank: 1,
+            score: 0.91,
+            doc_id: "qcdt-2024",
+            dieu: 47,
+            khoan: [2],
+            hieu_luc: true,
+          },
+        ],
+      },
+    };
+    render(<Bench bench={start} benchRun="stale" preview={preview} />);
+    expect(screen.getByRole("img").getAttribute("aria-label")).toBe("1 đoạn đã kéo");
+    expect(screen.getByText(/Điều 47.*hạng 1.*0,910/)).toBeDefined();
   });
 
   it("draws no dome gold for a followed trap case even when the run sends it", () => {

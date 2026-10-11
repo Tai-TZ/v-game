@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { describePostError, newKey } from "./api";
+import { describePostError, newKey, previewRetrieval } from "./api";
 
 const headers = (entries: Record<string, string> = {}) => new Headers(entries);
 const NOW = Date.parse("2026-10-08T12:00:00Z");
@@ -150,5 +150,54 @@ describe("newKey", () => {
     expect(a).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
     expect(a).toHaveLength(32);
     expect(newKey()).not.toBe(a);
+  });
+});
+
+describe("previewRetrieval", () => {
+  const graph = '{"schema":1,"nodes":[],"edges":[]}';
+  const fact = {
+    kind: "retrieved",
+    items: [
+      {
+        chunk_id: "f22a1df7",
+        rank: 1,
+        score: 0.8032,
+        doc_id: "qcdt-2024",
+        dieu: 53,
+        khoan: [1],
+        hieu_luc: true,
+      },
+    ],
+  };
+
+  function stubFetch(status: number, body: unknown) {
+    const calls: { url: string; init: RequestInit | undefined }[] = [];
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve(new Response(JSON.stringify(body), { status }));
+    });
+    return calls;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("returns one retrieved fact per retriever node", async () => {
+    const calls = stubFetch(200, { case: "lib-l1-v01", nodes: { vs: fact } });
+    const result = await previewRetrieval("grounded-citation", "lib-l1-v01", graph);
+    expect(result.ok && result.nodes.vs?.items[0]?.dieu).toBe(53);
+    expect(calls[0]?.url).toContain(
+      "/api/preview/retrieval?level=grounded-citation&case=lib-l1-v01",
+    );
+    expect(calls[0]?.init?.body).toBe(graph);
+  });
+
+  it("fails softly: a preview is a convenience, never a reason to block the bench", async () => {
+    stubFetch(404, { detail: "Chỉ xem trước được câu mẫu của màn này." });
+    expect((await previewRetrieval("grounded-citation", "lib-l1-h01", graph)).ok).toBe(false);
+  });
+
+  it("rejects a body the server did not shape as facts", async () => {
+    stubFetch(200, { case: "lib-l1-v01", nodes: { vs: { kind: "retrieved", items: [{}] } } });
+    expect((await previewRetrieval("grounded-citation", "lib-l1-v01", graph)).ok).toBe(false);
   });
 });
