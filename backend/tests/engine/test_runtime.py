@@ -33,12 +33,14 @@ from vgame.engine.levels import LevelSpec
 from vgame.engine.replay import ReplayStore
 from vgame.engine.types import (
     BudgetExceededError,
+    Diagnosis,
     EngineEvent,
     LLMCallError,
     LLMClient,
     LLMRequest,
     LLMResponse,
     PublicCase,
+    RunScope,
     Usage,
 )
 
@@ -246,6 +248,81 @@ def test_daily_cap_skips_cases_that_have_not_started() -> None:
     assert steps(events, "c1")[-1] == ("llm", "budget")
     assert steps(events, "c4") == []
     assert steps(events, "c5") == []
+
+
+def test_daily_cap_skips_carry_reason_daily_cap() -> None:
+    # Roadmap B0: the client must tell a run the server's DailyCap cut short (not counted as
+    # a star attempt) from cases the player's own graph ran out of calls on.
+    events = run(L1_STARTER, cs=cases(5), llm=DailyCapHit())
+    reasons = {e["case"]: e.get("reason") for e in events if e["type"] == "case.graded"}
+    assert reasons == {f"c{i}": "daily_cap" for i in range(1, 6)}
+
+
+def test_case_call_cap_skip_has_no_reason() -> None:
+    events = run(L1_STARTER, budget=RunBudget(max_calls_per_case=0))
+    graded_events = [e for e in events if e["type"] == "case.graded"]
+    assert [e["status"] for e in graded_events] == ["skipped_budget"]
+    assert "reason" not in graded_events[0]
+
+
+def test_sample_scope_runs_only_visible_cases_and_awards_no_stars() -> None:
+    # N2 "Thử 3 câu mẫu": the three visible cases only, never a star score.
+    deps = make_deps()
+    compiled = compile_graph(GraphPayload.model_validate(L1_STARTER), L1, deps)
+    events: list[EngineEvent] = []
+    cs = cases(5, hidden=(4, 5))
+    evaluator = RecordingEvaluator()
+    asyncio.run(runtime.run_level("r1", compiled, cs, deps, evaluator, events.append, scope="mau"))
+    assert_invariants(events)
+    assert set(graded(events)) == {"c1", "c2", "c3"}
+    assert [t.case.id for t in evaluator.traces] == ["c1", "c2", "c3"]
+    assert "BÍ MẬT" not in json.dumps(events, ensure_ascii=False)
+    started, finished = events[0], events[-1]
+    assert started["type"] == "run.started"
+    assert started.get("scope") == "mau"
+    assert [c["id"] for c in started["cases"]] == ["c1", "c2", "c3"]
+    assert not [e for e in events if e["type"] == "run.scored"]
+    assert finished["type"] == "run.finished"
+    assert finished.get("scope") == "mau"
+
+
+# daily-shift §3.1: a sample run pays for 3 cases, the token budget is for the full case set, so
+# the run-level budget.exceeded line (the only diagnosis with ``case`` None, grading.py) would
+# judge a sample run against a bill it never ran up.
+_CASE_LINE: Diagnosis = {"case": "c1", "flag": "cite_missing", "message_vi": "Câu 1 thiếu trích."}
+_RUN_LINE: Diagnosis = {
+    "case": None,
+    "flag": "budget.exceeded",
+    "message_vi": "Lượt này vượt ngân sách token.",
+}
+
+
+def _diagnosis_of(scope: RunScope | None) -> list[Diagnosis]:
+    deps = make_deps()
+    compiled = compile_graph(GraphPayload.model_validate(L1_STARTER), L1, deps)
+    events: list[EngineEvent] = []
+    evaluator = RecordingEvaluator(diagnosis=[_CASE_LINE, _RUN_LINE])
+    asyncio.run(
+        runtime.run_level("r1", compiled, cases(3), deps, evaluator, events.append, scope=scope)
+    )
+    finished = events[-1]
+    assert finished["type"] == "run.finished"
+    return list(finished["report"]["diagnosis"])
+
+
+def test_a_sample_run_drops_the_whole_run_budget_diagnosis() -> None:
+    assert _diagnosis_of("mau") == [_CASE_LINE]
+
+
+def test_a_star_run_keeps_the_whole_run_budget_diagnosis() -> None:
+    assert _diagnosis_of(None) == [_CASE_LINE, _RUN_LINE]
+
+
+def test_star_runs_carry_no_scope() -> None:
+    events = run(L1_STARTER)
+    assert "scope" not in events[0]
+    assert [e["type"] for e in events[-2:]] == ["run.scored", "run.finished"]
+    assert "scope" not in events[-1]
 
 
 def test_llm_error() -> None:

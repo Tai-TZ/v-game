@@ -325,6 +325,7 @@ class LevelEvaluator:
             counted=case.id not in self._rules["info_cases"],
             criteria=criteria,
             labels=tuple(labels),
+            cite_unknown=tuple(unknown),
         )
 
     def score(self, traces: Sequence[CaseTrace], grades: Sequence[CaseGrade]) -> StarResult:

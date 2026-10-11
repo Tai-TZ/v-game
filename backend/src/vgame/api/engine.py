@@ -40,6 +40,10 @@ class EngineServices:
     replay: ReplayStore | None = None
     index_stale: bool = False  # store is None because the index no longer matches docs/content
     tasks: dict[str, asyncio.Task[None]] = field(default_factory=dict)
+    # GET /api/quota; build_engine passes the settings, these defaults are the settings' own.
+    daily_cap: DailyCap = field(default_factory=lambda: DailyCap(500))
+    reserve: DailyCap = field(default_factory=lambda: DailyCap(17))  # R, refunds
+    learner_daily: int = 13  # P
 
     def spec(self, level_id: str) -> GradingSpec:
         return _spec(self.content_dir, level_id)
@@ -80,6 +84,7 @@ def build_engine(settings: Settings) -> EngineServices:
 
     llm: LLMClient | None = None
     replay: ReplayStore | None = None
+    daily_cap = DailyCap(settings.daily_llm_call_cap)
     if settings.gemini_api_key is not None:
         cache_dir.mkdir(parents=True, exist_ok=True)
         replay = ReplayStore(cache_dir / "replay.sqlite3")
@@ -88,9 +93,7 @@ def build_engine(settings: Settings) -> EngineServices:
         # only sign that the seed loaded.
         logger.warning("replay seed: %d answers added", replay.import_seed(SEED_PATH))
         try:
-            llm = build_llm_client(
-                settings, daily_cap=DailyCap(settings.daily_llm_call_cap), store=replay
-            )
+            llm = build_llm_client(settings, daily_cap=daily_cap, store=replay)
         except LLMNotConfiguredError:
             logger.warning("GEMINI_API_KEY is blank; runs will answer 503")
     else:
@@ -104,6 +107,9 @@ def build_engine(settings: Settings) -> EngineServices:
         runs=RunStore(max_concurrent_runs=settings.max_concurrent_runs),
         replay=replay,
         index_stale=index_stale,
+        daily_cap=daily_cap,
+        reserve=DailyCap(settings.quota_reserve_calls),
+        learner_daily=settings.quota_learner_calls,
     )
 
 
