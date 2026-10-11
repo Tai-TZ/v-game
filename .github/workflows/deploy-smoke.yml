@@ -38,4 +38,12 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-      - run: node frontend/scripts/smoke-deploy.mjs "$BASE_URL"
+      # After a deployment this check sits on the commit, and Render's checksPass trigger waits
+      # for every check: a red smoke test (e.g. the free API still waking up) then blocks the
+      # very backend deploy it is waiting for. So it only warns there; the daily and manual
+      # runs still fail.
+      - id: smoke
+        continue-on-error: ${{ github.event_name == 'deployment_status' }}
+        run: node frontend/scripts/smoke-deploy.mjs "$BASE_URL"
+      - if: steps.smoke.outcome == 'failure'
+        run: echo "::warning title=Deploy smoke test::Checks failed against $BASE_URL; see the smoke step log."

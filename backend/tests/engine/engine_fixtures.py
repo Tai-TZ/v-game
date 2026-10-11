@@ -17,6 +17,7 @@ from vgame.engine.types import (
     BlockType,
     CaseGrade,
     CaseTrace,
+    Diagnosis,
     IndexHandle,
     LevelRules,
     PublicCase,
@@ -360,9 +361,11 @@ LEVELS = {lv.id: lv for lv in (L1, L2, L3)}
 class RecordingEvaluator:
     """Passes a case iff it ended ``ok``; records what the runtime hands over."""
 
-    def __init__(self, *, fail_on: str | None = None) -> None:
+    def __init__(self, *, fail_on: str | None = None, diagnosis: Sequence[Diagnosis] = ()) -> None:
         self.traces: list[CaseTrace] = []
         self.fail_on = fail_on
+        # What report() hands back, so a test can plant a run-level line (``case`` None).
+        self.diagnosis = list(diagnosis)
 
     def grade_case(self, trace: CaseTrace) -> CaseGrade:
         if trace.case.id == self.fail_on:
@@ -393,7 +396,7 @@ class RecordingEvaluator:
         grades: Sequence[CaseGrade],
         retrievers: Mapping[str, tuple[BlockType, IndexHandle]],
     ) -> RunReport:
-        return {"gold": {}, "diagnosis": []}
+        return {"gold": {}, "diagnosis": list(self.diagnosis)}
 
 
 def _question(i: int, hidden: bool) -> str:

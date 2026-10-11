@@ -1,7 +1,8 @@
 """Run one level: cases in parallel (max 3), deadlines, grading, stars, report (§7.4, §8).
 
 Event order: run.started, then per case its step pairs and case.graded, then run.scored and
-run.finished; or a single run.failed. Gold appears only in run.finished (D4). Hidden/trap
+run.finished; or a single run.failed. A sample run (scope "mau") runs the visible cases only
+and has no run.scored. Gold appears only in run.finished (D4). Hidden/trap
 questions never appear in any event.
 """
 
@@ -10,7 +11,7 @@ import logging
 import time
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -25,6 +26,7 @@ from vgame.engine.types import (
     BlockType,
     BudgetExceededError,
     CaseGrade,
+    CaseGradedEvent,
     CaseInfo,
     CaseStatus,
     CaseTrace,
@@ -34,7 +36,10 @@ from vgame.engine.types import (
     LLMNotConfiguredError,
     PublicCase,
     RunFailedEvent,
+    RunFinishedEvent,
     RunReport,
+    RunScope,
+    RunStartedEvent,
     StarResult,
     Usage,
 )
@@ -85,6 +90,7 @@ class _Run:
     deadline: float
     budget: RunBudget
     daily_cap_hit: bool = False
+    daily_skipped: set[str] = field(default_factory=set)  # case ids DailyCap left unanswered
 
 
 async def _run_case(run: _Run, case: PublicCase) -> CaseTrace:
@@ -93,6 +99,7 @@ async def _run_case(run: _Run, case: PublicCase) -> CaseTrace:
     if now >= run.deadline:
         return CaseTrace(case, "timeout", (), None, Usage(), 0)
     if run.daily_cap_hit:
+        run.daily_skipped.add(case.id)
         return CaseTrace(case, "skipped_budget", (), None, Usage(), 0)
 
     ctx = CaseContext(run.run_id, run.emit, min(now + CASE_DEADLINE_S, run.deadline))
@@ -116,7 +123,9 @@ async def _run_case(run: _Run, case: PublicCase) -> CaseTrace:
         status = "timeout"
     except BudgetExceededError as exc:
         status = "skipped_budget"
-        run.daily_cap_hit = run.daily_cap_hit or exc.scope == "daily"
+        if exc.scope == "daily":
+            run.daily_cap_hit = True
+            run.daily_skipped.add(case.id)
     except EngineError as exc:
         status = exc.step_status
     steps = tuple(ctx.steps)
@@ -162,8 +171,11 @@ async def run_level(
     deps: EngineDeps,
     evaluator: Evaluator,
     emit: EventSink,
+    scope: RunScope | None = None,
 ) -> None:
     """Always ends with exactly one run.finished or run.failed."""
+    if scope == "mau":
+        cases = [c for c in cases if c.role == "visible"]
     failure = precheck(compiled, deps)
     if failure is not None:
         emit(_failed(run_id, failure[0], failure[1]))
@@ -180,18 +192,19 @@ async def run_level(
             trace = await _run_case(run, case)
         grade = evaluator.grade_case(trace)
         traces[case.id], grades[case.id] = trace, grade
-        emit(
-            {
-                "type": "case.graded",
-                "run": run_id,
-                "case": case.id,
-                "status": trace.status,
-                "passed": grade.passed,
-                "counted": grade.counted,
-                "criteria": dict(grade.criteria),
-                "labels": list(grade.labels),
-            }
-        )
+        graded: CaseGradedEvent = {
+            "type": "case.graded",
+            "run": run_id,
+            "case": case.id,
+            "status": trace.status,
+            "passed": grade.passed,
+            "counted": grade.counted,
+            "criteria": dict(grade.criteria),
+            "labels": list(grade.labels),
+        }
+        if case.id in run.daily_skipped:
+            graded["reason"] = "daily_cap"
+        emit(graded)
 
     try:
         infos: list[CaseInfo] = []
@@ -200,15 +213,16 @@ async def run_level(
             if c.role == "visible":
                 info["question"] = c.question
             infos.append(info)
-        emit(
-            {
-                "type": "run.started",
-                "run": run_id,
-                "level": compiled.level_id,
-                "cases": infos,
-                "ingestion": list(compiled.ingestion),
-            }
-        )
+        started: RunStartedEvent = {
+            "type": "run.started",
+            "run": run_id,
+            "level": compiled.level_id,
+            "cases": infos,
+            "ingestion": list(compiled.ingestion),
+        }
+        if scope is not None:
+            started["scope"] = scope
+        emit(started)
         async with asyncio.TaskGroup() as tg:
             for c in cases:
                 tg.create_task(one(c))
@@ -222,13 +236,24 @@ async def run_level(
             message = llm_unavailable_vi(run.daily_cap_hit, datetime.now(UTC))
             emit(_failed(run_id, "llm_unavailable", message))
             return
-        score = evaluator.score(ordered, ordered_grades)
-        emit({"type": "run.scored", "run": run_id, "score": score})
+        if scope is None:
+            score = evaluator.score(ordered, ordered_grades)
+            emit({"type": "run.scored", "run": run_id, "score": score})
         report = evaluator.report(ordered, ordered_grades, compiled.retrievers)
+        if scope is not None:  # the run's token budget is for the full case set
+            report["diagnosis"] = [d for d in report["diagnosis"] if d["case"] is not None]
         models = Counter(
             f["model"] for t in ordered for s in t.steps for f in s.facts if f["kind"] == "llm"
         )
-        emit({"type": "run.finished", "run": run_id, "report": report, "models": dict(models)})
+        finished: RunFinishedEvent = {
+            "type": "run.finished",
+            "run": run_id,
+            "report": report,
+            "models": dict(models),
+        }
+        if scope is not None:
+            finished["scope"] = scope
+        emit(finished)
     except asyncio.CancelledError:
         emit(_failed(run_id, "cancelled", CANCELLED_VI))
         raise

@@ -25,7 +25,13 @@ from vgame.engine.index import IndexNotBuiltError, IndexStaleError
 from vgame.engine.levels import load_level
 from vgame.engine.run_store import IdempotencyConflictError, RunBusyError
 from vgame.engine.runtime import CANCELLED_VI, precheck, run_level
-from vgame.engine.types import EngineError, EngineEvent, LLMNotConfiguredError, RunFailedEvent
+from vgame.engine.types import (
+    EngineError,
+    EngineEvent,
+    LLMNotConfiguredError,
+    RunFailedEvent,
+    RunScope,
+)
 from vgame.engine.validator import validate
 
 logger = logging.getLogger(__name__)
@@ -80,8 +86,10 @@ async def create_run(
     level: Annotated[str, Query(pattern=SLUG_PATTERN)],
     engine: Annotated[EngineServices, Depends(get_engine)],
     idempotency_key: Annotated[str | None, Header(pattern=IDEMPOTENCY_PATTERN)] = None,
+    scope: RunScope | None = None,
 ) -> JSONResponse:
-    """Body: the graph JSON (Part 3 §3.4). Returns ``run_id`` and info-level issues."""
+    """Body: the graph JSON (Part 3 §3.4). Returns ``run_id`` and info-level issues.
+    ``scope=mau`` runs the level's 3 visible cases only and scores no stars (N2)."""
     # JSON only: a cross-site form post cannot burn the LLM budget without a CORS preflight.
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
         return _error(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, JSON_ONLY)
@@ -118,7 +126,9 @@ async def create_run(
 
     spec = engine.spec(spec_level.id)
     try:
-        run_id, is_new = engine.runs.start(spec_level.id, idempotency_key, graph_hash(graph))
+        # The scope is part of the request: one key never serves both a sample and a star run.
+        request_hash = f"{scope or 'sao'}:{graph_hash(graph)}"
+        run_id, is_new = engine.runs.start(spec_level.id, idempotency_key, request_hash)
     except IdempotencyConflictError as exc:
         return _error(status.HTTP_409_CONFLICT, exc.message_vi)
     except RunBusyError as exc:
@@ -135,6 +145,7 @@ async def create_run(
                 deps,
                 evaluator,
                 partial(_emit, engine, run_id),
+                scope,
             )
         )
         engine.tasks[run_id] = task

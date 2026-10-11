@@ -46,9 +46,10 @@ class RunBudget:
 
 
 class DailyCap:
-    """Server-wide cap on real (non-replayed) provider calls per UTC day.
+    """Server-wide cap on real (non-replayed) provider calls per UTC day. Also the shared
+    reserve R of daily-shift §3.1 (refunds), which counts per UTC day with its own limit.
 
-    Event-loop only (no lock): reserve() has no await, so it is atomic under asyncio.
+    Event-loop only (no lock): no method awaits, so each is atomic under asyncio.
     """
 
     # ponytail: in-memory counter per UTC day, lost on restart and per process;
@@ -61,14 +62,32 @@ class DailyCap:
         self._count = 0
 
     @property
-    def exhausted(self) -> bool:
-        """True when ``reserve`` would refuse; counts nothing."""
+    def cap(self) -> int:
+        return self._cap
+
+    @property
+    def used(self) -> int:
         day = self._today()
         if day != self._day:
             self._day, self._count = day, 0
-        return self._count >= self._cap
+        return self._count
+
+    @property
+    def remaining(self) -> int:
+        return max(self._cap - self.used, 0)
+
+    @property
+    def exhausted(self) -> bool:
+        """True when ``reserve`` would refuse; counts nothing."""
+        return self.remaining == 0
 
     def reserve(self) -> None:
         if self.exhausted:
             raise BudgetExceededError("daily")
         self._count += 1
+
+    def take(self, n: int) -> int:
+        """Counts up to ``n`` more, never past the cap; returns how many it counted."""
+        taken = min(n, self.remaining)
+        self._count += taken
+        return taken
