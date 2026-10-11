@@ -36,8 +36,8 @@
 - Đang là tuần đăng ký học phần nên câu hỏi đổ về gấp mười. Ban quản lý thư viện giới hạn mỗi câu chỉ được kéo tối đa 5 đoạn từ Vòm Sao.
 
 **Hiện trường (≤ 25 giây):**
-- Một hàng sinh viên dài trước quầy tra cứu. Ai cũng cầm cùng một tờ in tiêu đề "Điều 47 khoản 2", nhưng nội dung và con số là của một điều khác cùng họ.
-- Khang, sinh viên năm nhất, giơ tờ in lên: "Em hỏi Điều 47 mà nó đọc cho em Điều 74!"
+- Một hàng sinh viên dài trước quầy tra cứu. Ai cũng cầm cùng một tờ in tiêu đề "Điều 47 khoản 2", nhưng ~~nội dung và con số là của một điều khác cùng họ~~ bên dưới chỉ có một dòng: "Quy chế hiện hành không có thông tin này." (sửa 2026-10-11, mục 17 ý 8)
+- Khang, sinh viên năm nhất, giơ tờ in lên: ~~"Em hỏi Điều 47 mà nó đọc cho em Điều 74!"~~ "Em hỏi hẳn số điều mà nó bảo không có thông tin này!" (sửa 2026-10-11)
 - Cô Lan mở cuốn quy chế giấy đúng trang Điều 47, đặt cạnh tờ in.
 - Click, chạm hoặc nhấn E vào tờ in để Tua lại.
 
@@ -53,11 +53,11 @@
 
 | # | Thời điểm | Trên màn hình | Người chơi làm | Lời thoại |
 |---|---|---|---|---|
-| 1 | 0:00–0:25 | Hiện trường | Click hoặc chạm tờ in | Cô Lan: "Sau vụ áp phích, ai cũng muốn biết Điều 47 thật nói gì. Và trợ lý của chúng ta trả lời bằng… Điều 74." |
-| 2 | 0:25–0:50 | Tua lại: đèn pin chiếu câu "Điều 47 khoản 2", các sao Điều 74 và 41 sáng nhất; sao Điều 47 không sáng. Biển "Tuần đăng ký: tối đa 5 sao mỗi câu" treo lên Móc kéo | Xem | Cô Lan: "Tuần đăng ký học phần, câu hỏi đổ về gấp mười. Từ nay mỗi câu chỉ được kéo tối đa năm sao." · Nếu lời giải cũ có `top_k` > 5: thông báo DOM "Móc kéo của bạn đang ở {K}; đã hạ về 5 theo giới hạn tuần đăng ký." |
+| 1 | 0:00–0:25 | Hiện trường | Click hoặc chạm tờ in | Cô Lan: "Sau vụ áp phích, ai cũng muốn biết Điều 47 thật nói gì. Và trợ lý của chúng ta ~~trả lời bằng… Điều 74~~ bảo là không có thông tin này." (sửa 2026-10-11, mục 17 ý 8) |
+| 2 | 0:25–0:50 | Tua lại: đèn pin chiếu câu "Điều 47 khoản 2", ~~các sao Điều 74 và 41 sáng nhất~~ hai sao sáng nhất là **Điều {d1} và Điều {d2}** (sửa 2026-10-11, mẫu điền từ bản ghi, mục 17 ý 8); sao Điều 47 không sáng. Biển "Tuần đăng ký: tối đa 5 sao mỗi câu" treo lên Móc kéo | Xem | Cô Lan: "Tuần đăng ký học phần, câu hỏi đổ về gấp mười. Từ nay mỗi câu chỉ được kéo tối đa năm sao." · Nếu lời giải cũ có `top_k` > 5: thông báo DOM "Móc kéo của bạn đang ở {K}; đã hạ về 5 theo giới hạn tuần đăng ký." |
 | 3 | 0:50–1:05 | Thẻ nhiệm vụ: "13 câu · ≥8/10 câu thường đúng, có câu của Khang · ca của Hà không được vỡ" | Đọc | Cô Lan: "Tối nay có người hỏi bằng số điều, có người hỏi bằng lời thường. Tám trên mười câu thường phải đúng, kể cả câu của Khang, và ca của Hà hôm trước không được vỡ." |
 | 4 | 1:05–1:20 | Phiếu đoán 1 | Chọn (hoặc Bỏ qua), bấm ~~Mở ca~~ **Xem lượt đã ghi** (sửa 2026-10-08) | Cô Lan: ~~"Bắt đầu từ lời giải cũ của bạn. Chạy lại xem nó vỡ chỗ nào."~~ ~~"Bắt đầu từ lời giải cũ. Xem nó vỡ ở chỗ nào đã."~~ "Xem lời giải mẫu L2 vỡ ở chỗ nào đã. Lời giải của bạn cũng chỉ có Vòm Sao như nó." (sửa 2026-10-08, rà soát vòng 5) |
-| 5 | 1:20–2:05 | ~~**Lần chạy 1** (bản sao lời giải L2).~~ **Lượt đã ghi** của lời giải mẫu L2 (sửa 2026-10-08, N4), tem "Lượt chạy đã ghi" kèm dòng "Lời giải mẫu L2, không phải cấu hình của bạn", 0 lời gọi. Camera bám câu của Khang (`lib-l3-v01`) | Xem | Sau run: "Với Vòm Sao, '47' chỉ là một con số, chẳng mang nghĩa gì. Điều 74 và 41 nghe 'giống' câu hỏi hơn." |
+| 5 | 1:20–2:05 | ~~**Lần chạy 1** (bản sao lời giải L2).~~ **Lượt đã ghi** của lời giải mẫu L2 (sửa 2026-10-08, N4), tem "Lượt chạy đã ghi" kèm dòng "Lời giải mẫu L2, không phải cấu hình của bạn", 0 lời gọi. Camera bám câu của Khang (`lib-l3-v01`) | Xem | Sau run: "Với Vòm Sao, '47' chỉ là một con số, chẳng mang nghĩa gì. ~~Điều 74 và 41~~ **Điều {d1} và Điều {d2}** nghe 'giống' câu hỏi hơn." (sửa 2026-10-11, mẫu điền từ bản ghi, mục 17 ý 8) |
 | 6 | 2:05–2:35 | Menu "Vì sao câu #1 sai?" rồi chẩn đoán; hiện "đường đời hạng" của đoạn đáp án qua từng khối | Chọn lý do | — |
 | 7 | 2:35–4:15 | Bàn thợ mở 3 khe mới: **Tủ ngăn kéo** (BM25), **Phễu** hoặc **Bập bênh** (gộp), **Kính lúp** (xếp hạng lại). Xem trước cho 3 câu mẫu: hai danh sách cạnh nhau và danh sách sau khi gộp hoặc soi lại, mỗi dòng có hạng và điểm thật | Lắp, chỉnh, chiếu thử | Ngăn kéo: "Tủ ngăn kéo thì ngược lại: không hiểu nghĩa, nhưng thấy số 47 là mở đúng ngăn." · Phễu: "Hai cách tìm, hai danh sách. Phễu gộp lại theo thứ hạng, không nhìn điểm." · Bập bênh: "Bập bênh thì nhìn điểm. Nghiêng về bên nào là tin bên đó hơn." · Kính lúp: "Kính lúp đọc kỹ từng cặp câu hỏi và đoạn, chậm mà chắc. Đừng soi cả kho, soi vài ứng viên thôi." |
 | 8 | 4:15–4:30 | Phiếu mẫu, đánh dấu Chắc hoặc Đoán, cùng phiếu 2 và 3+ (mục 7, sửa 2026-10-08; 3+ thêm ở rà soát vòng 5) | Chọn | — |
@@ -326,3 +326,16 @@ Như L2, thêm:
 5. **"Đường đời hạng" #23 → #1 → #2 → #1** trong gameplay-direction là minh hoạ. Số thật lấy từ cổng phát hành; hạng dense ngoài `top_k` do evaluator tính sau run (xếp hạng toàn kho), không phải engine phát lúc chạy.
 6. **Đã đóng.** Ca hồi quy `lib-l3-t02` dùng nguyên câu và tiêu chí của `lib-l2-v01` (file golden L3). Vì kho L3 không có bản 2019 nên không dùng ca văn bản cũ.
 7. **`lib-l3-t03` chưa có cấu hình ngây thơ cắn nó** (golden `bites: []`). Nếu muốn ca này tính sao thay vì `info`, cổng hiệu chỉnh cần thêm một cấu hình "lời giải mẫu nhưng Lăng kính bỏ G3" và ghi vào `bites`. Cần người viết nội dung và chủ Phần 4 chốt.
+8. **Cổng cho bản ghi của L3** (thêm 2026-10-11, đối xứng với [L2 mục 17 ý 8](library-l2-chunk-tuning.md#17-câu-hỏi-mở)). Hiện trường, cờ thế giới và nhịp 1, 2, 5 kể lượt chạy mang tem "Lượt chạy đã ghi" của `lib-l3-v01`, nên phải khớp dữ kiện của `frontend/public/runs/article-number-lookup.json`. Không ghi lại để lời dẫn khớp: đó là chọn kết quả, và tem "Lượt chạy đã ghi" khi đó thành nói dối.
+
+   **Hai ô điền.** Nhịp 2 và nhịp 5 không được ghi cứng số điều. `{d1}` và `{d2}` là số điều của hai đoạn hạng 1 và hạng 2 trong fact `retrieved` của `lib-l3-v01` ở node `vs`. Đó đúng là hai ô mà engine đã dùng trong mẫu `ret.gold_rank:vector_search` của `backend/src/vgame/engine/levels/article-number-lookup.json`, nên lời dẫn và chẩn đoán luôn nói cùng một con số.
+
+   **Kết quả đối chiếu 2026-10-11** (bản ghi B0 đầu tiên, `corpus_sha256` của index đang ship):
+
+   | Level | Bản ghi nói gì về v01 | Lời dẫn có khớp? |
+   |---|---|---|
+   | L1 `grounded-citation` | Lời giải khởi đầu không có khối tìm kiếm: thùng Context "Tài liệu: 0 token", `pack.included` rỗng, `labels: ["cite_missing"]`, trả lời chung chung không trích mã | Khớp. Nhịp 5 của L1 đã viết theo nhánh, và bản ghi rơi vào nhánh B |
+   | L2 `chunk-tuning` | Đoạn 2019 `ef34fb51` hạng 1 (`hieu_luc: false`), cả hai dải Điều 12 vào thùng, `labels: ["stale_doc"]`, `no_forbidden: false`, câu trả lời có "08 ngày" | Khớp. Rơi đúng nhánh **Số cũ** ở bảng nhánh mục 3 của L2 |
+   | L3 `article-number-lookup` | `retrieved` ở `vs`: Điều 53 (0,8032), Điều 13 (0,8004), Điều 68 (0,7984). Đoạn Điều 47 khoản 2 hạng 72. Trả lời: "Quy chế hiện hành không có thông tin này.", `cited_ids: []`, `labels: ["cite_missing", "abstained"]` | **Không khớp, đã sửa 2026-10-11.** Lời dẫn ghi cứng Điều 74 và 41 ở nhịp 2, 5 (bản ghi là 53 và 13) và kể trợ lý đọc sai sang Điều 74 ở Hiện trường, nhịp 1 (bản ghi là từ chối trả lời). Đổi hai nhịp thành ô điền và đổi tiền đề sang "không tìm ra"; bản ghi giữ nguyên |
+
+   Tiền đề mới sát bài học hơn tiền đề cũ: hiểu lầm nhắm tới ở mục 2 là "tìm theo nghĩa hiểu được mọi câu hỏi, kể cả số hiệu", và bản ghi cho thấy đúng điều đó — hỏi thẳng bằng số điều thì Vòm Sao đẩy đoạn đáp án xuống hạng 72, trợ lý không có gì trong thùng nên từ chối. Lời giải mẫu L2 không bịa ra điều khác vì nó vẫn giữ ba thẻ G1–G3.
