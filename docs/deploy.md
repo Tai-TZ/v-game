@@ -1,5 +1,7 @@
 # Deploy: Vercel (frontend) + Render (backend), gói miễn phí
 
+Bản production: <https://vgame.ai20k.cloud>.
+
 Bản công khai chỉ có theme **town**. Theme khuôn viên lấy cảm hứng từ trường thật không được đưa lên
 cho tới khi có phép của chủ thương hiệu (`frontend/scripts/build-vercel.mjs` mặc định
 `VITE_THEME_PACKS=town`).
@@ -109,7 +111,7 @@ tháng, mỗi lần build khoảng 3–5 phút.
 4. Deploy. Build chạy `npm run build:vercel`: build như thường, rồi ghi `.vercel/output` với header
    bảo mật (CSP theo hash của từng bản build), proxy `/api/*` sang Render và SPA fallback.
 
-## 3. Tên miền `vgame.ai20k.cloud`
+## 3. Tên miền `vgame.ai20k.cloud` (đã chạy)
 
 1. Vercel → Project → **Settings → Domains** → thêm `vgame.ai20k.cloud`.
 2. Ở nơi quản lý DNS của `ai20k.cloud`, tạo bản ghi **CNAME**: tên `vgame`, giá trị đúng như Vercel
@@ -145,9 +147,9 @@ flowchart LR
   Checks** → thêm các check của GitHub Actions `Frontend checks`, `End-to-end tests` và
   `Brand isolation`. Vercel giữ bản production lại, chỉ gắn vào tên miền khi các check đó xanh.
   Nếu gói Hobby không có mục này thì luồng vẫn chạy, chỉ là Vercel deploy song song với CI.
-- **Khi có tên miền riêng:** đặt biến repo `PRODUCTION_URL` (GitHub → Settings → Secrets and
-  variables → Actions → Variables) thành `https://vgame.ai20k.cloud`; mặc định smoke test dùng
-  `https://v-game-theta.vercel.app`.
+- **Smoke test gọi tên miền thật:** đặt biến repo `PRODUCTION_URL` (GitHub → Settings → Secrets and
+  variables → Actions → Variables) thành `https://vgame.ai20k.cloud`; không đặt thì smoke test dùng
+  mặc định `https://v-game-theta.vercel.app` (vẫn trỏ tới cùng bản deploy).
 - **Quay lại bản trước:** Vercel → Deployments → **Instant Rollback**; Render → service →
   Events → chọn bản deploy cũ → **Rollback**.
 

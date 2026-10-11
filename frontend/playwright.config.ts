@@ -11,6 +11,9 @@ export default defineConfig({
   // CI renders WebGL in software: with the skinned cast a walk across the campus can take
   // longer than 15 s there, so assertions that wait for an arrival get more room on CI.
   expect: { timeout: process.env.CI ? 30_000 : 15_000 },
+  // Same reason for whole tests: a re-bake or a long walk takes seconds per frame on CI.
+  // test.slow() triples this, so marked tests get 180 s there.
+  timeout: process.env.CI ? 60_000 : 30_000,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",

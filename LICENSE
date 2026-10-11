@@ -1,0 +1,22 @@
+Copyright (c) 2026 Tai Thanh Nguyen. All rights reserved.
+
+This repository is published for viewing and evaluation only. No licence is
+granted to use, copy, modify, merge, publish, distribute, sublicense or sell
+any part of it, in source or compiled form, without prior written permission
+from the copyright holder.
+
+Third-party material in this repository keeps its own licence (details in
+CREDITS.md):
+
+- 3D models by Kenney (kenney.nl) and Quaternius: CC0 1.0 Universal.
+- Font files under frontend/public/themes/*/fonts/: SIL Open Font License 1.1
+  (OFL.txt next to them).
+- Weather data, fetched at runtime by the visitor's browser from Open-Meteo
+  (open-meteo.com): CC BY 4.0.
+- The dense vectors in backend/src/vgame/engine/data/index/ were computed
+  with intfloat/multilingual-e5-large (MIT).
+- The rerank scores in backend/src/vgame/engine/data/index/rerank.* were
+  computed with jinaai/jina-reranker-v2-base-multilingual (CC BY-NC 4.0) and
+  may not be used for commercial purposes.
+- Software dependencies are under their own licences, as listed by the
+  package managers (frontend/package-lock.json, backend/uv.lock).
