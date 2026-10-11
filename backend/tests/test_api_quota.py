@@ -1,6 +1,7 @@
 """Wave B engine prerequisites (roadmap-v0.4 §5 B0, §5.1): the sample scope of POST /api/runs,
 GET /api/quota and the reserve refund. Offline: Oracle LLM, fake models."""
 
+import asyncio
 import inspect
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
@@ -8,18 +9,19 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
-from tests.engine.fakes_llm import FakeLLM
+from tests.engine.fakes_llm import FakeLLM, gemini_answer, install_fake_genai
 from tests.engine.fakes_oracle import LEVEL_IDS, oracle_llm, spec
 from tests.test_api_runs import JSON, L1, engine, post_run, read_events, reference
-from vgame.api.engine import EngineServices
+from vgame.api.engine import EngineServices, build_engine
 from vgame.api.routes.quota import get_quota
 from vgame.api.routes.quota import refund as refund_route
 from vgame.config import Settings
 from vgame.engine.budget import DailyCap
 from vgame.engine.llm import ReplayingLLM
 from vgame.engine.replay import ReplayStore
-from vgame.engine.types import LLMClient
+from vgame.engine.types import LLMClient, LLMMessage, LLMRequest
 from vgame.main import create_app
 
 VISIBLE = [c.id for c in spec(L1).cases if c.role == "visible"]
@@ -279,3 +281,33 @@ def test_quota_handlers_run_on_the_event_loop(handler: Callable[..., Any]) -> No
     # two refunds of one run can both pass the refunded() check and each take from R. Coroutine
     # handlers run in one event-loop turn, so the check and the write cannot be interleaved.
     assert inspect.iscoroutinefunction(handler), f"{handler.__name__} must be an async def"
+
+
+# --- the cap the endpoint reports is the cap the provider spends ------------------------------
+
+
+def test_quota_reports_the_cap_the_gemini_client_spends_from(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # build_engine must hand ONE DailyCap to both the LLM client and EngineServices. A second
+    # instance on either side would leave GET /api/quota reporting a counter nobody spends, so
+    # assert through behaviour: spend on the client's own path, then read the endpoint.
+    sdk = install_fake_genai(monkeypatch)
+    sdk.outcomes.append(gemini_answer())
+    keyed = settings.model_copy(
+        update={"gemini_api_key": SecretStr("AIzaFake-not-a-real-key"), "daily_llm_call_cap": 7}
+    )
+    services = build_engine(keyed)
+    assert services.llm is not None  # the fake SDK stands in for google-genai
+
+    with TestClient(create_app(keyed, engine=services)) as client:
+        assert client.get("/api/quota").json()["used"] == 0
+        asyncio.run(
+            services.llm.complete(
+                LLMRequest("can_bang", "khung", (LLMMessage("user", "Câu hỏi: x"),), 16000)
+            )
+        )
+        body = client.get("/api/quota").json()
+
+    assert sdk.calls, "the request must reach the provider, not the replay cache"
+    assert (body["cap"], body["used"], body["remaining"]) == (7, 1, 6)
