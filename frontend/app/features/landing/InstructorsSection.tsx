@@ -8,7 +8,7 @@ const POINTS: readonly string[] = [
 
 export function InstructorsSection() {
   return (
-    <section id="giang-vien" className="scroll-mt-20 bg-subtle py-20">
+    <section id="giang-vien" className="scroll-mt-20 bg-subtle py-12 sm:py-16">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <SectionHeading title="Dành cho giảng viên">
           Giảng viên giữ quyền quyết định nội dung. AI chỉ soạn nháp; mọi màn chơi cần được duyệt.

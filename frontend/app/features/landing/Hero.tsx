@@ -36,7 +36,7 @@ export function Hero() {
       />
       <div className="mx-auto flex min-h-[34rem] max-w-6xl flex-col justify-end px-4 py-16 sm:px-6 md:min-h-[40rem] md:justify-center md:py-24">
         <div className="max-w-xl space-y-6">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+          <h1 className="text-display font-bold sm:text-display-lg">
             Học AI bằng cách sửa những agent đang làm hỏng việc
           </h1>
           <p className="text-lg text-on-ink-muted">

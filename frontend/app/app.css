@@ -8,6 +8,29 @@
 @theme {
   --color-*: initial;
 
+  /*
+   * Display scale (art §8.1 covers 12-18 and 30/36; these name the two steps above it so no
+   * page reaches for a raw text-5xl again). Vietnamese stacks diacritics above and below the
+   * x-height, so every step here carries more leading than Tailwind's default for its size:
+   * text-5xl ships line-height 1, which let "ồ" and "ế" on one line touch the line above.
+   */
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.18;
+  --text-display--letter-spacing: -0.018em;
+  --text-display-lg: 3rem;
+  --text-display-lg--line-height: 1.12;
+  --text-display-lg--letter-spacing: -0.022em;
+  --text-title: 1.875rem;
+  --text-title--line-height: 1.26;
+  --text-title--letter-spacing: -0.012em;
+
+  /*
+   * Reading measure for running text. 36rem is about 62-66 characters of Be Vietnam Pro at
+   * 16 px, inside the 80 the eye can track without losing the line start. The page grid stays
+   * max-w-6xl; only prose is capped.
+   */
+  --container-measure: 36rem;
+
   /* HUD motion (art §7). The global reduced-motion rule below cuts these to ~0 ms. */
   --animate-enter: vg-enter 200ms ease-out both;
   --animate-appear: vg-appear 1ms 150ms both;
