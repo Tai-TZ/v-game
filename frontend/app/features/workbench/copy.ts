@@ -1,4 +1,5 @@
 import { domain, isAllowed, nodeIds, type Env } from "./bench";
+import type { Change } from "./diff";
 import type { Confidence, Why } from "./guess";
 import { unfinished, type BlockState, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, JsonValue, RunReport } from "./schema";
@@ -187,6 +188,38 @@ export const HISTORY_VI = {
   duplicateRow: (n: number) => `Nhân bản cấu hình của lượt ${n}`,
   actionColumn: "Cấu hình",
 } as const;
+
+/**
+ * Thẻ so lượt (N20). The label is a causality claim and rests entirely on how many turnable
+ * variables changed: see history.ts `compare`. This is intentionally a different sentence from
+ * `sameGraphNote` above -- that one is about the bench matching the run on show before a rerun;
+ * this is about two REMEMBERED runs, read after the fact.
+ */
+export const COMPARE_VI = {
+  heading: "So với lượt trước",
+  sameConfig: "Hai lượt này cùng một cấu hình, nên khác biệt không phải do bàn thợ.",
+  /** The one case where naming a cause is honest: exactly one variable moved. */
+  single: (name: string) => `${name} là thứ duy nhất đổi.`,
+  /** The required wording (roadmap §20), verbatim regardless of how many variables changed. */
+  multiple: "Đổi 2 thứ cùng lúc, chưa biết thứ nào gây ra",
+  changed: "Đã đổi:",
+  flip: (n: number, from: boolean, to: boolean) =>
+    `Câu #${n}: ${from ? "Đạt" : "Trượt"} → ${to ? "Đạt" : "Trượt"}.`,
+} as const;
+
+/**
+ * The name of one turnable variable, for the comparison card's evidence list.
+ *
+ * Reads `TOY[type].params` directly rather than `knobName`: that helper collapses every non-
+ * chunker param to its slot's own name (it exists for the "Xem ở {slot}" diagnosis link, which
+ * is about navigating to a slot, not naming a knob). Here the knob is the point -- "Vòm Sao đổi"
+ * would read as the block itself being attached or detached, when only its top_k moved.
+ */
+export function changeName(change: Change): string {
+  if (change.kind === "slot") return toyName(change.type);
+  if (change.kind === "param") return TOY[change.type].params?.[change.param] ?? change.param;
+  return `${TOY.llm.params?.system_prompt ?? "Lăng kính"} (khe ${change.slot + 1})`;
+}
 
 export const DROPPED_VI = {
   /** On a cut block. The rank is the place it had in the list the packer was handed. */

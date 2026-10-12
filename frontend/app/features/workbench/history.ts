@@ -6,8 +6,13 @@
  * Pure logic, no rendering, like bin.ts and journey.ts beside it.
  */
 
+import * as v from "valibot";
+
 import type { Stars } from "~/features/progress/progress";
 
+import type { Env } from "./bench";
+import { diffGraphs, type Change } from "./diff";
+import { GraphSchema, type Graph } from "./schema";
 import type { RunMark } from "./storage";
 
 /** "skip": that run never reached this case, which is missing data and not a verdict. */
@@ -55,3 +60,36 @@ export function historyMatrix(runs: readonly RunMark[]): HistoryMatrix {
  */
 export const lastPassing = (runs: readonly RunMark[]): RunMark | null =>
   runs.find((run) => run.stars >= 1) ?? null;
+
+/**
+ * What changed between two remembered runs of the same level, and which cases flipped (N20).
+ *
+ * The honest-causality label of the comparison card rests entirely on `changes.length`: a
+ * single turnable variable may be offered as a cause, two or more may not. See diffGraphs.
+ */
+export function compare(
+  env: Env,
+  prev: RunMark,
+  now: RunMark,
+): { changes: Change[]; flipped: readonly { n: number; from: boolean; to: boolean }[] } | null {
+  const before = parseGraph(prev.body);
+  const after = parseGraph(now.body);
+  if (before === null || after === null) return null;
+
+  const prevVerdict = new Map(prev.cases.map((c) => [c.n, c.passed]));
+  const flipped = now.cases.flatMap((c) => {
+    const was = prevVerdict.get(c.n);
+    return was === undefined || was === c.passed ? [] : [{ n: c.n, from: was, to: c.passed }];
+  });
+  return { changes: diffGraphs(env, before, after), flipped };
+}
+
+/** A mark's body, parsed like any other JSON the player's own bench once produced. */
+function parseGraph(body: string): Graph | null {
+  try {
+    const parsed = v.safeParse(GraphSchema, JSON.parse(body));
+    return parsed.success ? parsed.output : null;
+  } catch {
+    return null;
+  }
+}

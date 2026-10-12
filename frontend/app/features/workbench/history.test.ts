@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { historyMatrix, lastPassing } from "./history";
+import { graphFromBench, setCard, starterBench, type Bench } from "./bench";
+import { compare, historyMatrix, lastPassing } from "./history";
 import type { RunMark } from "./storage";
+import { testEnv } from "./test-fixtures";
 
 const mark = (at: number, stars: 0 | 1 | 2 | 3, ns: number[]): RunMark => ({
   body: `{"at":${at}}`,
@@ -70,5 +72,63 @@ describe("lastPassing", () => {
 
   it("takes the one passing run whatever its place in the list", () => {
     expect(lastPassing([mark(3, 0, [1]), mark(2, 0, [1]), mark(1, 3, [1])])?.at).toBe(1);
+  });
+});
+
+describe("compare", () => {
+  const l3 = testEnv("article-number-lookup");
+  const start = () => {
+    const bench = starterBench(l3);
+    if (!bench) throw new Error("L3 starter is not drawable");
+    return bench;
+  };
+  const body = (bench: Bench) => JSON.stringify(graphFromBench(l3, bench));
+  const run = (b: string, cases: [number, boolean][]): RunMark => ({
+    body: b,
+    at: 1,
+    stars: 1,
+    tokens: 10,
+    budget: 20,
+    cases: cases.map(([n, passed]) => ({ n, role: "visible" as const, passed })),
+  });
+
+  it("finds no change and no flip between a run and itself", () => {
+    const b = body(start());
+    const result = compare(l3, run(b, [[1, true]]), run(b, [[1, true]]));
+    expect(result).toEqual({ changes: [], flipped: [] });
+  });
+
+  it("names exactly the cases whose verdict differs, by case number", () => {
+    const b = body(start());
+    const prev = run(b, [
+      [1, true],
+      [2, true],
+    ]);
+    const now = run(b, [
+      [1, true],
+      [2, false],
+    ]);
+    const result = compare(l3, prev, now);
+    expect(result?.flipped).toEqual([{ n: 2, from: true, to: false }]);
+  });
+
+  it("leaves out a case missing from either side, which is not a flip", () => {
+    const b = body(start());
+    const prev = run(b, [[1, true]]);
+    const now = run(b, [
+      [1, true],
+      [2, false],
+    ]);
+    expect(compare(l3, prev, now)?.flipped).toEqual([]);
+  });
+
+  it("counts a card swap as two changes, via diffGraphs", () => {
+    const before = body(setCard(setCard(start(), 0, "G1"), 1, "G2"));
+    const after = body(setCard(setCard(start(), 0, "G2"), 1, "G1"));
+    expect(compare(l3, run(before, []), run(after, []))?.changes).toHaveLength(2);
+  });
+
+  it("has nothing to say when a body can no longer be drawn on this level", () => {
+    expect(compare(l3, run("{broken", []), run(body(start()), []))).toBeNull();
   });
 });
