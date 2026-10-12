@@ -22,6 +22,7 @@ import {
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
+import { RankJourney } from "./RankJourney";
 import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
 import { llmCalls, unfinished, type CaseView, type RunView } from "./run";
@@ -418,6 +419,13 @@ function GoldTrace({
                 ? "Hạng của đoạn đáp án đứng cao nhất qua từng khối:"
                 : "Hạng qua từng khối:"}
           </p>
+          <RankJourney
+            ranks={gold.ranks}
+            order={RANKED.map((type) => ids[type])}
+            toys={Object.fromEntries(
+              RANKED.map((type) => [ids[type], toyName(type, params(ids[type]))]),
+            )}
+          />
           <ul className="list-inside list-disc">
             {lines.map((line) => (
               <li key={line}>{line}</li>

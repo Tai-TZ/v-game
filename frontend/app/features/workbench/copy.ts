@@ -91,6 +91,9 @@ export const STAMP_VI = {
   note: "Câu viền liền là câu có nguồn trong thùng; viền đứt là câu không trích nguồn nào.",
 } as const;
 
+/** Đường đời hạng (L3): a block that never found the answer says so, not "#—". */
+export const JOURNEY_VI = { absent: "không thấy" } as const;
+
 const cosine = new Intl.NumberFormat("vi-VN", {
   minimumFractionDigits: 3,
   maximumFractionDigits: 3,
