@@ -95,7 +95,7 @@ export interface SlotGold {
   ranks: Readonly<Record<string, number | null>>;
   /** ret.gold_missing, ret.gold_rank, ret.boundary_split, ctx.gold_dropped. */
   flags: readonly string[];
-  /** False for a hidden or trap case: a live run sends their gold too, and it stays unshown. */
+  /** False for a hidden or trap case, whose gold the server withholds and the bench never draws. */
   visible: boolean;
 }
 

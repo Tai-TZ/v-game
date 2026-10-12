@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -8,7 +8,7 @@ import { PROGRESS_KEY, readProgress, recordStars } from "~/features/progress/pro
 import { starterBench } from "./bench";
 import { runReducer, type RunView } from "./run";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
-import { useRecordStars, WorkbenchPage } from "./WorkbenchPage";
+import { useRecordStars, usePreview, WorkbenchPage } from "./WorkbenchPage";
 
 vi.mock("~/features/progress/progress", async (importOriginal) => {
   const actual = await importOriginal<typeof progress>();
@@ -81,5 +81,98 @@ describe("useRecordStars", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     expect(() => record(replay(short), { ...l1.level, zone: "Thư viện" })).not.toThrow();
     expect(warn).toHaveBeenCalledOnce();
+  });
+});
+
+describe("usePreview", () => {
+  /** One retrieved item in the shape the route really sends, so the parser is exercised too. */
+  const item = (chunkId: string) => ({
+    chunk_id: chunkId,
+    rank: 1,
+    score: 0.88,
+    doc_id: "quy-che",
+    dieu: 12,
+    khoan: [1],
+    hieu_luc: true,
+  });
+
+  /** Answers every preview POST with a chunk id naming the body it was asked about. */
+  function serveByBody(fail = false) {
+    return vi.fn((_url: string, init?: RequestInit) => {
+      if (fail) return Promise.resolve(new Response("", { status: 503 }));
+      // previewRetrieval always sends the graph as a JSON string, never a Blob or a stream.
+      const body = typeof init?.body === "string" ? init.body : "";
+      const payload = {
+        case: "lib-l1-v01",
+        nodes: { vs: { kind: "retrieved", items: [item(`chunk-for-${body}`)] } },
+      };
+      return Promise.resolve(
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+  }
+
+  const pulled = (nodes: ReturnType<typeof usePreview>) => nodes?.vs?.items[0]?.chunk_id;
+
+  it("draws no dome for a bench whose preview has not come back yet", async () => {
+    vi.useFakeTimers();
+    const fetchMock = serveByBody();
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) => usePreview("grounded-citation", "lib-l1-v01", body, true),
+      { initialProps: { body: "top_k=3" } },
+    );
+
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(pulled(result.current)).toBe("chunk-for-top_k=3");
+
+    // The player drags the knob: a different variant, so different chunks and different scores.
+    rerender({ body: "top_k=9" });
+    // Before: the dome went on drawing the 3-pull and printing its cosines beside a slot that
+    // already read 9 -- a quarter of a second on a warm API, 33 s on a cold Render free one.
+    expect(result.current).toBeNull();
+
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(pulled(result.current)).toBe("chunk-for-top_k=9");
+    vi.useRealTimers();
+  });
+
+  it("hides a failed preview, and has the old bench's picture ready if the knob goes back", async () => {
+    vi.useFakeTimers();
+    const good = serveByBody();
+    vi.stubGlobal("fetch", good);
+    const { result, rerender } = renderHook(
+      ({ body }: { body: string }) => usePreview("grounded-citation", "lib-l1-v01", body, true),
+      { initialProps: { body: "a" } },
+    );
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(pulled(result.current)).toBe("chunk-for-a");
+
+    const bad = serveByBody(true);
+    vi.stubGlobal("fetch", bad);
+    rerender({ body: "b" });
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    // A failed preview is no preview -- and never the previous bench's, which is what the key
+    // is for; nothing here needs clearing.
+    expect(result.current).toBeNull();
+
+    // Undo the knob: the picture for this exact bench is the one already measured.
+    vi.stubGlobal("fetch", serveByBody(true));
+    rerender({ body: "a" });
+    expect(pulled(result.current)).toBe("chunk-for-a");
+    vi.useRealTimers();
+  });
+
+  it("asks for nothing while the run on screen still matches the bench", async () => {
+    vi.useFakeTimers();
+    const fetchMock = serveByBody();
+    vi.stubGlobal("fetch", fetchMock);
+    renderHook(() => usePreview("grounded-citation", "lib-l1-v01", "top_k=3", false));
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

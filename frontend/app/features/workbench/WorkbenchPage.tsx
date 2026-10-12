@@ -12,7 +12,7 @@ import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
 import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
-import { shouldPreview } from "./preview";
+import { previewableCase, shouldPreview } from "./preview";
 import { Results } from "./Results";
 import {
   frameAction,
@@ -228,31 +228,40 @@ const PREVIEW_DEBOUNCE_MS = 250;
  * input fires on every step of a drag and the point is one picture per settled knob, not sixty.
  * A failed preview is simply no preview: the bench never waits on it and never reports it.
  */
-function usePreview(
+export function usePreview(
   levelId: string,
   caseId: string | null,
   body: string,
   wanted: boolean,
 ): Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>> | null {
-  const [nodes, setNodes] = useState<Readonly<
-    Record<string, Extract<Fact, { kind: "retrieved" }>>
-  > | null>(null);
+  // Stored with the bench and case it describes, so a result can never outlive them. Held as
+  // free-floating state, it went on being drawn after the knob moved: the dome kept the old
+  // pull and printed its cosines beside a slot already reading the new value -- a quarter of a
+  // second on a warm API, and the 33 s of a cold Render free instance.
+  const [got, setGot] = useState<{
+    key: string;
+    nodes: Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>>;
+  } | null>(null);
+  const key = `${caseId ?? ""} ${body}`;
   useEffect(() => {
     if (!wanted || !caseId) return;
     let live = true;
     const timer = setTimeout(() => {
       void previewRetrieval(levelId, caseId, body).then((result) => {
-        if (live) setNodes(result.ok ? result.nodes : null);
+        // Only a success is stored, and only under its own key. A failure needs no clearing --
+        // the key already withholds another bench's picture -- and clearing would throw away a
+        // result the player gets back the moment they undo the knob.
+        if (live && result.ok) setGot({ key, nodes: result.nodes });
       });
     }, PREVIEW_DEBOUNCE_MS);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [levelId, caseId, body, wanted]);
+  }, [levelId, caseId, body, wanted, key]);
   // Derived, not cleared in the effect: setting state synchronously there cascades renders,
-  // and a preview nobody wants simply is not returned.
-  return wanted ? nodes : null;
+  // and a preview nobody wants -- or one for a bench that has moved on -- is not returned.
+  return wanted && got?.key === key ? got.nodes : null;
 }
 
 export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench; back: string }) {
@@ -292,8 +301,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const benchRun: BenchRun = !run ? "none" : changed ? "stale" : isActive(run) ? "active" : "done";
 
   // The dome previews the sample case the player follows, or the level's first sample before a
-  // run exists to follow one.
-  const previewCase = followed ?? level.visible_cases[0]?.id ?? null;
+  // run exists to follow one. A followed hidden or trap case falls back: see previewableCase.
+  const previewCase = previewableCase(followed, run?.cases ?? [], level);
   const previewNodes = usePreview(level.id, previewCase, body, shouldPreview(benchRun));
 
   const firstVisible = run?.cases.find((c) => c.role === "visible") ?? run?.cases[0];
@@ -304,8 +313,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       ? {
           run,
           followed: followedCase,
-          // The whole reveal, not just the chunk ids: the dome needs ranks[node]. `visible`
-          // is read here because a live run sends gold for hidden and trap cases too.
+          // The whole reveal, not just the chunk ids: the dome needs ranks[node]. The server
+          // now sends gold for samples only (runs.py), so `visible` is the second lock: a
+          // stale deploy or a replayed log must not turn the dome into a hidden-case readout.
           gold: reveal
             ? {
                 chunks: reveal.gold_chunks,
