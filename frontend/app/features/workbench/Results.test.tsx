@@ -31,14 +31,14 @@ function finishedRun(gold: Record<string, GoldReveal>, diagnosis: object[] = [])
   return run;
 }
 
-function show(run: RunView, graph: Graph = dense, env = l1) {
+function show(run: RunView, graph: Graph = dense, env = l1, runGraph: Graph = dense) {
   render(
     <MemoryRouter>
       <Results
         env={env}
         run={run}
         changed={false}
-        runGraph={dense}
+        runGraph={runGraph}
         graph={graph}
         backTo="/play/library"
         slip={null}
@@ -262,6 +262,18 @@ describe("a run some fallback model answered", () => {
     expect(line?.textContent).toContain("2/10 câu do model dự phòng trả lời");
   });
 
+  it("divides by the cases that got an answer, not by every case in the run", () => {
+    // A quota-exhausted run must not read "2/10": the cases that never reached the model have
+    // no model, and counting them would measure the denominator rather than the run.
+    const run = withFallback(2);
+    const stripped = {
+      ...run,
+      cases: run.cases.map((c, i) => (i < 8 ? c : { ...c, steps: {} })),
+    };
+    show(stripped);
+    expect(document.querySelector("[data-fallback]")?.textContent).toContain("2/8 câu");
+  });
+
   it("says star 2 is calibrated on the primary, beside the token evidence", () => {
     // spec §7: a fallback costs about 0,9k more output tokens on an L3 run, so the token figure
     // star 2 is judged against is not a measure of the player's bench.
@@ -278,5 +290,35 @@ describe("a run some fallback model answered", () => {
     expect(document.querySelector("[data-fallback]")).toBeNull();
     expect(document.body.textContent).not.toContain("model dự phòng");
     expect(document.body.textContent).not.toContain("model chính");
+  });
+});
+
+describe("a journey that crosses two rulers", () => {
+  it("is not drawn as a rise, because GoldTrace tells the chips the scales", () => {
+    // L3 is the only level with a block after the searches. hạng 23 over the whole store, then
+    // hạng 2 inside the 3 passages Kính lúp kept: the passage is better off, but the numbers
+    // are not points on one ruler (§8.6), and the prose list below says which is which.
+    const l3 = testEnv("article-number-lookup");
+    const starter = starterBench(l3);
+    if (!starter) throw new Error("L3 starter is not drawable");
+    const attached = setAttached(setAttached(starter, "bm25_search", true), "rerank", true);
+    const dense3 = setParam(l3, attached, "rerank", "top_n", 3);
+    const graph = graphFromBench(l3, dense3);
+    const gold: GoldReveal = {
+      gold_chunks: ["a1"],
+      ranks: { vs: 23, bm: 4, rr: 2 },
+      in_pack: true,
+      flags: [],
+    };
+    show(finishedRun({ "lib-l1-v01": gold }), graph, l3, graph);
+
+    const chips = [...document.querySelectorAll("[data-hop]")] as HTMLElement[];
+    // Both searches rank the whole store, so that hop is a real rise -- which only happens if
+    // GoldTrace passed the scales. The hop into Kính lúp's kept set is a change of ruler.
+    expect(chips.map((c) => c.dataset.hop)).toEqual(["start", "up", "rescaled"]);
+    expect(chips[2]?.className).not.toContain("success");
+    // The words still carry both scales, which is where §8.6 puts them.
+    expect(card(1)).toContain("hạng 23 trên toàn kho");
+    expect(card(1)).toContain("hạng 2 trong 3 đoạn giữ lại");
   });
 });

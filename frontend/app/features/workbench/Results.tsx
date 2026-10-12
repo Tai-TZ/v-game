@@ -22,6 +22,7 @@ import {
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
+import { type Scale } from "./journey";
 import { RankJourney } from "./RankJourney";
 import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
@@ -416,6 +417,17 @@ function GoldTrace({
   }
   const ids = nodeIds(env.level);
   const params = (node: string) => runGraph?.nodes.find((n) => n.id === node)?.params ?? {};
+  // The two searches rank the whole store; Phễu and Kính lúp rank inside what reached them, so
+  // their numbers sit on their own smaller rulers (§8.6) and no hop across the two is a move.
+  const scales: Record<string, Scale> = {};
+  for (const type of RANKED) {
+    if (type === "vector_search" || type === "bm25_search") {
+      scales[ids[type]] = { kind: "corpus" };
+      continue;
+    }
+    const kept = type === "rerank" ? params(ids[type]).top_n : params(ids[type]).top_k;
+    scales[ids[type]] = { kind: "kept", size: typeof kept === "number" ? kept : null };
+  }
   const lines = RANKED.flatMap((type) => {
     const node = ids[type];
     if (!(node in gold.ranks)) return [];
@@ -468,6 +480,7 @@ function GoldTrace({
             toys={Object.fromEntries(
               RANKED.map((type) => [ids[type], toyName(type, params(ids[type]))]),
             )}
+            scales={scales}
           />
           <ul className="list-inside list-disc">
             {lines.map((line) => (
