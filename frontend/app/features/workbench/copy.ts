@@ -221,6 +221,18 @@ export function changeName(change: Change): string {
   return `${TOY.llm.params?.system_prompt ?? "Lăng kính"} (khe ${change.slot + 1})`;
 }
 
+/**
+ * Rút kinh nghiệm 30 giây (N20): a four-line card closing the run. Lines 1-2 reuse gradeSlip's
+ * own sentences -- no new typing. Line 3 reads back the reason the player picked. Line 4 is the
+ * "next attempt" picker; its enum labels and legend live here.
+ */
+export const DEBRIEF_VI = {
+  heading: "Rút kinh nghiệm",
+  why: (text: string) => `Lý do bạn chọn: ${text}`,
+  nextLegend: "Lần tới đổi đúng một thứ",
+  nextChosen: (label: string) => `Đã chọn: ${label}`,
+} as const;
+
 export const DROPPED_VI = {
   /** On a cut block. The rank is the place it had in the list the packer was handed. */
   piece: (rank: number) => `bị cắt: hạng ${rank}`,
