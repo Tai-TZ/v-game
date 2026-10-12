@@ -25,6 +25,7 @@ import {
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
+import { Compare } from "./Compare";
 import { History } from "./History";
 import { type Scale } from "./journey";
 import type { RunMark } from "./storage";
@@ -314,6 +315,9 @@ export function Results({
         <>
           <h3 className="mt-8 text-lg font-bold">{HISTORY_VI.heading}</h3>
           <History runs={history} onDuplicate={onDuplicate} />
+          {/* history[0] is the run just finished (recordRun prepends), history[1] the one
+              before it -- from the second run of a level on, there is a prior to compare. */}
+          {history[0] && history[1] && <Compare env={env} prev={history[1]} now={history[0]} />}
         </>
       )}
 

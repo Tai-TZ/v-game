@@ -466,3 +466,38 @@ describe("duplicating a row of the strip", () => {
     expect(picked).toEqual([2]);
   });
 });
+
+describe("the comparison card from the second run on", () => {
+  const twoRuns: RunMark[] = [
+    {
+      body: JSON.stringify(dense),
+      at: 2,
+      stars: 2,
+      tokens: 10,
+      budget: 20,
+      cases: [{ n: 1, role: "visible", passed: true }],
+    },
+    {
+      body: JSON.stringify(graphOf()),
+      at: 1,
+      stars: 0,
+      tokens: 10,
+      budget: 20,
+      cases: [{ n: 1, role: "visible", passed: false }],
+    },
+  ];
+
+  it("compares the two most recent runs, newest against the one before it", () => {
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, twoRuns);
+    expect(document.querySelector("[data-compare]")).not.toBeNull();
+    // The case flipped from Trượt to Đạt between the two stored marks.
+    expect(document.querySelector("[data-compare]")?.textContent).toContain("Trượt → Đạt");
+  });
+
+  it("draws no card with only one remembered run", () => {
+    const [onlyRun] = twoRuns;
+    if (!onlyRun) throw new Error("fixture lost its run");
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, [onlyRun]);
+    expect(document.querySelector("[data-compare]")).toBeNull();
+  });
+});
