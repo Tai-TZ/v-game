@@ -102,12 +102,22 @@ Mục 5 trước đây cho **góc** mang cosine, chuẩn hoá theo khoảng củ
 
 **Chốt:** vị trí mang **hạng**, trải đều, vì đó là đại lượng cái quạt biểu diễn được chính xác. Cosine là con số, và được in ba chữ số thập phân (`fmtCosine`). Luật ở mục 7 thắng cơ chế ở mục 5. Trải đều cũng khiến hai đoạn không bao giờ chung một chấm, nên canvas và danh sách DOM luôn cùng số sao như mục 9 đòi.
 
-## 10. Chưa làm ở v0.1
+## 10. Đã làm thêm sau v0.1 (2026-10-11)
 
-- Vặn núm để vòm vẽ lại (cần endpoint pha 2).
-- Vòm cho khối `bm25_search`, `fusion`, `rerank` — L3 có ba khối cùng xếp hạng, nên "đường đời hạng" đi qua nhiều khối là việc sau. `GoldReveal.ranks` đã sẵn khoá theo node nên không cần đổi dữ liệu.
-- Chín món đồ chơi còn lại.
-- **Chọn một sao để làm nổi dòng tương ứng ở bảng** (mục 6). Chưa nối, nên các sao trong danh sách `sr-only` là chữ thường, không phải nút: một nút không làm gì, lại bị `sr-only` cắt mất vòng focus, tệ hơn là không có nút.
-- **Dòng "còn {n} đoạn nữa trong kho"** (mục 5). Client không biết số đoạn của kho; cần endpoint xem trước của pha 2.
-- **Chùm đèn pin chưa được vẽ**, mới có cung vòm. Vì vị trí giờ mang hạng chứ không mang cosine, chùm sáng không còn là thứ để so góc; vẽ lại nó cùng pha 2, khi vặn núm làm vòm đổi.
-- `in_pack` và `flags` của `GoldReveal` (mục 3) chưa dùng tới.
+Bốn mục của danh sách "chưa làm" ban đầu đã xong trong cùng ngày, nên ghi lại cho đúng:
+
+- **Vặn núm là vòm vẽ lại.** `POST /api/preview/retrieval` (backend README) trả lời từ index đã ship, không gọi AI, không tốn quỹ. Bàn thợ gọi nó khi `shouldPreview` bật, tức ở trạng thái `none` và `stale` — xem [`preview.ts`](../../frontend/app/features/workbench/preview.ts).
+- **Vòm cho cả bốn khối xếp hạng.** Không cần component mới: `vector_search`, `bm25_search`, `fusion` và `rerank` đều trả qua `_docs_result` trong `blocks.py`, nên cùng phát fact `retrieved`, và `StarDome` vẽ bất kỳ step nào có fact đó.
+- **"Đường đời hạng"** là `RankJourney`, đọc `GoldReveal.ranks` theo đúng thứ tự khối mà đồ thị chạy.
+- **`flags` của `GoldReveal`** đã dùng: `ret.boundary_split` làm Lược dao chuyển đỏ.
+
+Năm món đồ chơi đã thay được form: Vòm Sao (dùng chung cho bốn khe tìm kiếm), Thùng Context, Lược dao, Máy đóng tem, và đường đời hạng. Bảy trên mười khe có hình.
+
+## 11. Vẫn chưa làm
+
+- **Ba khe còn lại**: Đèn pin, Móc kéo, Lăng kính. Hai cái sau là núm vặn mà hiệu ứng đã hiện trên vòm (số sao kéo về); Lăng kính cần **tên ngắn cho sáu thẻ G1–G6**, tức việc của người viết nội dung, vì `prompt_cards` chỉ có mã và câu đầy đủ.
+- **Xem trước cho `fusion` và `rerank`.** Endpoint hiện chỉ chạy khối tìm kiếm; hai khối kia cần danh sách của khối phía trên. Làm đúng là tái dùng đường chạy của engine chứ không dựng lại phép gộp trong route: tính lệch một chút là bức tranh nói dối, trái [hướng gameplay §4](gameplay-direction.md) ("cắm vào engine, không giả gì").
+- **Chọn một sao để làm nổi dòng tương ứng ở bảng** (mục 6). Vì chưa nối, các sao trong danh sách `sr-only` là chữ thường chứ không phải nút.
+- **Dòng "còn {n} đoạn nữa trong kho"** (mục 5): client không biết số đoạn của kho.
+- **Chùm đèn pin chưa được vẽ**, mới có cung vòm. Vị trí giờ mang hạng chứ không mang cosine, nên chùm sáng không còn là thứ để so góc.
+- **`in_pack`** của `GoldReveal` vẫn chưa dùng tới.
