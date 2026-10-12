@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setCard, setParam, starterBench, type Bench } from "./bench";
-import { diffGraphs } from "./diff";
+import { diffGraphs, nextPickOptions } from "./diff";
 import { testEnv } from "./test-fixtures";
 
 const l3 = testEnv("article-number-lookup");
@@ -89,5 +89,52 @@ describe("diffGraphs", () => {
     // Same configuration, written two ways: a phantom change here would make every rerun look
     // like a two-variable experiment.
     expect(diffGraphs(l3, g, stripped)).toEqual([]);
+  });
+});
+
+describe("nextPickOptions", () => {
+  it("offers to attach a block that is not on the bench, and nothing else about it", () => {
+    const options = nextPickOptions(l3, graph(start()));
+    const rerank = options.filter((o) => o.pick.type === "rerank");
+    expect(rerank).toEqual([{ label: "Gắn Kính lúp", pick: { type: "rerank", direction: "on" } }]);
+  });
+
+  it("offers to detach an attached block, plus up/down on its own numeric knobs", () => {
+    const options = nextPickOptions(l3, graph(setAttached(start(), "vector_search", true)));
+    const vs = options.filter((o) => o.pick.type === "vector_search");
+    expect(vs.map((o) => o.pick.direction)).toEqual(expect.arrayContaining(["off", "up", "down"]));
+    expect(vs.some((o) => o.pick.param === "top_k" && o.pick.direction === "down")).toBe(true);
+  });
+
+  it("offers nothing for a block the level locked, even one whose knobs are not individually fixed", () => {
+    // In every shipped level a locked node's params also happen to be fixed one by one via
+    // param_limits, so the node-level lock alone is never exercised by real content -- nothing
+    // stops a future level from locking a node without fixing every param. Locking
+    // vector_search's own node id, with its param_limits left untouched, isolates that guard.
+    const locked = {
+      ...l3,
+      level: { ...l3.level, locked_nodes: [...l3.level.locked_nodes, "vs"] },
+    };
+    const options = nextPickOptions(locked, graph(setAttached(start(), "vector_search", true)));
+    expect(options.some((o) => o.pick.type === "vector_search")).toBe(false);
+  });
+
+  it("offers to fill an empty Lăng kính slot, and to clear a filled one", () => {
+    const options = nextPickOptions(l3, graph(setCard(start(), 2, null)));
+    const slot2 = options.filter((o) => o.pick.slot === 2);
+    expect(slot2).toEqual([
+      {
+        label: "Thêm Lăng kính (khe 3)",
+        pick: { type: "llm", param: "system_prompt", slot: 2, direction: "add" },
+      },
+    ]);
+    const slot0 = options.filter((o) => o.pick.slot === 0);
+    expect(slot0[0]?.pick.direction).toBe("remove");
+  });
+
+  it("offers no two options with the same label", () => {
+    const options = nextPickOptions(l3, graph(setAttached(start(), "vector_search", true)));
+    const labels = options.map((o) => o.label);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });
