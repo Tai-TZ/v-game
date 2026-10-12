@@ -8,7 +8,8 @@ import { PROGRESS_KEY, readProgress, recordStars } from "~/features/progress/pro
 import { starterBench } from "./bench";
 import { runReducer, type RunView } from "./run";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
-import { useRecordStars, usePreview, WorkbenchPage } from "./WorkbenchPage";
+import { loadHistory } from "./storage";
+import { useRecordHistory, usePreview, useRecordStars, WorkbenchPage } from "./WorkbenchPage";
 
 vi.mock("~/features/progress/progress", async (importOriginal) => {
   const actual = await importOriginal<typeof progress>();
@@ -208,5 +209,90 @@ describe("usePreview stops work the bench no longer needs", () => {
     unmount();
     expect(signals[1]?.aborted).toBe(true);
     vi.useRealTimers();
+  });
+});
+
+describe("useRecordHistory", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  const scored = short.findIndex((f) => f.event === "run.scored");
+  const BODY = '{"schema":1,"nodes":[],"edges":[]}';
+  const record = (run: RunView | null, body: string | null = BODY) =>
+    renderHook((props: { run: RunView | null }) => useRecordHistory(l1.level.id, props.run, body), {
+      initialProps: { run },
+    });
+
+  it("keeps the run once it is scored, with the graph that ran and each case's verdict", () => {
+    const hook = record(replay(short.slice(0, scored)));
+    // Nothing yet: a run still going has no result to remember.
+    expect(loadHistory(l1.level.id)).toEqual([]);
+
+    hook.rerender({ run: replay(short.slice(0, scored + 1)) });
+    const kept = loadHistory(l1.level.id);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.body).toBe(BODY);
+    expect(kept[0]?.stars).toBe(1);
+    expect(kept[0]?.cases.map((c) => [c.n, c.passed])).toEqual([
+      [1, true],
+      [2, true],
+    ]);
+  });
+
+  it("remembers which case failed, which is the whole point of the strip", () => {
+    // The committed short run passes both cases, so a fixture that cannot fail would let
+    // `passed: true` for everything through.
+    const run = replay(short.slice(0, scored + 1));
+    if (!run) throw new Error("no run");
+    const withFailure: RunView = {
+      ...run,
+      cases: run.cases.map((c, i) =>
+        i !== 1 || !c.graded ? c : { ...c, graded: { ...c.graded, passed: false } },
+      ),
+    };
+    record(withFailure);
+    expect(loadHistory(l1.level.id)[0]?.cases.map((c) => c.passed)).toEqual([true, false]);
+  });
+
+  it("writes one entry per run, however many events arrive after the score", () => {
+    const hook = record(replay(short.slice(0, scored + 1)));
+    hook.rerender({ run: replay(short) }); // run.finished: the same run
+    expect(loadHistory(l1.level.id)).toHaveLength(1);
+
+    const next = runReducer(null, { kind: "reset", runId: "f".repeat(32) });
+    hook.rerender({ run: next });
+    hook.rerender({ run: replay(short, next) });
+    expect(loadHistory(l1.level.id)).toHaveLength(2);
+  });
+
+  it("never persists a fact or a gold reveal, which the server hands over per role", () => {
+    // A localStorage copy would outlive the role gate the server and Results both apply.
+    record(replay(short.slice(0, scored + 1)));
+    const raw = window.localStorage.getItem(`vg.history.v1.${l1.level.id}`) ?? "";
+    expect(raw).not.toContain("gold");
+    expect(raw).not.toContain("facts");
+    expect(raw).not.toContain("question");
+  });
+
+  it("remembers nothing when it does not know which graph ran", () => {
+    record(replay(short.slice(0, scored + 1)), null);
+    expect(loadHistory(l1.level.id)).toEqual([]);
+  });
+});
+
+describe("useRecordHistory and the live bench", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  const scored = short.findIndex((f) => f.event === "run.scored");
+
+  it("writes nothing more when the player edits the bench after a scored run", () => {
+    // The hook takes the graph that RAN. Watching the live body would add an entry on every
+    // knob turn, filling the five slots with one run.
+    const run = replay(short.slice(0, scored + 1));
+    const hook = renderHook(
+      (props: { body: string }) => useRecordHistory(l1.level.id, run, props.body),
+      { initialProps: { body: '{"ran":1}' } },
+    );
+    expect(loadHistory(l1.level.id)).toHaveLength(1);
+    hook.rerender({ body: '{"ran":1,"edited":true}' });
+    hook.rerender({ body: '{"ran":1,"edited":2}' });
+    expect(loadHistory(l1.level.id)).toHaveLength(1);
   });
 });

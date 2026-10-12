@@ -120,6 +120,15 @@ test.describe("workbench", () => {
 
     // The gate frontend-architecture §12 promised: every figure carries its three parts. Until
     // today `data-vg-viz` appeared nowhere in the app, so this could never have fired.
+    // The history hook is wired into the page, not only unit-tested: a scored run leaves one
+    // summary behind, with the graph that ran and each case's verdict (N3).
+    const history = await page.evaluate(() =>
+      window.localStorage.getItem("vg.history.v1.grounded-citation"),
+    );
+    const kept = JSON.parse(history ?? "null") as { runs?: { cases?: unknown[] }[] } | null;
+    expect(kept?.runs).toHaveLength(1);
+    expect(kept?.runs?.[0]?.cases).toHaveLength(cases);
+
     // A figure inside a collapsed <details> ("Xem vết chạy") is in the DOM but not visible, and
     // the gate is about what every figure carries, not about which disclosure happens to be
     // open. Open them all first, as the a11y suite does.

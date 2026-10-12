@@ -32,7 +32,7 @@ import {
   type Issue,
   type PublicLevel,
 } from "./schema";
-import { loadSaved, loadSlip, save, saveSlip } from "./storage";
+import { loadSaved, loadSlip, recordRun, save, saveSlip } from "./storage";
 import { errorsOf, validateGraph } from "./validate";
 
 const levelsUrl = (zoneId: string | null) => (zoneId ? `/play/${zoneId}` : "/play");
@@ -213,6 +213,48 @@ export function useRecordStars(level: PublicLevel, run: RunView | null) {
   }, [scoredRun, stars, level.zone, level.id]);
 }
 
+/**
+ * Keeps a summary of each scored run of this level (N3), once per run.
+ *
+ * Scored runs only. A sample run earns no stars and grades three cases instead of ten, so
+ * mixing the two would put rows of different widths in one regression strip and make "the last
+ * passing configuration" mean two things.
+ *
+ * Only the verdicts go in -- never a fact or a gold reveal. Those reach the client per case
+ * role, and a copy in localStorage would outlive the gate the server and the results screen
+ * both apply.
+ *
+ * `ranBody` is the graph that was POSTED, not the bench as it stands. Only the run id decides
+ * when to write, so a caller that hands over a changing body still gets one entry per run
+ * instead of one per knob turn.
+ */
+export function useRecordHistory(levelId: string, run: RunView | null, ranBody: string | null) {
+  const scoredRun = run?.score ? run.runId : null;
+  // The run id of the entry already written. Stating the invariant this way keeps the dep list
+  // complete -- a fresh `cases` object or an edited body re-runs the effect, and the guard, not
+  // a hand-trimmed dep list, is what stops a second entry for one run.
+  const written = useRef<string | null>(null);
+  useEffect(() => {
+    if (scoredRun === null || scoredRun === written.current) return;
+    // The score check narrows the type -- a non-null `scoredRun` already means there is one.
+    // A missing body is the real condition: nobody knows which graph ran.
+    if (!run?.score || ranBody === null) return;
+    written.current = scoredRun;
+    recordRun(levelId, {
+      body: ranBody,
+      at: Date.now(),
+      stars: run.score.stars as Stars,
+      tokens: run.score.tokens,
+      budget: run.score.budget,
+      cases: run.cases.map((c) => ({
+        n: c.n,
+        role: c.role,
+        passed: c.graded?.passed ?? false,
+      })),
+    });
+  }, [scoredRun, run, ranBody, levelId]);
+}
+
 /** The graph of the run on show; ours, so it parses, but checked like any other JSON. */
 function parseGraph(body: string | null): Graph | null {
   if (body === null) return null;
@@ -293,6 +335,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
 
   useRunStream(run?.runId ?? null, attempt, dispatch);
   useRecordStars(level, run);
+  useRecordHistory(level.id, run, lastBody);
   const left = useCancelOnLeave(run);
 
   const issues = serverIssues ?? clientIssues;
