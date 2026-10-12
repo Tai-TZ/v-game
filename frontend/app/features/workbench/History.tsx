@@ -112,7 +112,7 @@ export function History({
   );
 
   return (
-    <Viz caption={HISTORY_VI.caption} stamp="run">
+    <Viz caption={HISTORY_VI.caption} stamp="run" form="table">
       {/* Thirteen columns at L1 (ten cases plus three), far wider than a 375 px screen. Without
           its own scroller the table pushes the page sideways and lies over what is above it.
           Focusable for the same reason as the figure frame's: scrolling it IS the function. */}

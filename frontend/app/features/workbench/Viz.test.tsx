@@ -96,7 +96,12 @@ describe("Viz", () => {
   it("carries a description beside the stamp when the run on show is not the player's", () => {
     viewport(false);
     render(
-      <Viz caption="x" stamp="recorded" note="Lời giải mẫu L1, không phải cấu hình của bạn.">
+      <Viz
+        caption="x"
+        stamp="recorded"
+        note="Lời giải mẫu L1, không phải cấu hình của bạn."
+        table={<table />}
+      >
         <p data-picture>hình</p>
       </Viz>,
     );
@@ -104,16 +109,30 @@ describe("Viz", () => {
     expect(screen.getByText(/Lời giải mẫu L1, không phải cấu hình của bạn\./)).toBeDefined();
   });
 
-  it("offers no toggle when there is no table to offer", () => {
+  it("offers no toggle for a figure that already is a table", () => {
+    // History.tsx is the real caller: its content is a literal <table>, not a picture, so
+    // `form="table"` is the only legal way to opt out of the toggle -- a picture with no
+    // table alternative at all cannot be constructed; it would fail to typecheck.
     viewport(false);
     render(
-      <Viz caption="x" stamp="run">
-        <p data-picture>hình</p>
+      <Viz caption="x" stamp="run" form="table">
+        <table data-picture />
       </Viz>,
     );
     expect(screen.queryByRole("button", { name: /Xem dạng/ })).toBeNull();
     // Said on the element, so the CI gate does not have to guess from the DOM.
     expect(document.querySelector("[data-vg-viz]")?.getAttribute("data-vg-viz")).toBe("table");
+    expect(document.querySelector("[data-picture]")).not.toBeNull();
+  });
+
+  it("cannot be constructed with a picture and no table alternative", () => {
+    const invalid = () => (
+      // @ts-expect-error -- a figure must declare form="table" or supply a table, per §8.2.
+      <Viz caption="x" stamp="run">
+        <p>hình</p>
+      </Viz>
+    );
+    expect(typeof invalid).toBe("function");
   });
 });
 

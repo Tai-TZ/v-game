@@ -19,35 +19,42 @@ const NARROW = "(max-width: 639px)";
  * No `role="img"` here. Putting one on a wrapper orphaned every list item inside it the last
  * time it was tried, which axe caught on the workbench page.
  */
-export function Viz({
-  caption,
-  stamp,
-  note,
-  table,
-  children,
-}: {
-  /** What the picture shows, as one Vietnamese sentence. */
-  caption: string;
-  stamp: VizStamp;
-  /** Said beside the stamp when the figure needs it, e.g. whose recorded run this is. */
-  note?: string;
-  /** The same numbers as a table. Without one, no toggle is offered. */
-  table?: ReactNode;
-  children: ReactNode;
-}): ReactElement {
+type VizProps =
+  | {
+      caption: string;
+      stamp: VizStamp;
+      note?: string;
+      /** The content IS a table already: no other form to offer, so no toggle. */
+      form: "table";
+      children: ReactNode;
+    }
+  | {
+      caption: string;
+      stamp: VizStamp;
+      note?: string;
+      form?: undefined;
+      /** The same data as a table, behind the "Xem dạng bảng" toggle. */
+      table: ReactNode;
+      children: ReactNode;
+    };
+
+export function Viz(props: VizProps): ReactElement {
+  const { caption, stamp, note, children } = props;
   const narrow = useMediaQuery(NARROW);
   // Null until the player picks: their choice then holds, rather than snapping back on resize.
   const [chosen, setChosen] = useState<"picture" | "table" | null>(null);
   const showing = chosen ?? (narrow ? "table" : "picture");
-  const asTable = table !== undefined && showing === "table";
+  const asTable = props.form !== "table" && showing === "table";
+  const table = props.form === "table" ? children : props.table;
 
   return (
     <figure
-      // "table": the content is already a table and has no other form to offer, so no toggle.
-      // "both": a picture with a table alternative behind the toggle. Stated, not inferred --
-      // below 640 px every figure of the second kind is SHOWING a table, which is not the same
-      // thing as being one.
-      data-vg-viz={table === undefined ? "table" : "both"}
+      // Declared by the caller, not re-derived from whether a `table` prop was passed: a
+      // picture with no readable alternative then fails to typecheck instead of exempting
+      // itself from the toggle at the one width where the gate could not tell the difference
+      // (round 4 of this PR's CI). "both": a picture with a table alternative behind the
+      // toggle -- below 640 px it is SHOWING that table, which is not the same as being one.
+      data-vg-viz={props.form === "table" ? "table" : "both"}
       className="mt-3"
     >
       {/* A region that scrolls has to be reachable by keyboard, or a keyboard-only player
@@ -62,6 +69,8 @@ export function Viz({
         >
           {table}
         </div>
+      ) : props.form === "table" ? (
+        table
       ) : (
         children
       )}
@@ -70,7 +79,7 @@ export function Viz({
         {VIZ_STAMP[stamp]}
         {note !== undefined && ` · ${note}`}
       </p>
-      {table !== undefined && (
+      {props.form !== "table" && (
         <button
           type="button"
           onClick={() => setChosen(asTable ? "picture" : "table")}
