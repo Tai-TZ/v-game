@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { historyMatrix } from "./history";
+import { historyMatrix, lastPassing } from "./history";
 import type { RunMark } from "./storage";
 
 const mark = (at: number, stars: 0 | 1 | 2 | 3, ns: number[]): RunMark => ({
@@ -50,5 +50,25 @@ describe("historyMatrix", () => {
 
   it("has nothing to draw with no runs behind it", () => {
     expect(historyMatrix([])).toEqual({ columns: [], rows: [] });
+  });
+});
+
+describe("lastPassing", () => {
+  it("picks the newest run that earned a star, not the newest run", () => {
+    // Star 1 is the level's passing line: it is what lights the zone.
+    const runs = [mark(9, 0, [1]), mark(5, 2, [1]), mark(1, 1, [1])];
+    expect(lastPassing(runs)?.at).toBe(5);
+  });
+
+  it("has nothing to go back to when no run earned a star", () => {
+    expect(lastPassing([mark(2, 0, [1]), mark(1, 0, [1])])).toBeNull();
+  });
+
+  it("has nothing to go back to with no history at all", () => {
+    expect(lastPassing([])).toBeNull();
+  });
+
+  it("takes the one passing run whatever its place in the list", () => {
+    expect(lastPassing([mark(3, 0, [1]), mark(2, 0, [1]), mark(1, 3, [1])])?.at).toBe(1);
   });
 });

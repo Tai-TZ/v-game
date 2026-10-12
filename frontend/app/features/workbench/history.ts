@@ -44,3 +44,14 @@ export function historyMatrix(runs: readonly RunMark[]): HistoryMatrix {
   });
   return { columns, rows };
 }
+
+/**
+ * The newest run that earned a star, or none. Star 1 is the level's passing line -- it is what
+ * lights the zone on the campus -- so it is what "go back to the last version that worked"
+ * means.
+ *
+ * A run the daily cap cut short is not in the history at all (useRecordHistory withholds it),
+ * so there is no untrustworthy star to filter out here.
+ */
+export const lastPassing = (runs: readonly RunMark[]): RunMark | null =>
+  runs.find((run) => run.stars >= 1) ?? null;
