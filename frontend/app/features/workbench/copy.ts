@@ -81,6 +81,13 @@ export const BIN_VI = {
 
 /** Lược dao (L2's lesson): the blade says when it cut through the thing being looked for. */
 export const BLADE_VI = {
+  caption: "Chỗ lược dao hạ xuống kho, theo cỡ đoạn trung bình của lượt này.",
+  columns: {
+    variant: "Cách chia",
+    chunks: "Số đoạn",
+    avg: "Trung bình",
+    split: "Cắt đứt câu đáp án",
+  },
   split: "lượt này cắt đứt câu đáp án",
   splitLine: "Lược dao cắt đứt câu đáp án: đoạn đúng nằm vắt qua hai mảnh.",
 } as const;
@@ -146,6 +153,17 @@ export const LEDGER_VI = {
 } as const;
 
 /** Máy đóng tem (L1's lesson): a source the bin never held is the thing to notice. */
+/**
+ * N5: cô Lan's diagnosis is assembled from the run's own trace. The assistant is never asked
+ * why it failed -- a reader who thinks it was takes away the opposite of the lesson -- so this
+ * is descriptive copy and deliberately not one of §8.4's source stamps (roadmap N5).
+ */
+export const DIAGNOSIS_VI = {
+  source:
+    "Chẩn đoán này dựng từ vết chạy của lượt. Trợ lý không được hỏi vì sao nó sai: " +
+    "mọi câu dưới đây là mẫu câu điền bằng số liệu của chính lượt bạn vừa chạy.",
+} as const;
+
 export const DROPPED_VI = {
   /** On a cut block. The rank is the place it had in the list the packer was handed. */
   piece: (rank: number) => `bị cắt: hạng ${rank}`,
@@ -162,6 +180,11 @@ export const DROPPED_VI = {
 
 export const STAMP_VI = {
   fake: "· mã này không có trong thùng",
+  /** L1 §12: "TRƯỢT vì thiếu nguồn: bong bóng vỡ, chữ 'không có nguồn'". */
+  bubble: "· không có nguồn",
+  /** The same three kinds as words, for the table form. */
+  kind: { brick: "có nguồn trong thùng", fake: "trích nguồn bịa", bubble: "không có nguồn" },
+  caption: "Từng câu của trả lời và nguồn nó dựa vào.",
   note: "Câu viền liền là câu có nguồn trong thùng; viền đứt là câu không trích nguồn nào.",
 } as const;
 

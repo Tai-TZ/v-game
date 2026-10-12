@@ -369,3 +369,29 @@ describe("the swing in output tokens", () => {
     expect(document.querySelector("[data-out-spread]")?.textContent).not.toContain("–");
   });
 });
+
+describe("where cô Lan's diagnosis came from", () => {
+  const lesson = {
+    case: "lib-l1-v01",
+    flag: "ret.gold_missing",
+    message_vi: "Câu #1 cần một đoạn trong Điều 39.",
+  };
+
+  it("says the diagnosis was built from the trace, in plain sight and above the list", () => {
+    // N5's point: the assistant was never asked why it failed. A reader who thinks it was
+    // learns the opposite of the lesson, so this is descriptive copy, not a source stamp.
+    show(finishedRun({ "lib-l1-v01": trap }, [lesson]));
+    const note = document.querySelector("[data-diagnosis-source]");
+    expect(note?.textContent).toContain("dựng từ vết chạy");
+    // Visible: sr-only would leave the sighted reader with the wrong impression.
+    expect(note?.className).not.toContain("sr-only");
+    // Above the list, not parked at the foot of the page.
+    const list = document.querySelector('ul[aria-labelledby="wb-diagnosis-title"]');
+    expect(list?.previousElementSibling).toBe(note);
+  });
+
+  it("stays quiet when there is no diagnosis to explain", () => {
+    show(finishedRun({ "lib-l1-v01": trap }));
+    expect(document.querySelector("[data-diagnosis-source]")).toBeNull();
+  });
+});

@@ -125,6 +125,28 @@ test.describe("workbench", () => {
     await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
     await expect(page.getByText("Đã lưu cấu hình trên máy này.")).toBeVisible();
 
+    // The gate frontend-architecture §12 promised: every figure carries its three parts. Until
+    // today `data-vg-viz` appeared nowhere in the app, so this could never have fired.
+    const figures = page.locator("[data-vg-viz]");
+    const count = await figures.count();
+    expect(count).toBeGreaterThan(0);
+    const STAMPS = [
+      "Đo từ lượt của bạn",
+      "Đo từ nhãn của bạn",
+      "Tính sẵn từ chỉ mục",
+      "Minh hoạ",
+      "Lượt chạy đã ghi",
+      "Mô phỏng",
+      "Dữ liệu ghi sẵn",
+    ];
+    for (let i = 0; i < count; i++) {
+      const figure = figures.nth(i);
+      await expect(figure.locator("figcaption")).not.toBeEmpty();
+      const text = (await figure.textContent()) ?? "";
+      expect(STAMPS.filter((stamp) => text.includes(stamp))).toHaveLength(1);
+      await expect(figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ })).toBeVisible();
+    }
+
     await page.setViewportSize({ width: 375, height: 812 });
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

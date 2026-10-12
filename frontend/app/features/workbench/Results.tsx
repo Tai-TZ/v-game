@@ -14,6 +14,7 @@ import {
   groupDiagnosis,
   knobName,
   LABEL_VI,
+  DIAGNOSIS_VI,
   LEVEL_COPY,
   lowerFirst,
   stepStatusText,
@@ -229,63 +230,68 @@ export function Results({
       ) : run.report.diagnosis.length === 0 ? (
         <p className="mt-2 text-sm">Không có câu nào cần chẩn đoán.</p>
       ) : (
-        <ul aria-labelledby="wb-diagnosis-title" className="mt-3 max-w-prose space-y-3">
-          {groupDiagnosis(run.report.diagnosis).map((group) => {
-            const [first, ...rest] = group.cases.flatMap((id) => {
-              const c = run.cases.find((item) => item.id === id);
-              return c ? [c] : [];
-            });
-            const target = diagnosisTarget(env, group, revealed, runGraph);
-            const showSlot = target !== null && hasControls(env, target.slot);
-            const attached = graph.nodes.some((node) => node.type === target?.slot);
-            return (
-              <li key={group.flag} className="rounded-md border border-line bg-surface p-3">
-                <p>{rich(group.message_vi)}</p>
-                {showSlot && target.why && <p className="mt-1 text-sm">{target.why}</p>}
-                {rest.length > 0 && (
-                  <p className="mt-1 text-sm">
-                    Cùng lỗi ở{" "}
-                    {rest.map((c, index) => (
-                      <span key={c.id}>
-                        {index > 0 && ", "}
+        <>
+          <p data-diagnosis-source className="mt-2 max-w-prose text-sm text-fg-muted">
+            {DIAGNOSIS_VI.source}
+          </p>
+          <ul aria-labelledby="wb-diagnosis-title" className="mt-3 max-w-prose space-y-3">
+            {groupDiagnosis(run.report.diagnosis).map((group) => {
+              const [first, ...rest] = group.cases.flatMap((id) => {
+                const c = run.cases.find((item) => item.id === id);
+                return c ? [c] : [];
+              });
+              const target = diagnosisTarget(env, group, revealed, runGraph);
+              const showSlot = target !== null && hasControls(env, target.slot);
+              const attached = graph.nodes.some((node) => node.type === target?.slot);
+              return (
+                <li key={group.flag} className="rounded-md border border-line bg-surface p-3">
+                  <p>{rich(group.message_vi)}</p>
+                  {showSlot && target.why && <p className="mt-1 text-sm">{target.why}</p>}
+                  {rest.length > 0 && (
+                    <p className="mt-1 text-sm">
+                      Cùng lỗi ở{" "}
+                      {rest.map((c, index) => (
+                        <span key={c.id}>
+                          {index > 0 && ", "}
+                          <a
+                            href={`#cau-${c.n}`}
+                            className="font-semibold text-brand underline underline-offset-4"
+                          >
+                            câu #{c.n}
+                          </a>
+                        </span>
+                      ))}
+                      .
+                    </p>
+                  )}
+                  {(first ?? showSlot) && (
+                    <div className="mt-1 flex flex-wrap gap-x-5">
+                      {first && (
                         <a
-                          href={`#cau-${c.n}`}
-                          className="font-semibold text-brand underline underline-offset-4"
+                          href={`#cau-${first.n}`}
+                          className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline underline-offset-4"
                         >
-                          câu #{c.n}
+                          Xem câu #{first.n}
                         </a>
-                      </span>
-                    ))}
-                    .
-                  </p>
-                )}
-                {(first ?? showSlot) && (
-                  <div className="mt-1 flex flex-wrap gap-x-5">
-                    {first && (
-                      <a
-                        href={`#cau-${first.n}`}
-                        className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline underline-offset-4"
-                      >
-                        Xem câu #{first.n}
-                      </a>
-                    )}
-                    {showSlot && (
-                      <button
-                        type="button"
-                        onClick={() => onFocusSlot(target.slot, target.param)}
-                        className={buttonClass("inline")}
-                      >
-                        {attached
-                          ? `Xem ở ${knobName(target.slot, target.param)}`
-                          : `Thử gắn ${TOY[target.slot].name}`}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                      )}
+                      {showSlot && (
+                        <button
+                          type="button"
+                          onClick={() => onFocusSlot(target.slot, target.param)}
+                          className={buttonClass("inline")}
+                        >
+                          {attached
+                            ? `Xem ở ${knobName(target.slot, target.param)}`
+                            : `Thử gắn ${TOY[target.slot].name}`}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>
