@@ -148,6 +148,7 @@ export const LEDGER_VI = {
       : inBin === 0
         ? `Trợ lý trích ${cited} mã: không mã nào có trong thùng.`
         : `Trợ lý trích ${cited} mã: ${inBin} có trong thùng, ${ghost} không có.`,
+  caption: "Mã đoạn qua ba chặng: đã lấy về, vào thùng, đã trích.",
   /** Said on screen, because a player who opens a hidden case will wonder where this went. */
   samplesOnly: "Sổ đối chiếu chỉ mở cho câu mẫu.",
 } as const;

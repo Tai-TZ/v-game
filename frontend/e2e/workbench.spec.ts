@@ -118,13 +118,6 @@ test.describe("workbench", () => {
     const [model, calls] = Object.entries(finished.models)[0] ?? ["", 0];
     await expect(page.getByText(`${model} (${calls} lời gọi)`)).toBeVisible();
 
-    await page.getByRole("button", { name: "Chỉnh rồi chạy lại" }).click();
-    await expect(page.getByRole("heading", { level: 2, name: "Bàn thợ" })).toBeFocused();
-    await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
-    await page.reload();
-    await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
-    await expect(page.getByText("Đã lưu cấu hình trên máy này.")).toBeVisible();
-
     // The gate frontend-architecture §12 promised: every figure carries its three parts. Until
     // today `data-vg-viz` appeared nowhere in the app, so this could never have fired.
     const figures = page.locator("[data-vg-viz]");
@@ -146,6 +139,13 @@ test.describe("workbench", () => {
       expect(STAMPS.filter((stamp) => text.includes(stamp))).toHaveLength(1);
       await expect(figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ })).toBeVisible();
     }
+
+    await page.getByRole("button", { name: "Chỉnh rồi chạy lại" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Bàn thợ" })).toBeFocused();
+    await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
+    await page.reload();
+    await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
+    await expect(page.getByText("Đã lưu cấu hình trên máy này.")).toBeVisible();
 
     await page.setViewportSize({ width: 375, height: 812 });
     const overflow = await page.evaluate(

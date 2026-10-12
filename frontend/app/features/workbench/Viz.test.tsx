@@ -112,3 +112,15 @@ describe("Viz", () => {
     expect(screen.queryByRole("button", { name: /Xem dạng/ })).toBeNull();
   });
 });
+
+describe("the table form scrolls, so it has to be reachable", () => {
+  it("gives the scrolling wrapper a tab stop", () => {
+    // axe scrollable-region-focusable, serious: without this a keyboard-only player cannot
+    // scroll a wide table. Here the tab stop does something, unlike a chip that does nothing.
+    viewport(true);
+    const { container } = draw();
+    const scroller = container.querySelector(".overflow-x-auto");
+    expect(scroller?.getAttribute("tabindex")).toBe("0");
+    expect(scroller?.querySelector("table")).not.toBeNull();
+  });
+});

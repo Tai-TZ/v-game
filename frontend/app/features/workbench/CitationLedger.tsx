@@ -73,7 +73,13 @@ export function CitationLedger({
 
   return (
     <div className="mt-3">
-      <div className="overflow-x-auto">
+      {/* Focusable for the same reason as the figure frame's table: it scrolls. */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label={LEDGER_VI.caption}
+        className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-brand"
+      >
         <table className="text-sm">
           <caption className="sr-only">
             Mã đoạn qua ba chặng: đã lấy về, vào thùng, đã trích.

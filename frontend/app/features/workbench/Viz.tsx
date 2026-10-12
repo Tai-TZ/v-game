@@ -43,7 +43,21 @@ export function Viz({
 
   return (
     <figure data-vg-viz className="mt-3">
-      {asTable ? <div className="overflow-x-auto">{table}</div> : children}
+      {/* A region that scrolls has to be reachable by keyboard, or a keyboard-only player
+          cannot scroll it (axe scrollable-region-focusable). Unlike a chip, the tab stop here
+          does something: it scrolls. The <figcaption> below names it. */}
+      {asTable ? (
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label={caption}
+          className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-brand"
+        >
+          {table}
+        </div>
+      ) : (
+        children
+      )}
       <figcaption className="mt-1 max-w-prose text-sm">{caption}</figcaption>
       <p className="mt-1 text-xs text-fg-muted">
         {VIZ_STAMP[stamp]}

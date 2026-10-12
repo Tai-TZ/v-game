@@ -99,6 +99,16 @@ describe("CitationLedger", () => {
     // Same call as StarDome's sr-only list: no handler is wired, so a focusable chip would be
     // a stop that leads nowhere. The table is the thing a screen reader walks.
     draw();
-    expect(document.querySelectorAll("[tabindex]")).toHaveLength(0);
+    // Narrow to the cells: the scrolling wrapper around the table is focusable on purpose,
+    // because there a tab stop is how a keyboard user scrolls.
+    expect(document.querySelectorAll("td [tabindex], th [tabindex]")).toHaveLength(0);
+  });
+});
+
+describe("the ledger scrolls sideways when there are many codes", () => {
+  it("gives its scrolling wrapper a tab stop for the same reason", () => {
+    const { container } = draw();
+    const scroller = container.querySelector(".overflow-x-auto");
+    expect(scroller?.getAttribute("tabindex")).toBe("0");
   });
 });
