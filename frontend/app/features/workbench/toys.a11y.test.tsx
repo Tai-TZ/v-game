@@ -3,6 +3,7 @@ import axe from "axe-core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Blade } from "./Blade";
+import { CitationLedger } from "./CitationLedger";
 import { ContextBin } from "./ContextBin";
 import { Stamps } from "./Stamps";
 import { StarDome } from "./StarDome";
@@ -17,6 +18,9 @@ afterEach(cleanup);
  */
 const STRUCTURAL = [
   "list",
+  "th-has-data-cells",
+  "td-headers-attr",
+  "scope-attr-valid",
   "listitem",
   "aria-required-children",
   "aria-required-parent",
@@ -78,6 +82,21 @@ describe("the toys answer axe's structural rules", () => {
   it("StarDome", async () => {
     const { container } = render(
       <StarDome items={items} goldChunks={["ab12cd34"]} goldRank={1} showGold />,
+    );
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it("the citation ledger answers the table rules too", async () => {
+    // A <table> brings its own structural rules: a row header with no data cells, a bad scope,
+    // or headers pointing at nothing are all invisible to the list rules above.
+    const { container } = render(
+      <CitationLedger
+        caseRole="visible"
+        ranked={items}
+        included={["ab12cd34"]}
+        cited={["ab12cd34", "zz99zz99"]}
+        gold={{ chunks: ["ab12cd34"], ranks: {}, flags: [], visible: true }}
+      />,
     );
     expect(await violations(container)).toEqual([]);
   });
