@@ -25,7 +25,14 @@ import { SlipResult, WhyMenu } from "./GuessSlip";
 import { RankJourney } from "./RankJourney";
 import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
-import { caseModel, llmCalls, unfinished, type CaseView, type RunView } from "./run";
+import {
+  caseModel,
+  fallbackAnswers,
+  llmCalls,
+  unfinished,
+  type CaseView,
+  type RunView,
+} from "./run";
 import { BLOCK_TYPES, type BlockType, type GoldReveal, type Graph } from "./schema";
 
 interface ResultsProps {
@@ -86,6 +93,7 @@ export function Results({
   const first = run.cases.find((c) => c.id === level.s1_required[0]);
   const skipped = unfinished(run).length;
   const calls = llmCalls(run);
+  const served = fallbackAnswers(run);
   const conditions = [
     {
       ok: score.s1,
@@ -97,7 +105,16 @@ export function Results({
       ].join(" · "),
       bar: false,
     },
-    { ok: score.s2, evidence: `${fmt(score.tokens)}/${fmt(score.budget)} token`, bar: true },
+    {
+      ok: score.s2,
+      // X7: a fallback costs about 0,9k more output tokens on an L3 run (spec §7), so when one
+      // answered, this token figure is not a measure of the player's bench alone.
+      evidence: [
+        `${fmt(score.tokens)}/${fmt(score.budget)} token`,
+        ...(served.fallback > 0 ? ["hiệu chỉnh trên model chính"] : []),
+      ].join(" · "),
+      bar: true,
+    },
     {
       ok: score.s3,
       evidence: [
@@ -280,6 +297,12 @@ export function Results({
           {Object.entries(run.models)
             .map(([model, count]) => `${model} (${count} lời gọi)`)
             .join(" · ")}
+        </p>
+      )}
+      {served.fallback > 0 && (
+        <p data-fallback={served.fallback} className="max-w-prose text-sm text-fg-muted">
+          {`${served.fallback}/${served.answered} câu do model dự phòng trả lời. Sao 2 hiệu chỉnh` +
+            " trên model chính, nên số token của lượt này không phải thước đo cấu hình của bạn."}
         </p>
       )}
 

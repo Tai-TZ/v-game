@@ -193,7 +193,7 @@ describe("which model answered each case", () => {
     document.getElementById(`cau-${n}`)?.querySelector("[data-case-model]");
 
   it("names the model on every case that got an answer", () => {
-    // The committed L1 reference stream: all ten cases answered by the primary.
+    // The committed short L1 run: both cases answered by the primary.
     show(finishedRun({ "lib-l1-v01": trap, "lib-l1-t01": trap }));
     expect(model(1)?.getAttribute("data-case-model")).toBe("gemini-3.5-flash-lite");
     expect(model(1)?.textContent).toContain("Model");
@@ -221,5 +221,62 @@ describe("which model answered each case", () => {
     };
     show(cached);
     expect(model(1)?.textContent).toContain("Kết quả đã lưu");
+  });
+});
+
+describe("a run some fallback model answered", () => {
+  /** The committed ten-case L1 reference stream, re-stamped so `n` cases came from a fallback. */
+  const withFallback = (n: number) => {
+    const run = replay(parseSse(readText("e2e", "data", "run-l1-reference.sse")));
+    if (!run) throw new Error("no reference run");
+    return {
+      ...run,
+      primaryModel: "gemini-3.5-flash-lite",
+      cases: run.cases.map((c, i) =>
+        i >= n
+          ? c
+          : {
+              ...c,
+              steps: Object.fromEntries(
+                Object.entries(c.steps).map(([node, s]) => [
+                  node,
+                  s.block !== "llm"
+                    ? s
+                    : {
+                        ...s,
+                        facts: (s.facts ?? []).map((f) =>
+                          f.kind !== "llm" ? f : { ...f, model: "gemini-3.1-flash-lite" },
+                        ),
+                      },
+                ]),
+              ),
+            },
+      ),
+    };
+  };
+
+  it("counts the cases the fallback answered, out of the cases that got an answer", () => {
+    show(withFallback(2));
+    const line = document.querySelector("[data-fallback]");
+    expect(line?.getAttribute("data-fallback")).toBe("2");
+    expect(line?.textContent).toContain("2/10 câu do model dự phòng trả lời");
+  });
+
+  it("says star 2 is calibrated on the primary, beside the token evidence", () => {
+    // spec §7: a fallback costs about 0,9k more output tokens on an L3 run, so the token figure
+    // star 2 is judged against is not a measure of the player's bench.
+    show(withFallback(2));
+    const s2 = [...document.querySelectorAll("li")].find((li) =>
+      li.textContent.startsWith("Sao 2"),
+    );
+    expect(s2?.textContent).toContain("token");
+    expect(s2?.textContent).toContain("hiệu chỉnh trên model chính");
+  });
+
+  it("stays quiet when the primary answered every case", () => {
+    show(withFallback(0));
+    expect(document.querySelector("[data-fallback]")).toBeNull();
+    expect(document.body.textContent).not.toContain("model dự phòng");
+    expect(document.body.textContent).not.toContain("model chính");
   });
 });

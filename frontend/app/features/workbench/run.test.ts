@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   blockState,
   caseModel,
+  fallbackAnswers,
   frameAction,
   isActive,
   llmCalls,
   runningNodes,
   runReducer,
   type CaseView,
+  type RunView,
   type StepView,
 } from "./run";
 import { parseEvent, type EventType } from "./schema";
@@ -260,5 +262,63 @@ describe("caseModel", () => {
     // A hidden case on a recorded run keeps only case.graded, and a skipped case has no llm fact.
     const bare = { ...withLlm("x", false), steps: {} };
     expect(caseModel(bare)).toBeNull();
+  });
+});
+
+describe("fallbackAnswers", () => {
+  const caseWith = (model: string | null, replayed = false) =>
+    ({
+      steps:
+        model === null
+          ? {}
+          : {
+              llm: {
+                block: "llm",
+                state: "done",
+                status: "ok",
+                facts: [
+                  {
+                    kind: "llm",
+                    stop_reason: "end",
+                    cited_ids: [],
+                    replayed,
+                    model,
+                    system_tokens: 1,
+                  },
+                ],
+              },
+            },
+    }) as unknown as CaseView;
+
+  const run = (primaryModel: string | undefined, cases: CaseView[]) =>
+    ({ cases, primaryModel }) as unknown as RunView;
+
+  it("counts the cases a model other than the primary answered", () => {
+    const r = run("gemini-3.5-flash-lite", [
+      caseWith("gemini-3.5-flash-lite"),
+      caseWith("gemini-3.1-flash-lite"),
+      caseWith("gemini-3.1-flash-lite"),
+    ]);
+    expect(fallbackAnswers(r)).toEqual({ fallback: 2, answered: 3 });
+  });
+
+  it("counts a cached fallback answer too: the grade is read off that answer either way", () => {
+    // engine-v0.2 §663 replays a fallback's old answer. It was not a call this run made -- the
+    // "lời gọi AI" line says that -- but star 2 is still being judged on its token count.
+    const r = run("gemini-3.5-flash-lite", [caseWith("gemini-3.1-flash-lite", true)]);
+    expect(fallbackAnswers(r)).toEqual({ fallback: 1, answered: 1 });
+  });
+
+  it("leaves a case that got no answer out of both numbers", () => {
+    // Otherwise a quota-exhausted run reads as "0/10 do model dự phòng", which measures the
+    // denominator rather than the run.
+    const r = run("m1", [caseWith("m1"), caseWith(null), caseWith(null)]);
+    expect(fallbackAnswers(r)).toEqual({ fallback: 0, answered: 1 });
+  });
+
+  it("claims no fallback when the run never said which model is primary", () => {
+    // A recorded run exported before the field existed: unknown, so assert nothing.
+    const r = run(undefined, [caseWith("whatever")]);
+    expect(fallbackAnswers(r)).toEqual({ fallback: 0, answered: 1 });
   });
 });

@@ -60,6 +60,8 @@ export interface RunView {
   score?: StarResult;
   report?: RunReport;
   models?: Readonly<Record<string, number>>;
+  /** X7: the model star 2 is calibrated on. Absent when nothing answered this run. */
+  primaryModel?: string;
   failure?: { code: string; message_vi: string };
 }
 
@@ -143,6 +145,7 @@ function apply(run: RunView, event: RunEvent): RunView {
         stream: "closed",
         report: event.report,
         models: event.models,
+        ...(event.primary_model === undefined ? {} : { primaryModel: event.primary_model }),
       };
     case "run.failed":
       // A failure can follow run.scored (report error, cancel in between): the stars stay.
@@ -217,6 +220,30 @@ export function caseModel(c: CaseView): { model: string; replayed: boolean } | n
     }
   }
   return null;
+}
+
+/**
+ * Cases a model other than the primary answered, out of the cases that got an answer (X7).
+ *
+ * Counted by which model produced the answer, replays included: the spec calibrates star 2 on
+ * the primary model because a fallback costs about 0,9k more output tokens on an L3 run, and the
+ * grade is read off whichever answer is on screen, cached or not. Whether this run *called* the
+ * fallback is a different question, answered by the "lời gọi AI" line.
+ *
+ * A case with no answer is in neither number -- counting it would make a quota-exhausted run
+ * read as "0/10 do model dự phòng" -- and a run that never said which model is primary claims
+ * no fallback at all rather than guessing.
+ */
+export function fallbackAnswers(run: RunView): { fallback: number; answered: number } {
+  let fallback = 0;
+  let answered = 0;
+  for (const c of run.cases) {
+    const served = caseModel(c);
+    if (served === null) continue;
+    answered += 1;
+    if (run.primaryModel !== undefined && served.model !== run.primaryModel) fallback += 1;
+  }
+  return { fallback, answered };
 }
 
 /** LLM answers of the run: real calls and answers served from the replay cache (§8.6). */

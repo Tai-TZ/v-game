@@ -248,6 +248,9 @@ export const EVENT_SCHEMAS = {
   "run.finished": v.looseObject({
     report: RunReportSchema,
     models: v.record(v.string(), Int),
+    // X7: the model the run's scoring assumes. Absent when nothing answered, and on runs
+    // recorded before the engine sent it.
+    primary_model: v.optional(v.string()),
   }),
   "run.failed": v.looseObject({ code: v.string(), message_vi: v.string() }),
 } as const;
