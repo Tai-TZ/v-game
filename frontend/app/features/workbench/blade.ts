@@ -17,6 +17,9 @@ const MAX_CUTS = 24;
 export function bladeCuts(avgTokens: number): number[] {
   if (avgTokens <= 0) return [];
   const spacing = (Math.min(avgTokens, WIDEST) / WIDEST) * 100;
-  const count = Math.min(Math.floor(100 / spacing) - 1, MAX_CUTS);
+  // Every multiple of the spacing that falls strictly inside the strip. floor() dropped the
+  // last one, so a chunk averaging 979 of 1024 drew no cut at all and the remainder was
+  // silently merged into a full-width piece.
+  const count = Math.min(Math.ceil(100 / spacing) - 1, MAX_CUTS);
   return Array.from({ length: Math.max(count, 0) }, (_, i) => (i + 1) * spacing);
 }
