@@ -46,6 +46,7 @@ import {
   outcomeText,
   shownLabels,
   stepStatusText,
+  TOKENS_VI,
   TOY,
   toyName,
   vaiVi,
@@ -402,6 +403,7 @@ function Slot({
           packed={packedIds(view)}
           caseRole={view?.followed.role ?? null}
           ranked={packerSaw(view?.followed.steps ?? {})}
+          prompt={promptTokens(view)}
         />
       )}
       {/* No step for this slot yet, or the bench has moved on from the run: the dome follows
@@ -712,6 +714,14 @@ function Ingestion({ run, node, gold }: { run: RunView; node: string; gold: Slot
 }
 
 /** What the packer put in the bin for the followed case, from whichever node packed it. */
+/** What the provider charged for this case's prompt; the packer's own step has no usage. */
+function promptTokens(view: BenchRunView | null): number | null {
+  for (const step of Object.values(view?.followed.steps ?? {})) {
+    if (step.block === "llm") return step.tokens?.in ?? null;
+  }
+  return null;
+}
+
 function packedIds(view: BenchRunView | null): readonly string[] {
   for (const step of Object.values(view?.followed.steps ?? {})) {
     const pack = step.facts?.find((f): f is Extract<Fact, { kind: "pack" }> => f.kind === "pack");
@@ -728,6 +738,7 @@ function StepState({
   packed: packedIn,
   caseRole,
   ranked,
+  prompt,
 }: {
   step: StepView;
   node: string;
@@ -739,6 +750,8 @@ function StepState({
   caseRole: CaseRole | null;
   /** The ranked list the packer was handed; like `packed`, not visible from the llm step. */
   ranked: readonly Extract<Fact, { kind: "retrieved" }>["items"][number][];
+  /** The provider's input count for this case, read off the llm step. */
+  prompt: number | null;
 }) {
   const retrieved = step.facts?.find(
     (f): f is Extract<Fact, { kind: "retrieved" }> => f.kind === "retrieved",
@@ -763,7 +776,12 @@ function StepState({
         />
       )}
       {packed && (
-        <ContextBin tokens={packed.tokens} included={packed.included} dropped={packed.dropped} />
+        <ContextBin
+          tokens={packed.tokens}
+          included={packed.included}
+          dropped={packed.dropped}
+          promptTokens={prompt}
+        />
       )}
       {retrieved && (
         <StarDome
@@ -845,7 +863,7 @@ function FactView({ fact, step, gold }: { fact: Fact; step: StepView; gold: Slot
     return (
       <div className="space-y-1">
         <p>
-          {fmt(total)}/{fmt(budget)} token
+          {fmt(total)}/{fmt(budget)} token <span className="text-fg-muted">({TOKENS_VI.bin})</span>
         </p>
         <Bar value={total} max={budget} />
         <p className="text-fg-muted">
@@ -861,7 +879,8 @@ function FactView({ fact, step, gold }: { fact: Fact; step: StepView; gold: Slot
     <div className="space-y-1">
       {step.tokens && (
         <p>
-          {fmt(step.tokens.in)} vào · {fmt(step.tokens.out)} ra token
+          {fmt(step.tokens.in)} vào · {fmt(step.tokens.out)} ra token{" "}
+          <span className="text-fg-muted">({TOKENS_VI.usage})</span>
         </p>
       )}
       <p>

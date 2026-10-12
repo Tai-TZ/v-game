@@ -17,6 +17,7 @@ import {
   LEVEL_COPY,
   lowerFirst,
   stepStatusText,
+  TOKENS_VI,
   TOY,
   toyName,
   WHY_MENU,
@@ -111,7 +112,7 @@ export function Results({
       // X7: a fallback costs about 0,9k more output tokens on an L3 run (spec §7), so when one
       // answered, this token figure is not a measure of the player's bench alone.
       evidence: [
-        `${fmt(score.tokens)}/${fmt(score.budget)} token`,
+        `${fmt(score.tokens)}/${fmt(score.budget)} token (${TOKENS_VI.usage})`,
         ...(served.fallback > 0 ? ["hiệu chỉnh trên model chính"] : []),
       ].join(" · "),
       bar: true,
@@ -343,8 +344,8 @@ function CaseCard({
       </h4>
       {c.question && <p className="mt-1 text-sm text-fg-muted">{c.question}</p>}
       <Grade c={c} />
-      <p className="mt-2 text-sm text-fg-muted tabular-nums">
-        {fmt(c.tokens.in + c.tokens.out)} token
+      <p data-case-tokens className="mt-2 text-sm text-fg-muted tabular-nums">
+        {fmt(c.tokens.in + c.tokens.out)} token ({TOKENS_VI.usage})
       </p>
       <details className="group mt-1">
         <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">

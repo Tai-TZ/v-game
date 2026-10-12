@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import { binFill } from "./bin";
-import { BIN_VI, fmt } from "./copy";
+import { BIN_VI, fmt, TOKENS_VI } from "./copy";
 import { Viz } from "./Viz";
 
 /**
@@ -15,10 +15,13 @@ export function ContextBin({
   tokens,
   included,
   dropped,
+  promptTokens,
 }: {
   tokens: { docs: number; query: number; total: number; budget: number };
   included: readonly string[];
   dropped: readonly string[];
+  /** What the provider charged for this case's whole prompt; null until its step finishes. */
+  promptTokens: number | null;
 }): ReactElement {
   const fill = binFill(tokens);
   const cut = dropped.length > 0 ? `, ${dropped.length} đoạn bị cắt` : "";
@@ -89,7 +92,13 @@ export function ContextBin({
       </div>
       <p className="mt-1 text-sm tabular-nums">
         {fmt(tokens.total)}/{fmt(tokens.budget)} token · tài liệu {fmt(tokens.docs)} · câu hỏi{" "}
-        {fmt(tokens.query)}
+        {fmt(tokens.query)} <span className="text-fg-muted">({TOKENS_VI.bin})</span>
+      </p>
+      {/* The second of §8.4's two counts. Its own line, not a second band: the provider counts
+          the whole prompt and the bin only what it packed, so side by side they would read as
+          one quantity measured twice. */}
+      <p className="mt-1 max-w-prose text-sm text-fg-muted tabular-nums">
+        {promptTokens === null ? TOKENS_VI.noneYet : TOKENS_VI.prompt(fmt(promptTokens))}
       </p>
       {fill.overflow && <p className="text-sm font-semibold text-danger">{BIN_VI.overflow}</p>}
       <p className="mt-1 max-w-prose text-xs text-fg-muted">{BIN_VI.counted}</p>

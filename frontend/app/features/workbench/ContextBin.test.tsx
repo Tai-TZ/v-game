@@ -12,6 +12,7 @@ describe("ContextBin", () => {
         tokens={{ docs: 600, query: 400, total: 1000, budget: 3000 }}
         included={["a", "b"]}
         dropped={[]}
+        promptTokens={null}
       />,
     );
     expect(screen.getByRole("img").getAttribute("aria-label")).toBe(
@@ -25,6 +26,7 @@ describe("ContextBin", () => {
         tokens={{ docs: 3500, query: 100, total: 3600, budget: 3000 }}
         included={["a"]}
         dropped={["b", "c"]}
+        promptTokens={null}
       />,
     );
     expect(screen.getByText(/Nắp không đóng được/)).toBeDefined();
@@ -39,6 +41,7 @@ describe("ContextBin", () => {
         tokens={{ docs: 600, query: 400, total: 1000, budget: 3000 }}
         included={["a", "b", "c"]}
         dropped={[]}
+        promptTokens={null}
       />,
     );
     expect(screen.getByText(/mỗi khối là một đoạn, không theo cỡ/)).toBeDefined();
@@ -60,6 +63,7 @@ describe("what the bin actually paints", () => {
         tokens={{ docs: 1200, query: 93, total: 1293, budget: 3000 }}
         included={["a", "b"]}
         dropped={[]}
+        promptTokens={null}
       />,
     );
     const { docs, query, bin } = bands();
@@ -78,6 +82,7 @@ describe("what the bin actually paints", () => {
         tokens={{ docs: 3500, query: 100, total: 3600, budget: 3000 }}
         included={["a"]}
         dropped={["b"]}
+        promptTokens={null}
       />,
     );
     // bin.test.ts asks for an overflow that sticks out rather than a bar quietly at 100 %.
@@ -90,6 +95,7 @@ describe("what the bin actually paints", () => {
         tokens={{ docs: 600, query: 400, total: 1000, budget: 3000 }}
         included={["a", "b", "c", "d", "e"]}
         dropped={[]}
+        promptTokens={null}
       />,
     );
     expect(document.querySelectorAll("[data-passage]")).toHaveLength(5);
@@ -101,6 +107,7 @@ describe("what the bin actually paints", () => {
         tokens={{ docs: 600, query: 400, total: 1000, budget: 3000 }}
         included={["a"]}
         dropped={[]}
+        promptTokens={null}
       />,
     );
     expect(screen.getByText(/tài liệu 600 · câu hỏi 400/)).toBeDefined();
@@ -114,6 +121,7 @@ describe("the bin's table form", () => {
         tokens={{ docs: 1200, query: 93, total: 1293, budget: 3000 }}
         included={["a", "b"]}
         dropped={["c"]}
+        promptTokens={null}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Xem dạng bảng" }));
@@ -136,9 +144,34 @@ describe("the bin's table form", () => {
         tokens={{ docs: 600, query: 400, total: 1000, budget: 3000 }}
         included={["a"]}
         dropped={[]}
+        promptTokens={null}
       />,
     );
     expect(document.querySelector("figure[data-vg-viz]")).not.toBeNull();
     expect(document.body.textContent).toContain("Đo từ lượt của bạn");
+  });
+});
+
+describe("the two token counts", () => {
+  const pack = { docs: 393, query: 27, total: 420, budget: 3000 };
+
+  it("names the counter the bin used, and gives the provider's number its own words", () => {
+    // The committed L2 case: the bin counted 420 with regex-v1, Gemini charged 600 in for the
+    // same case. Both are true and they do not measure the same thing.
+    render(<ContextBin tokens={pack} included={["a"]} dropped={[]} promptTokens={600} />);
+    expect(document.body.textContent).toContain("đếm bằng regex-v1");
+    expect(document.body.textContent).toContain(
+      "Gemini tính 600 token vào cho cả lời nhắc, không chỉ phần trong thùng.",
+    );
+    // Two different figures, not one printed twice.
+    expect(document.body.textContent).toContain("420");
+    expect(document.body.textContent).toContain("600");
+  });
+
+  it("says it has no provider number yet rather than showing a zero", () => {
+    render(<ContextBin tokens={pack} included={["a"]} dropped={[]} promptTokens={null} />);
+    expect(document.body.textContent).toContain("Chưa có số của Gemini cho câu này.");
+    expect(document.body.textContent).not.toContain("0 token vào");
+    expect(document.body.textContent).toContain("đếm bằng regex-v1");
   });
 });

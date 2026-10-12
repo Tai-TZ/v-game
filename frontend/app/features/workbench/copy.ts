@@ -106,6 +106,20 @@ export const VIZ_VI = {
   toPicture: "Xem dạng hình",
 } as const;
 
+/**
+ * There are two token counts and §8.4 requires every bar to say which one it is using. The bin
+ * counts with the engine's own `regex-v1` (chunking, packing; engine-v0.2 E3); star 2 counts
+ * with Gemini's usage, thinking tokens included (E2, E8). They are not two readings of one
+ * quantity: the provider counts the whole prompt, the bin only what it packed.
+ */
+export const TOKENS_VI = {
+  bin: "đếm bằng regex-v1",
+  usage: "theo usage của Gemini",
+  prompt: (n: string) => `Gemini tính ${n} token vào cho cả lời nhắc, không chỉ phần trong thùng.`,
+  /** Said rather than defaulting the provider's number to zero. */
+  noneYet: "Chưa có số của Gemini cho câu này.",
+} as const;
+
 /** Sổ đối chiếu trích dẫn (N13): the same codes at three stages, aligned so a gap shows. */
 export const LEDGER_VI = {
   pull: "Đã lấy về",

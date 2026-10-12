@@ -67,6 +67,7 @@ describe("the toys answer axe's structural rules", () => {
         tokens={{ docs: 600, query: 40, total: 640, budget: 3000 }}
         included={["ab12cd34"]}
         dropped={["zz"]}
+        promptTokens={600}
       />,
     );
     expect(await violations(container)).toEqual([]);

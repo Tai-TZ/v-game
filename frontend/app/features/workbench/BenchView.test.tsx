@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
 import { BenchSection, type BenchRunView, type SlotGold } from "./BenchView";
-import type { BenchRun } from "./run";
+import type { BenchRun, StepView } from "./run";
 import type { Fact } from "./schema";
 import type { EventType } from "./schema";
 import { frame, readText, replay, testEnv } from "./test-fixtures";
@@ -296,5 +296,42 @@ describe("the citation ledger on the bench", () => {
     render(<Bench bench={start} benchRun="done" view={hidden} />);
     expect(document.querySelector('[data-row="pull"]')).toBeNull();
     expect(document.querySelector("[data-ledger-note]")).toBeNull();
+  });
+});
+
+describe("the provider's token count on the bin", () => {
+  const stripLlmTokens = (view: BenchRunView): BenchRunView => ({
+    ...view,
+    followed: {
+      ...view.followed,
+      steps: Object.fromEntries(
+        Object.entries(view.followed.steps).map(([node, s]) => {
+          if (s.block !== "llm") return [node, s];
+          // The key goes, rather than being set to undefined: an unfinished step has no
+          // `tokens` at all, which is the state this is here to reproduce.
+          const running: Omit<StepView, "tokens"> = { ...s };
+          delete (running as { tokens?: unknown }).tokens;
+          return [node, running];
+        }),
+      ),
+    },
+  });
+
+  it("says there is no provider number yet rather than printing a zero", () => {
+    // The llm step is still running, so Gemini has charged nothing for this case yet. A zero
+    // would read as "the prompt cost nothing", which is a number the run never measured.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} benchRun="done" view={stripLlmTokens(recordedView(null))} />);
+    expect(document.body.textContent).toContain("Chưa có số của Gemini cho câu này.");
+    expect(document.body.textContent).not.toContain("tính 0 token");
+  });
+
+  it("prints what the provider charged once its step has finished", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} benchRun="done" view={recordedView(null)} />);
+    expect(document.body.textContent).toContain("không chỉ phần trong thùng");
+    expect(document.body.textContent).not.toContain("Chưa có số của Gemini");
   });
 });

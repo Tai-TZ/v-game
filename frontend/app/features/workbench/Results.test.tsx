@@ -322,3 +322,20 @@ describe("a journey that crosses two rulers", () => {
     expect(card(1)).toContain("hạng 2 trong 3 đoạn giữ lại");
   });
 });
+
+describe("every token figure names the counter behind it", () => {
+  it("says star 2 is counted by the provider, thinking tokens included", () => {
+    // §8.4: the two counts differ, and stars_vi only says "tốn không quá 15.000 token".
+    show(finishedRun({ "lib-l1-v01": trap }));
+    const s2 = [...document.querySelectorAll("li")].find((li) =>
+      li.textContent.startsWith("Sao 2"),
+    );
+    expect(s2?.textContent).toContain("theo usage của Gemini");
+  });
+
+  it("says the same of a case's own token line", () => {
+    show(finishedRun({ "lib-l1-v01": trap }));
+    const line = document.querySelector("[data-case-tokens]");
+    expect(line?.textContent).toContain("theo usage của Gemini");
+  });
+});
