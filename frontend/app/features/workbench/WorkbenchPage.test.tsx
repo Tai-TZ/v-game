@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as progress from "~/features/progress/progress";
 import { PROGRESS_KEY, readProgress, recordStars } from "~/features/progress/progress";
 
-import { starterBench } from "./bench";
+import { graphFromBench, setAttached, setParam, starterBench } from "./bench";
 import { runReducer, type RunView } from "./run";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
 import { loadHistory, type RunMark } from "./storage";
@@ -369,5 +369,77 @@ describe("useRecordHistory reports what it wrote", () => {
     );
     expect(seen).toHaveLength(1);
     expect(seen[0]?.[0]?.body).toBe('{"ran":1}');
+  });
+});
+
+describe("going back to a remembered configuration", () => {
+  const seed = (body: string, stars: 0 | 1 | 2 | 3 = 1) =>
+    window.localStorage.setItem(
+      `vg.history.v1.${l1.level.id}`,
+      JSON.stringify({
+        runs: [
+          {
+            body,
+            at: 1,
+            stars,
+            tokens: 10,
+            budget: 20,
+            cases: [{ n: 1, role: "visible", passed: true }],
+          },
+        ],
+      }),
+    );
+
+  const page = () => {
+    const starter = starterBench(l1);
+    if (!starter) throw new Error("L1 starter is not drawable");
+    return render(
+      <MemoryRouter>
+        <WorkbenchPage env={l1} starter={starter} back="/play/library" />
+      </MemoryRouter>,
+    );
+  };
+
+  it("puts the starred run's values back on the bench, and saves them", () => {
+    const starter = starterBench(l1);
+    if (!starter) throw new Error("no starter");
+    const seven = setParam(
+      l1,
+      setAttached(starter, "vector_search", true),
+      "vector_search",
+      "top_k",
+      7,
+    );
+    seed(JSON.stringify(graphFromBench(l1, seven)));
+    page();
+    // L1 starts with no search block, so the knob is not even on the bench yet.
+    expect(screen.queryByRole("slider", { name: /Móc kéo/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Quay về bản đạt gần nhất" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quay về" }));
+
+    // The drawn control, not a handler call: this is what the player sees.
+    expect(screen.getByRole("slider", { name: /Móc kéo/ })).toHaveProperty("value", "7");
+    expect(window.localStorage.getItem(`vg.bench.v1.${l1.level.id}`)).toContain('"top_k":7');
+  });
+
+  it("leaves the bench alone and says so when that configuration no longer fits", () => {
+    // A value outside today's domain, the same case a discarded saved config hits (W8).
+    seed(
+      '{"schema":1,"nodes":[{"id":"vs","type":"vector_search","params":{"top_k":99}}],"edges":[]}',
+    );
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Quay về bản đạt gần nhất" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quay về" }));
+    // Untouched: still the starter, with no search block and so no knob.
+    expect(screen.queryByRole("slider", { name: /Móc kéo/ })).toBeNull();
+    expect(screen.getByRole("switch", { name: /Vòm Sao/ })).toHaveProperty("checked", false);
+    expect(screen.getByText(/không còn vẽ được trên bàn thợ/)).toBeDefined();
+  });
+
+  it("offers nothing to go back to when no remembered run earned a star", () => {
+    seed('{"schema":1,"nodes":[],"edges":[]}', 0);
+    page();
+    expect(screen.queryByRole("button", { name: /Quay về bản đạt/ })).toBeNull();
   });
 });

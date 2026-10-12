@@ -57,6 +57,8 @@ interface RunPanelProps {
   onOpen: () => void;
   onRetry: () => void;
   onRestore: () => void;
+  /** Puts the newest starred run's configuration back; null when no run has earned a star (N3). */
+  backToPassing: (() => void) | null;
   onFocusSlot: (type: BlockType, param?: string) => void;
   onStop: () => void;
   onReconnect: () => void;
@@ -121,6 +123,7 @@ function Editing({
   onOpen,
   onRetry,
   onRestore,
+  backToPassing,
   onFocusSlot,
   onRerun,
   onEdit,
@@ -131,6 +134,14 @@ function Editing({
     opener,
     question,
     onKeyDown: onRestoreKey,
+  } = useConfirm();
+  // Its own instance: two confirms that shared one state would both open at once.
+  const {
+    open: reverting,
+    setOpen: setReverting,
+    opener: revertOpener,
+    question: revertQuestion,
+    onKeyDown: onRevertKey,
   } = useConfirm();
   const { level } = env;
   const errors = issues.filter((issue) => issue.severity === "error");
@@ -334,6 +345,50 @@ function Editing({
           Khôi phục cấu hình khởi đầu
         </button>
       )}
+
+      {/* N3: back to the newest configuration that earned a star. Absent until one has. */}
+      {backToPassing !== null &&
+        (reverting ? (
+          // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Escape from any of its controls closes the confirm
+          <div onKeyDown={onRevertKey} className="rounded-md border border-line p-4">
+            <p ref={revertQuestion} tabIndex={-1} className="text-sm">
+              Cấu hình hiện tại sẽ được thay bằng cấu hình của lượt đạt gần nhất.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setReverting(false);
+                  backToPassing();
+                }}
+                // Same reason as the starter restore: replacing mid-POST would reset the
+                // request and let a second POST out.
+                disabled={sending}
+                className={buttonClass("primary")}
+              >
+                Quay về
+              </button>
+              <button
+                type="button"
+                onClick={() => setReverting(false)}
+                disabled={sending}
+                className={buttonClass("secondary")}
+              >
+                Giữ cấu hình
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            ref={revertOpener}
+            type="button"
+            onClick={() => setReverting(true)}
+            disabled={sending}
+            className={buttonClass("inline")}
+          >
+            Quay về bản đạt gần nhất
+          </button>
+        ))}
     </section>
   );
 }

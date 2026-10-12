@@ -7,12 +7,13 @@ import { buttonClass } from "~/components/ui/button";
 import { recordStars, type Stars } from "~/features/progress/progress";
 
 import { cancelRun, eventsUrl, newKey, postRun, previewRetrieval, type LevelPageData } from "./api";
-import { graphFromBench, type Bench, type Env } from "./bench";
+import { benchFromGraph, graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
 import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
+import { lastPassing } from "./history";
 import { Results } from "./Results";
 import {
   cappedRun,
@@ -358,6 +359,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   useRunStream(run?.runId ?? null, attempt, dispatch);
   useRecordStars(level, run);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
+  const passing = lastPassing(history);
   useRecordHistory(level.id, run, lastBody, setHistory);
   const left = useCancelOnLeave(run);
 
@@ -431,6 +433,29 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     setRequest({ state: "idle" });
     setNotes([]);
     setHighlight(null);
+  }
+
+  /**
+   * Puts a remembered configuration back on the bench (N3). A body the bench can no longer draw
+   * -- an older level version, a value outside today's domain -- leaves the bench alone and
+   * says one line, the same discipline as a discarded saved config (W8).
+   */
+  function benchFrom(mark: RunMark) {
+    const graph = parseGraph(mark.body);
+    const remembered = graph === null ? null : benchFromGraph(env, graph);
+    if (remembered === null) {
+      setNotes([
+        {
+          code: "W_HISTORY_STALE",
+          severity: "info",
+          node: null,
+          port: null,
+          message_vi: "Cấu hình của lượt đó không còn vẽ được trên bàn thợ của màn này.",
+        },
+      ]);
+      return;
+    }
+    edit(remembered);
   }
 
   function editSlip(next: Slip) {
@@ -537,6 +562,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
               if (request.state === "failed") void send(request.body, request.key);
             }}
             onRestore={() => edit(starter)}
+            backToPassing={passing === null ? null : () => benchFrom(passing)}
             onFocusSlot={focusSlot}
             onStop={() => {
               if (!run) return;
