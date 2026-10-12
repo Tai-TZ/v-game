@@ -187,3 +187,39 @@ describe("gold stays on the sample cases", () => {
     expect(card(2)).not.toContain(NO_ANSWER);
   });
 });
+
+describe("which model answered each case", () => {
+  const model = (n: number) =>
+    document.getElementById(`cau-${n}`)?.querySelector("[data-case-model]");
+
+  it("names the model on every case that got an answer", () => {
+    // The committed L1 reference stream: all ten cases answered by the primary.
+    show(finishedRun({ "lib-l1-v01": trap, "lib-l1-t01": trap }));
+    expect(model(1)?.getAttribute("data-case-model")).toBe("gemini-3.5-flash-lite");
+    expect(model(1)?.textContent).toContain("Model");
+  });
+
+  it("marks a cached answer rather than passing it off as a call this run made", () => {
+    const run = finishedRun({ "lib-l1-v01": trap });
+    const cached = {
+      ...run,
+      cases: run.cases.map((c, i) =>
+        i !== 0
+          ? c
+          : {
+              ...c,
+              steps: Object.fromEntries(
+                Object.entries(c.steps).map(([node, s]) => [
+                  node,
+                  s.block !== "llm"
+                    ? s
+                    : { ...s, facts: (s.facts ?? []).map((f) => ({ ...f, replayed: true })) },
+                ]),
+              ),
+            },
+      ),
+    };
+    show(cached);
+    expect(model(1)?.textContent).toContain("Kết quả đã lưu");
+  });
+});

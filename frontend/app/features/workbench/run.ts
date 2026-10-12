@@ -204,6 +204,21 @@ export function frameAction(
 export const runningNodes = (c: CaseView) =>
   Object.entries(c.steps).flatMap(([node, step]) => (step.state === "running" ? [node] : []));
 
+/**
+ * The model that answered one case, and whether it came from the replay cache (X7).
+ *
+ * Null when no model answered: a skipped or timed-out case has no `llm` fact, and on a recorded
+ * run the hidden and trap cases keep only `case.graded`. That is missing data, not a fault.
+ */
+export function caseModel(c: CaseView): { model: string; replayed: boolean } | null {
+  for (const step of Object.values(c.steps)) {
+    for (const fact of step.facts ?? []) {
+      if (fact.kind === "llm") return { model: fact.model, replayed: fact.replayed };
+    }
+  }
+  return null;
+}
+
 /** LLM answers of the run: real calls and answers served from the replay cache (§8.6). */
 export function llmCalls(run: RunView): { real: number; replayed: number } {
   let real = 0;

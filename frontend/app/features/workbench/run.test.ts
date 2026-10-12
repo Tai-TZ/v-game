@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   blockState,
+  caseModel,
   frameAction,
   isActive,
   llmCalls,
   runningNodes,
   runReducer,
+  type CaseView,
   type StepView,
 } from "./run";
 import { parseEvent, type EventType } from "./schema";
@@ -210,5 +212,53 @@ describe("blockState (N6)", () => {
     expect(blockState("active", undefined, ingest)).toBe("passed");
     expect(blockState("done", undefined, ingest)).toBe("passed");
     expect(blockState("done", undefined, { ...ingest, started: false })).toBe("idle");
+  });
+});
+
+describe("caseModel", () => {
+  const withLlm = (model: string, replayed: boolean): CaseView =>
+    ({
+      id: "c1",
+      n: 1,
+      role: "visible",
+      vai: "sv",
+      state: "graded",
+      tokens: { in: 1, out: 1 },
+      steps: {
+        llm: {
+          block: "llm",
+          state: "done",
+          status: "ok",
+          facts: [
+            {
+              kind: "llm",
+              stop_reason: "end",
+              cited_ids: [],
+              replayed,
+              model,
+              system_tokens: 1,
+            },
+          ],
+        },
+      },
+    }) as unknown as CaseView;
+
+  it("names the model that actually answered the case", () => {
+    expect(caseModel(withLlm("gemini-3.1-flash-lite", false))).toEqual({
+      model: "gemini-3.1-flash-lite",
+      replayed: false,
+    });
+  });
+
+  it("says when the answer came from the replay cache rather than a call", () => {
+    // §8.6: a cached answer inside a real run is not a call this run made, and the two must not
+    // read the same -- the fallback count depends on telling them apart.
+    expect(caseModel(withLlm("gemini-3.5-flash-lite", true))?.replayed).toBe(true);
+  });
+
+  it("has no model for a case that never reached the model", () => {
+    // A hidden case on a recorded run keeps only case.graded, and a skipped case has no llm fact.
+    const bare = { ...withLlm("x", false), steps: {} };
+    expect(caseModel(bare)).toBeNull();
   });
 });

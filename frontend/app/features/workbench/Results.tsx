@@ -25,7 +25,7 @@ import { SlipResult, WhyMenu } from "./GuessSlip";
 import { RankJourney } from "./RankJourney";
 import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
-import { llmCalls, unfinished, type CaseView, type RunView } from "./run";
+import { caseModel, llmCalls, unfinished, type CaseView, type RunView } from "./run";
 import { BLOCK_TYPES, type BlockType, type GoldReveal, type Graph } from "./schema";
 
 interface ResultsProps {
@@ -307,6 +307,7 @@ function CaseCard({
   runGraph: Graph | null;
 }) {
   const titleId = `cau-${c.n}-title`;
+  const served = caseModel(c);
   return (
     <article
       id={`cau-${c.n}`}
@@ -338,6 +339,18 @@ function CaseCard({
             );
           })}
         </ol>
+        {/* X7: star 2 is calibrated on the primary model, so which model answered this case is
+            part of reading the grade. Same words as the bench's llm step, so the two agree. */}
+        {served && (
+          <p className="mt-2 text-sm" data-case-model={served.model}>
+            Model <code className="font-mono text-xs">{served.model}</code>
+            {served.replayed && (
+              <span className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-xs">
+                Kết quả đã lưu
+              </span>
+            )}
+          </p>
+        )}
         {c.answer && (
           <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-sm whitespace-pre-line">
             {c.answer}
