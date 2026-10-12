@@ -243,6 +243,10 @@ export const EVENT_SCHEMAS = {
     counted: v.boolean(),
     criteria: v.record(v.string(), v.boolean()),
     labels: v.array(v.string()),
+    // Only when the server's daily cap skipped this case: §3.3 exempts such a run from
+    // overwriting the stars, so the client has to be able to tell it apart from a case the
+    // player's own per-case budget skipped.
+    reason: v.optional(v.literal("daily_cap")),
   }),
   "run.scored": v.looseObject({ score: StarResultSchema }),
   "run.finished": v.looseObject({

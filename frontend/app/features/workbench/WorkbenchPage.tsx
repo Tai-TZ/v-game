@@ -15,6 +15,7 @@ import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
 import { Results } from "./Results";
 import {
+  cappedRun,
   frameAction,
   isActive,
   runReducer,
@@ -201,7 +202,9 @@ function useFocusLater() {
  * Best effort: a blocked storage or a bad id must never cost the player the results on screen.
  */
 export function useRecordStars(level: PublicLevel, run: RunView | null) {
-  const scoredRun = run?.score ? run.runId : null;
+  // §3.3: a run the server's daily cap cut short "không tính là một lần thử sao … không ghi đè
+  // kết quả sao". It is still graded and still on screen; it is just not a result.
+  const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
   const stars = run?.score?.stars;
   useEffect(() => {
     if (!scoredRun || stars === undefined) return;
@@ -229,7 +232,9 @@ export function useRecordStars(level: PublicLevel, run: RunView | null) {
  * instead of one per knob turn.
  */
 export function useRecordHistory(levelId: string, run: RunView | null, ranBody: string | null) {
-  const scoredRun = run?.score ? run.runId : null;
+  // Same rule as the stars, and for the strip there is a second reason: a truncated run has
+  // fewer rows than the others, so it would not be comparable with them.
+  const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
   // The run id of the entry already written. Stating the invariant this way keeps the dep list
   // complete -- a fresh `cases` object or an edited body re-runs the effect, and the guard, not
   // a hand-trimmed dep list, is what stops a second entry for one run.
@@ -246,11 +251,11 @@ export function useRecordHistory(levelId: string, run: RunView | null, ranBody: 
       stars: run.score.stars as Stars,
       tokens: run.score.tokens,
       budget: run.score.budget,
-      cases: run.cases.map((c) => ({
-        n: c.n,
-        role: c.role,
-        passed: c.graded?.passed ?? false,
-      })),
+      // Graded cases only. An ungraded one has no verdict, and `?? false` would write it
+      // into the strip as the player's failure -- a result the run never reached.
+      cases: run.cases.flatMap((c) =>
+        c.graded ? [{ n: c.n, role: c.role, passed: c.graded.passed }] : [],
+      ),
     });
   }, [scoredRun, run, ranBody, levelId]);
 }

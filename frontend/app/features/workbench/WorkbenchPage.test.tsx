@@ -296,3 +296,60 @@ describe("useRecordHistory and the live bench", () => {
     expect(loadHistory(l1.level.id)).toHaveLength(1);
   });
 });
+
+describe("a run the daily cap cut short is not a star attempt", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  const capped = short.map((f) => {
+    if (f.event !== "case.graded") return f;
+    const data = JSON.parse(f.data) as Record<string, unknown>;
+    return {
+      ...f,
+      data: JSON.stringify({ ...data, status: "skipped_budget", reason: "daily_cap" }),
+    };
+  });
+
+  it("does not overwrite the stored stars, and does not join the history", () => {
+    // §3.3: "không tính là một lần thử sao (… không ghi đè kết quả sao)". The run is still
+    // graded and still on screen; it just is not a result.
+    const run = replay(capped);
+    renderHook(() => {
+      useRecordStars(l1.level, run);
+      useRecordHistory(l1.level.id, run, '{"ran":1}');
+    });
+    expect(recordStars).not.toHaveBeenCalled();
+    expect(readProgress()).toEqual({});
+    expect(loadHistory(l1.level.id)).toEqual([]);
+  });
+
+  it("still records a run whose cases the player's own budget skipped", () => {
+    // The paired positive: an ordinary failure must still be a result, or "never record"
+    // would pass the test above.
+    const ownBudget = short.map((f) => {
+      if (f.event !== "case.graded") return f;
+      const data = JSON.parse(f.data) as Record<string, unknown>;
+      return { ...f, data: JSON.stringify({ ...data, status: "skipped_budget" }) };
+    });
+    const run = replay(ownBudget);
+    renderHook(() => {
+      useRecordStars(l1.level, run);
+      useRecordHistory(l1.level.id, run, '{"ran":1}');
+    });
+    expect(recordStars).toHaveBeenCalledOnce();
+    expect(loadHistory(l1.level.id)).toHaveLength(1);
+  });
+
+  it("leaves a case that never ran out of the strip instead of calling it a failure", () => {
+    // `passed: c.graded?.passed ?? false` labelled an ungraded case as broken, which is a
+    // verdict the run never reached.
+    const run = replay(
+      short.slice(
+        0,
+        short.findIndex((f) => f.event === "case.graded"),
+      ),
+    );
+    const scoredWithUngraded: RunView | null =
+      run === null ? null : { ...run, score: { stars: 1, tokens: 1, budget: 2 } as never };
+    renderHook(() => useRecordHistory(l1.level.id, scoredWithUngraded, '{"ran":1}'));
+    expect(loadHistory(l1.level.id)[0]?.cases).toEqual([]);
+  });
+});

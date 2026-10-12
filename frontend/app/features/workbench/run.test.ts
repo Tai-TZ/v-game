@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   blockState,
+  cappedRun,
   caseModel,
   fallbackAnswers,
   frameAction,
@@ -375,5 +376,42 @@ describe("outTokenSpread", () => {
   it("says low and high are the same for one case, so the copy can avoid a range of one", () => {
     const one = outTokenSpread(run([answered(420)]));
     expect(one?.low).toBe(one?.high);
+  });
+});
+
+describe("a run the daily cap cut short", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  /** Rewrite the nth case.graded frame into the shape the engine sends when the cap is hit. */
+  const capAt = (n: number) => {
+    let seen = 0;
+    return short.map((f) => {
+      if (f.event !== "case.graded") return f;
+      seen += 1;
+      if (seen !== n) return f;
+      const data = JSON.parse(f.data) as Record<string, unknown>;
+      return {
+        ...f,
+        data: JSON.stringify({ ...data, status: "skipped_budget", reason: "daily_cap" }),
+      };
+    });
+  };
+
+  it("keeps the reason the engine gave, which the client dropped on the floor", () => {
+    const run = replay(capAt(2));
+    expect(run?.cases[1]?.graded?.reason).toBe("daily_cap");
+    expect(run?.cases[0]?.graded?.reason).toBeUndefined();
+  });
+
+  it("knows the run was cut short by the server's quota, not by the player's budget", () => {
+    // §3.3: a case skipped by the player's own per-case budget is an ordinary failure; only a
+    // case the DAILY cap skipped exempts the run from overwriting the stars.
+    expect(cappedRun(replay(capAt(2)))).toBe(true);
+    const ownBudget = short.map((f) => {
+      if (f.event !== "case.graded") return f;
+      const data = JSON.parse(f.data) as Record<string, unknown>;
+      return { ...f, data: JSON.stringify({ ...data, status: "skipped_budget" }) };
+    });
+    expect(cappedRun(replay(ownBudget))).toBe(false);
+    expect(cappedRun(replay(short))).toBe(false);
   });
 });
