@@ -24,5 +24,17 @@ The user writes Vietnamese; UI copy is Vietnamese, sentence case, verb-first but
 - Frontend: `npm run check`, `npm run build`, `npm run test:e2e` (in `frontend/`).
 - Backend: `uv run ruff check`, `uv run mypy src tests`, `uv run pytest` (in `backend/`).
 
+## Run the CI gates locally before pushing
+Three CI rounds were spent in one day on things a local run answers in seconds.
+- `semgrep scan --config p/default --error --metrics=off --exclude-rule python.lang.compatibility.python37.python37-compatibility-importlib2`
+  from the repo root — the same scan the Security workflow runs. It blocks
+  `detect-non-literal-regexp`, among others.
+- `axe-core` ships with `@axe-core/playwright`, so jsdom tests can run it without a browser:
+  see `frontend/app/features/workbench/toys.a11y.test.tsx`. Its structural rules (roles,
+  required parents, allowed roles) catch what the Playwright a11y suite would, nine minutes
+  earlier. Contrast, touch targets and horizontal scroll still need the real suite.
+- The pre-commit hook fails the commit, it does not stop a `&&` chain that follows a `grep`.
+  Check `git log -1` actually moved before assuming a push carried your work.
+
 ## Secrets
 Never read, print or commit `.env` files, keys or tokens.
