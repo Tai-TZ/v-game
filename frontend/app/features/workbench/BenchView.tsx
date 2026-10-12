@@ -15,6 +15,8 @@ import {
 
 import { Blade } from "./Blade";
 import { Stamps } from "./Stamps";
+import { CitationLedger } from "./CitationLedger";
+import { packerSaw } from "./ledger";
 import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
 import {
@@ -56,7 +58,7 @@ import {
   type RunView,
   type StepView,
 } from "./run";
-import type { BlockType, Fact, Graph, Issue, JsonValue } from "./schema";
+import type { BlockType, CaseRole, Fact, Graph, Issue, JsonValue } from "./schema";
 import { fixFor } from "./validate";
 
 /** `*X*` in server messages becomes <strong>X</strong>; the rest stays plain text. */
@@ -398,6 +400,8 @@ function Slot({
           toy={toy}
           gold={view?.gold ?? null}
           packed={packedIds(view)}
+          caseRole={view?.followed.role ?? null}
+          ranked={packerSaw(view?.followed.steps ?? {})}
         />
       )}
       {/* No step for this slot yet, or the bench has moved on from the run: the dome follows
@@ -722,6 +726,8 @@ function StepState({
   toy,
   gold,
   packed: packedIn,
+  caseRole,
+  ranked,
 }: {
   step: StepView;
   node: string;
@@ -729,6 +735,10 @@ function StepState({
   gold: SlotGold | null;
   /** The bin's contents for this case; the llm step cannot see the packer's own step. */
   packed: readonly string[];
+  /** Of the case being followed: the ledger is for samples only. */
+  caseRole: CaseRole | null;
+  /** The ranked list the packer was handed; like `packed`, not visible from the llm step. */
+  ranked: readonly Extract<Fact, { kind: "retrieved" }>["items"][number][];
 }) {
   const retrieved = step.facts?.find(
     (f): f is Extract<Fact, { kind: "retrieved" }> => f.kind === "retrieved",
@@ -742,6 +752,15 @@ function StepState({
       {step.summary && <p className="mt-1 max-w-prose text-fg-muted">{step.summary}</p>}
       {said?.answer !== undefined && gold?.visible !== false && (
         <Stamps answer={said.answer} included={packedIn} />
+      )}
+      {said && (
+        <CitationLedger
+          caseRole={caseRole}
+          ranked={ranked}
+          included={packedIn}
+          cited={said.cited_ids}
+          gold={gold}
+        />
       )}
       {packed && (
         <ContextBin tokens={packed.tokens} included={packed.included} dropped={packed.dropped} />

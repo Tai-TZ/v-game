@@ -275,3 +275,26 @@ describe("the star dome in the search slot", () => {
     expect(domeLabel(container)).toBe("3 đoạn đã kéo");
   });
 });
+
+describe("the citation ledger on the bench", () => {
+  it("lines the codes up for a sample case", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} benchRun="done" view={recordedView(null, "lib-l3-v03")} />);
+    expect(document.querySelector('[data-row="pull"]')).not.toBeNull();
+    expect(document.querySelector('[data-row="cite"]')).not.toBeNull();
+  });
+
+  it("draws nothing for a hidden case, which a live run does send the codes for", () => {
+    // The engine sends pack.included and llm.cited_ids for every role -- only `answer` is held
+    // back (blocks.py) -- and a hidden case's valid code points straight at its gold chunk
+    // (roadmap B0). So the gate is the case's role, not the absence of data.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    const sample = recordedView(null, "lib-l3-v03");
+    const hidden = { ...sample, followed: { ...sample.followed, role: "hidden" as const } };
+    render(<Bench bench={start} benchRun="done" view={hidden} />);
+    expect(document.querySelector('[data-row="pull"]')).toBeNull();
+    expect(document.querySelector("[data-ledger-note]")).toBeNull();
+  });
+});

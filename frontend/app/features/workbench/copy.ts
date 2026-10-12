@@ -85,6 +85,23 @@ export const BLADE_VI = {
   splitLine: "Lược dao cắt đứt câu đáp án: đoạn đúng nằm vắt qua hai mảnh.",
 } as const;
 
+/** Sổ đối chiếu trích dẫn (N13): the same codes at three stages, aligned so a gap shows. */
+export const LEDGER_VI = {
+  pull: "Đã lấy về",
+  bin: "Vào thùng",
+  cite: "Đã trích",
+  gap: "không có",
+  /** Codes, not sentences: Stamps already counts sentences, and the two numbers differ. */
+  note: (cited: number, inBin: number, ghost: number) =>
+    ghost === 0
+      ? `Trợ lý trích ${cited} mã: cả ${cited} đều có trong thùng.`
+      : inBin === 0
+        ? `Trợ lý trích ${cited} mã: không mã nào có trong thùng.`
+        : `Trợ lý trích ${cited} mã: ${inBin} có trong thùng, ${ghost} không có.`,
+  /** Said on screen, because a player who opens a hidden case will wonder where this went. */
+  samplesOnly: "Sổ đối chiếu chỉ mở cho câu mẫu.",
+} as const;
+
 /** Máy đóng tem (L1's lesson): a source the bin never held is the thing to notice. */
 export const STAMP_VI = {
   fake: "· mã này không có trong thùng",
