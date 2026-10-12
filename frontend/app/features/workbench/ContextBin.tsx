@@ -2,8 +2,8 @@ import type { ReactElement } from "react";
 
 import { AlertIcon } from "~/components/ui/icons";
 
-import { binFill } from "./bin";
-import { BIN_VI, fmt, TOKENS_VI } from "./copy";
+import { binFill, droppedRanks } from "./bin";
+import { BIN_VI, DROPPED_VI, fmt, TOKENS_VI } from "./copy";
 import { Viz } from "./Viz";
 
 /**
@@ -17,15 +17,19 @@ export function ContextBin({
   tokens,
   included,
   dropped,
+  ranked,
   promptTokens,
 }: {
   tokens: { docs: number; query: number; total: number; budget: number };
   included: readonly string[];
   dropped: readonly string[];
+  /** The list the packer was handed: where a cut passage stood is a join against it. */
+  ranked?: readonly { chunk_id: string; rank: number }[];
   /** What the provider charged for this case's whole prompt; null until its step finishes. */
   promptTokens: number | null;
 }): ReactElement {
   const fill = binFill(tokens);
+  const lost = droppedRanks(dropped, ranked ?? []);
   const cut = dropped.length > 0 ? `, ${dropped.length} đoạn bị cắt` : "";
   const label =
     `Thùng chứa ${fmt(tokens.total)} trên ${fmt(tokens.budget)} token, ` +
@@ -112,6 +116,23 @@ export function ContextBin({
             <li key={id} data-passage="" className="size-2 rounded-xs bg-brand" />
           ))}
         </ul>
+        {/* What the lid cut off, on the floor under the bin, in cut order. Each says where it
+            stood -- a passage the ranked list never named says it has no rank rather than
+            borrowing its position in the array. */}
+        {lost.pieces.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-1 border-t border-dashed border-line pt-2">
+            {lost.pieces.map((piece) => (
+              <li
+                key={piece.id}
+                data-cut-piece=""
+                aria-label={piece.rank === null ? DROPPED_VI.unknown : DROPPED_VI.piece(piece.rank)}
+                className="rounded-xs border border-line-strong bg-subtle px-1 text-xs text-fg-muted tabular-nums"
+              >
+                {piece.rank ?? "?"}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <p className="mt-1 text-sm tabular-nums">
         {fmt(tokens.total)}/{fmt(tokens.budget)} token · tài liệu {fmt(tokens.docs)} · câu hỏi{" "}
@@ -123,6 +144,11 @@ export function ContextBin({
       <p className="mt-1 max-w-prose text-sm text-fg-muted tabular-nums">
         {promptTokens === null ? TOKENS_VI.noneYet : TOKENS_VI.prompt(fmt(promptTokens))}
       </p>
+      {lost.pieces.length > 0 && (
+        <p data-cut-note className="mt-1 text-sm tabular-nums">
+          {DROPPED_VI.summary(lost.pieces.length, lost.range)}
+        </p>
+      )}
       {fill.overflow && (
         <p data-overflow-note className="flex items-center gap-1 text-sm font-semibold text-danger">
           <AlertIcon className="size-4 shrink-0" />

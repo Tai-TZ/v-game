@@ -47,3 +47,31 @@ export function binFill({
     overPct: Math.max(0, ((total - budget) / budget) * 100),
   };
 }
+
+/** A passage the packer cut, with where it stood in the list it was cut from. */
+export interface DroppedPiece {
+  id: string;
+  /** Null when the list the packer was handed never named it: no rank is better than a guess. */
+  rank: number | null;
+}
+
+/**
+ * The cut passages with their ranks, in cut order (`pack.dropped` is "ids cut by on_overflow,
+ * in cut order" and carries no rank), plus the span of the ranks that are known.
+ *
+ * The join is against the same ranked list the bin's own contents come from. A passage missing
+ * from it keeps a null rank rather than borrowing its array index, which would read as a
+ * measurement.
+ */
+export function droppedRanks(
+  dropped: readonly string[],
+  retrieved: readonly { chunk_id: string; rank: number }[],
+): { pieces: DroppedPiece[]; range: [number, number] | null } {
+  const rank = new Map(retrieved.map((item) => [item.chunk_id, item.rank]));
+  const pieces = dropped.map((id) => ({ id, rank: rank.get(id) ?? null }));
+  const known = pieces.flatMap((p) => (p.rank === null ? [] : [p.rank]));
+  return {
+    pieces,
+    range: known.length === 0 ? null : [Math.min(...known), Math.max(...known)],
+  };
+}

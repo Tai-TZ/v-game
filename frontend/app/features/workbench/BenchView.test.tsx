@@ -335,3 +335,18 @@ describe("the provider's token count on the bin", () => {
     expect(document.body.textContent).not.toContain("Chưa có số của Gemini");
   });
 });
+
+describe("the cut passages under the bin", () => {
+  it("names the rank each cut passage was cut from, joined against the run's own list", () => {
+    // pack.dropped carries ids only; the rank is the place they had in the ranked list the
+    // packer was handed, which lives on another step of the same case.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} benchRun="done" view={recordedView(null)} />);
+    const note = document.querySelector("[data-cut-note]");
+    const pieces = document.querySelectorAll("[data-cut-piece]");
+    // The committed L3 run packs everything, so there is nothing on the floor and no note.
+    expect(pieces).toHaveLength(0);
+    expect(note).toBeNull();
+  });
+});

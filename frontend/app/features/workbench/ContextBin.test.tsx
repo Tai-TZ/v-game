@@ -225,3 +225,81 @@ describe("the two token counts", () => {
     expect(document.body.textContent).toContain("đếm bằng regex-v1");
   });
 });
+
+describe("the passages the lid cut off", () => {
+  const ranked = [4, 5, 6, 7].map((rank) => ({
+    chunk_id: `d${rank}`,
+    rank,
+    score: 1 - rank / 100,
+    doc_id: "quy-che",
+    dieu: rank,
+    khoan: [1],
+    hieu_luc: true,
+  }));
+
+  it("drops one block per cut passage, each saying the rank it was cut from", () => {
+    render(
+      <ContextBin
+        tokens={{ docs: 2960, query: 20, total: 2980, budget: 3000 }}
+        included={["a1"]}
+        dropped={["d4", "d5", "d6", "d7"]}
+        ranked={ranked}
+        promptTokens={null}
+      />,
+    );
+    const cut = [...document.querySelectorAll("[data-cut-piece]")];
+    expect(cut).toHaveLength(4);
+    expect(cut.map((el) => el.getAttribute("aria-label"))).toEqual([
+      "bị cắt: hạng 4",
+      "bị cắt: hạng 5",
+      "bị cắt: hạng 6",
+      "bị cắt: hạng 7",
+    ]);
+  });
+
+  it("says the span of the ranks it cut, not only how many", () => {
+    // L2 §6 asks for "Thùng: 2.980/3.000 token. Bị cắt: 4 đoạn (hạng 4–7)."
+    render(
+      <ContextBin
+        tokens={{ docs: 2960, query: 20, total: 2980, budget: 3000 }}
+        included={["a1"]}
+        dropped={["d4", "d5", "d6", "d7"]}
+        ranked={ranked}
+        promptTokens={null}
+      />,
+    );
+    expect(document.querySelector("[data-cut-note]")?.textContent).toBe(
+      "Bị cắt: 4 đoạn (hạng 4–7).",
+    );
+  });
+
+  it("will not invent a rank for a passage the ranked list never named", () => {
+    render(
+      <ContextBin
+        tokens={{ docs: 100, query: 20, total: 120, budget: 3000 }}
+        included={["a1"]}
+        dropped={["zz"]}
+        ranked={ranked}
+        promptTokens={null}
+      />,
+    );
+    const cut = document.querySelector("[data-cut-piece]");
+    expect(cut?.getAttribute("aria-label")).toBe("bị cắt: không rõ hạng");
+    expect(cut?.textContent).not.toMatch(/\d/);
+    expect(document.querySelector("[data-cut-note]")?.textContent).toBe("Bị cắt: 1 đoạn.");
+  });
+
+  it("draws no floor at all when the lid closed over everything", () => {
+    render(
+      <ContextBin
+        tokens={{ docs: 100, query: 20, total: 120, budget: 3000 }}
+        included={["a1"]}
+        dropped={[]}
+        ranked={ranked}
+        promptTokens={null}
+      />,
+    );
+    expect(document.querySelectorAll("[data-cut-piece]")).toHaveLength(0);
+    expect(document.querySelector("[data-cut-note]")).toBeNull();
+  });
+});

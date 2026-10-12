@@ -780,6 +780,7 @@ function StepState({
           tokens={packed.tokens}
           included={packed.included}
           dropped={packed.dropped}
+          ranked={ranked}
           promptTokens={prompt}
         />
       )}

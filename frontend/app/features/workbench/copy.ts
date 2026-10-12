@@ -138,6 +138,20 @@ export const LEDGER_VI = {
 } as const;
 
 /** Máy đóng tem (L1's lesson): a source the bin never held is the thing to notice. */
+export const DROPPED_VI = {
+  /** On a cut block. The rank is the place it had in the list the packer was handed. */
+  piece: (rank: number) => `bị cắt: hạng ${rank}`,
+  /** The ranked list never named it, so there is no rank to show. */
+  unknown: "bị cắt: không rõ hạng",
+  /** En dash, as a span of ranks: "Bị cắt: 4 đoạn (hạng 4–7)." */
+  summary: (count: number, range: readonly [number, number] | null) =>
+    range === null
+      ? `Bị cắt: ${count} đoạn.`
+      : range[0] === range[1]
+        ? `Bị cắt: ${count} đoạn (hạng ${range[0]}).`
+        : `Bị cắt: ${count} đoạn (hạng ${range[0]}–${range[1]}).`,
+} as const;
+
 export const STAMP_VI = {
   fake: "· mã này không có trong thùng",
   note: "Câu viền liền là câu có nguồn trong thùng; viền đứt là câu không trích nguồn nào.",
