@@ -197,3 +197,33 @@ describe("a strip wider than the screen", () => {
     expect(scroller?.getAttribute("tabindex")).toBe("0");
   });
 });
+
+describe("the table at the width that squeezes it", () => {
+  it("never lets the table shrink below its natural width", () => {
+    // w-max: without it table-layout auto compresses every column to its min-content inside the
+    // scroller, which breaks a button's label onto four lines in a fixed-height row.
+    viewport(true);
+    render(<History runs={[mark(1, 1, [[1, true]])]} />);
+    expect(document.querySelector("table")?.className).toContain("w-max");
+  });
+
+  it("keeps every header and the duplicate button on one line", () => {
+    viewport(true);
+    render(
+      <History
+        runs={[
+          mark(1, 1, [
+            [1, true],
+            [2, false],
+          ]),
+        ]}
+        onDuplicate={() => undefined}
+      />,
+    );
+    const headers = [...document.querySelectorAll("th")];
+    const button = document.querySelector("[data-duplicate]");
+    for (const el of [...headers, button]) {
+      expect(el?.className).toContain("whitespace-nowrap");
+    }
+  });
+});

@@ -48,24 +48,27 @@ export function History({
   const { columns, rows } = historyMatrix(runs);
   if (rows.length === 0) return null;
 
+  // w-max: without it the table shrinks to the scroller's available width and table-layout
+  // auto compresses every column to its min-content -- which breaks a button's label onto
+  // four lines inside a fixed-height row (caught by an adversarial audit of this PR).
   const table = (
-    <table className="text-sm">
+    <table className="w-max text-sm">
       <caption className="sr-only">{HISTORY_VI.caption}</caption>
       <thead>
         <tr>
-          <th scope="col" className="px-2 py-1 text-left font-semibold">
+          <th scope="col" className="px-2 py-1 text-left font-semibold whitespace-nowrap">
             {HISTORY_VI.runColumn}
           </th>
-          <th scope="col" className="px-2 py-1 text-left font-semibold">
+          <th scope="col" className="px-2 py-1 text-left font-semibold whitespace-nowrap">
             {HISTORY_VI.starsColumn}
           </th>
           {columns.map((n) => (
-            <th key={n} scope="col" className="px-2 py-1 text-left font-semibold">
+            <th key={n} scope="col" className="px-2 py-1 text-left font-semibold whitespace-nowrap">
               {HISTORY_VI.case(n)}
             </th>
           ))}
           {onDuplicate && (
-            <th scope="col" className="px-2 py-1 text-left font-semibold">
+            <th scope="col" className="px-2 py-1 text-left font-semibold whitespace-nowrap">
               {HISTORY_VI.actionColumn}
             </th>
           )}
@@ -95,7 +98,7 @@ export function History({
                     onClick={() => {
                       onDuplicate(mark);
                     }}
-                    className={buttonClass("inline")}
+                    className={buttonClass("inline", "whitespace-nowrap")}
                   >
                     {HISTORY_VI.duplicate}
                   </button>
