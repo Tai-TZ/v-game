@@ -310,8 +310,12 @@ export function Results({
         ))}
       </div>
 
-      <h3 className="mt-8 text-lg font-bold">{HISTORY_VI.heading}</h3>
-      <History runs={history} onDuplicate={onDuplicate} />
+      {history.length > 0 && (
+        <>
+          <h3 className="mt-8 text-lg font-bold">{HISTORY_VI.heading}</h3>
+          <History runs={history} onDuplicate={onDuplicate} />
+        </>
+      )}
 
       {run.models && Object.keys(run.models).length > 0 && (
         <p className="mt-6 text-sm text-fg-muted">

@@ -426,6 +426,8 @@ describe("the regression strip on the results screen", () => {
   it("shows no strip before the level has a run behind it", () => {
     show(finishedRun({ "lib-l1-v01": trap }));
     expect(document.querySelectorAll("[data-run-row]")).toHaveLength(0);
+    // Reachable with storage blocked or full: the heading must not sit over nothing.
+    expect(screen.queryByText("Các lượt trước")).toBeNull();
   });
 });
 
