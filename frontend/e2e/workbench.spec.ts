@@ -134,6 +134,25 @@ test.describe("workbench", () => {
     await expect(page.getByRole("heading", { name: "Các lượt trước" })).toBeVisible();
     await expect(page.locator("[data-run-row]")).toHaveCount(1);
 
+    // The strip is thirteen columns wide at L1, so it is the page's widest thing by far. Measure
+    // here, while it is on screen: the suite's other overflow check runs after a reload, which
+    // drops the in-memory run and takes the strip with it -- so deleting the strip's scroller
+    // would not have failed anything.
+    const wide = page.viewportSize();
+    await page.setViewportSize({ width: 375, height: 812 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
+    // The width goes somewhere: inside the strip's own region, not into the page.
+    expect(
+      await page
+        .locator('[data-vg-viz="table"] [role="region"]')
+        .evaluate((el) => el.scrollWidth > el.clientWidth),
+    ).toBe(true);
+    if (wide) await page.setViewportSize(wide);
+
     // Duplicating a row loads its configuration and is not itself a run: the strip stays at one.
     await page.getByRole("button", { name: "Nhân bản cấu hình của lượt 1" }).click();
     const afterDuplicate = await page.evaluate(() => {
@@ -171,9 +190,17 @@ test.describe("workbench", () => {
       // a table, so looking for one in the DOM cannot tell them apart.
       const toggle = figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ });
       if ((await figure.getAttribute("data-vg-viz")) === "table") {
+        // Both halves, or the check is the component asserting its own flag: a figure may skip
+        // the toggle only by really being a table.
+        await expect(figure.locator("table")).toHaveCount(1);
         await expect(toggle).toHaveCount(0);
       } else {
         await expect(toggle).toBeVisible();
+        // And the toggle must actually swap the form, not merely exist.
+        const before = await figure.locator("table").count();
+        await toggle.click();
+        await expect(figure.locator("table")).toHaveCount(before === 0 ? 1 : 0);
+        await toggle.click();
       }
     }
 
