@@ -110,7 +110,17 @@ export function History({
 
   return (
     <Viz caption={HISTORY_VI.caption} stamp="run">
-      {table}
+      {/* Thirteen columns at L1 (ten cases plus three), far wider than a 375 px screen. Without
+          its own scroller the table pushes the page sideways and lies over what is above it.
+          Focusable for the same reason as the figure frame's: scrolling it IS the function. */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label={HISTORY_VI.caption}
+        className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-brand"
+      >
+        {table}
+      </div>
     </Viz>
   );
 }

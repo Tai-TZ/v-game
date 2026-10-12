@@ -180,3 +180,20 @@ describe("duplicating a remembered configuration", () => {
     expect(document.querySelectorAll("[data-duplicate]")).toHaveLength(0);
   });
 });
+
+describe("a strip wider than the screen", () => {
+  it("scrolls inside its own region instead of pushing the page sideways", () => {
+    // L1 runs ten cases, so the table is thirteen columns. Without this the table overflows a
+    // 375 px screen and lies over the case grid above it.
+    viewport(true);
+    const ten = mark(
+      1,
+      1,
+      Array.from({ length: 10 }, (_, i) => [i + 1, true] as [number, boolean]),
+    );
+    const { container } = render(<History runs={[ten]} />);
+    const scroller = container.querySelector(".overflow-x-auto");
+    expect(scroller?.querySelector("table")).not.toBeNull();
+    expect(scroller?.getAttribute("tabindex")).toBe("0");
+  });
+});
