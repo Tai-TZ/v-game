@@ -129,6 +129,15 @@ test.describe("workbench", () => {
     expect(kept?.runs).toHaveLength(1);
     expect(kept?.runs?.[0]?.cases).toHaveLength(cases);
 
+    // Picking a debrief option (N20) writes onto that same stored run, through the full
+    // WorkbenchPage -> Debrief -> onDebrief -> recordExtras chain, not only the unit-tested parts.
+    await page.locator('input[name="debrief-next"]').first().check();
+    const afterDebrief = await page.evaluate(() => {
+      const raw = window.localStorage.getItem("vg.history.v1.grounded-citation");
+      return JSON.parse(raw ?? "null") as { runs?: { next?: unknown }[] } | null;
+    });
+    expect(afterDebrief?.runs?.[0]?.next).toBeDefined();
+
     // The strip is on the page, loaded at mount and refreshed by the write: one row for the
     // run that just finished.
     await expect(page.getByRole("heading", { name: "Các lượt trước" })).toBeVisible();
