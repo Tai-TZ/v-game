@@ -33,7 +33,15 @@ import {
   type Issue,
   type PublicLevel,
 } from "./schema";
-import { loadSaved, loadSlip, recordRun, save, saveSlip } from "./storage";
+import {
+  loadHistory,
+  loadSaved,
+  loadSlip,
+  recordRun,
+  save,
+  saveSlip,
+  type RunMark,
+} from "./storage";
 import { errorsOf, validateGraph } from "./validate";
 
 const levelsUrl = (zoneId: string | null) => (zoneId ? `/play/${zoneId}` : "/play");
@@ -231,7 +239,12 @@ export function useRecordStars(level: PublicLevel, run: RunView | null) {
  * when to write, so a caller that hands over a changing body still gets one entry per run
  * instead of one per knob turn.
  */
-export function useRecordHistory(levelId: string, run: RunView | null, ranBody: string | null) {
+export function useRecordHistory(
+  levelId: string,
+  run: RunView | null,
+  ranBody: string | null,
+  onWritten?: (runs: RunMark[]) => void,
+) {
   // Same rule as the stars, and for the strip there is a second reason: a truncated run has
   // fewer rows than the others, so it would not be comparable with them.
   const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
@@ -257,7 +270,11 @@ export function useRecordHistory(levelId: string, run: RunView | null, ranBody: 
         c.graded ? [{ n: c.n, role: c.role, passed: c.graded.passed }] : [],
       ),
     });
-  }, [scoredRun, run, ranBody, levelId]);
+    // The store is write-only otherwise: the strip needs the list it just joined.
+    onWritten?.(loadHistory(levelId));
+    // `onWritten` is in the deps, which is honest: a fresh closure re-runs the effect, and the
+    // guard above -- not a trimmed dep list -- is what keeps it to one entry per run.
+  }, [scoredRun, run, ranBody, levelId, onWritten]);
 }
 
 /** The graph of the run on show; ours, so it parses, but checked like any other JSON. */
@@ -340,7 +357,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
 
   useRunStream(run?.runId ?? null, attempt, dispatch);
   useRecordStars(level, run);
-  useRecordHistory(level.id, run, lastBody);
+  const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
+  useRecordHistory(level.id, run, lastBody, setHistory);
   const left = useCancelOnLeave(run);
 
   const issues = serverIssues ?? clientIssues;
@@ -564,6 +582,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           graph={graph}
           backTo={back}
           slip={ranSlip?.runId === run.runId ? ranSlip.slip : null}
+          history={history}
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}
         />

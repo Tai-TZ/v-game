@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
 import { Results } from "./Results";
 import type { RunView } from "./run";
+import type { RunMark } from "./storage";
 import type { GoldReveal, Graph } from "./schema";
 import { frame, parseSse, readText, replay, testEnv } from "./test-fixtures";
 
@@ -31,7 +32,13 @@ function finishedRun(gold: Record<string, GoldReveal>, diagnosis: object[] = [])
   return run;
 }
 
-function show(run: RunView, graph: Graph = dense, env = l1, runGraph: Graph = dense) {
+function show(
+  run: RunView,
+  graph: Graph = dense,
+  env = l1,
+  runGraph: Graph = dense,
+  history: RunMark[] = [],
+) {
   render(
     <MemoryRouter>
       <Results
@@ -42,6 +49,7 @@ function show(run: RunView, graph: Graph = dense, env = l1, runGraph: Graph = de
         graph={graph}
         backTo="/play/library"
         slip={null}
+        history={history}
         onEdit={() => undefined}
         onFocusSlot={() => undefined}
       />
@@ -393,5 +401,29 @@ describe("where cô Lan's diagnosis came from", () => {
   it("stays quiet when there is no diagnosis to explain", () => {
     show(finishedRun({ "lib-l1-v01": trap }));
     expect(document.querySelector("[data-diagnosis-source]")).toBeNull();
+  });
+});
+
+describe("the regression strip on the results screen", () => {
+  it("draws the level's earlier runs under its own heading", () => {
+    const earlier: RunMark[] = [
+      {
+        body: "{}",
+        at: 2,
+        stars: 0,
+        tokens: 10,
+        budget: 20,
+        cases: [{ n: 1, role: "visible", passed: false }],
+      },
+    ];
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, earlier);
+    expect(screen.getByRole("heading", { name: "Các lượt trước" })).toBeDefined();
+    expect(document.querySelectorAll("[data-run-row]")).toHaveLength(1);
+    expect(document.querySelector('[data-cell="fail"]')).not.toBeNull();
+  });
+
+  it("shows no strip before the level has a run behind it", () => {
+    show(finishedRun({ "lib-l1-v01": trap }));
+    expect(document.querySelectorAll("[data-run-row]")).toHaveLength(0);
   });
 });

@@ -8,7 +8,7 @@ import { PROGRESS_KEY, readProgress, recordStars } from "~/features/progress/pro
 import { starterBench } from "./bench";
 import { runReducer, type RunView } from "./run";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
-import { loadHistory } from "./storage";
+import { loadHistory, type RunMark } from "./storage";
 import { useRecordHistory, usePreview, useRecordStars, WorkbenchPage } from "./WorkbenchPage";
 
 vi.mock("~/features/progress/progress", async (importOriginal) => {
@@ -351,5 +351,23 @@ describe("a run the daily cap cut short is not a star attempt", () => {
       run === null ? null : { ...run, score: { stars: 1, tokens: 1, budget: 2 } as never };
     renderHook(() => useRecordHistory(l1.level.id, scoredWithUngraded, '{"ran":1}'));
     expect(loadHistory(l1.level.id)[0]?.cases).toEqual([]);
+  });
+});
+
+describe("useRecordHistory reports what it wrote", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  const scored = short.findIndex((f) => f.event === "run.scored");
+
+  it("hands the fresh list back, because the store is otherwise write-only", () => {
+    // Without this the strip would show nothing until the next page load: loadHistory has no
+    // other caller on the page.
+    const seen: RunMark[][] = [];
+    renderHook(() =>
+      useRecordHistory(l1.level.id, replay(short.slice(0, scored + 1)), '{"ran":1}', (runs) =>
+        seen.push(runs),
+      ),
+    );
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.[0]?.body).toBe('{"ran":1}');
   });
 });

@@ -165,6 +165,19 @@ export const DIAGNOSIS_VI = {
     "mọi câu dưới đây là mẫu câu điền bằng số liệu của chính lượt bạn vừa chạy.",
 } as const;
 
+/**
+ * Dải hồi quy (N3). The caption says what the strip shows and never a run count: §3.1 of the
+ * reward rules forbids presenting attempts as an achievement.
+ */
+export const HISTORY_VI = {
+  caption: "Các lượt đã chấm của màn này, mới nhất trên cùng, theo từng câu.",
+  heading: "Các lượt trước",
+  cell: { pass: "Đạt", fail: "Trượt", skip: "Không chạy" },
+  case: (n: number) => `Câu #${n}`,
+  stars: (n: number) => `${n}/3 sao`,
+  starsColumn: "Sao",
+} as const;
+
 export const DROPPED_VI = {
   /** On a cut block. The rank is the place it had in the list the packer was handed. */
   piece: (rank: number) => `bị cắt: hạng ${rank}`,

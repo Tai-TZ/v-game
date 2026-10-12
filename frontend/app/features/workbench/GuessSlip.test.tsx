@@ -79,6 +79,7 @@ function show(run: RunView, slip: Slip | null) {
         graph={graph}
         backTo="/play/library"
         slip={slip}
+        history={[]}
         onEdit={() => undefined}
         onFocusSlot={() => undefined}
       />

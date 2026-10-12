@@ -129,6 +129,11 @@ test.describe("workbench", () => {
     expect(kept?.runs).toHaveLength(1);
     expect(kept?.runs?.[0]?.cases).toHaveLength(cases);
 
+    // The strip is on the page, loaded at mount and refreshed by the write: one row for the
+    // run that just finished.
+    await expect(page.getByRole("heading", { name: "Các lượt trước" })).toBeVisible();
+    await expect(page.locator("[data-run-row]")).toHaveCount(1);
+
     // A figure inside a collapsed <details> ("Xem vết chạy") is in the DOM but not visible, and
     // the gate is about what every figure carries, not about which disclosure happens to be
     // open. Open them all first, as the a11y suite does.
@@ -152,7 +157,11 @@ test.describe("workbench", () => {
       await expect(figure.locator("figcaption")).not.toBeEmpty();
       const text = (await figure.textContent()) ?? "";
       expect(STAMPS.filter((stamp) => text.includes(stamp))).toHaveLength(1);
-      await expect(figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ })).toBeVisible();
+      // The toggle is for a picture that needs a readable alternative (§8.2). A figure that is
+      // already a table has nothing to swap to, and a button that did nothing would be worse.
+      const toggle = figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ });
+      if ((await figure.locator("table").count()) > 0) await expect(toggle).toHaveCount(0);
+      else await expect(toggle).toBeVisible();
     }
 
     await page.getByRole("button", { name: "Chỉnh rồi chạy lại" }).click();

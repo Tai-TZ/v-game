@@ -15,6 +15,7 @@ import {
   knobName,
   LABEL_VI,
   DIAGNOSIS_VI,
+  HISTORY_VI,
   LEVEL_COPY,
   lowerFirst,
   stepStatusText,
@@ -24,7 +25,9 @@ import {
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
+import { History } from "./History";
 import { type Scale } from "./journey";
+import type { RunMark } from "./storage";
 import { RankJourney } from "./RankJourney";
 import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
@@ -51,6 +54,8 @@ interface ResultsProps {
   backTo: string;
   /** The guess slip that went with this run, if the player filled one (B1). */
   slip: Slip | null;
+  /** This level's last scored runs, newest first, for the regression strip (N3). */
+  history: readonly RunMark[];
   onEdit: () => void;
   onFocusSlot: (type: BlockType, param?: string) => void;
 }
@@ -72,6 +77,7 @@ export function Results({
   graph,
   backTo,
   slip,
+  history,
   onEdit,
   onFocusSlot,
 }: ResultsProps) {
@@ -300,6 +306,9 @@ export function Results({
           <CaseCard key={c.id} env={env} c={c} gold={revealed[c.id]} runGraph={runGraph} />
         ))}
       </div>
+
+      <h3 className="mt-8 text-lg font-bold">{HISTORY_VI.heading}</h3>
+      <History runs={history} />
 
       {run.models && Object.keys(run.models).length > 0 && (
         <p className="mt-6 text-sm text-fg-muted">
