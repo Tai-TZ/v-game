@@ -216,6 +216,9 @@ export async function previewRetrieval(
   levelId: string,
   caseId: string,
   body: string,
+  /** Aborted when the bench moves on: the answer is already unusable, and the instance the
+   *  preview runs on has 0,1 CPU to spend on work nobody is waiting for. */
+  signal: AbortSignal | null = null,
 ): Promise<PreviewResult> {
   const url = `${API_BASE}/api/preview/retrieval?level=${encodeURIComponent(levelId)}&case=${encodeURIComponent(caseId)}`;
   let response: Response;
@@ -224,9 +227,10 @@ export async function previewRetrieval(
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body,
+      signal,
     });
   } catch {
-    return { ok: false };
+    return { ok: false }; // including the abort above: a dropped preview is simply no preview
   }
   if (!response.ok) return { ok: false };
   const json: unknown = await response.json().catch(() => null);

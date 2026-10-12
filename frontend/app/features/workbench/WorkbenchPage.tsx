@@ -246,8 +246,9 @@ export function usePreview(
   useEffect(() => {
     if (!wanted || !caseId) return;
     let live = true;
+    const drop = new AbortController();
     const timer = setTimeout(() => {
-      void previewRetrieval(levelId, caseId, body).then((result) => {
+      void previewRetrieval(levelId, caseId, body, drop.signal).then((result) => {
         // Only a success is stored, and only under its own key. A failure needs no clearing --
         // the key already withholds another bench's picture -- and clearing would throw away a
         // result the player gets back the moment they undo the knob.
@@ -257,6 +258,7 @@ export function usePreview(
     return () => {
       live = false;
       clearTimeout(timer);
+      drop.abort(); // a request already sent is work the instance can stop doing
     };
   }, [levelId, caseId, body, wanted, key]);
   // Derived, not cleared in the effect: setting state synchronously there cascades renders,

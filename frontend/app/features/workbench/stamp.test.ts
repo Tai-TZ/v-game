@@ -94,3 +94,18 @@ describe("sentence splitting on the committed answers", () => {
     expect(bullets.every((p) => p.kind === "brick")).toBe(true);
   });
 });
+
+describe("a sentence citing more than one passage", () => {
+  it("is fabricated when any one of its citations was never in the bin", () => {
+    // The strict branch: `every`, not `some`. A sentence that leans half on a real passage and
+    // half on an invented one is the harder version of L1's lesson, not a brick.
+    const parts = stampAnswer("Theo Điều 12 [aa11] và Điều 47 [zz99].", ["aa11"]);
+    expect(parts[0]?.kind).toBe("fake");
+    expect(parts[0]?.ids).toEqual(["aa11", "zz99"]);
+  });
+
+  it("is a brick when every citation was in the bin", () => {
+    const parts = stampAnswer("Theo Điều 12 [aa11] và Điều 13 [bb22].", ["aa11", "bb22"]);
+    expect(parts[0]?.kind).toBe("brick");
+  });
+});

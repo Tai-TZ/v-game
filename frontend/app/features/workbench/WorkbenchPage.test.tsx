@@ -176,3 +176,37 @@ describe("usePreview", () => {
     vi.useRealTimers();
   });
 });
+
+describe("usePreview stops work the bench no longer needs", () => {
+  it("aborts a request already in flight when the knob moves again", async () => {
+    vi.useFakeTimers();
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        if (init?.signal) signals.push(init.signal);
+        return new Promise<Response>(() => {
+          /* never settles: the instance is still working on it */
+        });
+      }),
+    );
+    const { rerender, unmount } = renderHook(
+      ({ body }: { body: string }) => usePreview("grounded-citation", "lib-l1-v01", body, true),
+      { initialProps: { body: "top_k=3" } },
+    );
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
+
+    rerender({ body: "top_k=9" });
+    // The answer to the old question is already unusable; the 0,1-CPU instance should not
+    // finish computing it.
+    expect(signals[0]?.aborted).toBe(true);
+
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(signals).toHaveLength(2);
+    unmount();
+    expect(signals[1]?.aborted).toBe(true);
+    vi.useRealTimers();
+  });
+});
