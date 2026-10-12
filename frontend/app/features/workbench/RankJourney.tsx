@@ -38,6 +38,7 @@ export function RankJourney({
         {steps.map((step) => (
           <li
             key={step.node}
+            data-hop={step.move}
             className={`rounded-sm border px-2 py-1 tabular-nums ${TONE[step.move]}`}
           >
             <span className="text-fg-muted">{toys[step.node] ?? step.node}</span>{" "}

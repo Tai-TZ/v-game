@@ -36,6 +36,7 @@ export function Blade({
           {cuts.map((at) => (
             <span
               key={at}
+              data-cut=""
               style={{ left: `${at}%` }}
               aria-hidden="true"
               className={`absolute inset-y-0 w-px ${split ? "bg-danger" : "bg-line-strong"}`}
