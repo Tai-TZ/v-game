@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ContextBin } from "./ContextBin";
@@ -104,5 +104,41 @@ describe("what the bin actually paints", () => {
       />,
     );
     expect(screen.getByText(/tài liệu 600 · câu hỏi 400/)).toBeDefined();
+  });
+});
+
+describe("the bin's table form", () => {
+  it("carries the same numbers the bands were drawn from", () => {
+    render(
+      <ContextBin
+        tokens={{ docs: 1200, query: 93, total: 1293, budget: 3000 }}
+        included={["a", "b"]}
+        dropped={["c"]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Xem dạng bảng" }));
+    const cells = [...document.querySelectorAll("tbody tr")].map(
+      (tr) => `${tr.querySelector("th")?.textContent}=${tr.querySelector("td")?.textContent}`,
+    );
+    expect(cells).toEqual([
+      "Tổng=1.293",
+      "Ngân sách=3.000",
+      "Tài liệu=1.200",
+      "Câu hỏi=93",
+      "Đoạn vào thùng=2",
+      "Đoạn bị cắt=1",
+    ]);
+  });
+
+  it("wears the run stamp, because every number in it was measured by the run", () => {
+    render(
+      <ContextBin
+        tokens={{ docs: 600, query: 400, total: 1000, budget: 3000 }}
+        included={["a"]}
+        dropped={[]}
+      />,
+    );
+    expect(document.querySelector("figure[data-vg-viz]")).not.toBeNull();
+    expect(document.body.textContent).toContain("Đo từ lượt của bạn");
   });
 });

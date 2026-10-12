@@ -85,6 +85,27 @@ export const BLADE_VI = {
   splitLine: "Lược dao cắt đứt câu đáp án: đoạn đúng nằm vắt qua hai mảnh.",
 } as const;
 
+/**
+ * The seven source stamps of frontend-architecture §8.4, word for word. The list is closed: a
+ * figure whose provenance is none of these has no stamp to wear, and inventing one is the thing
+ * the rule exists to stop.
+ */
+export const VIZ_STAMP = {
+  run: "Đo từ lượt của bạn",
+  labels: "Đo từ nhãn của bạn",
+  index: "Tính sẵn từ chỉ mục",
+  illustration: "Minh hoạ",
+  recorded: "Lượt chạy đã ghi",
+  simulation: "Mô phỏng",
+  precomputed: "Dữ liệu ghi sẵn",
+} as const;
+export type VizStamp = keyof typeof VIZ_STAMP;
+
+export const VIZ_VI = {
+  toTable: "Xem dạng bảng",
+  toPicture: "Xem dạng hình",
+} as const;
+
 /** Sổ đối chiếu trích dẫn (N13): the same codes at three stages, aligned so a gap shows. */
 export const LEDGER_VI = {
   pull: "Đã lấy về",

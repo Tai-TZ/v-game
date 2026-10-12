@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 
 import { binFill } from "./bin";
 import { BIN_VI, fmt } from "./copy";
+import { Viz } from "./Viz";
 
 /**
  * Thùng Context: the pack as a bin filling toward its budget line, with the lid refusing to
@@ -26,7 +27,33 @@ export function ContextBin({
     `${included.length} đoạn vào thùng${cut}`;
 
   return (
-    <div className="mt-2">
+    <Viz
+      caption={label}
+      stamp="run"
+      table={
+        <table className="text-sm tabular-nums">
+          <tbody>
+            {(
+              [
+                ["Tổng", tokens.total],
+                ["Ngân sách", tokens.budget],
+                ["Tài liệu", tokens.docs],
+                ["Câu hỏi", tokens.query],
+                ["Đoạn vào thùng", included.length],
+                ["Đoạn bị cắt", dropped.length],
+              ] as const
+            ).map(([name, value]) => (
+              <tr key={name} className="border-t border-line">
+                <th scope="row" className="py-1 pr-3 text-left font-semibold whitespace-nowrap">
+                  {name}
+                </th>
+                <td className="py-1">{fmt(value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      }
+    >
       <div role="img" aria-label={label} className="max-w-80">
         {/* The bin, seen from the side. Height is the budget; the bands are what the run
             measured taking it up. An overflowing band is clipped by the bin, which is what
@@ -66,6 +93,6 @@ export function ContextBin({
       </p>
       {fill.overflow && <p className="text-sm font-semibold text-danger">{BIN_VI.overflow}</p>}
       <p className="mt-1 max-w-prose text-xs text-fg-muted">{BIN_VI.counted}</p>
-    </div>
+    </Viz>
   );
 }

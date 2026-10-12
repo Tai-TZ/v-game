@@ -10,6 +10,7 @@ export default defineConfig({
     environment: "jsdom",
     // scripts/ too: the deploy config is code, and until now nothing checked it.
     include: ["app/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs"],
+    setupFiles: ["app/test-setup.ts"],
     restoreMocks: true,
   },
 });
