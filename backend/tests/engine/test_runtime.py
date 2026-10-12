@@ -3,6 +3,7 @@ import json
 import time
 from collections import Counter
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -648,3 +649,36 @@ def test_an_index_error_fails_the_run_with_the_stale_index_message() -> None:
     assert events[-1]["type"] == "run.failed"
     assert events[-1]["code"] == "index_stale"
     assert events[-1]["message_vi"] == IndexStaleError.message_vi
+
+
+class FallbackServingLLM(FakeLLM):
+    """Primary is "fake-llm"; a fallback answered. The provider decides which model serves, so
+    the response names one the client's `model` property does not."""
+
+    SERVED = "fake-llm-2"
+
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        answer = await super().complete(request)
+        return replace(answer, model=self.SERVED)
+
+
+def test_run_finished_names_the_model_the_scoring_assumes() -> None:
+    """X7 (spec §7): star 2 is calibrated on the primary model only, so the client has to be able
+    to tell a primary answer from a fallback one. `models` alone cannot say: it is keyed by
+    whichever model served, and carries no mark for the one the run's scoring assumes."""
+    events = run(L1_STARTER, llm=FallbackServingLLM("Trả lời [abc]."))
+    finished = events[-1]
+    assert finished["type"] == "run.finished"
+    assert finished["models"] == {FallbackServingLLM.SERVED: 1}
+    assert finished["primary_model"] == "fake-llm"
+
+
+def test_run_finished_claims_no_model_when_nothing_answered() -> None:
+    """A run whose own per-case call budget ran out still finishes and is still graded (§3.3), and
+    no model answered it. The field describes what answered this run, not what the server happens
+    to be configured with, so it has to be absent rather than name a model that never ran."""
+    events = run(L1_STARTER, budget=RunBudget(max_calls_per_case=0))
+    finished = events[-1]
+    assert finished["type"] == "run.finished"  # not failed: the budget is the player's own
+    assert finished["models"] == {}
+    assert "primary_model" not in finished
