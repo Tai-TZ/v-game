@@ -15,6 +15,13 @@ _BACKEND_DIR = Path(__file__).resolve().parents[2]
 SHIPPED_INDEX_DIR = Path(__file__).resolve().parent / "engine" / "data" / "index"
 
 
+# daily-shift §3.1: both come out of the class share and neither scales with class size --
+# the projector pool is fixed per session (and the only source a teacher tops up from), and the
+# common-incident fix run is one 3-case run a day.
+PROJECTOR_POOL = 40
+INCIDENT_RUN = 3
+
+
 class Settings(BaseSettings):
     # Absolute: backend/.env resolves from any cwd. Tests pass _env_file=None so they never
     # read it (it may hold the owner's real key).
@@ -91,17 +98,25 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _quota_fits_the_cap(self) -> "Settings":
-        """daily-shift §3.1 gives the class 90 % of the cap, and out of that share every learner
-        gets P while the reserve R is set aside, so one learner plus R has to fit inside it.
-        Class size lives in the lesson plan, not here, so this is the strongest size-free check:
-        it catches the 13/17 defaults left behind on a smaller cap."""
+        """daily-shift §3.1 checks `students * P + 40 + 3 + R <= 0,9 * cap`. Class size lives in
+        the lesson plan rather than here, so this is that check at its weakest -- one learner --
+        but the two fixed pools belong in it either way: without them 13/17 passed on every cap
+        down to 34, and a cap of 50 booted a server that offered L1's 10-call run to a class of
+        30 out of a share of 45."""
+        if self.daily_llm_call_cap == 0:
+            # "No live calls today", not "no server today": DailyCap(0) already refuses every
+            # call and §3.3 degrades the run, while raising here would take create_app with it.
+            return self
         share = self.daily_llm_call_cap * 9 // 10
-        if self.quota_learner_calls + self.quota_reserve_calls > share:
+        fixed = PROJECTOR_POOL + INCIDENT_RUN
+        need = self.quota_learner_calls + self.quota_reserve_calls + fixed
+        if need > share:
             raise ValueError(
                 f"QUOTA_LEARNER_CALLS ({self.quota_learner_calls}) + QUOTA_RESERVE_CALLS "
-                f"({self.quota_reserve_calls}) exceed the class share {share} of "
-                f"DAILY_LLM_CALL_CAP ({self.daily_llm_call_cap}); recompute them with the "
-                f"formula in docs/content/scenarios/daily-shift.md §3.1"
+                f"({self.quota_reserve_calls}) + {fixed} for the projector pool and the daily "
+                f"incident run exceed the class share {share} of DAILY_LLM_CALL_CAP "
+                f"({self.daily_llm_call_cap}); recompute them with the formula in "
+                f"docs/content/scenarios/daily-shift.md §3.1"
             )
         return self
 
