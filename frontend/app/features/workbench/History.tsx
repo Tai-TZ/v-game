@@ -54,6 +54,9 @@ export function History({
       <thead>
         <tr>
           <th scope="col" className="px-2 py-1 text-left font-semibold">
+            {HISTORY_VI.runColumn}
+          </th>
+          <th scope="col" className="px-2 py-1 text-left font-semibold">
             {HISTORY_VI.starsColumn}
           </th>
           {columns.map((n) => (
@@ -75,8 +78,11 @@ export function History({
           return (
             <tr key={row.at} data-run-row className="border-t border-line">
               <th scope="row" className="px-2 py-1 text-left font-semibold whitespace-nowrap">
-                {HISTORY_VI.stars(row.stars)}
+                {HISTORY_VI.run(index + 1)}
               </th>
+              <td className="px-2 py-1 whitespace-nowrap tabular-nums">
+                {HISTORY_VI.stars(row.stars)}
+              </td>
               <Cells row={row} />
               {onDuplicate && mark && (
                 <td className="px-2 py-1">

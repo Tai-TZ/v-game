@@ -176,6 +176,10 @@ export const HISTORY_VI = {
   case: (n: number) => `Câu #${n}`,
   stars: (n: number) => `${n}/3 sao`,
   starsColumn: "Sao",
+  /** Identifies the row. Counting from the newest, the order the table reads -- and not the
+   *  star count, which would read exactly like the screen's own "3/3 sao" headline. */
+  run: (n: number) => `Lượt ${n}`,
+  runColumn: "Lượt",
   /** Per row. The number counts from the newest, which is the order the table reads. */
   duplicate: "Nhân bản cấu hình",
   duplicateRow: (n: number) => `Nhân bản cấu hình của lượt ${n}`,

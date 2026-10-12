@@ -125,8 +125,10 @@ describe("History", () => {
       />,
     );
     const heads = [...document.querySelectorAll("thead th")].map((h) => h.textContent);
-    expect(heads).toEqual(["Sao", "Câu #1", "Câu #2"]);
-    expect(document.querySelector("tbody th")?.textContent).toBe("1/3 sao");
+    expect(heads).toEqual(["Lượt", "Sao", "Câu #1", "Câu #2"]);
+    // The row header identifies the row; "1/3 sao" alone would read like the screen's headline.
+    expect(document.querySelector("tbody th")?.textContent).toBe("Lượt 1");
+    expect(document.querySelector("tbody td")?.textContent).toBe("1/3 sao");
   });
 
   it("says nothing at all before there is a run behind it", () => {
