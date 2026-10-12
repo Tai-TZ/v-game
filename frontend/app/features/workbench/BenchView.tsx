@@ -14,6 +14,7 @@ import {
 } from "~/components/ui/icons";
 
 import { Blade } from "./Blade";
+import { Stamps } from "./Stamps";
 import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
 import {
@@ -390,7 +391,15 @@ function Slot({
 
       {type === "chunker" && view && <Ingestion run={view.run} node={id} gold={view.gold} />}
       <SlotIssues env={env} graph={graph} issues={own} />
-      {step && <StepState step={step} node={id} toy={toy} gold={view?.gold ?? null} />}
+      {step && (
+        <StepState
+          step={step}
+          node={id}
+          toy={toy}
+          gold={view?.gold ?? null}
+          packed={packedIds(view)}
+        />
+      )}
       {/* No step for this slot yet, or the bench has moved on from the run: the dome follows
           the bench. */}
       {!step && preview?.[id] && (
@@ -698,25 +707,42 @@ function Ingestion({ run, node, gold }: { run: RunView; node: string; gold: Slot
   );
 }
 
+/** What the packer put in the bin for the followed case, from whichever node packed it. */
+function packedIds(view: BenchRunView | null): readonly string[] {
+  for (const step of Object.values(view?.followed.steps ?? {})) {
+    const pack = step.facts?.find((f): f is Extract<Fact, { kind: "pack" }> => f.kind === "pack");
+    if (pack) return pack.included;
+  }
+  return [];
+}
+
 function StepState({
   step,
   node,
   toy,
   gold,
+  packed: packedIn,
 }: {
   step: StepView;
   node: string;
   toy: string;
   gold: SlotGold | null;
+  /** The bin's contents for this case; the llm step cannot see the packer's own step. */
+  packed: readonly string[];
 }) {
   const retrieved = step.facts?.find(
     (f): f is Extract<Fact, { kind: "retrieved" }> => f.kind === "retrieved",
   );
   const packed = step.facts?.find((f): f is Extract<Fact, { kind: "pack" }> => f.kind === "pack");
+  // Only a visible case carries its answer text at all; a hidden one never does.
+  const said = step.facts?.find((f): f is Extract<Fact, { kind: "llm" }> => f.kind === "llm");
   return (
     <div className="mt-3 border-t border-line pt-3 text-sm">
       <p className="font-semibold">{stepStatusText(step.status, step.ms)}</p>
       {step.summary && <p className="mt-1 max-w-prose text-fg-muted">{step.summary}</p>}
+      {said?.answer !== undefined && gold?.visible !== false && (
+        <Stamps answer={said.answer} included={packedIn} />
+      )}
       {packed && (
         <ContextBin tokens={packed.tokens} included={packed.included} dropped={packed.dropped} />
       )}

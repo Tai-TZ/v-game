@@ -85,6 +85,12 @@ export const BLADE_VI = {
   splitLine: "Lược dao cắt đứt câu đáp án: đoạn đúng nằm vắt qua hai mảnh.",
 } as const;
 
+/** Máy đóng tem (L1's lesson): a source the bin never held is the thing to notice. */
+export const STAMP_VI = {
+  fake: "· mã này không có trong thùng",
+  note: "Câu viền liền là câu có nguồn trong thùng; viền đứt là câu không trích nguồn nào.",
+} as const;
+
 const cosine = new Intl.NumberFormat("vi-VN", {
   minimumFractionDigits: 3,
   maximumFractionDigits: 3,

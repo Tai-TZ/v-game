@@ -12,12 +12,12 @@ import { validateGraph } from "./validate";
 const l3 = testEnv("article-number-lookup");
 
 /** The committed L3 recorded run, replayed into the view a finished bench holds. */
-function recordedView(gold: SlotGold | null): BenchRunView {
+function recordedView(gold: SlotGold | null, caseId = "lib-l3-v01"): BenchRunView {
   const file = JSON.parse(readText("public", "runs", "article-number-lookup.json")) as {
     events: { type: string }[];
   };
   const run = replay(file.events.map((e, i) => frame(i + 1, e.type as EventType, e)));
-  const followed = run?.cases.find((c) => c.id === "lib-l3-v01");
+  const followed = run?.cases.find((c) => c.id === caseId);
   if (!run || !followed) throw new Error("the recorded L3 run does not replay");
   return { run, followed, gold };
 }
@@ -224,6 +224,24 @@ describe("the star dome in the search slot", () => {
       />,
     );
     expect(screen.queryByText(/cắt đứt câu đáp án/)).toBeNull();
+  });
+
+  it("reads the packed ids from the packer step, not from the llm step beside it", () => {
+    // The llm node's step carries the answer; the packer node's carries what went into the
+    // bin. Looking for both on one step makes every citation read as fabricated.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(
+      <Bench
+        bench={start}
+        benchRun="done"
+        view={recordedView({ chunks: [], ranks: RANKS, flags: [], visible: true }, "lib-l3-v03")}
+      />,
+    );
+    // lib-l3-v03 cites 8b5bf36c, which its packer really did put in the bin, so the stamp
+    // summary says sourced and nothing else. ("bịa" also appears in a grading criterion, so
+    // the whole page's text is too blunt an instrument here.)
+    expect(screen.getByText(/^\d+ câu có nguồn$/)).toBeDefined();
   });
 
   it("shows the context bin for the packer slot, with the run's own token numbers", () => {
