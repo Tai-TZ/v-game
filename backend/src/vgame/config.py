@@ -93,8 +93,19 @@ class Settings(BaseSettings):
     def _quota_fits_the_cap(self) -> "Settings":
         """daily-shift §3.1 gives the class 90 % of the cap, and out of that share every learner
         gets P while the reserve R is set aside, so one learner plus R has to fit inside it.
-        Class size lives in the lesson plan, not here, so this is the strongest size-free check:
-        it catches the 13/17 defaults left behind on a smaller cap."""
+
+        Deliberately weak: it catches 13/17 only below a cap of 34. The rest of §3.1 -- the
+        40-call projector pool, the daily incident run, the class size -- describes a day with a
+        class in a room, which a solo or dev instance does not have, so putting those terms here
+        would refuse caps that are perfectly good without one. The deployed numbers are pinned
+        where they belong, against the blueprint: tests/test_deploy_config.py re-derives P and R
+        from render.yaml's own cap and asserts the full inequality."""
+        if self.daily_llm_call_cap == 0:
+            # "No live calls today" rather than "no server today": DailyCap(0) already refuses
+            # every call, while raising here would take create_app, and the Render health check,
+            # down with it. (Dropping GEMINI_API_KEY is the documented kill switch -- deploy.md
+            # §2 -- and leaves the same endpoints up; this just keeps cap 0 from being a trap.)
+            return self
         share = self.daily_llm_call_cap * 9 // 10
         if self.quota_learner_calls + self.quota_reserve_calls > share:
             raise ValueError(

@@ -36,5 +36,25 @@ Three CI rounds were spent in one day on things a local run answers in seconds.
 - The pre-commit hook fails the commit, it does not stop a `&&` chain that follows a `grep`.
   Check `git log -1` actually moved before assuming a push carried your work.
 
+## Prove a test bites before trusting it
+A green test is not evidence; a test that fails when you break the code is.
+- Re-break the thing on purpose and re-run. An audit found five mutations surviving 720 tests --
+  drawing no cuts, one stamp for a ten-sentence answer, a fabricated citation with a sourced
+  one's border -- because the tests asserted the `aria-label` and never the drawn output. Give
+  the drawn part a stable `data-*` hook and assert that.
+- Watch for assertions that cannot fail: an `axe.run` over an `aria-hidden` subtree reports every
+  rule inapplicable, which reads exactly like a pass (`expect(result.passes.length)` guards it);
+  a `toEqual([])` on a field the payload has no key for; a fixture whose values make the bug
+  invisible. Delete a test you cannot make fail, or fix it -- it is worse than no test, because
+  it reads as coverage.
+- Mutation-test your own fix the same way, including the branch you think is obvious. One
+  "clear the cache on failure" line turned out to be both unreachable and harmful.
+
+## Do not copy deploy constants into config.py
+`Settings` validators run on every instance, including a dev box with no class and no projector.
+Adding daily-shift §3.1's projector pool and incident run to one refused every cap below 48
+regardless of P and R, so `cap=10, P=1, R=1` stopped booting. Those constants belong in
+`tests/test_deploy_config.py`, which re-derives P and R from `render.yaml`'s own cap.
+
 ## Secrets
 Never read, print or commit `.env` files, keys or tokens.

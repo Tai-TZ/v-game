@@ -71,8 +71,8 @@ describe("Results", () => {
     expect(card(1)).toContain("Không đoạn nào của cách chia này chứa trọn câu đáp án.");
     expect(card(1)).toContain("Vòm Sao: hạng 2 trên toàn kho, Móc kéo lấy 3, tối đa 10");
     expect(card(1)).toContain("Đoạn đáp án bị cắt đôi khi chia");
-    // A trap that asks for something the regulation does not have.
-    expect(card(2)).toContain(NO_ANSWER);
+    // The trap is a secret case, so its gold verdict is not drawn at all (§3.7).
+    expect(card(2)).not.toContain(NO_ANSWER);
   });
 
   it("keeps the usual trace for an answer passage that some chunk holds", () => {
@@ -158,5 +158,32 @@ describe("Results", () => {
         "Máy chủ đã chấm sao nhưng phần chẩn đoán chưa tới được. Chạy lại cùng cấu hình để xem: các câu đã chạy xong dùng kết quả đã lưu.",
       ),
     ).toBeDefined();
+  });
+});
+
+describe("gold stays on the sample cases", () => {
+  // What a live run measures for a secret case: ranked pieces, a packed verdict, flags. The
+  // server redacts this (runs.py), so reaching the card at all means the gate upstream broke.
+  const secret: GoldReveal = {
+    gold_chunks: ["k1", "k3"],
+    ranks: { vs: 7 },
+    in_pack: false,
+    flags: ["ret.gold_missing", "ret.gold_rank"],
+  };
+
+  it("draws no trace, no rank and no flag for a hidden or trap case", () => {
+    const whole: GoldReveal = { gold_chunks: ["a1"], ranks: { vs: 4 }, in_pack: true, flags: [] };
+    show(finishedRun({ "lib-l1-v01": whole, "lib-l1-t01": secret }));
+
+    // The sample still teaches: its own rank is drawn.
+    expect(card(1)).toContain("Vòm Sao: hạng 4 trên toàn kho");
+    // The trap card keeps its title and grade and loses every measurement.
+    expect(card(2)).toContain("Câu bẫy");
+    expect(card(2)).not.toContain("hạng 7");
+    expect(card(2)).not.toContain("Đoạn đáp án");
+    // "Vòm Sao" itself still appears: the step list shows what the player's own bench pulled,
+    // which is their output, not where the answer sits.
+    expect(card(2)).toContain("Vòm Sao · Xong");
+    expect(card(2)).not.toContain(NO_ANSWER);
   });
 });

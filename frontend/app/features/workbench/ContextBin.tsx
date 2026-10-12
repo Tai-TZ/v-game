@@ -32,27 +32,30 @@ export function ContextBin({
             measured taking it up. An overflowing band is clipped by the bin, which is what
             the lid not closing looks like. */}
         <div
+          data-bin=""
           className={`relative h-28 overflow-hidden rounded-sm border-2 border-b-4 bg-subtle ${
             fill.overflow ? "border-danger" : "border-line-strong"
           }`}
         >
+          {/* The bin's height is the budget, so each band is its own share of it: 40 % of the
+              budget is 40 % of the bin. Both bands measure against the bin directly -- put them
+              inside a wrapper that is itself a percentage of the bin and the paint becomes the
+              square of the real fill. A band past 100 % is clipped by the bin, which is what
+              the lid not closing looks like. */}
           <div
-            style={{ height: `${Math.min(fill.docsPct + fill.queryPct, 100)}%` }}
-            className="absolute inset-x-0 bottom-0 flex flex-col-reverse"
-          >
-            <div
-              style={{ flexBasis: `${fill.docsPct}%` }}
-              className="min-h-0 shrink bg-brand-tint"
-            />
-            <div
-              style={{ flexBasis: `${fill.queryPct}%` }}
-              className="min-h-0 shrink bg-accent-tint"
-            />
-          </div>
+            data-band="docs"
+            style={{ height: `${fill.docsPct}%` }}
+            className="absolute inset-x-0 bottom-0 bg-brand-tint"
+          />
+          <div
+            data-band="query"
+            style={{ height: `${fill.queryPct}%`, bottom: `${fill.docsPct}%` }}
+            className="absolute inset-x-0 bg-accent-tint"
+          />
           {/* Each passage that made it in, counted along the bin's floor. */}
           <ul className="absolute inset-x-1 bottom-1 flex flex-wrap gap-0.5">
             {included.map((id) => (
-              <li key={id} className="size-2 rounded-xs bg-brand" />
+              <li key={id} data-passage="" className="size-2 rounded-xs bg-brand" />
             ))}
           </ul>
         </div>

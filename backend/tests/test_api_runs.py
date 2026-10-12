@@ -173,7 +173,8 @@ def test_reference_run_streams_the_full_event_sequence(api: TestClient) -> None:
             assert "gold" not in data
     assert open_steps == {}
     assert events[-2][2]["score"]["stars"] == 3
-    assert set(events[-1][2]["report"]["gold"]) == graded
+    # Samples only, a strict subset of the ten graded; the gold-redaction test pins which.
+    assert set(events[-1][2]["report"]["gold"]) < graded
 
 
 def test_last_event_id_replays_the_rest(api: TestClient) -> None:
@@ -468,3 +469,30 @@ def test_startup_imports_the_replay_seed(
         assert replay is not None
         assert all(replay.get(key) is not None for key in entries)
     assert f"replay seed: {len(entries)} answers added" in caplog.text
+
+
+def naive(naive_id: str, level_id: str = L1) -> str:
+    """One of the level's own worked-wrong benches, so a run reaches the diagnosis path."""
+    graphs = {n.id: n.graph for n in load_level(level_id).naive_graphs}
+    return graphs[naive_id].model_dump_json(by_alias=True)
+
+
+@pytest.mark.parametrize("graph", [reference(), naive("N5"), naive("N1")])
+def test_report_reveals_gold_and_diagnosis_for_sample_cases_only(
+    api: TestClient, graph: str
+) -> None:
+    """§3.7 keeps gold off the client for every case but the samples. A hidden case's rank table
+    is a per-case retrieval scoreboard: with it the player tunes top_k against the secret set
+    instead of reasoning about it, which is the whole measurement the level withholds. N5 is the
+    level's own bench that ranks the answer badly on hidden lib-l1-h02 alone, so its one
+    ret.gold_rank group would otherwise carry nothing but a secret case; N1 misses the gold on
+    every normal case, and its ret.gold_missing template prints the case's gold Điều outright."""
+    run_id = post_run(api, graph).json()["run_id"]
+    events = read_events(api, run_id)
+    report = events[-1][2]["report"]
+    sample = {c["id"] for c in api.get(f"/api/levels/{L1}").json()["visible_cases"]}
+
+    assert set(report["gold"]) == sample
+    # The templates interpolate the case's own gold Điều, chunk ids and rank (§11), so a group
+    # headed by a secret case has to go rather than be reworded.
+    assert {d["case"] for d in report["diagnosis"]} <= sample | {None}

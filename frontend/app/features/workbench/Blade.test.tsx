@@ -25,3 +25,27 @@ describe("Blade", () => {
     expect(screen.queryByText(/cắt đứt/)).toBeNull();
   });
 });
+
+describe("what the strip actually draws", () => {
+  const cuts = () => document.querySelectorAll("[data-cut]");
+
+  it("draws a tick for every cut the average implies", () => {
+    // 158 of a widest 1024 is a cut every 15,4 %: six inside the strip.
+    render(<Blade variant="theo_dieu-512-10" chunks={84} avgTokens={158} split={false} />);
+    expect(cuts()).toHaveLength(6);
+  });
+
+  it("still cuts the widest chunk the level offers", () => {
+    // co_dinh/1024 bakes to 15 chunks averaging 979; a strip with no tick at all would be a
+    // picture of an uncut corpus above a caption reading "15 đoạn".
+    render(<Blade variant="co_dinh-1024-0" chunks={15} avgTokens={979} split={false} />);
+    expect(cuts()).toHaveLength(1);
+  });
+
+  it("spaces the ticks evenly from the left edge", () => {
+    render(<Blade variant="co_dinh-512-0" chunks={29} avgTokens={512} split={false} />);
+    const at = [...cuts()].map((c) => parseFloat((c as HTMLElement).style.left));
+    expect(at).toHaveLength(1);
+    expect(at[0]).toBeCloseTo(50, 6);
+  });
+});

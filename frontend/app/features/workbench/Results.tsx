@@ -65,6 +65,13 @@ export function Results({
   onFocusSlot,
 }: ResultsProps) {
   const { level } = env;
+  // §3.7: gold belongs to the sample cases. The server redacts the rest (runs.py), so this is
+  // the second lock rather than the only one -- a stale deploy or a replayed log cannot turn a
+  // hidden case's rank table into something the player tunes top_k against.
+  const sample = new Set(run.cases.filter((c) => c.role === "visible").map((c) => c.id));
+  const revealed = Object.fromEntries(
+    Object.entries(run.report?.gold ?? {}).filter(([id]) => sample.has(id)),
+  );
   // The reason menu comes before the diagnosis (L1 §11); one per run (the parent keys by run).
   const [why, setWhy] = useState<"ask" | "answered" | "skipped">("ask");
   useEffect(() => {
@@ -207,7 +214,7 @@ export function Results({
               const c = run.cases.find((item) => item.id === id);
               return c ? [c] : [];
             });
-            const target = diagnosisTarget(env, group, run.report?.gold, runGraph);
+            const target = diagnosisTarget(env, group, revealed, runGraph);
             const showSlot = target !== null && hasControls(env, target.slot);
             const attached = graph.nodes.some((node) => node.type === target?.slot);
             return (
@@ -263,7 +270,7 @@ export function Results({
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         {run.cases.map((c) => (
-          <CaseCard key={c.id} env={env} c={c} gold={run.report?.gold[c.id]} runGraph={runGraph} />
+          <CaseCard key={c.id} env={env} c={c} gold={revealed[c.id]} runGraph={runGraph} />
         ))}
       </div>
 

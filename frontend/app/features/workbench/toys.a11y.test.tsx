@@ -30,6 +30,10 @@ const STRUCTURAL = [
 
 async function violations(node: Element) {
   const result = await axe.run(node, { runOnly: { type: "rule", values: STRUCTURAL } });
+  // An empty violations list means nothing only if a rule actually matched something. Put
+  // aria-hidden on the subtree, or role="img" on a list, and every structural rule becomes
+  // inapplicable -- which reads exactly like a pass. Fail loudly instead.
+  expect(result.passes.length).toBeGreaterThan(0);
   return result.violations.map((v) => `${v.id}: ${v.nodes[0]?.target.join(" ")}`);
 }
 

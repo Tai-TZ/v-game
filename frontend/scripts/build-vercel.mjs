@@ -8,8 +8,10 @@
 // - /api/* is proxied to VG_API_ORIGIN, so the API stays same-origin (CSP connect-src 'self'; the
 //   only other source is Open-Meteo, which the browser calls for the campus weather).
 // - Theme packs not listed in VITE_THEME_PACKS are left out of the deployment.
-// - /play gets its pre-rendered page; unknown /assets and /themes paths answer 404; every other
-//   path gets the SPA fallback.
+// - The route table itself lives in scripts/vercel-routes.mjs (tested separately): /play gets
+//   its pre-rendered page, /assets is immutable for a year, /themes, /models and /runs are
+//   cached for a day, unknown /assets and /themes paths answer 404, and every other path gets
+//   the SPA fallback.
 import { execSync } from "node:child_process";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";

@@ -40,7 +40,11 @@ export function Stamps({
       <p className="sr-only">{label}</p>
       <ul className="max-w-prose space-y-1">
         {parts.map((part, index) => (
-          <li key={index} className={`rounded-sm border px-2 py-1 text-sm ${LOOK[part.kind]}`}>
+          <li
+            key={index}
+            data-stamp={part.kind}
+            className={`rounded-sm border px-2 py-1 text-sm ${LOOK[part.kind]}`}
+          >
             {part.text}
             {part.kind === "fake" && (
               <span className="ml-1 font-semibold text-danger">{STAMP_VI.fake}</span>
