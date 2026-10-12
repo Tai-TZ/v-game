@@ -55,6 +55,54 @@ describe("what the bin actually paints", () => {
     bin: document.querySelector<HTMLElement>("[data-bin]"),
   });
 
+  it("draws the part that will not fit, so a lid that shuts is not the same picture", () => {
+    // Before: overflow-hidden clipped the band, so 3.600/3.000 and 3.000/3.000 painted
+    // pixel-identically and only a border colour and one sentence told them apart.
+    render(
+      <ContextBin
+        tokens={{ docs: 3500, query: 100, total: 3600, budget: 3000 }}
+        included={["a"]}
+        dropped={["b"]}
+        promptTokens={null}
+      />,
+    );
+    const over = document.querySelector("[data-overflow]");
+    expect(over).not.toBeNull();
+    expect(parseFloat(over?.getAttribute("data-overflow") ?? "0")).toBeCloseTo(20, 1);
+    // Colour is not the only carrier: an icon and the words sit beside it.
+    expect(document.querySelector("[data-overflow-note] svg")).not.toBeNull();
+    expect(document.querySelector("[data-overflow-note]")?.textContent).toContain(
+      "Nắp không đóng được",
+    );
+  });
+
+  it("draws nothing over the rim for a pack that exactly fills the bin", () => {
+    render(
+      <ContextBin
+        tokens={{ docs: 2900, query: 100, total: 3000, budget: 3000 }}
+        included={["a"]}
+        dropped={[]}
+        promptTokens={null}
+      />,
+    );
+    expect(document.querySelector("[data-overflow]")).toBeNull();
+    expect(document.querySelector("[data-overflow-note]")).toBeNull();
+  });
+
+  it("sizes the bands with SVG attributes, never a style attribute", () => {
+    // frontend-architecture §8.1: sizes and colours go through SVG attributes or Tailwind, not
+    // `style=`, which CSP blocks the moment it reaches prerendered HTML.
+    const { container } = render(
+      <ContextBin
+        tokens={{ docs: 1200, query: 93, total: 1293, budget: 3000 }}
+        included={["a"]}
+        dropped={[]}
+        promptTokens={null}
+      />,
+    );
+    expect(container.querySelectorAll("[style]")).toHaveLength(0);
+  });
+
   it("gives each band its measured share of the bin, not the square of it", () => {
     // 1.200 + 93 of 3.000 is 40 % + 3,1 %. Nesting the bands inside a wrapper that was itself
     // 43,1 % of the bin painted 40 % *of that*: 17,2 % of the bin for a 40 % band.
@@ -67,13 +115,15 @@ describe("what the bin actually paints", () => {
       />,
     );
     const { docs, query, bin } = bands();
-    expect(parseFloat(docs?.style.height ?? "")).toBeCloseTo(40, 6);
-    expect(parseFloat(query?.style.height ?? "")).toBeCloseTo(3.1, 6);
-    // Each band measures against the bin itself, so no ancestor can rescale it.
+    // The bin's viewBox is 100 tall, so a band's height attribute IS its share of the budget.
+    expect(parseFloat(docs?.getAttribute("height") ?? "")).toBeCloseTo(40, 6);
+    expect(parseFloat(query?.getAttribute("height") ?? "")).toBeCloseTo(3.1, 6);
+    // Both bands are drawn straight into the bin, so no ancestor can rescale them.
     expect(docs?.parentElement).toBe(bin);
     expect(query?.parentElement).toBe(bin);
-    // The question stacks on top of the documents rather than overlapping them.
-    expect(parseFloat(query?.style.bottom ?? "")).toBeCloseTo(40, 6);
+    // The question stacks on top of the documents: its foot is where the documents end.
+    expect(parseFloat(query?.getAttribute("y") ?? "")).toBeCloseTo(100 - 40 - 3.1, 6);
+    expect(parseFloat(docs?.getAttribute("y") ?? "")).toBeCloseTo(60, 6);
   });
 
   it("lets an over-budget band run past the bin instead of pinning it at full", () => {
@@ -86,7 +136,7 @@ describe("what the bin actually paints", () => {
       />,
     );
     // bin.test.ts asks for an overflow that sticks out rather than a bar quietly at 100 %.
-    expect(parseFloat(bands().docs?.style.height ?? "0")).toBeGreaterThan(100);
+    expect(parseFloat(bands().docs?.getAttribute("height") ?? "0")).toBeGreaterThan(100);
   });
 
   it("draws one block per passage that made it in", () => {

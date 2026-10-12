@@ -14,6 +14,12 @@ export interface BinFill {
   queryPct: number;
   /** The lid does not close: the pack asked for more than the budget allows. */
   overflow: boolean;
+  /**
+   * How far past the rim the pack goes, as a percentage of the budget: 0 when it fits. Not
+   * clamped, so a pack of twice the budget reads as 100 rather than flattening every size of
+   * mistake into one picture.
+   */
+  overPct: number;
 }
 
 export function binFill({
@@ -29,10 +35,15 @@ export function binFill({
 }): BinFill {
   // A budget of zero has no room for anything, so anything at all is an overflow — and there
   // is no ratio to take.
-  if (budget <= 0) return { docsPct: total > 0 ? 100 : 0, queryPct: 0, overflow: total > 0 };
+  // A budget of zero is full to the rim, and there is no ratio with which to measure what
+  // stands past it.
+  if (budget <= 0) {
+    return { docsPct: total > 0 ? 100 : 0, queryPct: 0, overflow: total > 0, overPct: 0 };
+  }
   return {
     docsPct: (docs / budget) * 100,
     queryPct: (query / budget) * 100,
     overflow: total > budget,
+    overPct: Math.max(0, ((total - budget) / budget) * 100),
   };
 }

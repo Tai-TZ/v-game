@@ -1,5 +1,7 @@
 import type { ReactElement } from "react";
 
+import { AlertIcon } from "~/components/ui/icons";
+
 import { binFill } from "./bin";
 import { BIN_VI, fmt, TOKENS_VI } from "./copy";
 import { Viz } from "./Viz";
@@ -58,37 +60,58 @@ export function ContextBin({
       }
     >
       <div role="img" aria-label={label} className="max-w-80">
-        {/* The bin, seen from the side. Height is the budget; the bands are what the run
-            measured taking it up. An overflowing band is clipped by the bin, which is what
-            the lid not closing looks like. */}
-        <div
+        {/* The part that will not fit, drawn above the rim so a lid that shuts and one that
+            does not are different pictures -- overflow-hidden made them identical. The strip
+            is capped at a bin's worth: past that it says "some of this does not fit", which is
+            true at any size, and the figure itself is printed below. */}
+        {fill.overflow && (
+          <svg
+            data-overflow={fill.overPct}
+            aria-hidden="true"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="h-4 w-full"
+          >
+            <rect
+              y={Math.max(0, 100 - Math.min(fill.overPct, 100))}
+              width="100"
+              height={Math.min(fill.overPct, 100)}
+              className="fill-danger-tint"
+            />
+          </svg>
+        )}
+        {/* The bin, seen from the side. The viewBox is 100 tall, so a band's height attribute
+            is its share of the budget -- no style attribute anywhere (§8.1, CSP). */}
+        <svg
           data-bin=""
-          className={`relative h-28 overflow-hidden rounded-sm border-2 border-b-4 bg-subtle ${
+          aria-hidden="true"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          className={`h-28 w-full rounded-sm border-2 border-b-4 bg-subtle ${
             fill.overflow ? "border-danger" : "border-line-strong"
           }`}
         >
-          {/* The bin's height is the budget, so each band is its own share of it: 40 % of the
-              budget is 40 % of the bin. Both bands measure against the bin directly -- put them
-              inside a wrapper that is itself a percentage of the bin and the paint becomes the
-              square of the real fill. A band past 100 % is clipped by the bin, which is what
-              the lid not closing looks like. */}
-          <div
+          <rect
             data-band="docs"
-            style={{ height: `${fill.docsPct}%` }}
-            className="absolute inset-x-0 bottom-0 bg-brand-tint"
+            y={100 - fill.docsPct}
+            width="100"
+            height={fill.docsPct}
+            className="fill-brand-tint"
           />
-          <div
+          <rect
             data-band="query"
-            style={{ height: `${fill.queryPct}%`, bottom: `${fill.docsPct}%` }}
-            className="absolute inset-x-0 bg-accent-tint"
+            y={100 - fill.docsPct - fill.queryPct}
+            width="100"
+            height={fill.queryPct}
+            className="fill-accent-tint"
           />
-          {/* Each passage that made it in, counted along the bin's floor. */}
-          <ul className="absolute inset-x-1 bottom-1 flex flex-wrap gap-0.5">
-            {included.map((id) => (
-              <li key={id} data-passage="" className="size-2 rounded-xs bg-brand" />
-            ))}
-          </ul>
-        </div>
+        </svg>
+        {/* Each passage that made it in, counted along the bin's floor. */}
+        <ul className="-mt-4 flex flex-wrap gap-0.5 px-1">
+          {included.map((id) => (
+            <li key={id} data-passage="" className="size-2 rounded-xs bg-brand" />
+          ))}
+        </ul>
       </div>
       <p className="mt-1 text-sm tabular-nums">
         {fmt(tokens.total)}/{fmt(tokens.budget)} token · tài liệu {fmt(tokens.docs)} · câu hỏi{" "}
@@ -100,7 +123,12 @@ export function ContextBin({
       <p className="mt-1 max-w-prose text-sm text-fg-muted tabular-nums">
         {promptTokens === null ? TOKENS_VI.noneYet : TOKENS_VI.prompt(fmt(promptTokens))}
       </p>
-      {fill.overflow && <p className="text-sm font-semibold text-danger">{BIN_VI.overflow}</p>}
+      {fill.overflow && (
+        <p data-overflow-note className="flex items-center gap-1 text-sm font-semibold text-danger">
+          <AlertIcon className="size-4 shrink-0" />
+          {BIN_VI.overflow}
+        </p>
+      )}
       <p className="mt-1 max-w-prose text-xs text-fg-muted">{BIN_VI.counted}</p>
     </Viz>
   );
