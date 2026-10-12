@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { graphFromBench, starterBench } from "./bench";
 import { EMPTY_SLIP, type Slip } from "./guess";
-import { GuessSlip } from "./GuessSlip";
+import { GuessSlip, WhyMenu } from "./GuessSlip";
 import { Results } from "./Results";
 import type { RunView } from "./run";
 import { frame, parseSse, readText, replay, testEnv } from "./test-fixtures";
@@ -80,6 +80,7 @@ function show(run: RunView, slip: Slip | null) {
         backTo="/play/library"
         slip={slip}
         history={[]}
+        onDebrief={() => undefined}
         onDuplicate={() => undefined}
         onEdit={() => undefined}
         onFocusSlot={() => undefined}
@@ -218,5 +219,41 @@ describe("Results with the guess loop", () => {
     show(run, null);
     expect(screen.queryByRole("group", { name: /Vì sao/ })).toBeNull();
     expect(screen.getByText("Không có câu nào cần chẩn đoán.")).toBeDefined();
+  });
+});
+
+describe("WhyMenu reports the stable index, not the rotated display position", () => {
+  const menu = { options: ["Lý do A", "Lý do B", "Lý do C"] as [string, ...string[]] };
+
+  it("reports the clicked option's place in menu.options, however the rotation drew it", () => {
+    // turn=2 rotates the display so option 1 ("Lý do B") is shown FIRST. Clicking by its text,
+    // not by position, is what proves the report is the stable index and not the display slot.
+    const seen: number[] = [];
+    render(
+      <WhyMenu
+        c={null}
+        menu={menu}
+        turn={2}
+        onAnswer={(i) => seen.push(i)}
+        onSkip={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Lý do B" }));
+    expect(seen).toEqual([1]);
+  });
+
+  it("reports 0 for the answer itself, wherever it was rotated to", () => {
+    const seen: number[] = [];
+    render(
+      <WhyMenu
+        c={null}
+        menu={menu}
+        turn={2}
+        onAnswer={(i) => seen.push(i)}
+        onSkip={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "Lý do A" }));
+    expect(seen).toEqual([0]);
   });
 });
