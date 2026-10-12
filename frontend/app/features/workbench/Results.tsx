@@ -26,7 +26,9 @@ import {
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
 import { Compare } from "./Compare";
+import { Debrief } from "./Debrief";
 import { History } from "./History";
+import type { NextPick } from "./diff";
 import { type Scale } from "./journey";
 import type { RunMark } from "./storage";
 import { RankJourney } from "./RankJourney";
@@ -59,6 +61,8 @@ interface ResultsProps {
   history: readonly RunMark[];
   /** Puts a remembered configuration back on the bench, from a row of the strip. */
   onDuplicate: (mark: RunMark) => void;
+  /** Persists the debrief's picks (N20) onto the run just recorded. */
+  onDebrief: (extras: { why?: number; next?: NextPick }) => void;
   onEdit: () => void;
   onFocusSlot: (type: BlockType, param?: string) => void;
 }
@@ -82,6 +86,7 @@ export function Results({
   slip,
   history,
   onDuplicate,
+  onDebrief,
   onEdit,
   onFocusSlot,
 }: ResultsProps) {
@@ -95,6 +100,9 @@ export function Results({
   );
   // The reason menu comes before the diagnosis (L1 §11); one per run (the parent keys by run).
   const [why, setWhy] = useState<"ask" | "answered" | "skipped">("ask");
+  // The stable index chosen, for the debrief's line 3 (N20) -- kept separately from `why` above
+  // so the existing ask/answered/skipped control flow does not have to change shape.
+  const [whyIndex, setWhyIndex] = useState<number | null>(null);
   useEffect(() => {
     if (why === "skipped") document.getElementById("wb-diagnosis-title")?.focus();
   }, [why]);
@@ -225,7 +233,10 @@ export function Results({
           // no case of its own. +1 so a seed divisible by the option count cannot land the
           // answer first.
           turn={(ask.c?.n ?? run.cases.length) + 1}
-          onAnswer={() => setWhy("answered")}
+          onAnswer={(index) => {
+            setWhy("answered");
+            setWhyIndex(index);
+          }}
           onSkip={() => setWhy("skipped")}
         />
       )}
@@ -340,6 +351,16 @@ export function Results({
             " trên model chính, nên số token của lượt này không phải thước đo cấu hình của bạn."}
         </p>
       )}
+
+      <Debrief
+        env={env}
+        run={run}
+        slip={slip}
+        graph={graph}
+        ask={ask}
+        whyIndex={whyIndex}
+        onPick={onDebrief}
+      />
 
       <div className="mt-8 flex flex-wrap gap-2">
         <button type="button" onClick={onEdit} className={buttonClass("primary")}>

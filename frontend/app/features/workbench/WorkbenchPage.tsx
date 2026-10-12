@@ -36,6 +36,7 @@ import {
 } from "./schema";
 import {
   loadHistory,
+  recordExtras,
   loadSaved,
   loadSlip,
   recordRun,
@@ -609,6 +610,10 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           backTo={back}
           slip={ranSlip?.runId === run.runId ? ranSlip.slip : null}
           history={history}
+          onDebrief={(extras) => {
+            recordExtras(level.id, extras);
+            setHistory(loadHistory(level.id));
+          }}
           onDuplicate={benchFrom}
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}

@@ -38,6 +38,7 @@ function show(
   env = l1,
   runGraph: Graph = dense,
   history: RunMark[] = [],
+  onDebrief: (extras: { why?: number; next?: unknown }) => void = () => undefined,
 ) {
   render(
     <MemoryRouter>
@@ -50,6 +51,7 @@ function show(
         backTo="/play/library"
         slip={null}
         history={history}
+        onDebrief={onDebrief}
         onDuplicate={() => undefined}
         onEdit={() => undefined}
         onFocusSlot={() => undefined}
@@ -456,6 +458,7 @@ describe("duplicating a row of the strip", () => {
           backTo="/play/library"
           slip={null}
           history={runs}
+          onDebrief={() => undefined}
           onDuplicate={(mark) => picked.push(mark.at)}
           onEdit={() => undefined}
           onFocusSlot={() => undefined}
@@ -499,5 +502,18 @@ describe("the comparison card from the second run on", () => {
     if (!onlyRun) throw new Error("fixture lost its run");
     show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, [onlyRun]);
     expect(document.querySelector("[data-compare]")).toBeNull();
+  });
+});
+
+describe("Debrief's picks reach the page through onDebrief", () => {
+  it("calls onDebrief with exactly the option the player picked", () => {
+    const picks: unknown[] = [];
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, [], (extras) => picks.push(extras));
+    const radios = document.querySelectorAll('input[type="radio"][name="debrief-next"]');
+    const first = radios[0];
+    expect(first).toBeDefined();
+    if (!first) throw new Error("no debrief option rendered");
+    fireEvent.click(first);
+    expect(picks).toHaveLength(1);
   });
 });
