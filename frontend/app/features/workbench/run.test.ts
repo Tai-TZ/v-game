@@ -7,6 +7,7 @@ import {
   frameAction,
   isActive,
   llmCalls,
+  outTokenSpread,
   runningNodes,
   runReducer,
   type CaseView,
@@ -320,5 +321,59 @@ describe("fallbackAnswers", () => {
     // A recorded run exported before the field existed: unknown, so assert nothing.
     const r = run(undefined, [caseWith("whatever")]);
     expect(fallbackAnswers(r)).toEqual({ fallback: 0, answered: 1 });
+  });
+});
+
+describe("outTokenSpread", () => {
+  const answered = (out: number): CaseView =>
+    ({
+      tokens: { in: 100, out },
+      steps: {
+        llm: {
+          block: "llm",
+          state: "done",
+          status: "ok",
+          facts: [
+            {
+              kind: "llm",
+              stop_reason: "end",
+              cited_ids: [],
+              replayed: false,
+              model: "m1",
+              system_tokens: 1,
+            },
+          ],
+        },
+      },
+    }) as unknown as CaseView;
+  const skipped = () => ({ tokens: { in: 0, out: 0 }, steps: {} }) as unknown as CaseView;
+  const run = (cases: CaseView[]) => ({ cases }) as unknown as RunView;
+
+  it("reports the low and the high, because the spread is the point", () => {
+    // frontend-architecture §8.4: the same L3 prompt answered in 74 and in 528 output tokens.
+    // An average of 301 would hide exactly what the learner is meant to see.
+    expect(outTokenSpread(run([answered(74), answered(300), answered(528)]))).toEqual({
+      low: 74,
+      high: 528,
+      cases: 3,
+    });
+  });
+
+  it("leaves a case that never reached the model out of the spread", () => {
+    // Its zero is not a short answer; it is no answer, and it would drag the low to nothing.
+    expect(outTokenSpread(run([answered(74), skipped(), skipped()]))).toEqual({
+      low: 74,
+      high: 74,
+      cases: 1,
+    });
+  });
+
+  it("has no spread to report when nothing answered", () => {
+    expect(outTokenSpread(run([skipped()]))).toBeNull();
+  });
+
+  it("says low and high are the same for one case, so the copy can avoid a range of one", () => {
+    const one = outTokenSpread(run([answered(420)]));
+    expect(one?.low).toBe(one?.high);
   });
 });

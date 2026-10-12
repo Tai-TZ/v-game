@@ -339,3 +339,33 @@ describe("every token figure names the counter behind it", () => {
     expect(line?.textContent).toContain("theo usage của Gemini");
   });
 });
+
+describe("the swing in output tokens", () => {
+  it("shows the low and the high, not an average that hides the swing", () => {
+    // §8.4: "Token suy nghĩ dao động mạnh … cho người học thấy điều đó, không làm phẳng."
+    const run = finishedRun({ "lib-l1-v01": trap });
+    const spread = {
+      ...run,
+      cases: run.cases.map((c, i) => ({ ...c, tokens: { in: 100, out: i === 0 ? 74 : 528 } })),
+    };
+    show(spread);
+    const line = document.querySelector("[data-out-spread]");
+    expect(line?.textContent).toContain("74");
+    expect(line?.textContent).toContain("528");
+    expect(line?.textContent).toContain("gồm token suy nghĩ");
+    expect(line?.textContent).not.toContain("301");
+  });
+
+  it("prints one number for one answered case, not a range of one", () => {
+    const run = finishedRun({ "lib-l1-v01": trap });
+    const single = {
+      ...run,
+      cases: run.cases.map((c, i) =>
+        i === 0 ? { ...c, tokens: { in: 1, out: 420 } } : { ...c, steps: {} },
+      ),
+    };
+    show(single);
+    expect(document.querySelector("[data-out-spread]")?.textContent).toContain("câu duy nhất");
+    expect(document.querySelector("[data-out-spread]")?.textContent).not.toContain("–");
+  });
+});

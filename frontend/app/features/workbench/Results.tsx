@@ -31,6 +31,7 @@ import {
   caseModel,
   fallbackAnswers,
   llmCalls,
+  outTokenSpread,
   unfinished,
   type CaseView,
   type RunView,
@@ -96,6 +97,7 @@ export function Results({
   const skipped = unfinished(run).length;
   const calls = llmCalls(run);
   const served = fallbackAnswers(run);
+  const spread = outTokenSpread(run);
   const conditions = [
     {
       ok: score.s1,
@@ -299,6 +301,11 @@ export function Results({
           {Object.entries(run.models)
             .map(([model, count]) => `${model} (${count} lời gọi)`)
             .join(" · ")}
+        </p>
+      )}
+      {spread !== null && (
+        <p data-out-spread className="mt-6 max-w-prose text-sm text-fg-muted tabular-nums">
+          {TOKENS_VI.spread(fmt(spread.low), fmt(spread.high), spread.cases)}
         </p>
       )}
       {served.fallback > 0 && (

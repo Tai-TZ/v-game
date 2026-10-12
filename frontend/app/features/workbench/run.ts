@@ -262,6 +262,23 @@ export function llmCalls(run: RunView): { real: number; replayed: number } {
   return { real, replayed };
 }
 
+/**
+ * How far apart the shortest and the longest answer of this run were, in output tokens.
+ *
+ * §8.4: thinking tokens swing hard -- the same L3 prompt came back in 74 and in 528 output
+ * tokens -- and the rule is to show the learner that rather than flatten it. So this is a low
+ * and a high, never a mean. `Usage.output_tokens` already includes thinking and the engine
+ * emits no separate count, so a split into prompt/output/thinking would draw a number the run
+ * never measured.
+ *
+ * A case that never reached the model is left out: its zero is no answer, not a short one.
+ */
+export function outTokenSpread(run: RunView): { low: number; high: number; cases: number } | null {
+  const out = run.cases.flatMap((c) => (caseModel(c) === null ? [] : [c.tokens.out]));
+  if (out.length === 0) return null;
+  return { low: Math.min(...out), high: Math.max(...out), cases: out.length };
+}
+
 const NOT_YOUR_FAULT = new Set(["skipped_budget", "llm_error", "timeout"]);
 /**
  * Cases that did not finish for the server's reasons (AI overloaded, daily quota, deadline).

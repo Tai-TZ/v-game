@@ -118,6 +118,14 @@ export const TOKENS_VI = {
   prompt: (n: string) => `Gemini tính ${n} token vào cho cả lời nhắc, không chỉ phần trong thùng.`,
   /** Said rather than defaulting the provider's number to zero. */
   noneYet: "Chưa có số của Gemini cho câu này.",
+  /**
+   * The spread, never a mean: §8.4 asks for the swing to be shown, not flattened. Output
+   * includes thinking tokens, and the engine reports no separate count for them.
+   */
+  spread: (low: string, high: string, cases: number) =>
+    low === high
+      ? `Token ra: ${low} ở câu duy nhất đã trả lời (gồm token suy nghĩ).`
+      : `Token ra: ${low}–${high} qua ${cases} câu (gồm token suy nghĩ).`,
 } as const;
 
 /** Sổ đối chiếu trích dẫn (N13): the same codes at three stages, aligned so a gap shows. */
