@@ -118,6 +118,34 @@ test.describe("workbench", () => {
     const [model, calls] = Object.entries(finished.models)[0] ?? ["", 0];
     await expect(page.getByText(`${model} (${calls} lời gọi)`)).toBeVisible();
 
+    // The gate frontend-architecture §12 promised: every figure carries its three parts. Until
+    // today `data-vg-viz` appeared nowhere in the app, so this could never have fired.
+    // A figure inside a collapsed <details> ("Xem vết chạy") is in the DOM but not visible, and
+    // the gate is about what every figure carries, not about which disclosure happens to be
+    // open. Open them all first, as the a11y suite does.
+    for (const details of await page.locator("details").all()) {
+      await details.evaluate((element) => element.setAttribute("open", ""));
+    }
+    const figures = page.locator("[data-vg-viz]");
+    const count = await figures.count();
+    expect(count).toBeGreaterThan(0);
+    const STAMPS = [
+      "Đo từ lượt của bạn",
+      "Đo từ nhãn của bạn",
+      "Tính sẵn từ chỉ mục",
+      "Minh hoạ",
+      "Lượt chạy đã ghi",
+      "Mô phỏng",
+      "Dữ liệu ghi sẵn",
+    ];
+    for (let i = 0; i < count; i++) {
+      const figure = figures.nth(i);
+      await expect(figure.locator("figcaption")).not.toBeEmpty();
+      const text = (await figure.textContent()) ?? "";
+      expect(STAMPS.filter((stamp) => text.includes(stamp))).toHaveLength(1);
+      await expect(figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ })).toBeVisible();
+    }
+
     await page.getByRole("button", { name: "Chỉnh rồi chạy lại" }).click();
     await expect(page.getByRole("heading", { level: 2, name: "Bàn thợ" })).toBeFocused();
     await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");

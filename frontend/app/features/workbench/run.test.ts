@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   blockState,
+  caseModel,
+  fallbackAnswers,
   frameAction,
   isActive,
   llmCalls,
+  outTokenSpread,
   runningNodes,
   runReducer,
+  type CaseView,
+  type RunView,
   type StepView,
 } from "./run";
 import { parseEvent, type EventType } from "./schema";
@@ -210,5 +215,165 @@ describe("blockState (N6)", () => {
     expect(blockState("active", undefined, ingest)).toBe("passed");
     expect(blockState("done", undefined, ingest)).toBe("passed");
     expect(blockState("done", undefined, { ...ingest, started: false })).toBe("idle");
+  });
+});
+
+describe("caseModel", () => {
+  const withLlm = (model: string, replayed: boolean): CaseView =>
+    ({
+      id: "c1",
+      n: 1,
+      role: "visible",
+      vai: "sv",
+      state: "graded",
+      tokens: { in: 1, out: 1 },
+      steps: {
+        llm: {
+          block: "llm",
+          state: "done",
+          status: "ok",
+          facts: [
+            {
+              kind: "llm",
+              stop_reason: "end",
+              cited_ids: [],
+              replayed,
+              model,
+              system_tokens: 1,
+            },
+          ],
+        },
+      },
+    }) as unknown as CaseView;
+
+  it("names the model that actually answered the case", () => {
+    expect(caseModel(withLlm("gemini-3.1-flash-lite", false))).toEqual({
+      model: "gemini-3.1-flash-lite",
+      replayed: false,
+    });
+  });
+
+  it("says when the answer came from the replay cache rather than a call", () => {
+    // §8.6: a cached answer inside a real run is not a call this run made, and the two must not
+    // read the same -- the fallback count depends on telling them apart.
+    expect(caseModel(withLlm("gemini-3.5-flash-lite", true))?.replayed).toBe(true);
+  });
+
+  it("has no model for a case that never reached the model", () => {
+    // A hidden case on a recorded run keeps only case.graded, and a skipped case has no llm fact.
+    const bare = { ...withLlm("x", false), steps: {} };
+    expect(caseModel(bare)).toBeNull();
+  });
+});
+
+describe("fallbackAnswers", () => {
+  const caseWith = (model: string | null, replayed = false) =>
+    ({
+      steps:
+        model === null
+          ? {}
+          : {
+              llm: {
+                block: "llm",
+                state: "done",
+                status: "ok",
+                facts: [
+                  {
+                    kind: "llm",
+                    stop_reason: "end",
+                    cited_ids: [],
+                    replayed,
+                    model,
+                    system_tokens: 1,
+                  },
+                ],
+              },
+            },
+    }) as unknown as CaseView;
+
+  const run = (primaryModel: string | undefined, cases: CaseView[]) =>
+    ({ cases, primaryModel }) as unknown as RunView;
+
+  it("counts the cases a model other than the primary answered", () => {
+    const r = run("gemini-3.5-flash-lite", [
+      caseWith("gemini-3.5-flash-lite"),
+      caseWith("gemini-3.1-flash-lite"),
+      caseWith("gemini-3.1-flash-lite"),
+    ]);
+    expect(fallbackAnswers(r)).toEqual({ fallback: 2, answered: 3 });
+  });
+
+  it("counts a cached fallback answer too: the grade is read off that answer either way", () => {
+    // engine-v0.2 §663 replays a fallback's old answer. It was not a call this run made -- the
+    // "lời gọi AI" line says that -- but star 2 is still being judged on its token count.
+    const r = run("gemini-3.5-flash-lite", [caseWith("gemini-3.1-flash-lite", true)]);
+    expect(fallbackAnswers(r)).toEqual({ fallback: 1, answered: 1 });
+  });
+
+  it("leaves a case that got no answer out of both numbers", () => {
+    // Otherwise a quota-exhausted run reads as "0/10 do model dự phòng", which measures the
+    // denominator rather than the run.
+    const r = run("m1", [caseWith("m1"), caseWith(null), caseWith(null)]);
+    expect(fallbackAnswers(r)).toEqual({ fallback: 0, answered: 1 });
+  });
+
+  it("claims no fallback when the run never said which model is primary", () => {
+    // A recorded run exported before the field existed: unknown, so assert nothing.
+    const r = run(undefined, [caseWith("whatever")]);
+    expect(fallbackAnswers(r)).toEqual({ fallback: 0, answered: 1 });
+  });
+});
+
+describe("outTokenSpread", () => {
+  const answered = (out: number): CaseView =>
+    ({
+      tokens: { in: 100, out },
+      steps: {
+        llm: {
+          block: "llm",
+          state: "done",
+          status: "ok",
+          facts: [
+            {
+              kind: "llm",
+              stop_reason: "end",
+              cited_ids: [],
+              replayed: false,
+              model: "m1",
+              system_tokens: 1,
+            },
+          ],
+        },
+      },
+    }) as unknown as CaseView;
+  const skipped = () => ({ tokens: { in: 0, out: 0 }, steps: {} }) as unknown as CaseView;
+  const run = (cases: CaseView[]) => ({ cases }) as unknown as RunView;
+
+  it("reports the low and the high, because the spread is the point", () => {
+    // frontend-architecture §8.4: the same L3 prompt answered in 74 and in 528 output tokens.
+    // An average of 301 would hide exactly what the learner is meant to see.
+    expect(outTokenSpread(run([answered(74), answered(300), answered(528)]))).toEqual({
+      low: 74,
+      high: 528,
+      cases: 3,
+    });
+  });
+
+  it("leaves a case that never reached the model out of the spread", () => {
+    // Its zero is not a short answer; it is no answer, and it would drag the low to nothing.
+    expect(outTokenSpread(run([answered(74), skipped(), skipped()]))).toEqual({
+      low: 74,
+      high: 74,
+      cases: 1,
+    });
+  });
+
+  it("has no spread to report when nothing answered", () => {
+    expect(outTokenSpread(run([skipped()]))).toBeNull();
+  });
+
+  it("says low and high are the same for one case, so the copy can avoid a range of one", () => {
+    const one = outTokenSpread(run([answered(420)]));
+    expect(one?.low).toBe(one?.high);
   });
 });

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Blade } from "./Blade";
@@ -47,5 +47,27 @@ describe("what the strip actually draws", () => {
     const at = [...cuts()].map((c) => parseFloat((c as HTMLElement).style.left));
     expect(at).toHaveLength(1);
     expect(at[0]).toBeCloseTo(50, 6);
+  });
+});
+
+describe("the strip in its frame", () => {
+  it("wears the run stamp, because the index numbers come from this run", () => {
+    render(<Blade variant="co_dinh-128-0" chunks={115} avgTokens={128} split={false} />);
+    expect(document.querySelector("figure[data-vg-viz]")).not.toBeNull();
+    expect(document.body.textContent).toContain("Đo từ lượt của bạn");
+  });
+
+  it("puts the same numbers the strip was drawn from in the table", () => {
+    render(<Blade variant="theo_dieu-512-10" chunks={84} avgTokens={158} split />);
+    fireEvent.click(screen.getByRole("button", { name: "Xem dạng bảng" }));
+    const rows = [...document.querySelectorAll("tbody tr")].map(
+      (tr) => `${tr.querySelector("th")?.textContent}=${tr.querySelector("td")?.textContent}`,
+    );
+    expect(rows).toEqual([
+      "Cách chia=theo_dieu-512-10",
+      "Số đoạn=84",
+      "Trung bình=158 token",
+      "Cắt đứt câu đáp án=Có",
+    ]);
   });
 });

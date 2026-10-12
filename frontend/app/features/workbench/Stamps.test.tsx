@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Stamps } from "./Stamps";
@@ -48,5 +48,31 @@ describe("what the stamp wall actually draws", () => {
   it("draws one card per sentence of the answer", () => {
     render(<Stamps answer="Một. Hai. Ba." included={[]} />);
     expect(kinds()).toHaveLength(3);
+  });
+});
+
+describe("the stamp wall in its frame", () => {
+  it("wears the run stamp and says what the wall shows", () => {
+    render(<Stamps answer="A [aa11]. B." included={["aa11"]} />);
+    expect(document.querySelector("figure[data-vg-viz]")).not.toBeNull();
+    expect(document.body.textContent).toContain("Đo từ lượt của bạn");
+    expect(document.querySelector("figcaption")?.textContent).toBeTruthy();
+  });
+
+  it("gives an unsourced sentence words of its own, not only a dashed border", () => {
+    // L1 §12: "TRƯỢT vì thiếu nguồn: bong bóng vỡ, chữ 'không có nguồn'". Until now only the
+    // fabricated kind printed words, so a bubble was style-only.
+    render(<Stamps answer="Thường thì trường nào cũng vậy." included={[]} />);
+    const bubble = document.querySelector('[data-stamp="bubble"]');
+    expect(bubble?.textContent).toContain("không có nguồn");
+  });
+
+  it("names each sentence's kind in words in the table form", () => {
+    render(<Stamps answer="A [aa11]. B [zz99]. C." included={["aa11"]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Xem dạng bảng" }));
+    const kinds = [...document.querySelectorAll("tbody tr")].map(
+      (tr) => tr.querySelectorAll("td")[1]?.textContent,
+    );
+    expect(kinds).toEqual(["có nguồn trong thùng", "trích nguồn bịa", "không có nguồn"]);
   });
 });

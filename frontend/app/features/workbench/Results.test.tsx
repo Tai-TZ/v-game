@@ -31,14 +31,14 @@ function finishedRun(gold: Record<string, GoldReveal>, diagnosis: object[] = [])
   return run;
 }
 
-function show(run: RunView, graph: Graph = dense, env = l1) {
+function show(run: RunView, graph: Graph = dense, env = l1, runGraph: Graph = dense) {
   render(
     <MemoryRouter>
       <Results
         env={env}
         run={run}
         changed={false}
-        runGraph={dense}
+        runGraph={runGraph}
         graph={graph}
         backTo="/play/library"
         slip={null}
@@ -185,5 +185,213 @@ describe("gold stays on the sample cases", () => {
     // which is their output, not where the answer sits.
     expect(card(2)).toContain("Vòm Sao · Xong");
     expect(card(2)).not.toContain(NO_ANSWER);
+  });
+});
+
+describe("which model answered each case", () => {
+  const model = (n: number) =>
+    document.getElementById(`cau-${n}`)?.querySelector("[data-case-model]");
+
+  it("names the model on every case that got an answer", () => {
+    // The committed short L1 run: both cases answered by the primary.
+    show(finishedRun({ "lib-l1-v01": trap, "lib-l1-t01": trap }));
+    expect(model(1)?.getAttribute("data-case-model")).toBe("gemini-3.5-flash-lite");
+    expect(model(1)?.textContent).toContain("Model");
+  });
+
+  it("marks a cached answer rather than passing it off as a call this run made", () => {
+    const run = finishedRun({ "lib-l1-v01": trap });
+    const cached = {
+      ...run,
+      cases: run.cases.map((c, i) =>
+        i !== 0
+          ? c
+          : {
+              ...c,
+              steps: Object.fromEntries(
+                Object.entries(c.steps).map(([node, s]) => [
+                  node,
+                  s.block !== "llm"
+                    ? s
+                    : { ...s, facts: (s.facts ?? []).map((f) => ({ ...f, replayed: true })) },
+                ]),
+              ),
+            },
+      ),
+    };
+    show(cached);
+    expect(model(1)?.textContent).toContain("Kết quả đã lưu");
+  });
+});
+
+describe("a run some fallback model answered", () => {
+  /** The committed ten-case L1 reference stream, re-stamped so `n` cases came from a fallback. */
+  const withFallback = (n: number) => {
+    const run = replay(parseSse(readText("e2e", "data", "run-l1-reference.sse")));
+    if (!run) throw new Error("no reference run");
+    return {
+      ...run,
+      primaryModel: "gemini-3.5-flash-lite",
+      cases: run.cases.map((c, i) =>
+        i >= n
+          ? c
+          : {
+              ...c,
+              steps: Object.fromEntries(
+                Object.entries(c.steps).map(([node, s]) => [
+                  node,
+                  s.block !== "llm"
+                    ? s
+                    : {
+                        ...s,
+                        facts: (s.facts ?? []).map((f) =>
+                          f.kind !== "llm" ? f : { ...f, model: "gemini-3.1-flash-lite" },
+                        ),
+                      },
+                ]),
+              ),
+            },
+      ),
+    };
+  };
+
+  it("counts the cases the fallback answered, out of the cases that got an answer", () => {
+    show(withFallback(2));
+    const line = document.querySelector("[data-fallback]");
+    expect(line?.getAttribute("data-fallback")).toBe("2");
+    expect(line?.textContent).toContain("2/10 câu do model dự phòng trả lời");
+  });
+
+  it("divides by the cases that got an answer, not by every case in the run", () => {
+    // A quota-exhausted run must not read "2/10": the cases that never reached the model have
+    // no model, and counting them would measure the denominator rather than the run.
+    const run = withFallback(2);
+    const stripped = {
+      ...run,
+      cases: run.cases.map((c, i) => (i < 8 ? c : { ...c, steps: {} })),
+    };
+    show(stripped);
+    expect(document.querySelector("[data-fallback]")?.textContent).toContain("2/8 câu");
+  });
+
+  it("says star 2 is calibrated on the primary, beside the token evidence", () => {
+    // spec §7: a fallback costs about 0,9k more output tokens on an L3 run, so the token figure
+    // star 2 is judged against is not a measure of the player's bench.
+    show(withFallback(2));
+    const s2 = [...document.querySelectorAll("li")].find((li) =>
+      li.textContent.startsWith("Sao 2"),
+    );
+    expect(s2?.textContent).toContain("token");
+    expect(s2?.textContent).toContain("hiệu chỉnh trên model chính");
+  });
+
+  it("stays quiet when the primary answered every case", () => {
+    show(withFallback(0));
+    expect(document.querySelector("[data-fallback]")).toBeNull();
+    expect(document.body.textContent).not.toContain("model dự phòng");
+    expect(document.body.textContent).not.toContain("model chính");
+  });
+});
+
+describe("a journey that crosses two rulers", () => {
+  it("is not drawn as a rise, because GoldTrace tells the chips the scales", () => {
+    // L3 is the only level with a block after the searches. hạng 23 over the whole store, then
+    // hạng 2 inside the 3 passages Kính lúp kept: the passage is better off, but the numbers
+    // are not points on one ruler (§8.6), and the prose list below says which is which.
+    const l3 = testEnv("article-number-lookup");
+    const starter = starterBench(l3);
+    if (!starter) throw new Error("L3 starter is not drawable");
+    const attached = setAttached(setAttached(starter, "bm25_search", true), "rerank", true);
+    const dense3 = setParam(l3, attached, "rerank", "top_n", 3);
+    const graph = graphFromBench(l3, dense3);
+    const gold: GoldReveal = {
+      gold_chunks: ["a1"],
+      ranks: { vs: 23, bm: 4, rr: 2 },
+      in_pack: true,
+      flags: [],
+    };
+    show(finishedRun({ "lib-l1-v01": gold }), graph, l3, graph);
+
+    const chips = [...document.querySelectorAll("[data-hop]")] as HTMLElement[];
+    // Both searches rank the whole store, so that hop is a real rise -- which only happens if
+    // GoldTrace passed the scales. The hop into Kính lúp's kept set is a change of ruler.
+    expect(chips.map((c) => c.dataset.hop)).toEqual(["start", "up", "rescaled"]);
+    expect(chips[2]?.className).not.toContain("success");
+    // The words still carry both scales, which is where §8.6 puts them.
+    expect(card(1)).toContain("hạng 23 trên toàn kho");
+    expect(card(1)).toContain("hạng 2 trong 3 đoạn giữ lại");
+  });
+});
+
+describe("every token figure names the counter behind it", () => {
+  it("says star 2 is counted by the provider, thinking tokens included", () => {
+    // §8.4: the two counts differ, and stars_vi only says "tốn không quá 15.000 token".
+    show(finishedRun({ "lib-l1-v01": trap }));
+    const s2 = [...document.querySelectorAll("li")].find((li) =>
+      li.textContent.startsWith("Sao 2"),
+    );
+    expect(s2?.textContent).toContain("theo usage của Gemini");
+  });
+
+  it("says the same of a case's own token line", () => {
+    show(finishedRun({ "lib-l1-v01": trap }));
+    const line = document.querySelector("[data-case-tokens]");
+    expect(line?.textContent).toContain("theo usage của Gemini");
+  });
+});
+
+describe("the swing in output tokens", () => {
+  it("shows the low and the high, not an average that hides the swing", () => {
+    // §8.4: "Token suy nghĩ dao động mạnh … cho người học thấy điều đó, không làm phẳng."
+    const run = finishedRun({ "lib-l1-v01": trap });
+    const spread = {
+      ...run,
+      cases: run.cases.map((c, i) => ({ ...c, tokens: { in: 100, out: i === 0 ? 74 : 528 } })),
+    };
+    show(spread);
+    const line = document.querySelector("[data-out-spread]");
+    expect(line?.textContent).toContain("74");
+    expect(line?.textContent).toContain("528");
+    expect(line?.textContent).toContain("gồm token suy nghĩ");
+    expect(line?.textContent).not.toContain("301");
+  });
+
+  it("prints one number for one answered case, not a range of one", () => {
+    const run = finishedRun({ "lib-l1-v01": trap });
+    const single = {
+      ...run,
+      cases: run.cases.map((c, i) =>
+        i === 0 ? { ...c, tokens: { in: 1, out: 420 } } : { ...c, steps: {} },
+      ),
+    };
+    show(single);
+    expect(document.querySelector("[data-out-spread]")?.textContent).toContain("câu duy nhất");
+    expect(document.querySelector("[data-out-spread]")?.textContent).not.toContain("–");
+  });
+});
+
+describe("where cô Lan's diagnosis came from", () => {
+  const lesson = {
+    case: "lib-l1-v01",
+    flag: "ret.gold_missing",
+    message_vi: "Câu #1 cần một đoạn trong Điều 39.",
+  };
+
+  it("says the diagnosis was built from the trace, in plain sight and above the list", () => {
+    // N5's point: the assistant was never asked why it failed. A reader who thinks it was
+    // learns the opposite of the lesson, so this is descriptive copy, not a source stamp.
+    show(finishedRun({ "lib-l1-v01": trap }, [lesson]));
+    const note = document.querySelector("[data-diagnosis-source]");
+    expect(note?.textContent).toContain("dựng từ vết chạy");
+    // Visible: sr-only would leave the sighted reader with the wrong impression.
+    expect(note?.className).not.toContain("sr-only");
+    // Above the list, not parked at the foot of the page.
+    const list = document.querySelector('ul[aria-labelledby="wb-diagnosis-title"]');
+    expect(list?.previousElementSibling).toBe(note);
+  });
+
+  it("stays quiet when there is no diagnosis to explain", () => {
+    show(finishedRun({ "lib-l1-v01": trap }));
+    expect(document.querySelector("[data-diagnosis-source]")).toBeNull();
   });
 });

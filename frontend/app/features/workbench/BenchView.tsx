@@ -15,6 +15,8 @@ import {
 
 import { Blade } from "./Blade";
 import { Stamps } from "./Stamps";
+import { CitationLedger } from "./CitationLedger";
+import { packerSaw } from "./ledger";
 import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
 import {
@@ -44,6 +46,7 @@ import {
   outcomeText,
   shownLabels,
   stepStatusText,
+  TOKENS_VI,
   TOY,
   toyName,
   vaiVi,
@@ -56,7 +59,7 @@ import {
   type RunView,
   type StepView,
 } from "./run";
-import type { BlockType, Fact, Graph, Issue, JsonValue } from "./schema";
+import type { BlockType, CaseRole, Fact, Graph, Issue, JsonValue } from "./schema";
 import { fixFor } from "./validate";
 
 /** `*X*` in server messages becomes <strong>X</strong>; the rest stays plain text. */
@@ -398,6 +401,9 @@ function Slot({
           toy={toy}
           gold={view?.gold ?? null}
           packed={packedIds(view)}
+          caseRole={view?.followed.role ?? null}
+          ranked={packerSaw(view?.followed.steps ?? {})}
+          prompt={promptTokens(view)}
         />
       )}
       {/* No step for this slot yet, or the bench has moved on from the run: the dome follows
@@ -708,6 +714,14 @@ function Ingestion({ run, node, gold }: { run: RunView; node: string; gold: Slot
 }
 
 /** What the packer put in the bin for the followed case, from whichever node packed it. */
+/** What the provider charged for this case's prompt; the packer's own step has no usage. */
+function promptTokens(view: BenchRunView | null): number | null {
+  for (const step of Object.values(view?.followed.steps ?? {})) {
+    if (step.block === "llm") return step.tokens?.in ?? null;
+  }
+  return null;
+}
+
 function packedIds(view: BenchRunView | null): readonly string[] {
   for (const step of Object.values(view?.followed.steps ?? {})) {
     const pack = step.facts?.find((f): f is Extract<Fact, { kind: "pack" }> => f.kind === "pack");
@@ -722,6 +736,9 @@ function StepState({
   toy,
   gold,
   packed: packedIn,
+  caseRole,
+  ranked,
+  prompt,
 }: {
   step: StepView;
   node: string;
@@ -729,6 +746,12 @@ function StepState({
   gold: SlotGold | null;
   /** The bin's contents for this case; the llm step cannot see the packer's own step. */
   packed: readonly string[];
+  /** Of the case being followed: the ledger is for samples only. */
+  caseRole: CaseRole | null;
+  /** The ranked list the packer was handed; like `packed`, not visible from the llm step. */
+  ranked: readonly Extract<Fact, { kind: "retrieved" }>["items"][number][];
+  /** The provider's input count for this case, read off the llm step. */
+  prompt: number | null;
 }) {
   const retrieved = step.facts?.find(
     (f): f is Extract<Fact, { kind: "retrieved" }> => f.kind === "retrieved",
@@ -743,8 +766,23 @@ function StepState({
       {said?.answer !== undefined && gold?.visible !== false && (
         <Stamps answer={said.answer} included={packedIn} />
       )}
+      {said && (
+        <CitationLedger
+          caseRole={caseRole}
+          ranked={ranked}
+          included={packedIn}
+          cited={said.cited_ids}
+          gold={gold}
+        />
+      )}
       {packed && (
-        <ContextBin tokens={packed.tokens} included={packed.included} dropped={packed.dropped} />
+        <ContextBin
+          tokens={packed.tokens}
+          included={packed.included}
+          dropped={packed.dropped}
+          ranked={ranked}
+          promptTokens={prompt}
+        />
       )}
       {retrieved && (
         <StarDome
@@ -826,7 +864,7 @@ function FactView({ fact, step, gold }: { fact: Fact; step: StepView; gold: Slot
     return (
       <div className="space-y-1">
         <p>
-          {fmt(total)}/{fmt(budget)} token
+          {fmt(total)}/{fmt(budget)} token <span className="text-fg-muted">({TOKENS_VI.bin})</span>
         </p>
         <Bar value={total} max={budget} />
         <p className="text-fg-muted">
@@ -842,7 +880,8 @@ function FactView({ fact, step, gold }: { fact: Fact; step: StepView; gold: Slot
     <div className="space-y-1">
       {step.tokens && (
         <p>
-          {fmt(step.tokens.in)} vào · {fmt(step.tokens.out)} ra token
+          {fmt(step.tokens.in)} vào · {fmt(step.tokens.out)} ra token{" "}
+          <span className="text-fg-muted">({TOKENS_VI.usage})</span>
         </p>
       )}
       <p>

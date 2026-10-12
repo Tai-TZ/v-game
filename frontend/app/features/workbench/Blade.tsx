@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { bladeCuts } from "./blade";
+import { Viz } from "./Viz";
 import { BLADE_VI, fmt, variantVi } from "./copy";
 
 /**
@@ -26,7 +27,31 @@ export function Blade({
     (split ? `, ${BLADE_VI.split}` : "");
 
   return (
-    <div className="mt-3">
+    <Viz
+      caption={BLADE_VI.caption}
+      stamp="run"
+      table={
+        <table className="text-sm">
+          <tbody>
+            {(
+              [
+                [BLADE_VI.columns.variant, variant],
+                [BLADE_VI.columns.chunks, fmt(chunks)],
+                [BLADE_VI.columns.avg, `${fmt(avgTokens)} token`],
+                [BLADE_VI.columns.split, split ? "Có" : "Không"],
+              ] as const
+            ).map(([name, value]) => (
+              <tr key={name} className="border-t border-line">
+                <th scope="row" className="py-1 pr-3 text-left font-semibold whitespace-nowrap">
+                  {name}
+                </th>
+                <td className="py-1">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      }
+    >
       <div role="img" aria-label={label} className="max-w-80">
         <div
           className={`relative h-8 overflow-hidden rounded-sm border bg-subtle ${
@@ -49,6 +74,6 @@ export function Blade({
         đoạn, trung bình {fmt(avgTokens)} token mỗi đoạn.
       </p>
       {split && <p className="text-sm font-semibold text-danger">{BLADE_VI.splitLine}</p>}
-    </div>
+    </Viz>
   );
 }

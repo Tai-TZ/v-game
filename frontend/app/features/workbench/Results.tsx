@@ -14,18 +14,29 @@ import {
   groupDiagnosis,
   knobName,
   LABEL_VI,
+  DIAGNOSIS_VI,
   LEVEL_COPY,
   lowerFirst,
   stepStatusText,
+  TOKENS_VI,
   TOY,
   toyName,
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
+import { type Scale } from "./journey";
 import { RankJourney } from "./RankJourney";
 import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
-import { llmCalls, unfinished, type CaseView, type RunView } from "./run";
+import {
+  caseModel,
+  fallbackAnswers,
+  llmCalls,
+  outTokenSpread,
+  unfinished,
+  type CaseView,
+  type RunView,
+} from "./run";
 import { BLOCK_TYPES, type BlockType, type GoldReveal, type Graph } from "./schema";
 
 interface ResultsProps {
@@ -86,6 +97,8 @@ export function Results({
   const first = run.cases.find((c) => c.id === level.s1_required[0]);
   const skipped = unfinished(run).length;
   const calls = llmCalls(run);
+  const served = fallbackAnswers(run);
+  const spread = outTokenSpread(run);
   const conditions = [
     {
       ok: score.s1,
@@ -97,7 +110,16 @@ export function Results({
       ].join(" · "),
       bar: false,
     },
-    { ok: score.s2, evidence: `${fmt(score.tokens)}/${fmt(score.budget)} token`, bar: true },
+    {
+      ok: score.s2,
+      // X7: a fallback costs about 0,9k more output tokens on an L3 run (spec §7), so when one
+      // answered, this token figure is not a measure of the player's bench alone.
+      evidence: [
+        `${fmt(score.tokens)}/${fmt(score.budget)} token (${TOKENS_VI.usage})`,
+        ...(served.fallback > 0 ? ["hiệu chỉnh trên model chính"] : []),
+      ].join(" · "),
+      bar: true,
+    },
     {
       ok: score.s3,
       evidence: [
@@ -208,63 +230,68 @@ export function Results({
       ) : run.report.diagnosis.length === 0 ? (
         <p className="mt-2 text-sm">Không có câu nào cần chẩn đoán.</p>
       ) : (
-        <ul aria-labelledby="wb-diagnosis-title" className="mt-3 max-w-prose space-y-3">
-          {groupDiagnosis(run.report.diagnosis).map((group) => {
-            const [first, ...rest] = group.cases.flatMap((id) => {
-              const c = run.cases.find((item) => item.id === id);
-              return c ? [c] : [];
-            });
-            const target = diagnosisTarget(env, group, revealed, runGraph);
-            const showSlot = target !== null && hasControls(env, target.slot);
-            const attached = graph.nodes.some((node) => node.type === target?.slot);
-            return (
-              <li key={group.flag} className="rounded-md border border-line bg-surface p-3">
-                <p>{rich(group.message_vi)}</p>
-                {showSlot && target.why && <p className="mt-1 text-sm">{target.why}</p>}
-                {rest.length > 0 && (
-                  <p className="mt-1 text-sm">
-                    Cùng lỗi ở{" "}
-                    {rest.map((c, index) => (
-                      <span key={c.id}>
-                        {index > 0 && ", "}
+        <>
+          <p data-diagnosis-source className="mt-2 max-w-prose text-sm text-fg-muted">
+            {DIAGNOSIS_VI.source}
+          </p>
+          <ul aria-labelledby="wb-diagnosis-title" className="mt-3 max-w-prose space-y-3">
+            {groupDiagnosis(run.report.diagnosis).map((group) => {
+              const [first, ...rest] = group.cases.flatMap((id) => {
+                const c = run.cases.find((item) => item.id === id);
+                return c ? [c] : [];
+              });
+              const target = diagnosisTarget(env, group, revealed, runGraph);
+              const showSlot = target !== null && hasControls(env, target.slot);
+              const attached = graph.nodes.some((node) => node.type === target?.slot);
+              return (
+                <li key={group.flag} className="rounded-md border border-line bg-surface p-3">
+                  <p>{rich(group.message_vi)}</p>
+                  {showSlot && target.why && <p className="mt-1 text-sm">{target.why}</p>}
+                  {rest.length > 0 && (
+                    <p className="mt-1 text-sm">
+                      Cùng lỗi ở{" "}
+                      {rest.map((c, index) => (
+                        <span key={c.id}>
+                          {index > 0 && ", "}
+                          <a
+                            href={`#cau-${c.n}`}
+                            className="font-semibold text-brand underline underline-offset-4"
+                          >
+                            câu #{c.n}
+                          </a>
+                        </span>
+                      ))}
+                      .
+                    </p>
+                  )}
+                  {(first ?? showSlot) && (
+                    <div className="mt-1 flex flex-wrap gap-x-5">
+                      {first && (
                         <a
-                          href={`#cau-${c.n}`}
-                          className="font-semibold text-brand underline underline-offset-4"
+                          href={`#cau-${first.n}`}
+                          className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline underline-offset-4"
                         >
-                          câu #{c.n}
+                          Xem câu #{first.n}
                         </a>
-                      </span>
-                    ))}
-                    .
-                  </p>
-                )}
-                {(first ?? showSlot) && (
-                  <div className="mt-1 flex flex-wrap gap-x-5">
-                    {first && (
-                      <a
-                        href={`#cau-${first.n}`}
-                        className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline underline-offset-4"
-                      >
-                        Xem câu #{first.n}
-                      </a>
-                    )}
-                    {showSlot && (
-                      <button
-                        type="button"
-                        onClick={() => onFocusSlot(target.slot, target.param)}
-                        className={buttonClass("inline")}
-                      >
-                        {attached
-                          ? `Xem ở ${knobName(target.slot, target.param)}`
-                          : `Thử gắn ${TOY[target.slot].name}`}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                      )}
+                      {showSlot && (
+                        <button
+                          type="button"
+                          onClick={() => onFocusSlot(target.slot, target.param)}
+                          className={buttonClass("inline")}
+                        >
+                          {attached
+                            ? `Xem ở ${knobName(target.slot, target.param)}`
+                            : `Thử gắn ${TOY[target.slot].name}`}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>
@@ -280,6 +307,17 @@ export function Results({
           {Object.entries(run.models)
             .map(([model, count]) => `${model} (${count} lời gọi)`)
             .join(" · ")}
+        </p>
+      )}
+      {spread !== null && (
+        <p data-out-spread className="mt-6 max-w-prose text-sm text-fg-muted tabular-nums">
+          {TOKENS_VI.spread(fmt(spread.low), fmt(spread.high), spread.cases)}
+        </p>
+      )}
+      {served.fallback > 0 && (
+        <p data-fallback={served.fallback} className="max-w-prose text-sm text-fg-muted">
+          {`${served.fallback}/${served.answered} câu do model dự phòng trả lời. Sao 2 hiệu chỉnh` +
+            " trên model chính, nên số token của lượt này không phải thước đo cấu hình của bạn."}
         </p>
       )}
 
@@ -307,6 +345,7 @@ function CaseCard({
   runGraph: Graph | null;
 }) {
   const titleId = `cau-${c.n}-title`;
+  const served = caseModel(c);
   return (
     <article
       id={`cau-${c.n}`}
@@ -318,8 +357,8 @@ function CaseCard({
       </h4>
       {c.question && <p className="mt-1 text-sm text-fg-muted">{c.question}</p>}
       <Grade c={c} />
-      <p className="mt-2 text-sm text-fg-muted tabular-nums">
-        {fmt(c.tokens.in + c.tokens.out)} token
+      <p data-case-tokens className="mt-2 text-sm text-fg-muted tabular-nums">
+        {fmt(c.tokens.in + c.tokens.out)} token ({TOKENS_VI.usage})
       </p>
       <details className="group mt-1">
         <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
@@ -338,6 +377,18 @@ function CaseCard({
             );
           })}
         </ol>
+        {/* X7: star 2 is calibrated on the primary model, so which model answered this case is
+            part of reading the grade. Same words as the bench's llm step, so the two agree. */}
+        {served && (
+          <p className="mt-2 text-sm" data-case-model={served.model}>
+            Model <code className="font-mono text-xs">{served.model}</code>
+            {served.replayed && (
+              <span className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-xs">
+                Kết quả đã lưu
+              </span>
+            )}
+          </p>
+        )}
         {c.answer && (
           <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-sm whitespace-pre-line">
             {c.answer}
@@ -380,6 +431,17 @@ function GoldTrace({
   }
   const ids = nodeIds(env.level);
   const params = (node: string) => runGraph?.nodes.find((n) => n.id === node)?.params ?? {};
+  // The two searches rank the whole store; Phễu and Kính lúp rank inside what reached them, so
+  // their numbers sit on their own smaller rulers (§8.6) and no hop across the two is a move.
+  const scales: Record<string, Scale> = {};
+  for (const type of RANKED) {
+    if (type === "vector_search" || type === "bm25_search") {
+      scales[ids[type]] = { kind: "corpus" };
+      continue;
+    }
+    const kept = type === "rerank" ? params(ids[type]).top_n : params(ids[type]).top_k;
+    scales[ids[type]] = { kind: "kept", size: typeof kept === "number" ? kept : null };
+  }
   const lines = RANKED.flatMap((type) => {
     const node = ids[type];
     if (!(node in gold.ranks)) return [];
@@ -432,6 +494,7 @@ function GoldTrace({
             toys={Object.fromEntries(
               RANKED.map((type) => [ids[type], toyName(type, params(ids[type]))]),
             )}
+            scales={scales}
           />
           <ul className="list-inside list-disc">
             {lines.map((line) => (

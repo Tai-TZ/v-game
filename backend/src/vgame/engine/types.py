@@ -445,6 +445,10 @@ class RunFinishedEvent(TypedDict):
     run: str
     report: RunReport
     models: dict[str, int]  # model id -> answered LLM calls (replays included)
+    # The model star 2 is calibrated on (spec §7, X7). `models` is keyed by whichever model
+    # served, so without this the client cannot tell a primary answer from a fallback one.
+    # Absent when nothing answered: the field describes this run, not the server's config.
+    primary_model: NotRequired[str]
     scope: NotRequired[RunScope]  # "mau": no run.scored came before it
 
 

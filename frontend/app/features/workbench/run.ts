@@ -60,6 +60,8 @@ export interface RunView {
   score?: StarResult;
   report?: RunReport;
   models?: Readonly<Record<string, number>>;
+  /** X7: the model star 2 is calibrated on. Absent when nothing answered this run. */
+  primaryModel?: string;
   failure?: { code: string; message_vi: string };
 }
 
@@ -143,6 +145,7 @@ function apply(run: RunView, event: RunEvent): RunView {
         stream: "closed",
         report: event.report,
         models: event.models,
+        ...(event.primary_model === undefined ? {} : { primaryModel: event.primary_model }),
       };
     case "run.failed":
       // A failure can follow run.scored (report error, cancel in between): the stars stay.
@@ -204,6 +207,45 @@ export function frameAction(
 export const runningNodes = (c: CaseView) =>
   Object.entries(c.steps).flatMap(([node, step]) => (step.state === "running" ? [node] : []));
 
+/**
+ * The model that answered one case, and whether it came from the replay cache (X7).
+ *
+ * Null when no model answered: a skipped or timed-out case has no `llm` fact, and on a recorded
+ * run the hidden and trap cases keep only `case.graded`. That is missing data, not a fault.
+ */
+export function caseModel(c: CaseView): { model: string; replayed: boolean } | null {
+  for (const step of Object.values(c.steps)) {
+    for (const fact of step.facts ?? []) {
+      if (fact.kind === "llm") return { model: fact.model, replayed: fact.replayed };
+    }
+  }
+  return null;
+}
+
+/**
+ * Cases a model other than the primary answered, out of the cases that got an answer (X7).
+ *
+ * Counted by which model produced the answer, replays included: the spec calibrates star 2 on
+ * the primary model because a fallback costs about 0,9k more output tokens on an L3 run, and the
+ * grade is read off whichever answer is on screen, cached or not. Whether this run *called* the
+ * fallback is a different question, answered by the "lời gọi AI" line.
+ *
+ * A case with no answer is in neither number -- counting it would make a quota-exhausted run
+ * read as "0/10 do model dự phòng" -- and a run that never said which model is primary claims
+ * no fallback at all rather than guessing.
+ */
+export function fallbackAnswers(run: RunView): { fallback: number; answered: number } {
+  let fallback = 0;
+  let answered = 0;
+  for (const c of run.cases) {
+    const served = caseModel(c);
+    if (served === null) continue;
+    answered += 1;
+    if (run.primaryModel !== undefined && served.model !== run.primaryModel) fallback += 1;
+  }
+  return { fallback, answered };
+}
+
 /** LLM answers of the run: real calls and answers served from the replay cache (§8.6). */
 export function llmCalls(run: RunView): { real: number; replayed: number } {
   let real = 0;
@@ -218,6 +260,23 @@ export function llmCalls(run: RunView): { real: number; replayed: number } {
     }
   }
   return { real, replayed };
+}
+
+/**
+ * How far apart the shortest and the longest answer of this run were, in output tokens.
+ *
+ * §8.4: thinking tokens swing hard -- the same L3 prompt came back in 74 and in 528 output
+ * tokens -- and the rule is to show the learner that rather than flatten it. So this is a low
+ * and a high, never a mean. `Usage.output_tokens` already includes thinking and the engine
+ * emits no separate count, so a split into prompt/output/thinking would draw a number the run
+ * never measured.
+ *
+ * A case that never reached the model is left out: its zero is no answer, not a short one.
+ */
+export function outTokenSpread(run: RunView): { low: number; high: number; cases: number } | null {
+  const out = run.cases.flatMap((c) => (caseModel(c) === null ? [] : [c.tokens.out]));
+  if (out.length === 0) return null;
+  return { low: Math.min(...out), high: Math.max(...out), cases: out.length };
 }
 
 const NOT_YOUR_FAULT = new Set(["skipped_budget", "llm_error", "timeout"]);

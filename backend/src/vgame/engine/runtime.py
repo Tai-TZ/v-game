@@ -251,6 +251,10 @@ async def run_level(
             "report": report,
             "models": dict(models),
         }
+        # Nothing answered -> the run has no model to be calibrated against. An unconfigured
+        # server has no client either, and then nothing can have answered.
+        if models and deps.llm is not None:
+            finished["primary_model"] = deps.llm.model
         if scope is not None:
             finished["scope"] = scope
         emit(finished)

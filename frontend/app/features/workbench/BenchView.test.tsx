@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
 import { BenchSection, type BenchRunView, type SlotGold } from "./BenchView";
-import type { BenchRun } from "./run";
+import type { BenchRun, StepView } from "./run";
 import type { Fact } from "./schema";
 import type { EventType } from "./schema";
 import { frame, readText, replay, testEnv } from "./test-fixtures";
@@ -273,5 +273,80 @@ describe("the star dome in the search slot", () => {
       />,
     );
     expect(domeLabel(container)).toBe("3 đoạn đã kéo");
+  });
+});
+
+describe("the citation ledger on the bench", () => {
+  it("lines the codes up for a sample case", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} benchRun="done" view={recordedView(null, "lib-l3-v03")} />);
+    expect(document.querySelector('[data-row="pull"]')).not.toBeNull();
+    expect(document.querySelector('[data-row="cite"]')).not.toBeNull();
+  });
+
+  it("draws nothing for a hidden case, which a live run does send the codes for", () => {
+    // The engine sends pack.included and llm.cited_ids for every role -- only `answer` is held
+    // back (blocks.py) -- and a hidden case's valid code points straight at its gold chunk
+    // (roadmap B0). So the gate is the case's role, not the absence of data.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    const sample = recordedView(null, "lib-l3-v03");
+    const hidden = { ...sample, followed: { ...sample.followed, role: "hidden" as const } };
+    render(<Bench bench={start} benchRun="done" view={hidden} />);
+    expect(document.querySelector('[data-row="pull"]')).toBeNull();
+    expect(document.querySelector("[data-ledger-note]")).toBeNull();
+  });
+});
+
+describe("the provider's token count on the bin", () => {
+  const stripLlmTokens = (view: BenchRunView): BenchRunView => ({
+    ...view,
+    followed: {
+      ...view.followed,
+      steps: Object.fromEntries(
+        Object.entries(view.followed.steps).map(([node, s]) => {
+          if (s.block !== "llm") return [node, s];
+          // The key goes, rather than being set to undefined: an unfinished step has no
+          // `tokens` at all, which is the state this is here to reproduce.
+          const running: Omit<StepView, "tokens"> = { ...s };
+          delete (running as { tokens?: unknown }).tokens;
+          return [node, running];
+        }),
+      ),
+    },
+  });
+
+  it("says there is no provider number yet rather than printing a zero", () => {
+    // The llm step is still running, so Gemini has charged nothing for this case yet. A zero
+    // would read as "the prompt cost nothing", which is a number the run never measured.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} benchRun="done" view={stripLlmTokens(recordedView(null))} />);
+    expect(document.body.textContent).toContain("Chưa có số của Gemini cho câu này.");
+    expect(document.body.textContent).not.toContain("tính 0 token");
+  });
+
+  it("prints what the provider charged once its step has finished", () => {
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} benchRun="done" view={recordedView(null)} />);
+    expect(document.body.textContent).toContain("không chỉ phần trong thùng");
+    expect(document.body.textContent).not.toContain("Chưa có số của Gemini");
+  });
+});
+
+describe("the cut passages under the bin", () => {
+  it("names the rank each cut passage was cut from, joined against the run's own list", () => {
+    // pack.dropped carries ids only; the rank is the place they had in the ranked list the
+    // packer was handed, which lives on another step of the same case.
+    const start = starterBench(l3);
+    if (!start) throw new Error("L3 starter is not drawable");
+    render(<Bench bench={start} benchRun="done" view={recordedView(null)} />);
+    const note = document.querySelector("[data-cut-note]");
+    const pieces = document.querySelectorAll("[data-cut-piece]");
+    // The committed L3 run packs everything, so there is nothing on the floor and no note.
+    expect(pieces).toHaveLength(0);
+    expect(note).toBeNull();
   });
 });

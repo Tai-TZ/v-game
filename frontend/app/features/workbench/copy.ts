@@ -81,18 +81,125 @@ export const BIN_VI = {
 
 /** Lược dao (L2's lesson): the blade says when it cut through the thing being looked for. */
 export const BLADE_VI = {
+  caption: "Chỗ lược dao hạ xuống kho, theo cỡ đoạn trung bình của lượt này.",
+  columns: {
+    variant: "Cách chia",
+    chunks: "Số đoạn",
+    avg: "Trung bình",
+    split: "Cắt đứt câu đáp án",
+  },
   split: "lượt này cắt đứt câu đáp án",
   splitLine: "Lược dao cắt đứt câu đáp án: đoạn đúng nằm vắt qua hai mảnh.",
 } as const;
 
+/**
+ * The seven source stamps of frontend-architecture §8.4, word for word. The list is closed: a
+ * figure whose provenance is none of these has no stamp to wear, and inventing one is the thing
+ * the rule exists to stop.
+ */
+export const VIZ_STAMP = {
+  run: "Đo từ lượt của bạn",
+  labels: "Đo từ nhãn của bạn",
+  index: "Tính sẵn từ chỉ mục",
+  illustration: "Minh hoạ",
+  recorded: "Lượt chạy đã ghi",
+  simulation: "Mô phỏng",
+  precomputed: "Dữ liệu ghi sẵn",
+} as const;
+export type VizStamp = keyof typeof VIZ_STAMP;
+
+export const VIZ_VI = {
+  toTable: "Xem dạng bảng",
+  toPicture: "Xem dạng hình",
+} as const;
+
+/**
+ * There are two token counts and §8.4 requires every bar to say which one it is using. The bin
+ * counts with the engine's own `regex-v1` (chunking, packing; engine-v0.2 E3); star 2 counts
+ * with Gemini's usage, thinking tokens included (E2, E8). They are not two readings of one
+ * quantity: the provider counts the whole prompt, the bin only what it packed.
+ */
+export const TOKENS_VI = {
+  bin: "đếm bằng regex-v1",
+  usage: "theo usage của Gemini",
+  prompt: (n: string) => `Gemini tính ${n} token vào cho cả lời nhắc, không chỉ phần trong thùng.`,
+  /** Said rather than defaulting the provider's number to zero. */
+  noneYet: "Chưa có số của Gemini cho câu này.",
+  /**
+   * The spread, never a mean: §8.4 asks for the swing to be shown, not flattened. Output
+   * includes thinking tokens, and the engine reports no separate count for them.
+   */
+  spread: (low: string, high: string, cases: number) =>
+    low === high
+      ? `Token ra: ${low} ở câu duy nhất đã trả lời (gồm token suy nghĩ).`
+      : `Token ra: ${low}–${high} qua ${cases} câu (gồm token suy nghĩ).`,
+} as const;
+
+/** Sổ đối chiếu trích dẫn (N13): the same codes at three stages, aligned so a gap shows. */
+export const LEDGER_VI = {
+  pull: "Đã lấy về",
+  bin: "Vào thùng",
+  cite: "Đã trích",
+  gap: "không có",
+  /** Codes, not sentences: Stamps already counts sentences, and the two numbers differ. */
+  note: (cited: number, inBin: number, ghost: number) =>
+    ghost === 0
+      ? `Trợ lý trích ${cited} mã: cả ${cited} đều có trong thùng.`
+      : inBin === 0
+        ? `Trợ lý trích ${cited} mã: không mã nào có trong thùng.`
+        : `Trợ lý trích ${cited} mã: ${inBin} có trong thùng, ${ghost} không có.`,
+  caption: "Mã đoạn qua ba chặng: đã lấy về, vào thùng, đã trích.",
+  /** Said on screen, because a player who opens a hidden case will wonder where this went. */
+  samplesOnly: "Sổ đối chiếu chỉ mở cho câu mẫu.",
+} as const;
+
 /** Máy đóng tem (L1's lesson): a source the bin never held is the thing to notice. */
+/**
+ * N5: cô Lan's diagnosis is assembled from the run's own trace. The assistant is never asked
+ * why it failed -- a reader who thinks it was takes away the opposite of the lesson -- so this
+ * is descriptive copy and deliberately not one of §8.4's source stamps (roadmap N5).
+ */
+export const DIAGNOSIS_VI = {
+  source:
+    "Chẩn đoán này dựng từ vết chạy của lượt. Trợ lý không được hỏi vì sao nó sai: " +
+    "mọi câu dưới đây là mẫu câu điền bằng số liệu của chính lượt bạn vừa chạy.",
+} as const;
+
+export const DROPPED_VI = {
+  /** On a cut block. The rank is the place it had in the list the packer was handed. */
+  piece: (rank: number) => `bị cắt: hạng ${rank}`,
+  /** The ranked list never named it, so there is no rank to show. */
+  unknown: "bị cắt: không rõ hạng",
+  /** En dash, as a span of ranks: "Bị cắt: 4 đoạn (hạng 4–7)." */
+  summary: (count: number, range: readonly [number, number] | null) =>
+    range === null
+      ? `Bị cắt: ${count} đoạn.`
+      : range[0] === range[1]
+        ? `Bị cắt: ${count} đoạn (hạng ${range[0]}).`
+        : `Bị cắt: ${count} đoạn (hạng ${range[0]}–${range[1]}).`,
+} as const;
+
 export const STAMP_VI = {
   fake: "· mã này không có trong thùng",
+  /** L1 §12: "TRƯỢT vì thiếu nguồn: bong bóng vỡ, chữ 'không có nguồn'". */
+  bubble: "· không có nguồn",
+  /** The same three kinds as words, for the table form. */
+  kind: { brick: "có nguồn trong thùng", fake: "trích nguồn bịa", bubble: "không có nguồn" },
+  caption: "Từng câu của trả lời và nguồn nó dựa vào.",
   note: "Câu viền liền là câu có nguồn trong thùng; viền đứt là câu không trích nguồn nào.",
 } as const;
 
 /** Đường đời hạng (L3): a block that never found the answer says so, not "#—". */
-export const JOURNEY_VI = { absent: "không thấy" } as const;
+export const JOURNEY_VI = {
+  absent: "không thấy",
+  /** What the rank was counted over. §8.6: the meaning of a rank differs by block. */
+  corpus: "toàn kho",
+  kept: (size: number) => `${size} đoạn giữ lại`,
+  /** The knob that decides the kept size is not on the bench, so say so, do not guess. */
+  unknownScale: "chưa rõ",
+  caption: "Hạng của đoạn đáp án ở từng khối, mỗi khối trên thang đo của nó.",
+  columns: { block: "Khối", rank: "Hạng", scale: "Trên" },
+} as const;
 
 const cosine = new Intl.NumberFormat("vi-VN", {
   minimumFractionDigits: 3,
