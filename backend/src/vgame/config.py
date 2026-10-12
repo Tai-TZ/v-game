@@ -15,13 +15,6 @@ _BACKEND_DIR = Path(__file__).resolve().parents[2]
 SHIPPED_INDEX_DIR = Path(__file__).resolve().parent / "engine" / "data" / "index"
 
 
-# daily-shift §3.1: both come out of the class share and neither scales with class size --
-# the projector pool is fixed per session (and the only source a teacher tops up from), and the
-# common-incident fix run is one 3-case run a day.
-PROJECTOR_POOL = 40
-INCIDENT_RUN = 3
-
-
 class Settings(BaseSettings):
     # Absolute: backend/.env resolves from any cwd. Tests pass _env_file=None so they never
     # read it (it may hold the owner's real key).
@@ -98,25 +91,28 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _quota_fits_the_cap(self) -> "Settings":
-        """daily-shift §3.1 checks `students * P + 40 + 3 + R <= 0,9 * cap`. Class size lives in
-        the lesson plan rather than here, so this is that check at its weakest -- one learner --
-        but the two fixed pools belong in it either way: without them 13/17 passed on every cap
-        down to 34, and a cap of 50 booted a server that offered L1's 10-call run to a class of
-        30 out of a share of 45."""
+        """daily-shift §3.1 gives the class 90 % of the cap, and out of that share every learner
+        gets P while the reserve R is set aside, so one learner plus R has to fit inside it.
+
+        Deliberately weak: it catches 13/17 only below a cap of 34. The rest of §3.1 -- the
+        40-call projector pool, the daily incident run, the class size -- describes a day with a
+        class in a room, which a solo or dev instance does not have, so putting those terms here
+        would refuse caps that are perfectly good without one. The deployed numbers are pinned
+        where they belong, against the blueprint: tests/test_deploy_config.py re-derives P and R
+        from render.yaml's own cap and asserts the full inequality."""
         if self.daily_llm_call_cap == 0:
-            # "No live calls today", not "no server today": DailyCap(0) already refuses every
-            # call and §3.3 degrades the run, while raising here would take create_app with it.
+            # "No live calls today" rather than "no server today": DailyCap(0) already refuses
+            # every call, while raising here would take create_app, and the Render health check,
+            # down with it. (Dropping GEMINI_API_KEY is the documented kill switch -- deploy.md
+            # §2 -- and leaves the same endpoints up; this just keeps cap 0 from being a trap.)
             return self
         share = self.daily_llm_call_cap * 9 // 10
-        fixed = PROJECTOR_POOL + INCIDENT_RUN
-        need = self.quota_learner_calls + self.quota_reserve_calls + fixed
-        if need > share:
+        if self.quota_learner_calls + self.quota_reserve_calls > share:
             raise ValueError(
                 f"QUOTA_LEARNER_CALLS ({self.quota_learner_calls}) + QUOTA_RESERVE_CALLS "
-                f"({self.quota_reserve_calls}) + {fixed} for the projector pool and the daily "
-                f"incident run exceed the class share {share} of DAILY_LLM_CALL_CAP "
-                f"({self.daily_llm_call_cap}); recompute them with the formula in "
-                f"docs/content/scenarios/daily-shift.md §3.1"
+                f"({self.quota_reserve_calls}) exceed the class share {share} of "
+                f"DAILY_LLM_CALL_CAP ({self.daily_llm_call_cap}); recompute them with the "
+                f"formula in docs/content/scenarios/daily-shift.md §3.1"
             )
         return self
 

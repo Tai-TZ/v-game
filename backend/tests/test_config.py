@@ -48,14 +48,29 @@ def test_rejects_a_quota_the_cap_cannot_serve() -> None:
         Settings(_env_file=None, daily_llm_call_cap=20)
 
 
-@pytest.mark.parametrize("cap", [20, 34, 50, 81])
+@pytest.mark.parametrize("cap", [1, 20, 33])
 def test_rejects_the_big_cap_defaults_left_on_a_smaller_cap(cap: int) -> None:
-    """§3.1 checks `students * P + 40 + 3 + R <= share`: the projector pool and the daily
-    incident run come out of the same share and neither depends on class size. Leaving them out
-    let 13/17 through on every cap down to 34 -- the exact case this is here to catch. At cap 50
-    the server booted and /api/quota offered L1's 10-call run to a class of 30 out of 45."""
+    """One learner plus R must fit in the class share. This is as far as a settings-level check
+    reaches: the rest of §3.1 counts a projector and a class, which a solo instance has neither
+    of, so caps above 33 with these defaults are left to tests/test_deploy_config.py, which
+    checks them against the blueprint that really does deploy to a classroom."""
     with pytest.raises(ValidationError, match="DAILY_LLM_CALL_CAP"):
         Settings(_env_file=None, daily_llm_call_cap=cap)
+
+
+@pytest.mark.parametrize(("cap", "learner", "reserve"), [(10, 1, 1), (20, 2, 10), (60, 4, 7)])
+def test_accepts_a_small_cap_sized_for_one_machine(cap: int, learner: int, reserve: int) -> None:
+    """A dev or solo instance runs a small cap with a small P and R and no class at all; the
+    check must not demand room for a projector pool nobody is using."""
+    assert (
+        Settings(
+            _env_file=None,
+            daily_llm_call_cap=cap,
+            quota_learner_calls=learner,
+            quota_reserve_calls=reserve,
+        ).daily_llm_call_cap
+        == cap
+    )
 
 
 def test_a_zero_cap_still_serves_the_endpoints_that_cost_nothing(settings: Settings) -> None:
