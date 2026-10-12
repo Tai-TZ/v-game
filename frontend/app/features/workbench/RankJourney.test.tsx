@@ -1,5 +1,5 @@
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RankJourney } from "./RankJourney";
 
@@ -69,5 +69,65 @@ describe("what the journey actually draws", () => {
   it("claims no move at all when it was not told the scales", () => {
     render(<RankJourney ranks={{ vs: 23, bm: 2 }} order={ORDER} toys={TOYS} />);
     expect(chips()[1]?.dataset.hop).toBe("rescaled");
+  });
+});
+
+describe("the rank table, which is the main form on a narrow screen", () => {
+  const narrow = (on: boolean) =>
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: on && q.includes("max-width"),
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+  const rows = () => [...document.querySelectorAll("tbody tr")];
+  const cells = (n: number) =>
+    [...(rows()[n]?.querySelectorAll("th, td") ?? [])].map((c) => c.textContent);
+
+  it("opens as a table at 375 px and as the chips on a wide screen", () => {
+    // §8.2: for a rank table the table is the main interface and colour the extra layer.
+    narrow(true);
+    render(<RankJourney ranks={{ vs: 23, bm: 2 }} order={ORDER} toys={TOYS} scales={STORE} />);
+    expect(document.querySelector("table")).not.toBeNull();
+    expect(document.querySelector("ol")).toBeNull();
+    cleanup();
+
+    narrow(false);
+    render(<RankJourney ranks={{ vs: 23, bm: 2 }} order={ORDER} toys={TOYS} scales={STORE} />);
+    expect(document.querySelector("ol")).not.toBeNull();
+    expect(document.querySelector("table")).toBeNull();
+  });
+
+  it("keeps the blocks in slot order, not the order the ranks object happens to have", () => {
+    // The ranks map is keyed by node, so its own key order is alphabetical: bm, fu, rr, vs.
+    // §8.6 names this trap explicitly.
+    narrow(true);
+    render(<RankJourney ranks={{ rr: 1, vs: 23, fu: 2 }} order={ORDER} toys={TOYS} />);
+    expect(rows().map((_, i) => cells(i)[0])).toEqual(["Vòm Sao", "Phễu", "Kính lúp"]);
+  });
+
+  it("says a block found nothing in words, never as a dash or a made-up number", () => {
+    narrow(true);
+    render(<RankJourney ranks={{ bm: null }} order={ORDER} toys={TOYS} scales={STORE} />);
+    expect(cells(0)[1]).toBe("không thấy");
+  });
+
+  it("names the population each rank was counted over, per row", () => {
+    narrow(true);
+    render(
+      <RankJourney
+        ranks={{ vs: 23, rr: 2 }}
+        order={ORDER}
+        toys={TOYS}
+        scales={{ vs: { kind: "corpus" }, rr: { kind: "kept", size: 3 } }}
+      />,
+    );
+    expect(cells(0)).toEqual(["Vòm Sao", "#23", "toàn kho"]);
+    expect(cells(1)).toEqual(["Kính lúp", "#2", "3 đoạn giữ lại"]);
+  });
+
+  it("says it has no scale rather than implying one it was not given", () => {
+    narrow(true);
+    render(<RankJourney ranks={{ vs: 23 }} order={ORDER} toys={TOYS} />);
+    expect(cells(0)[2]).toBe("chưa rõ");
   });
 });

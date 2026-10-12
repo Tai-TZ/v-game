@@ -130,7 +130,16 @@ export const STAMP_VI = {
 } as const;
 
 /** Đường đời hạng (L3): a block that never found the answer says so, not "#—". */
-export const JOURNEY_VI = { absent: "không thấy" } as const;
+export const JOURNEY_VI = {
+  absent: "không thấy",
+  /** What the rank was counted over. §8.6: the meaning of a rank differs by block. */
+  corpus: "toàn kho",
+  kept: (size: number) => `${size} đoạn giữ lại`,
+  /** The knob that decides the kept size is not on the bench, so say so, do not guess. */
+  unknownScale: "chưa rõ",
+  caption: "Hạng của đoạn đáp án ở từng khối, mỗi khối trên thang đo của nó.",
+  columns: { block: "Khối", rank: "Hạng", scale: "Trên" },
+} as const;
 
 const cosine = new Intl.NumberFormat("vi-VN", {
   minimumFractionDigits: 3,

@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { JOURNEY_VI } from "./copy";
+import { Viz } from "./Viz";
 import { rankJourney, type Move, type Scale } from "./journey";
 
 /**
@@ -48,11 +49,41 @@ export function RankJourney({
   const steps = rankJourney(ranks, order, scales);
   if (steps.length === 0) return null;
 
-  // No sr-only copy of the journey: the prose list directly below is the same ranks said
-  // properly, with the scale each was taken on, so a second reading would be both duplicate
-  // and worse. The chips are the picture of it, and stay out of the a11y tree.
+  const scaleOf = (node: string) => {
+    const scale = scales?.[node];
+    if (scale === undefined) return JOURNEY_VI.unknownScale;
+    return scale.kind === "corpus"
+      ? JOURNEY_VI.corpus
+      : scale.size === null
+        ? JOURNEY_VI.unknownScale
+        : JOURNEY_VI.kept(scale.size);
+  };
+
+  // No sr-only copy of the journey: the table form below carries the same ranks with the scale
+  // each was taken on, so a second scale-free reading would be duplicate and worse. The chips
+  // are the picture of it, and stay out of the a11y tree.
   return (
-    <div className="mt-2">
+    <Viz
+      caption={JOURNEY_VI.caption}
+      stamp="run"
+      table={
+        <table className="text-sm">
+          <tbody>
+            {steps.map((step) => (
+              <tr key={step.node} className="border-t border-line">
+                <th scope="row" className="py-1 pr-3 text-left font-semibold whitespace-nowrap">
+                  {toys[step.node] ?? step.node}
+                </th>
+                <td className="py-1 pr-3 tabular-nums">
+                  {step.rank === null ? JOURNEY_VI.absent : `#${step.rank}`}
+                </td>
+                <td className="py-1 text-fg-muted">{scaleOf(step.node)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      }
+    >
       <ol aria-hidden="true" className="flex flex-wrap items-center gap-1 text-sm">
         {steps.map((step) => (
           <li
@@ -66,6 +97,6 @@ export function RankJourney({
           </li>
         ))}
       </ol>
-    </div>
+    </Viz>
   );
 }
