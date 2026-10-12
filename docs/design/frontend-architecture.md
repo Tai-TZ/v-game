@@ -278,7 +278,7 @@ Hoạt cảnh nhân vật và khối đạt/trượt làm bằng CSS keyframes t
 | Luật | Ép bằng |
 |---|---|
 | Trần route bàn thợ, không thư viện biểu đồ | `scripts/check-bundle.mjs` (thêm ngân sách route bàn thợ) |
-| `<figure>` có `<figcaption>`, tem nguồn và nút "Xem dạng bảng" | e2e: mọi phần tử `[data-vg-viz]` có đủ ba thứ |
+| `<figure>` có `<figcaption>` và tem nguồn; nút "Xem dạng bảng" khi hình có dạng bảng khác (`data-vg-viz="both"`), không có nút khi chính hình đã là bảng (`data-vg-viz="table"`, ví dụ dải hồi quy) | e2e: mọi phần tử `[data-vg-viz]` có figcaption + đúng một tem, và trạng thái nút khớp giá trị `data-vg-viz`; `Viz` ép bằng kiểu — truyền hình mà không khai `form="table"` hay `table` thì không dịch được (sửa 2026-10-12) |
 | axe sạch ở 375 và 1280 px | `e2e/a11y.spec.ts` |
 | Không `style=` trong HTML prerender | CSP thật: vi phạm hiện trong console của e2e |
 | Một live region | e2e đếm `[aria-live]` trên route bàn thợ = 1 |

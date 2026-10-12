@@ -15,6 +15,7 @@ import {
   knobName,
   LABEL_VI,
   DIAGNOSIS_VI,
+  HISTORY_VI,
   LEVEL_COPY,
   lowerFirst,
   stepStatusText,
@@ -24,7 +25,12 @@ import {
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
+import { Compare } from "./Compare";
+import { Debrief } from "./Debrief";
+import { History } from "./History";
+import type { NextPick } from "./diff";
 import { type Scale } from "./journey";
+import type { RunMark } from "./storage";
 import { RankJourney } from "./RankJourney";
 import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
@@ -51,6 +57,12 @@ interface ResultsProps {
   backTo: string;
   /** The guess slip that went with this run, if the player filled one (B1). */
   slip: Slip | null;
+  /** This level's last scored runs, newest first, for the regression strip (N3). */
+  history: readonly RunMark[];
+  /** Puts a remembered configuration back on the bench, from a row of the strip. */
+  onDuplicate: (mark: RunMark) => void;
+  /** Persists the debrief's picks (N20) onto the run just recorded. */
+  onDebrief: (extras: { why?: number; next?: NextPick }) => void;
   onEdit: () => void;
   onFocusSlot: (type: BlockType, param?: string) => void;
 }
@@ -72,6 +84,9 @@ export function Results({
   graph,
   backTo,
   slip,
+  history,
+  onDuplicate,
+  onDebrief,
   onEdit,
   onFocusSlot,
 }: ResultsProps) {
@@ -85,6 +100,9 @@ export function Results({
   );
   // The reason menu comes before the diagnosis (L1 §11); one per run (the parent keys by run).
   const [why, setWhy] = useState<"ask" | "answered" | "skipped">("ask");
+  // The stable index chosen, for the debrief's line 3 (N20) -- kept separately from `why` above
+  // so the existing ask/answered/skipped control flow does not have to change shape.
+  const [whyIndex, setWhyIndex] = useState<number | null>(null);
   useEffect(() => {
     if (why === "skipped") document.getElementById("wb-diagnosis-title")?.focus();
   }, [why]);
@@ -215,7 +233,10 @@ export function Results({
           // no case of its own. +1 so a seed divisible by the option count cannot land the
           // answer first.
           turn={(ask.c?.n ?? run.cases.length) + 1}
-          onAnswer={() => setWhy("answered")}
+          onAnswer={(index) => {
+            setWhy("answered");
+            setWhyIndex(index);
+          }}
           onSkip={() => setWhy("skipped")}
         />
       )}
@@ -301,6 +322,16 @@ export function Results({
         ))}
       </div>
 
+      {history.length > 0 && (
+        <>
+          <h3 className="mt-8 text-lg font-bold">{HISTORY_VI.heading}</h3>
+          <History runs={history} onDuplicate={onDuplicate} />
+          {/* history[0] is the run just finished (recordRun prepends), history[1] the one
+              before it -- from the second run of a level on, there is a prior to compare. */}
+          {history[0] && history[1] && <Compare env={env} prev={history[1]} now={history[0]} />}
+        </>
+      )}
+
       {run.models && Object.keys(run.models).length > 0 && (
         <p className="mt-6 text-sm text-fg-muted">
           Model đã trả lời:{" "}
@@ -320,6 +351,16 @@ export function Results({
             " trên model chính, nên số token của lượt này không phải thước đo cấu hình của bạn."}
         </p>
       )}
+
+      <Debrief
+        env={env}
+        run={run}
+        slip={slip}
+        graph={graph}
+        ask={ask}
+        whyIndex={whyIndex}
+        onPick={onDebrief}
+      />
 
       <div className="mt-8 flex flex-wrap gap-2">
         <button type="button" onClick={onEdit} className={buttonClass("primary")}>

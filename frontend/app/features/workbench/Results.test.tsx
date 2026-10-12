@@ -1,10 +1,11 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
 import { Results } from "./Results";
 import type { RunView } from "./run";
+import type { RunMark } from "./storage";
 import type { GoldReveal, Graph } from "./schema";
 import { frame, parseSse, readText, replay, testEnv } from "./test-fixtures";
 
@@ -31,7 +32,14 @@ function finishedRun(gold: Record<string, GoldReveal>, diagnosis: object[] = [])
   return run;
 }
 
-function show(run: RunView, graph: Graph = dense, env = l1, runGraph: Graph = dense) {
+function show(
+  run: RunView,
+  graph: Graph = dense,
+  env = l1,
+  runGraph: Graph = dense,
+  history: RunMark[] = [],
+  onDebrief: (extras: { why?: number; next?: unknown }) => void = () => undefined,
+) {
   render(
     <MemoryRouter>
       <Results
@@ -42,6 +50,9 @@ function show(run: RunView, graph: Graph = dense, env = l1, runGraph: Graph = de
         graph={graph}
         backTo="/play/library"
         slip={null}
+        history={history}
+        onDebrief={onDebrief}
+        onDuplicate={() => undefined}
         onEdit={() => undefined}
         onFocusSlot={() => undefined}
       />
@@ -393,5 +404,116 @@ describe("where cô Lan's diagnosis came from", () => {
   it("stays quiet when there is no diagnosis to explain", () => {
     show(finishedRun({ "lib-l1-v01": trap }));
     expect(document.querySelector("[data-diagnosis-source]")).toBeNull();
+  });
+});
+
+describe("the regression strip on the results screen", () => {
+  it("draws the level's earlier runs under its own heading", () => {
+    const earlier: RunMark[] = [
+      {
+        body: "{}",
+        at: 2,
+        stars: 0,
+        tokens: 10,
+        budget: 20,
+        cases: [{ n: 1, role: "visible", passed: false }],
+      },
+    ];
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, earlier);
+    expect(screen.getByRole("heading", { name: "Các lượt trước" })).toBeDefined();
+    expect(document.querySelectorAll("[data-run-row]")).toHaveLength(1);
+    expect(document.querySelector('[data-cell="fail"]')).not.toBeNull();
+  });
+
+  it("shows no strip before the level has a run behind it", () => {
+    show(finishedRun({ "lib-l1-v01": trap }));
+    expect(document.querySelectorAll("[data-run-row]")).toHaveLength(0);
+    // Reachable with storage blocked or full: the heading must not sit over nothing.
+    expect(screen.queryByText("Các lượt trước")).toBeNull();
+  });
+});
+
+describe("duplicating a row of the strip", () => {
+  const runs: RunMark[] = [9, 6, 3].map((topK, i) => ({
+    body: `{"top_k":${topK}}`,
+    at: 3 - i,
+    stars: 1,
+    tokens: 10,
+    budget: 20,
+    cases: [{ n: 1, role: "visible" as const, passed: true }],
+  }));
+
+  it("hands the page the mark of the row that was pressed", () => {
+    // The other half of the chain -- that a mark's values reach the drawn control -- is pinned
+    // by WorkbenchPage's "back to the last passing run" test, which asserts the slider.
+    const picked: number[] = [];
+    render(
+      <MemoryRouter>
+        <Results
+          env={l1}
+          run={finishedRun({ "lib-l1-v01": trap })}
+          changed={false}
+          runGraph={dense}
+          graph={dense}
+          backTo="/play/library"
+          slip={null}
+          history={runs}
+          onDebrief={() => undefined}
+          onDuplicate={(mark) => picked.push(mark.at)}
+          onEdit={() => undefined}
+          onFocusSlot={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Nhân bản cấu hình của lượt 2" }));
+    expect(picked).toEqual([2]);
+  });
+});
+
+describe("the comparison card from the second run on", () => {
+  const twoRuns: RunMark[] = [
+    {
+      body: JSON.stringify(dense),
+      at: 2,
+      stars: 2,
+      tokens: 10,
+      budget: 20,
+      cases: [{ n: 1, role: "visible", passed: true }],
+    },
+    {
+      body: JSON.stringify(graphOf()),
+      at: 1,
+      stars: 0,
+      tokens: 10,
+      budget: 20,
+      cases: [{ n: 1, role: "visible", passed: false }],
+    },
+  ];
+
+  it("compares the two most recent runs, newest against the one before it", () => {
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, twoRuns);
+    expect(document.querySelector("[data-compare]")).not.toBeNull();
+    // The case flipped from Trượt to Đạt between the two stored marks.
+    expect(document.querySelector("[data-compare]")?.textContent).toContain("Trượt → Đạt");
+  });
+
+  it("draws no card with only one remembered run", () => {
+    const [onlyRun] = twoRuns;
+    if (!onlyRun) throw new Error("fixture lost its run");
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, [onlyRun]);
+    expect(document.querySelector("[data-compare]")).toBeNull();
+  });
+});
+
+describe("Debrief's picks reach the page through onDebrief", () => {
+  it("calls onDebrief with exactly the option the player picked", () => {
+    const picks: unknown[] = [];
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, [], (extras) => picks.push(extras));
+    const radios = document.querySelectorAll('input[type="radio"][name="debrief-next"]');
+    const first = radios[0];
+    expect(first).toBeDefined();
+    if (!first) throw new Error("no debrief option rendered");
+    fireEvent.click(first);
+    expect(picks).toHaveLength(1);
   });
 });

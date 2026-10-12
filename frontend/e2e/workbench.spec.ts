@@ -120,6 +120,56 @@ test.describe("workbench", () => {
 
     // The gate frontend-architecture §12 promised: every figure carries its three parts. Until
     // today `data-vg-viz` appeared nowhere in the app, so this could never have fired.
+    // The history hook is wired into the page, not only unit-tested: a scored run leaves one
+    // summary behind, with the graph that ran and each case's verdict (N3).
+    const history = await page.evaluate(() =>
+      window.localStorage.getItem("vg.history.v1.grounded-citation"),
+    );
+    const kept = JSON.parse(history ?? "null") as { runs?: { cases?: unknown[] }[] } | null;
+    expect(kept?.runs).toHaveLength(1);
+    expect(kept?.runs?.[0]?.cases).toHaveLength(cases);
+
+    // Picking a debrief option (N20) writes onto that same stored run, through the full
+    // WorkbenchPage -> Debrief -> onDebrief -> recordExtras chain, not only the unit-tested parts.
+    await page.locator('input[name="debrief-next"]').first().check();
+    const afterDebrief = await page.evaluate(() => {
+      const raw = window.localStorage.getItem("vg.history.v1.grounded-citation");
+      return JSON.parse(raw ?? "null") as { runs?: { next?: unknown }[] } | null;
+    });
+    expect(afterDebrief?.runs?.[0]?.next).toBeDefined();
+
+    // The strip is on the page, loaded at mount and refreshed by the write: one row for the
+    // run that just finished.
+    await expect(page.getByRole("heading", { name: "Các lượt trước" })).toBeVisible();
+    await expect(page.locator("[data-run-row]")).toHaveCount(1);
+
+    // The strip is thirteen columns wide at L1, so it is the page's widest thing by far. Measure
+    // here, while it is on screen: the suite's other overflow check runs after a reload, which
+    // drops the in-memory run and takes the strip with it -- so deleting the strip's scroller
+    // would not have failed anything.
+    const wide = page.viewportSize();
+    await page.setViewportSize({ width: 375, height: 812 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
+    // The width goes somewhere: inside the strip's own region, not into the page.
+    expect(
+      await page
+        .locator('[data-vg-viz="table"] [role="region"]')
+        .evaluate((el) => el.scrollWidth > el.clientWidth),
+    ).toBe(true);
+    if (wide) await page.setViewportSize(wide);
+
+    // Duplicating a row loads its configuration and is not itself a run: the strip stays at one.
+    await page.getByRole("button", { name: "Nhân bản cấu hình của lượt 1" }).click();
+    const afterDuplicate = await page.evaluate(() => {
+      const raw = window.localStorage.getItem("vg.history.v1.grounded-citation");
+      return (JSON.parse(raw ?? "null") as { runs?: unknown[] } | null)?.runs?.length ?? 0;
+    });
+    expect(afterDuplicate).toBe(1);
+
     // A figure inside a collapsed <details> ("Xem vết chạy") is in the DOM but not visible, and
     // the gate is about what every figure carries, not about which disclosure happens to be
     // open. Open them all first, as the a11y suite does.
@@ -143,7 +193,24 @@ test.describe("workbench", () => {
       await expect(figure.locator("figcaption")).not.toBeEmpty();
       const text = (await figure.textContent()) ?? "";
       expect(STAMPS.filter((stamp) => text.includes(stamp))).toHaveLength(1);
-      await expect(figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ })).toBeVisible();
+      // The toggle is for a picture that needs a readable alternative (§8.2). A figure that is
+      // already a table has nothing to swap to, and a button that did nothing would be worse.
+      // Read the kind off the element: below 640 px every figure of the other kind is SHOWING
+      // a table, so looking for one in the DOM cannot tell them apart.
+      const toggle = figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ });
+      if ((await figure.getAttribute("data-vg-viz")) === "table") {
+        // Both halves, or the check is the component asserting its own flag: a figure may skip
+        // the toggle only by really being a table.
+        await expect(figure.locator("table")).toHaveCount(1);
+        await expect(toggle).toHaveCount(0);
+      } else {
+        await expect(toggle).toBeVisible();
+        // And the toggle must actually swap the form, not merely exist.
+        const before = await figure.locator("table").count();
+        await toggle.click();
+        await expect(figure.locator("table")).toHaveCount(before === 0 ? 1 : 0);
+        await toggle.click();
+      }
     }
 
     await page.getByRole("button", { name: "Chỉnh rồi chạy lại" }).click();

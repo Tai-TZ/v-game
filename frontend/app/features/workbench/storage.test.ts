@@ -2,7 +2,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { graphFromBench, setParam, starterBench } from "./bench";
 import { EMPTY_SLIP, type Slip } from "./guess";
-import { loadSaved, loadSlip, save, saveSlip } from "./storage";
+import type { Stars } from "~/features/progress/progress";
+
+import {
+  loadHistory,
+  loadSaved,
+  loadSlip,
+  recordExtras,
+  recordRun,
+  save,
+  saveSlip,
+  type RunMark,
+} from "./storage";
 import { testEnv } from "./test-fixtures";
 
 const env = testEnv("chunk-tuning");
@@ -82,5 +93,126 @@ describe("guess slip storage", () => {
     expect(loadSlip("chunk-tuning")).toEqual(EMPTY_SLIP);
     expect(() => saveSlip("chunk-tuning", slip)).not.toThrow();
     vi.restoreAllMocks();
+  });
+});
+
+describe("run history (N3)", () => {
+  const mark = (stars: Stars, body: string, cases: RunMark["cases"] = []): RunMark => ({
+    body,
+    at: 1000,
+    stars,
+    tokens: 420,
+    budget: 3000,
+    cases,
+  });
+
+  it("keeps a finished run and hands it back", () => {
+    recordRun("grounded-citation", mark(3, "{a}"));
+    expect(loadHistory("grounded-citation")).toEqual([mark(3, "{a}")]);
+  });
+
+  it("puts the newest run first, so the strip reads downward in time", () => {
+    recordRun("grounded-citation", mark(1, "{a}"));
+    recordRun("grounded-citation", mark(2, "{b}"));
+    expect(loadHistory("grounded-citation").map((r) => r.body)).toEqual(["{b}", "{a}"]);
+  });
+
+  it("keeps five runs and drops the oldest, because this is a summary and not a log", () => {
+    for (const n of [1, 2, 3, 4, 5, 6]) recordRun("grounded-citation", mark(0, `{${n}}`));
+    const kept = loadHistory("grounded-citation");
+    expect(kept).toHaveLength(5);
+    expect(kept.map((r) => r.body)).toEqual(["{6}", "{5}", "{4}", "{3}", "{2}"]);
+  });
+
+  it("keeps each level's history to itself", () => {
+    recordRun("grounded-citation", mark(3, "{l1}"));
+    recordRun("chunk-tuning", mark(1, "{l2}"));
+    expect(loadHistory("grounded-citation").map((r) => r.body)).toEqual(["{l1}"]);
+    expect(loadHistory("chunk-tuning").map((r) => r.body)).toEqual(["{l2}"]);
+  });
+
+  it("stores the per-case verdicts the strip needs, and nothing of the event log", () => {
+    const cases = [
+      { n: 1, role: "visible" as const, passed: true },
+      { n: 2, role: "hidden" as const, passed: false },
+    ];
+    recordRun("grounded-citation", mark(1, "{a}", cases));
+    expect(loadHistory("grounded-citation")[0]?.cases).toEqual(cases);
+    const raw = window.localStorage.getItem("vg.history.v1.grounded-citation") ?? "";
+    // The log is megabytes of facts; a summary must not grow with it.
+    expect(raw).not.toContain("step.finished");
+    expect(raw).not.toContain("facts");
+  });
+
+  it("reads as no history when the entry is not what this version writes", () => {
+    window.localStorage.setItem("vg.history.v1.grounded-citation", '{"runs":[{"stars":9}]}');
+    expect(loadHistory("grounded-citation")).toEqual([]);
+  });
+
+  // Spied on the prototype, not the instance: jsdom's localStorage inherits its methods, and an
+  // own-property spy never runs -- which made the first version of both these tests pass
+  // whatever the code did.
+  it("reads as no history when storage cannot be read at all", () => {
+    const blocked = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(loadHistory("grounded-citation")).toEqual([]);
+    expect(blocked).toHaveBeenCalled();
+  });
+
+  it("keeps playing when storage refuses the write", () => {
+    const full = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("full");
+    });
+    expect(() => recordRun("grounded-citation", mark(3, "{a}"))).not.toThrow();
+    expect(full).toHaveBeenCalled();
+  });
+});
+
+describe("the debrief picks (N20): why and next, patched onto the latest mark", () => {
+  const base: RunMark = {
+    body: "{a}",
+    at: 1,
+    stars: 1,
+    tokens: 10,
+    budget: 20,
+    cases: [{ n: 1, role: "visible", passed: true }],
+  };
+
+  it("adds the picks to the mark just written, without touching its other fields", () => {
+    recordRun("grounded-citation", base);
+    recordExtras("grounded-citation", {
+      why: 2,
+      next: { type: "vector_search", param: "top_k", direction: "down" },
+    });
+    const [mark] = loadHistory("grounded-citation");
+    expect(mark).toEqual({
+      ...base,
+      why: 2,
+      next: { type: "vector_search", param: "top_k", direction: "down" },
+    });
+  });
+
+  it("merges rather than overwrites: picking one line does not erase the other", () => {
+    recordRun("grounded-citation", base);
+    recordExtras("grounded-citation", { why: 0 });
+    recordExtras("grounded-citation", { next: { type: "rerank", direction: "on" } });
+    expect(loadHistory("grounded-citation")[0]).toMatchObject({
+      why: 0,
+      next: { type: "rerank", direction: "on" },
+    });
+  });
+
+  it("does nothing when there is no run to attach the picks to", () => {
+    expect(() => recordExtras("grounded-citation", { why: 1 })).not.toThrow();
+    expect(loadHistory("grounded-citation")).toEqual([]);
+  });
+
+  it("reads as a plain mark, minus the picks, on a version that predates them", () => {
+    window.localStorage.setItem(
+      "vg.history.v1.grounded-citation",
+      JSON.stringify({ runs: [base] }),
+    );
+    expect(loadHistory("grounded-citation")).toEqual([base]);
   });
 });

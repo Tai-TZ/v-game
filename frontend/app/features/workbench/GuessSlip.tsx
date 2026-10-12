@@ -285,7 +285,8 @@ export function WhyMenu({
   menu: Menu;
   /** Rotation seed; any non-negative integer that varies between menus. */
   turn: number;
-  onAnswer: () => void;
+  /** The stable index into `menu.options` the player picked -- never the rotated display slot. */
+  onAnswer: (index: number) => void;
   onSkip: () => void;
 }) {
   const id = useId();
@@ -317,7 +318,7 @@ export function WhyMenu({
               disabled={choice !== null}
               onChange={() => {
                 setChoice(i);
-                onAnswer();
+                onAnswer(i);
               }}
               className="size-5 shrink-0 accent-brand"
             />

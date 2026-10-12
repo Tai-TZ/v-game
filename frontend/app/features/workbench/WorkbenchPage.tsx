@@ -7,14 +7,16 @@ import { buttonClass } from "~/components/ui/button";
 import { recordStars, type Stars } from "~/features/progress/progress";
 
 import { cancelRun, eventsUrl, newKey, postRun, previewRetrieval, type LevelPageData } from "./api";
-import { graphFromBench, type Bench, type Env } from "./bench";
+import { benchFromGraph, graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
 import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
+import { lastPassing } from "./history";
 import { Results } from "./Results";
 import {
+  cappedRun,
   frameAction,
   isActive,
   runReducer,
@@ -32,7 +34,16 @@ import {
   type Issue,
   type PublicLevel,
 } from "./schema";
-import { loadSaved, loadSlip, save, saveSlip } from "./storage";
+import {
+  loadHistory,
+  recordExtras,
+  loadSaved,
+  loadSlip,
+  recordRun,
+  save,
+  saveSlip,
+  type RunMark,
+} from "./storage";
 import { errorsOf, validateGraph } from "./validate";
 
 const levelsUrl = (zoneId: string | null) => (zoneId ? `/play/${zoneId}` : "/play");
@@ -201,7 +212,9 @@ function useFocusLater() {
  * Best effort: a blocked storage or a bad id must never cost the player the results on screen.
  */
 export function useRecordStars(level: PublicLevel, run: RunView | null) {
-  const scoredRun = run?.score ? run.runId : null;
+  // §3.3: a run the server's daily cap cut short "không tính là một lần thử sao … không ghi đè
+  // kết quả sao". It is still graded and still on screen; it is just not a result.
+  const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
   const stars = run?.score?.stars;
   useEffect(() => {
     if (!scoredRun || stars === undefined) return;
@@ -211,6 +224,59 @@ export function useRecordStars(level: PublicLevel, run: RunView | null) {
       console.warn("Không lưu được số sao của màn.", error);
     }
   }, [scoredRun, stars, level.zone, level.id]);
+}
+
+/**
+ * Keeps a summary of each scored run of this level (N3), once per run.
+ *
+ * Scored runs only. A sample run earns no stars and grades three cases instead of ten, so
+ * mixing the two would put rows of different widths in one regression strip and make "the last
+ * passing configuration" mean two things.
+ *
+ * Only the verdicts go in -- never a fact or a gold reveal. Those reach the client per case
+ * role, and a copy in localStorage would outlive the gate the server and the results screen
+ * both apply.
+ *
+ * `ranBody` is the graph that was POSTED, not the bench as it stands. Only the run id decides
+ * when to write, so a caller that hands over a changing body still gets one entry per run
+ * instead of one per knob turn.
+ */
+export function useRecordHistory(
+  levelId: string,
+  run: RunView | null,
+  ranBody: string | null,
+  onWritten?: (runs: RunMark[]) => void,
+) {
+  // Same rule as the stars, and for the strip there is a second reason: a truncated run has
+  // fewer rows than the others, so it would not be comparable with them.
+  const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
+  // The run id of the entry already written. Stating the invariant this way keeps the dep list
+  // complete -- a fresh `cases` object or an edited body re-runs the effect, and the guard, not
+  // a hand-trimmed dep list, is what stops a second entry for one run.
+  const written = useRef<string | null>(null);
+  useEffect(() => {
+    if (scoredRun === null || scoredRun === written.current) return;
+    // The score check narrows the type -- a non-null `scoredRun` already means there is one.
+    // A missing body is the real condition: nobody knows which graph ran.
+    if (!run?.score || ranBody === null) return;
+    written.current = scoredRun;
+    recordRun(levelId, {
+      body: ranBody,
+      at: Date.now(),
+      stars: run.score.stars as Stars,
+      tokens: run.score.tokens,
+      budget: run.score.budget,
+      // Graded cases only. An ungraded one has no verdict, and `?? false` would write it
+      // into the strip as the player's failure -- a result the run never reached.
+      cases: run.cases.flatMap((c) =>
+        c.graded ? [{ n: c.n, role: c.role, passed: c.graded.passed }] : [],
+      ),
+    });
+    // The store is write-only otherwise: the strip needs the list it just joined.
+    onWritten?.(loadHistory(levelId));
+    // `onWritten` is in the deps, which is honest: a fresh closure re-runs the effect, and the
+    // guard above -- not a trimmed dep list -- is what keeps it to one entry per run.
+  }, [scoredRun, run, ranBody, levelId, onWritten]);
 }
 
 /** The graph of the run on show; ours, so it parses, but checked like any other JSON. */
@@ -293,6 +359,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
 
   useRunStream(run?.runId ?? null, attempt, dispatch);
   useRecordStars(level, run);
+  const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
+  const passing = lastPassing(history);
+  useRecordHistory(level.id, run, lastBody, setHistory);
   const left = useCancelOnLeave(run);
 
   const issues = serverIssues ?? clientIssues;
@@ -365,6 +434,29 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     setRequest({ state: "idle" });
     setNotes([]);
     setHighlight(null);
+  }
+
+  /**
+   * Puts a remembered configuration back on the bench (N3). A body the bench can no longer draw
+   * -- an older level version, a value outside today's domain -- leaves the bench alone and
+   * says one line, the same discipline as a discarded saved config (W8).
+   */
+  function benchFrom(mark: RunMark) {
+    const graph = parseGraph(mark.body);
+    const remembered = graph === null ? null : benchFromGraph(env, graph);
+    if (remembered === null) {
+      setNotes([
+        {
+          code: "W_HISTORY_STALE",
+          severity: "info",
+          node: null,
+          port: null,
+          message_vi: "Cấu hình của lượt đó không còn vẽ được trên bàn thợ của màn này.",
+        },
+      ]);
+      return;
+    }
+    edit(remembered);
   }
 
   function editSlip(next: Slip) {
@@ -471,6 +563,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
               if (request.state === "failed") void send(request.body, request.key);
             }}
             onRestore={() => edit(starter)}
+            backToPassing={passing === null ? null : () => benchFrom(passing)}
             onFocusSlot={focusSlot}
             onStop={() => {
               if (!run) return;
@@ -516,6 +609,12 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           graph={graph}
           backTo={back}
           slip={ranSlip?.runId === run.runId ? ranSlip.slip : null}
+          history={history}
+          onDebrief={(extras) => {
+            recordExtras(level.id, extras);
+            setHistory(loadHistory(level.id));
+          }}
+          onDuplicate={benchFrom}
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}
         />

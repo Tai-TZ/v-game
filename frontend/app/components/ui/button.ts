@@ -2,8 +2,12 @@ export type ButtonVariant = "primary" | "secondary" | "on-ink" | "quiet" | "inli
 
 // Not transition-colors: it animates outline-color too, so the focus ring faded in from the
 // text colour.
+// min-h-11, not h-11: a fixed height clips a label that wraps rather than growing the row around
+// it. For a one-line label the rendered height is identical; a label that does wrap (a cramped
+// column in the history strip, caught by an audit of B3) gets a taller button instead of
+// overprinted glyphs.
 const base =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-sm text-sm font-semibold transition-[color,background-color,border-color] duration-150 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-sm text-sm font-semibold transition-[color,background-color,border-color] duration-150 disabled:cursor-not-allowed disabled:opacity-50";
 
 // Padding lives in the variant: an extra `px-3` cannot beat a base `px-5` in the generated CSS.
 const variants: Record<ButtonVariant, string> = {

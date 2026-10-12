@@ -1,4 +1,5 @@
 import { domain, isAllowed, nodeIds, type Env } from "./bench";
+import type { Change } from "./diff";
 import type { Confidence, Why } from "./guess";
 import { unfinished, type BlockState, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, JsonValue, RunReport } from "./schema";
@@ -163,6 +164,73 @@ export const DIAGNOSIS_VI = {
   source:
     "Chẩn đoán này dựng từ vết chạy của lượt. Trợ lý không được hỏi vì sao nó sai: " +
     "mọi câu dưới đây là mẫu câu điền bằng số liệu của chính lượt bạn vừa chạy.",
+} as const;
+
+/**
+ * Dải hồi quy (N3). The caption says what the strip shows and never a run count: §3.1 of the
+ * reward rules forbids presenting attempts as an achievement.
+ */
+export const HISTORY_VI = {
+  caption: "Các lượt đã chấm của màn này, mới nhất trên cùng, theo từng câu.",
+  heading: "Các lượt trước",
+  cell: { pass: "Đạt", fail: "Trượt", skip: "Không chạy" },
+  case: (n: number) => `Câu #${n}`,
+  /** The numeral only: the column header says "Sao", and "3/3 sao" in a cell would read word
+   *  for word like the screen's own score headline, which means something else. */
+  stars: (n: number) => `${n}/3`,
+  starsColumn: "Sao",
+  /** Identifies the row. Counting from the newest, the order the table reads -- and not the
+   *  star count, which would read exactly like the screen's own "3/3 sao" headline. */
+  run: (n: number) => `Lượt ${n}`,
+  runColumn: "Lượt",
+  /** Per row. The number counts from the newest, which is the order the table reads. */
+  duplicate: "Nhân bản cấu hình",
+  duplicateRow: (n: number) => `Nhân bản cấu hình của lượt ${n}`,
+  actionColumn: "Cấu hình",
+} as const;
+
+/**
+ * Thẻ so lượt (N20). The label is a causality claim and rests entirely on how many turnable
+ * variables changed: see history.ts `compare`. This is intentionally a different sentence from
+ * `sameGraphNote` above -- that one is about the bench matching the run on show before a rerun;
+ * this is about two REMEMBERED runs, read after the fact.
+ */
+export const COMPARE_VI = {
+  heading: "So với lượt trước",
+  sameConfig: "Hai lượt này cùng một cấu hình, nên khác biệt không phải do bàn thợ.",
+  /** The one case where naming a cause is honest: exactly one variable moved. */
+  single: (name: string) => `${name} là thứ duy nhất đổi.`,
+  /** The required wording (roadmap §20), verbatim regardless of how many variables changed. */
+  multiple: "Đổi 2 thứ cùng lúc, chưa biết thứ nào gây ra",
+  changed: "Đã đổi:",
+  flip: (n: number, from: boolean, to: boolean) =>
+    `Câu #${n}: ${from ? "Đạt" : "Trượt"} → ${to ? "Đạt" : "Trượt"}.`,
+} as const;
+
+/**
+ * The name of one turnable variable, for the comparison card's evidence list.
+ *
+ * Reads `TOY[type].params` directly rather than `knobName`: that helper collapses every non-
+ * chunker param to its slot's own name (it exists for the "Xem ở {slot}" diagnosis link, which
+ * is about navigating to a slot, not naming a knob). Here the knob is the point -- "Vòm Sao đổi"
+ * would read as the block itself being attached or detached, when only its top_k moved.
+ */
+export function changeName(change: Change): string {
+  if (change.kind === "slot") return toyName(change.type);
+  if (change.kind === "param") return TOY[change.type].params?.[change.param] ?? change.param;
+  return `${TOY.llm.params?.system_prompt ?? "Lăng kính"} (khe ${change.slot + 1})`;
+}
+
+/**
+ * Rút kinh nghiệm 30 giây (N20): a four-line card closing the run. Lines 1-2 reuse gradeSlip's
+ * own sentences -- no new typing. Line 3 reads back the reason the player picked. Line 4 is the
+ * "next attempt" picker; its enum labels and legend live here.
+ */
+export const DEBRIEF_VI = {
+  heading: "Rút kinh nghiệm",
+  why: (text: string) => `Lý do bạn chọn: ${text}`,
+  nextLegend: "Lần tới đổi đúng một thứ",
+  nextChosen: (label: string) => `Đã chọn: ${label}`,
 } as const;
 
 export const DROPPED_VI = {

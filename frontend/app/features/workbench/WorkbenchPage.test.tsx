@@ -5,10 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as progress from "~/features/progress/progress";
 import { PROGRESS_KEY, readProgress, recordStars } from "~/features/progress/progress";
 
-import { starterBench } from "./bench";
+import { graphFromBench, setAttached, setParam, starterBench } from "./bench";
 import { runReducer, type RunView } from "./run";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
-import { useRecordStars, usePreview, WorkbenchPage } from "./WorkbenchPage";
+import { loadHistory, type RunMark } from "./storage";
+import { useRecordHistory, usePreview, useRecordStars, WorkbenchPage } from "./WorkbenchPage";
 
 vi.mock("~/features/progress/progress", async (importOriginal) => {
   const actual = await importOriginal<typeof progress>();
@@ -208,5 +209,237 @@ describe("usePreview stops work the bench no longer needs", () => {
     unmount();
     expect(signals[1]?.aborted).toBe(true);
     vi.useRealTimers();
+  });
+});
+
+describe("useRecordHistory", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  const scored = short.findIndex((f) => f.event === "run.scored");
+  const BODY = '{"schema":1,"nodes":[],"edges":[]}';
+  const record = (run: RunView | null, body: string | null = BODY) =>
+    renderHook((props: { run: RunView | null }) => useRecordHistory(l1.level.id, props.run, body), {
+      initialProps: { run },
+    });
+
+  it("keeps the run once it is scored, with the graph that ran and each case's verdict", () => {
+    const hook = record(replay(short.slice(0, scored)));
+    // Nothing yet: a run still going has no result to remember.
+    expect(loadHistory(l1.level.id)).toEqual([]);
+
+    hook.rerender({ run: replay(short.slice(0, scored + 1)) });
+    const kept = loadHistory(l1.level.id);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.body).toBe(BODY);
+    expect(kept[0]?.stars).toBe(1);
+    expect(kept[0]?.cases.map((c) => [c.n, c.passed])).toEqual([
+      [1, true],
+      [2, true],
+    ]);
+  });
+
+  it("remembers which case failed, which is the whole point of the strip", () => {
+    // The committed short run passes both cases, so a fixture that cannot fail would let
+    // `passed: true` for everything through.
+    const run = replay(short.slice(0, scored + 1));
+    if (!run) throw new Error("no run");
+    const withFailure: RunView = {
+      ...run,
+      cases: run.cases.map((c, i) =>
+        i !== 1 || !c.graded ? c : { ...c, graded: { ...c.graded, passed: false } },
+      ),
+    };
+    record(withFailure);
+    expect(loadHistory(l1.level.id)[0]?.cases.map((c) => c.passed)).toEqual([true, false]);
+  });
+
+  it("writes one entry per run, however many events arrive after the score", () => {
+    const hook = record(replay(short.slice(0, scored + 1)));
+    hook.rerender({ run: replay(short) }); // run.finished: the same run
+    expect(loadHistory(l1.level.id)).toHaveLength(1);
+
+    const next = runReducer(null, { kind: "reset", runId: "f".repeat(32) });
+    hook.rerender({ run: next });
+    hook.rerender({ run: replay(short, next) });
+    expect(loadHistory(l1.level.id)).toHaveLength(2);
+  });
+
+  it("never persists a fact or a gold reveal, which the server hands over per role", () => {
+    // A localStorage copy would outlive the role gate the server and Results both apply.
+    record(replay(short.slice(0, scored + 1)));
+    const raw = window.localStorage.getItem(`vg.history.v1.${l1.level.id}`) ?? "";
+    expect(raw).not.toContain("gold");
+    expect(raw).not.toContain("facts");
+    expect(raw).not.toContain("question");
+  });
+
+  it("remembers nothing when it does not know which graph ran", () => {
+    record(replay(short.slice(0, scored + 1)), null);
+    expect(loadHistory(l1.level.id)).toEqual([]);
+  });
+});
+
+describe("useRecordHistory and the live bench", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  const scored = short.findIndex((f) => f.event === "run.scored");
+
+  it("writes nothing more when the player edits the bench after a scored run", () => {
+    // The hook takes the graph that RAN. Watching the live body would add an entry on every
+    // knob turn, filling the five slots with one run.
+    const run = replay(short.slice(0, scored + 1));
+    const hook = renderHook(
+      (props: { body: string }) => useRecordHistory(l1.level.id, run, props.body),
+      { initialProps: { body: '{"ran":1}' } },
+    );
+    expect(loadHistory(l1.level.id)).toHaveLength(1);
+    hook.rerender({ body: '{"ran":1,"edited":true}' });
+    hook.rerender({ body: '{"ran":1,"edited":2}' });
+    expect(loadHistory(l1.level.id)).toHaveLength(1);
+  });
+});
+
+describe("a run the daily cap cut short is not a star attempt", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  const capped = short.map((f) => {
+    if (f.event !== "case.graded") return f;
+    const data = JSON.parse(f.data) as Record<string, unknown>;
+    return {
+      ...f,
+      data: JSON.stringify({ ...data, status: "skipped_budget", reason: "daily_cap" }),
+    };
+  });
+
+  it("does not overwrite the stored stars, and does not join the history", () => {
+    // §3.3: "không tính là một lần thử sao (… không ghi đè kết quả sao)". The run is still
+    // graded and still on screen; it just is not a result.
+    const run = replay(capped);
+    renderHook(() => {
+      useRecordStars(l1.level, run);
+      useRecordHistory(l1.level.id, run, '{"ran":1}');
+    });
+    expect(recordStars).not.toHaveBeenCalled();
+    expect(readProgress()).toEqual({});
+    expect(loadHistory(l1.level.id)).toEqual([]);
+  });
+
+  it("still records a run whose cases the player's own budget skipped", () => {
+    // The paired positive: an ordinary failure must still be a result, or "never record"
+    // would pass the test above.
+    const ownBudget = short.map((f) => {
+      if (f.event !== "case.graded") return f;
+      const data = JSON.parse(f.data) as Record<string, unknown>;
+      return { ...f, data: JSON.stringify({ ...data, status: "skipped_budget" }) };
+    });
+    const run = replay(ownBudget);
+    renderHook(() => {
+      useRecordStars(l1.level, run);
+      useRecordHistory(l1.level.id, run, '{"ran":1}');
+    });
+    expect(recordStars).toHaveBeenCalledOnce();
+    expect(loadHistory(l1.level.id)).toHaveLength(1);
+  });
+
+  it("leaves a case that never ran out of the strip instead of calling it a failure", () => {
+    // `passed: c.graded?.passed ?? false` labelled an ungraded case as broken, which is a
+    // verdict the run never reached.
+    const run = replay(
+      short.slice(
+        0,
+        short.findIndex((f) => f.event === "case.graded"),
+      ),
+    );
+    const scoredWithUngraded: RunView | null =
+      run === null ? null : { ...run, score: { stars: 1, tokens: 1, budget: 2 } as never };
+    renderHook(() => useRecordHistory(l1.level.id, scoredWithUngraded, '{"ran":1}'));
+    expect(loadHistory(l1.level.id)[0]?.cases).toEqual([]);
+  });
+});
+
+describe("useRecordHistory reports what it wrote", () => {
+  const short = parseSse(readText("e2e", "data", "run-l1-short.sse"));
+  const scored = short.findIndex((f) => f.event === "run.scored");
+
+  it("hands the fresh list back, because the store is otherwise write-only", () => {
+    // Without this the strip would show nothing until the next page load: loadHistory has no
+    // other caller on the page.
+    const seen: RunMark[][] = [];
+    renderHook(() =>
+      useRecordHistory(l1.level.id, replay(short.slice(0, scored + 1)), '{"ran":1}', (runs) =>
+        seen.push(runs),
+      ),
+    );
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.[0]?.body).toBe('{"ran":1}');
+  });
+});
+
+describe("going back to a remembered configuration", () => {
+  const seed = (body: string, stars: 0 | 1 | 2 | 3 = 1) =>
+    window.localStorage.setItem(
+      `vg.history.v1.${l1.level.id}`,
+      JSON.stringify({
+        runs: [
+          {
+            body,
+            at: 1,
+            stars,
+            tokens: 10,
+            budget: 20,
+            cases: [{ n: 1, role: "visible", passed: true }],
+          },
+        ],
+      }),
+    );
+
+  const page = () => {
+    const starter = starterBench(l1);
+    if (!starter) throw new Error("L1 starter is not drawable");
+    return render(
+      <MemoryRouter>
+        <WorkbenchPage env={l1} starter={starter} back="/play/library" />
+      </MemoryRouter>,
+    );
+  };
+
+  it("puts the starred run's values back on the bench, and saves them", () => {
+    const starter = starterBench(l1);
+    if (!starter) throw new Error("no starter");
+    const seven = setParam(
+      l1,
+      setAttached(starter, "vector_search", true),
+      "vector_search",
+      "top_k",
+      7,
+    );
+    seed(JSON.stringify(graphFromBench(l1, seven)));
+    page();
+    // L1 starts with no search block, so the knob is not even on the bench yet.
+    expect(screen.queryByRole("slider", { name: /Móc kéo/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Quay về bản đạt gần nhất" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quay về" }));
+
+    // The drawn control, not a handler call: this is what the player sees.
+    expect(screen.getByRole("slider", { name: /Móc kéo/ })).toHaveProperty("value", "7");
+    expect(window.localStorage.getItem(`vg.bench.v1.${l1.level.id}`)).toContain('"top_k":7');
+  });
+
+  it("leaves the bench alone and says so when that configuration no longer fits", () => {
+    // A value outside today's domain, the same case a discarded saved config hits (W8).
+    seed(
+      '{"schema":1,"nodes":[{"id":"vs","type":"vector_search","params":{"top_k":99}}],"edges":[]}',
+    );
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Quay về bản đạt gần nhất" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quay về" }));
+    // Untouched: still the starter, with no search block and so no knob.
+    expect(screen.queryByRole("slider", { name: /Móc kéo/ })).toBeNull();
+    expect(screen.getByRole("switch", { name: /Vòm Sao/ })).toHaveProperty("checked", false);
+    expect(screen.getByText(/không còn vẽ được trên bàn thợ/)).toBeDefined();
+  });
+
+  it("offers nothing to go back to when no remembered run earned a star", () => {
+    seed('{"schema":1,"nodes":[],"edges":[]}', 0);
+    page();
+    expect(screen.queryByRole("button", { name: /Quay về bản đạt/ })).toBeNull();
   });
 });

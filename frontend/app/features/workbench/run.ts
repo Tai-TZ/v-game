@@ -45,6 +45,8 @@ export interface CaseView {
     status: string;
     passed: boolean;
     counted: boolean;
+    /** "daily_cap": the server's quota, not the player's bench, is why this case did not run. */
+    reason?: "daily_cap";
     criteria: Readonly<Record<string, boolean>>;
     labels: readonly string[];
   };
@@ -134,6 +136,7 @@ function apply(run: RunView, event: RunEvent): RunView {
           counted: event.counted,
           criteria: event.criteria,
           labels: event.labels,
+          ...(event.reason === undefined ? {} : { reason: event.reason }),
         },
       }));
     case "run.scored":
@@ -278,6 +281,16 @@ export function outTokenSpread(run: RunView): { low: number; high: number; cases
   if (out.length === 0) return null;
   return { low: Math.min(...out), high: Math.max(...out), cases: out.length };
 }
+
+/**
+ * The server ran out of its daily quota part-way through this run (§3.3). Such a run is still
+ * graded and still shown, but it is not a star attempt: it must not overwrite a stored result,
+ * and it does not belong in the history, whose rows are meant to be comparable.
+ *
+ * A case the player's OWN per-case budget skipped is an ordinary failure and does not count.
+ */
+export const cappedRun = (run: RunView | null): boolean =>
+  run?.cases.some((c) => c.graded?.reason === "daily_cap") ?? false;
 
 const NOT_YOUR_FAULT = new Set(["skipped_budget", "llm_error", "timeout"]);
 /**
