@@ -134,6 +134,14 @@ test.describe("workbench", () => {
     await expect(page.getByRole("heading", { name: "Các lượt trước" })).toBeVisible();
     await expect(page.locator("[data-run-row]")).toHaveCount(1);
 
+    // Duplicating a row loads its configuration and is not itself a run: the strip stays at one.
+    await page.getByRole("button", { name: "Nhân bản cấu hình của lượt 1" }).click();
+    const afterDuplicate = await page.evaluate(() => {
+      const raw = window.localStorage.getItem("vg.history.v1.grounded-citation");
+      return (JSON.parse(raw ?? "null") as { runs?: unknown[] } | null)?.runs?.length ?? 0;
+    });
+    expect(afterDuplicate).toBe(1);
+
     // A figure inside a collapsed <details> ("Xem vết chạy") is in the DOM but not visible, and
     // the gate is about what every figure carries, not about which disclosure happens to be
     // open. Open them all first, as the a11y suite does.

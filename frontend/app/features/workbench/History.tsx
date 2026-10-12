@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, CircleDashIcon, CrossIcon } from "~/components/ui/icons";
 
 import { HISTORY_VI } from "./copy";
@@ -36,7 +37,14 @@ function Cells({ row }: { row: HistoryRow }) {
  * that needs a readable alternative. Giving one here would swap a table for the same table --
  * a control that does nothing, which is worse than no control.
  */
-export function History({ runs }: { runs: readonly RunMark[] }): ReactElement | null {
+export function History({
+  runs,
+  onDuplicate,
+}: {
+  runs: readonly RunMark[];
+  /** Puts that row's configuration back on the bench. Absent when nothing can receive one. */
+  onDuplicate?: (mark: RunMark) => void;
+}): ReactElement | null {
   const { columns, rows } = historyMatrix(runs);
   if (rows.length === 0) return null;
 
@@ -53,17 +61,43 @@ export function History({ runs }: { runs: readonly RunMark[] }): ReactElement | 
               {HISTORY_VI.case(n)}
             </th>
           ))}
+          {onDuplicate && (
+            <th scope="col" className="px-2 py-1 text-left font-semibold">
+              {HISTORY_VI.actionColumn}
+            </th>
+          )}
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
-          <tr key={row.at} data-run-row className="border-t border-line">
-            <th scope="row" className="px-2 py-1 text-left font-semibold whitespace-nowrap">
-              {HISTORY_VI.stars(row.stars)}
-            </th>
-            <Cells row={row} />
-          </tr>
-        ))}
+        {rows.map((row, index) => {
+          // The matrix keeps the store's order, so the row and its mark share an index.
+          const mark = runs[index];
+          return (
+            <tr key={row.at} data-run-row className="border-t border-line">
+              <th scope="row" className="px-2 py-1 text-left font-semibold whitespace-nowrap">
+                {HISTORY_VI.stars(row.stars)}
+              </th>
+              <Cells row={row} />
+              {onDuplicate && mark && (
+                <td className="px-2 py-1">
+                  <button
+                    type="button"
+                    data-duplicate=""
+                    // Three rows would otherwise be three buttons with one name; the number
+                    // counts from the newest, the order the table reads.
+                    aria-label={HISTORY_VI.duplicateRow(index + 1)}
+                    onClick={() => {
+                      onDuplicate(mark);
+                    }}
+                    className={buttonClass("inline")}
+                  >
+                    {HISTORY_VI.duplicate}
+                  </button>
+                </td>
+              )}
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );

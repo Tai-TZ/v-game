@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -50,6 +50,7 @@ function show(
         backTo="/play/library"
         slip={null}
         history={history}
+        onDuplicate={() => undefined}
         onEdit={() => undefined}
         onFocusSlot={() => undefined}
       />
@@ -425,5 +426,41 @@ describe("the regression strip on the results screen", () => {
   it("shows no strip before the level has a run behind it", () => {
     show(finishedRun({ "lib-l1-v01": trap }));
     expect(document.querySelectorAll("[data-run-row]")).toHaveLength(0);
+  });
+});
+
+describe("duplicating a row of the strip", () => {
+  const runs: RunMark[] = [9, 6, 3].map((topK, i) => ({
+    body: `{"top_k":${topK}}`,
+    at: 3 - i,
+    stars: 1,
+    tokens: 10,
+    budget: 20,
+    cases: [{ n: 1, role: "visible" as const, passed: true }],
+  }));
+
+  it("hands the page the mark of the row that was pressed", () => {
+    // The other half of the chain -- that a mark's values reach the drawn control -- is pinned
+    // by WorkbenchPage's "back to the last passing run" test, which asserts the slider.
+    const picked: number[] = [];
+    render(
+      <MemoryRouter>
+        <Results
+          env={l1}
+          run={finishedRun({ "lib-l1-v01": trap })}
+          changed={false}
+          runGraph={dense}
+          graph={dense}
+          backTo="/play/library"
+          slip={null}
+          history={runs}
+          onDuplicate={(mark) => picked.push(mark.at)}
+          onEdit={() => undefined}
+          onFocusSlot={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Nhân bản cấu hình của lượt 2" }));
+    expect(picked).toEqual([2]);
   });
 });

@@ -80,6 +80,7 @@ function show(run: RunView, slip: Slip | null) {
         backTo="/play/library"
         slip={slip}
         history={[]}
+        onDuplicate={() => undefined}
         onEdit={() => undefined}
         onFocusSlot={() => undefined}
       />

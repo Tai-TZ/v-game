@@ -176,6 +176,10 @@ export const HISTORY_VI = {
   case: (n: number) => `Câu #${n}`,
   stars: (n: number) => `${n}/3 sao`,
   starsColumn: "Sao",
+  /** Per row. The number counts from the newest, which is the order the table reads. */
+  duplicate: "Nhân bản cấu hình",
+  duplicateRow: (n: number) => `Nhân bản cấu hình của lượt ${n}`,
+  actionColumn: "Cấu hình",
 } as const;
 
 export const DROPPED_VI = {

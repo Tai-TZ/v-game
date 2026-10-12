@@ -56,6 +56,8 @@ interface ResultsProps {
   slip: Slip | null;
   /** This level's last scored runs, newest first, for the regression strip (N3). */
   history: readonly RunMark[];
+  /** Puts a remembered configuration back on the bench, from a row of the strip. */
+  onDuplicate: (mark: RunMark) => void;
   onEdit: () => void;
   onFocusSlot: (type: BlockType, param?: string) => void;
 }
@@ -78,6 +80,7 @@ export function Results({
   backTo,
   slip,
   history,
+  onDuplicate,
   onEdit,
   onFocusSlot,
 }: ResultsProps) {
@@ -308,7 +311,7 @@ export function Results({
       </div>
 
       <h3 className="mt-8 text-lg font-bold">{HISTORY_VI.heading}</h3>
-      <History runs={history} />
+      <History runs={history} onDuplicate={onDuplicate} />
 
       {run.models && Object.keys(run.models).length > 0 && (
         <p className="mt-6 text-sm text-fg-muted">

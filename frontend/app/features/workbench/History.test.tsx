@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { History } from "./History";
@@ -139,5 +139,40 @@ describe("History", () => {
     viewport(false);
     const { container } = render(<History runs={[mark(1, 1, [[1, true]])]} />);
     expect(container.querySelectorAll("[aria-live]")).toHaveLength(0);
+  });
+});
+
+describe("duplicating a remembered configuration", () => {
+  const three = [
+    { ...mark(3, 0, [[1, false]]), body: '{"top_k":9}' },
+    { ...mark(2, 1, [[1, true]]), body: '{"top_k":6}' },
+    { ...mark(1, 2, [[1, true]]), body: '{"top_k":3}' },
+  ];
+
+  it("hands over the configuration of the row that was pressed, not the newest", () => {
+    viewport(false);
+    const picked: string[] = [];
+    render(<History runs={three} onDuplicate={(m) => picked.push(m.body)} />);
+    // Rows are newest first, so row 2 is the middle mark. An off-by-one lands on 9 or 3.
+    fireEvent.click(screen.getByRole("button", { name: "Nhân bản cấu hình của lượt 2" }));
+    expect(picked).toEqual(['{"top_k":6}']);
+  });
+
+  it("gives each row its own name, so three buttons are not one name three times", () => {
+    viewport(false);
+    render(<History runs={three} onDuplicate={() => undefined} />);
+    expect(
+      [...document.querySelectorAll("[data-duplicate]")].map((b) => b.getAttribute("aria-label")),
+    ).toEqual([
+      "Nhân bản cấu hình của lượt 1",
+      "Nhân bản cấu hình của lượt 2",
+      "Nhân bản cấu hình của lượt 3",
+    ]);
+  });
+
+  it("offers nothing to press when the page has nowhere to put a configuration", () => {
+    viewport(false);
+    render(<History runs={three} />);
+    expect(document.querySelectorAll("[data-duplicate]")).toHaveLength(0);
   });
 });

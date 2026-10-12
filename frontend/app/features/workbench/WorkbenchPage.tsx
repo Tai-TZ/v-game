@@ -609,6 +609,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           backTo={back}
           slip={ranSlip?.runId === run.runId ? ranSlip.slip : null}
           history={history}
+          onDuplicate={benchFrom}
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}
         />
