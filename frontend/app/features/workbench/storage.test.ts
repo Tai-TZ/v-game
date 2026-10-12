@@ -8,6 +8,7 @@ import {
   loadHistory,
   loadSaved,
   loadSlip,
+  recordExtras,
   recordRun,
   save,
   saveSlip,
@@ -165,5 +166,53 @@ describe("run history (N3)", () => {
     });
     expect(() => recordRun("grounded-citation", mark(3, "{a}"))).not.toThrow();
     expect(full).toHaveBeenCalled();
+  });
+});
+
+describe("the debrief picks (N20): why and next, patched onto the latest mark", () => {
+  const base: RunMark = {
+    body: "{a}",
+    at: 1,
+    stars: 1,
+    tokens: 10,
+    budget: 20,
+    cases: [{ n: 1, role: "visible", passed: true }],
+  };
+
+  it("adds the picks to the mark just written, without touching its other fields", () => {
+    recordRun("grounded-citation", base);
+    recordExtras("grounded-citation", {
+      why: 2,
+      next: { type: "vector_search", param: "top_k", direction: "down" },
+    });
+    const [mark] = loadHistory("grounded-citation");
+    expect(mark).toEqual({
+      ...base,
+      why: 2,
+      next: { type: "vector_search", param: "top_k", direction: "down" },
+    });
+  });
+
+  it("merges rather than overwrites: picking one line does not erase the other", () => {
+    recordRun("grounded-citation", base);
+    recordExtras("grounded-citation", { why: 0 });
+    recordExtras("grounded-citation", { next: { type: "rerank", direction: "on" } });
+    expect(loadHistory("grounded-citation")[0]).toMatchObject({
+      why: 0,
+      next: { type: "rerank", direction: "on" },
+    });
+  });
+
+  it("does nothing when there is no run to attach the picks to", () => {
+    expect(() => recordExtras("grounded-citation", { why: 1 })).not.toThrow();
+    expect(loadHistory("grounded-citation")).toEqual([]);
+  });
+
+  it("reads as a plain mark, minus the picks, on a version that predates them", () => {
+    window.localStorage.setItem(
+      "vg.history.v1.grounded-citation",
+      JSON.stringify({ runs: [base] }),
+    );
+    expect(loadHistory("grounded-citation")).toEqual([base]);
   });
 });

@@ -86,6 +86,14 @@ const historyKey = (levelId: string) => `vg.history.v1.${levelId}`;
 /** Five is what the level's history shows; a sixth costs storage and teaches nothing more. */
 const KEEP = 5;
 
+/** One option of the debrief's line 4, "Lần tới đổi đúng một thứ" -- an enum, never free text. */
+const NextPickSchema = v.object({
+  type: v.string(),
+  param: v.optional(v.string()),
+  slot: v.optional(v.picklist([0, 1, 2])),
+  direction: v.picklist(["on", "off", "up", "down", "add", "remove"]),
+});
+
 const MarkSchema = v.object({
   /** The graph that ran, byte-exact, so a configuration can be put back or duplicated. */
   body: v.string(),
@@ -102,6 +110,13 @@ const MarkSchema = v.object({
       passed: v.boolean(),
     }),
   ),
+  /**
+   * The debrief's line 3 and line 4 picks (N20), optional so a mark from before they existed
+   * still reads: `why` is the stable index into that case's menu (never the rotated display
+   * position); `next` is one enum option the player chose for their next attempt.
+   */
+  why: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
+  next: v.optional(NextPickSchema),
 });
 const HistorySchema = v.object({ runs: v.array(MarkSchema) });
 
@@ -131,5 +146,25 @@ export function recordRun(levelId: string, mark: RunMark): void {
     window.localStorage.setItem(historyKey(levelId), JSON.stringify({ runs }));
   } catch {
     // Blocked or full storage: this run simply is not remembered.
+  }
+}
+
+/**
+ * Adds the debrief's picks to the run just recorded (N20). The player makes these choices on
+ * the results screen AFTER the run itself was written, so this patches `runs[0]` in place
+ * rather than appending a new entry -- merging field by field, so picking line 3 does not erase
+ * a line-4 pick made first. Silently does nothing without a run to attach to.
+ */
+export function recordExtras(
+  levelId: string,
+  extras: { why?: number; next?: RunMark["next"] },
+): void {
+  try {
+    const [latest, ...rest] = loadHistory(levelId);
+    if (latest === undefined) return;
+    const runs = [{ ...latest, ...extras }, ...rest];
+    window.localStorage.setItem(historyKey(levelId), JSON.stringify({ runs }));
+  } catch {
+    // Blocked or full storage: this run keeps playing without the picks remembered.
   }
 }
