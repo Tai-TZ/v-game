@@ -174,7 +174,9 @@ export const HISTORY_VI = {
   heading: "Các lượt trước",
   cell: { pass: "Đạt", fail: "Trượt", skip: "Không chạy" },
   case: (n: number) => `Câu #${n}`,
-  stars: (n: number) => `${n}/3 sao`,
+  /** The numeral only: the column header says "Sao", and "3/3 sao" in a cell would read word
+   *  for word like the screen's own score headline, which means something else. */
+  stars: (n: number) => `${n}/3`,
   starsColumn: "Sao",
   /** Identifies the row. Counting from the newest, the order the table reads -- and not the
    *  star count, which would read exactly like the screen's own "3/3 sao" headline. */

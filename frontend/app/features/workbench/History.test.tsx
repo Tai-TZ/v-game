@@ -128,7 +128,9 @@ describe("History", () => {
     expect(heads).toEqual(["Lượt", "Sao", "Câu #1", "Câu #2"]);
     // The row header identifies the row; "1/3 sao" alone would read like the screen's headline.
     expect(document.querySelector("tbody th")?.textContent).toBe("Lượt 1");
-    expect(document.querySelector("tbody td")?.textContent).toBe("1/3 sao");
+    // The numeral only: "1/3 sao" would collide with the results headline's own wording.
+    expect(document.querySelector("tbody td")?.textContent).toBe("1/3");
+    expect(document.body.textContent).not.toContain("1/3 sao");
   });
 
   it("says nothing at all before there is a run behind it", () => {
