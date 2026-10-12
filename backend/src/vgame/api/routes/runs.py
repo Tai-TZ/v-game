@@ -30,6 +30,8 @@ from vgame.engine.types import (
     EngineEvent,
     LLMNotConfiguredError,
     RunFailedEvent,
+    RunFinishedEvent,
+    RunReport,
     RunScope,
 )
 from vgame.engine.validator import validate
@@ -137,14 +139,16 @@ async def create_run(
         return _error(status.HTTP_429_TOO_MANY_REQUESTS, exc.message_vi, retry)
     if is_new:
         evaluator = LevelEvaluator(spec, spec_level.rules, engine.store)
+        cases = public_cases(spec)
+        secret = frozenset(c.id for c in cases if c.role != "visible")
         task = asyncio.create_task(
             run_level(
                 run_id,
                 compiled,
-                public_cases(spec),
+                cases,
                 deps,
                 evaluator,
-                partial(_emit, engine, run_id),
+                partial(_emit, engine, run_id, secret),
                 scope,
             )
         )
@@ -156,8 +160,27 @@ async def create_run(
     )
 
 
-def _emit(engine: EngineServices, run_id: str, event: EngineEvent) -> None:
-    engine.runs.append(run_id, event)
+def _emit(engine: EngineServices, run_id: str, secret: frozenset[str], event: EngineEvent) -> None:
+    """The client boundary, and the one place the replayed log is written. The engine keeps the
+    full report on purpose -- the recorder and the level e2e tests read its hidden-case flags --
+    so redaction belongs here rather than in run_level."""
+    engine.runs.append(run_id, _without_secret_gold(event, secret) if secret else event)
+
+
+def _without_secret_gold(event: EngineEvent, secret: frozenset[str]) -> EngineEvent:
+    """§3.7 reveals gold for the sample cases only. A hidden case's rank table is a retrieval
+    scoreboard the player would tune top_k against instead of reasoning about the secret set, and
+    a diagnosis template interpolates that case's own gold Điều. Run-level diagnosis (case None)
+    is about the bench, not a case, so it stays."""
+    if event["type"] != "run.finished":
+        return event
+    report = event["report"]
+    kept: RunReport = {
+        "gold": {k: v for k, v in report["gold"].items() if k not in secret},
+        "diagnosis": [d for d in report["diagnosis"] if d["case"] not in secret],
+    }
+    shown: RunFinishedEvent = {**event, "report": kept}
+    return shown
 
 
 def _finish(engine: EngineServices, run_id: str, task: asyncio.Task[None]) -> None:
