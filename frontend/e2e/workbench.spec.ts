@@ -167,9 +167,14 @@ test.describe("workbench", () => {
       expect(STAMPS.filter((stamp) => text.includes(stamp))).toHaveLength(1);
       // The toggle is for a picture that needs a readable alternative (§8.2). A figure that is
       // already a table has nothing to swap to, and a button that did nothing would be worse.
+      // Read the kind off the element: below 640 px every figure of the other kind is SHOWING
+      // a table, so looking for one in the DOM cannot tell them apart.
       const toggle = figure.getByRole("button", { name: /^Xem dạng (bảng|hình)$/ });
-      if ((await figure.locator("table").count()) > 0) await expect(toggle).toHaveCount(0);
-      else await expect(toggle).toBeVisible();
+      if ((await figure.getAttribute("data-vg-viz")) === "table") {
+        await expect(toggle).toHaveCount(0);
+      } else {
+        await expect(toggle).toBeVisible();
+      }
     }
 
     await page.getByRole("button", { name: "Chỉnh rồi chạy lại" }).click();

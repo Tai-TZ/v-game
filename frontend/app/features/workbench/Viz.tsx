@@ -42,7 +42,14 @@ export function Viz({
   const asTable = table !== undefined && showing === "table";
 
   return (
-    <figure data-vg-viz className="mt-3">
+    <figure
+      // "table": the content is already a table and has no other form to offer, so no toggle.
+      // "both": a picture with a table alternative behind the toggle. Stated, not inferred --
+      // below 640 px every figure of the second kind is SHOWING a table, which is not the same
+      // thing as being one.
+      data-vg-viz={table === undefined ? "table" : "both"}
+      className="mt-3"
+    >
       {/* A region that scrolls has to be reachable by keyboard, or a keyboard-only player
           cannot scroll it (axe scrollable-region-focusable). Unlike a chip, the tab stop here
           does something: it scrolls. The <figcaption> below names it. */}

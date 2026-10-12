@@ -43,6 +43,8 @@ describe("Viz", () => {
     const { container } = draw();
     const figure = container.querySelector("figure[data-vg-viz]");
     expect(figure).not.toBeNull();
+    // A picture with a table behind the toggle.
+    expect(figure?.getAttribute("data-vg-viz")).toBe("both");
     expect(figure?.querySelector("figcaption")?.textContent).toContain(
       "Thùng còn chỗ: 420 trên 3.000 token.",
     );
@@ -110,6 +112,8 @@ describe("Viz", () => {
       </Viz>,
     );
     expect(screen.queryByRole("button", { name: /Xem dạng/ })).toBeNull();
+    // Said on the element, so the CI gate does not have to guess from the DOM.
+    expect(document.querySelector("[data-vg-viz]")?.getAttribute("data-vg-viz")).toBe("table");
   });
 });
 
