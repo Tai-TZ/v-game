@@ -777,3 +777,31 @@ Thứ tự lựa chọn trong menu xoay theo `turn` do chỗ gọi truyền: s�
 - `WHY_MENU` là chữ chép từ L1 §11, nên thuộc diện §13.4 (chữ chép có thể lệch khi kịch bản đổi).
 - Lượt chạy mất kết nối rồi bấm "Chạy lại" thì phiếu của lượt đó mất, không có cảnh báo.
 
+---
+
+## 20. Lớp đồ chơi trong khe (2026-10-11)
+
+Chủ dự án xem bản chạy và nói bàn thợ "nhìn không phải game mà là một bài học bình thường": mười món đồ vật được gọi tên nhưng vẽ thành `<select>` và `<input type=range>`. Đợt này thay bảy khe bằng hình, mỗi hình chỉ vẽ thứ lượt chạy đã đo. Thiết kế gốc ở [vom-sao-v0.1](vom-sao-v0.1.md); đây là mặt bàn thợ của nó.
+
+| Khe | Hình | Nguồn dữ liệu |
+|---|---|---|
+| Vòm Sao, Tủ ngăn kéo, Phễu, Kính lúp | `StarDome`: sao theo **hạng**, trải đều; sao vàng là đoạn đáp án; ngoài tầm kéo thì nét đứt kèm hạng thật | fact `retrieved` — cả bốn khối phát qua `_docs_result` |
+| Lược dao | `Blade`: dải kho với nhát cắt; đỏ khi lượt này cắt đứt câu đáp án | `run.started.ingestion` + cờ `ret.boundary_split` |
+| Thùng Context | `ContextBin`: thùng đầy tới vạch ngân sách; nắp không đóng khi tràn | fact `pack` |
+| Bộ Óc | `Stamps`: mỗi câu một ô — gạch nếu trích nguồn có trong thùng, đỏ nếu trích mã thùng không hề có, viền đứt nếu không trích gì | fact `llm` (`answer`, chỉ ca thấy được) + `pack.included` |
+| Chẩn đoán | `RankJourney`: chỗ đứng của đoạn đáp án qua từng khối | `report.gold[case].ranks`, theo thứ tự `nodeIds` |
+
+### 20.1 Ba luật mà mọi món phải theo
+
+1. **Không vẽ con số lượt chạy chưa đo.** Thùng đo tổng token nên các đoạn được **đếm**, không cân. Lược dao biết số đoạn và token trung bình nên khoảng cách nhát cắt theo trung bình, còn số đoạn thì **in ra** chứ không vẽ 115 vạch. Vòm Sao cho vị trí mang hạng sau khi vòng soát chỉ ra rằng mã hoá cosine biến chênh lệch 0,005 thành quạt 70°.
+2. **Ca ẩn và ca bẫy không lộ gì.** Lượt chạy thật gửi `report.gold` cho **mọi** ca (`test_api_runs.py:176`), nên mỗi món tự lọc theo `SlotGold.visible` chứ không tin dữ liệu đã sạch: `StarDome` qua `showGold`, `Blade` qua `split`, bảng truy xuất qua `isGold`, `Stamps` qua chính việc engine chỉ đặt `answer` cho ca thấy được.
+3. **Canvas chỉ ở Vòm Sao.** `check-bundle.mjs` cấm three.js trong chunk bàn thợ và chặn trần 120 kB; các món còn lại là DOM thường, vốn đã tiếp cận được và test được mà không cần 2D context. Cả lớp đồ chơi tốn khoảng 7 kB gzip.
+
+### 20.2 Xem trước
+
+`shouldPreview` bật ở trạng thái `none` và `stale`, tắt ở `active` và `done`. Luật này về **trung thực** chứ không về độ mới: lượt chạy xong đã đo thật, nên xem trước cùng đồ thị chỉ là bản sao yếu hơn; nhưng ngay khi bàn thợ bị sửa, dữ liệu lượt cũ mô tả một cấu hình không còn trên màn hình, và đó mới là bức tranh nói dối. Lời gọi chống dội 250 ms, và mọi thất bại chỉ là không có xem trước — bàn thợ không bao giờ chờ nó.
+
+### 20.3 Lưới a11y tại chỗ
+
+`toys.a11y.test.tsx` chạy `axe-core` trong jsdom trên cả bốn component. Nó có vì bộ a11y của Playwright chỉ chạy trên CI, và hai lần trong một ngày nó là thứ duy nhất bắt được lỗi cấu trúc — lần cuối là `role="img"` đặt lên một `<ul>`, làm mọi `<li>` mất cha hợp lệ. Các luật cấu trúc không cần layout nên jsdom trả lời trong mili giây. Nó **không** thay được Playwright: tương phản màu, vùng chạm 44 px và cuộn ngang vẫn cần layout thật.
+
