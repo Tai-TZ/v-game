@@ -24,6 +24,7 @@ import { previewableCase, shouldPreview } from "./preview";
 import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
 import { lastPassing } from "./history";
 import { Results } from "./Results";
+import { SampleResult } from "./SampleResult";
 import {
   cappedRun,
   frameAction,
@@ -483,6 +484,12 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   useEffect(() => {
     if (scoredRun) focusOn(document.getElementById("wb-results"));
   }, [scoredRun]);
+  // A sample run earns no stars, so it never reaches the line above -- and the run panel that
+  // held focus unmounts the moment it ends. Its own summary takes the focus instead (N2).
+  const sampleRun = run !== null && sampleVerdict(run) !== null ? run.runId : null;
+  useEffect(() => {
+    if (sampleRun) focusOn(document.getElementById("wb-sample"));
+  }, [sampleRun]);
   const failedRun = run?.phase === "failed" ? run.runId : null;
   useEffect(() => {
     if (failedRun) focusOn(document.getElementById("wb-run-failed"));
@@ -681,6 +688,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           />
         </aside>
       </div>
+      {run && <SampleResult run={run} />}
       {run?.score && (
         <Results
           key={run.runId}
