@@ -15,6 +15,7 @@ import {
   useLastSample,
   useRecordedRun,
   useRecordStars,
+  useStaticViz,
   useStarRunAfterSample,
   WorkbenchPage,
 } from "./WorkbenchPage";
@@ -710,6 +711,65 @@ describe("useLastSample (N2)", () => {
     );
     rerender({ run: sample() });
     rerender({ run: null });
+    expect(result.current).toBeNull();
+  });
+});
+
+describe("useStaticViz (N22)", () => {
+  const body = JSON.parse(readText("public", "viz", "chunk-tuning.json")) as unknown;
+  const l2 = testEnv("chunk-tuning");
+
+  function serve(status: number, payload: unknown = body) {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", (url: string) => {
+      urls.push(url);
+      return Promise.resolve(new Response(JSON.stringify(payload), { status }));
+    });
+    return urls;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  // The free preview, so it loads without being asked: by the time the player drags the blade
+  // the strip has to already be able to redraw.
+  it("loads the level's static data off the static file, unprompted", async () => {
+    const urls = serve(200);
+    const { result } = renderHook(() => useStaticViz(l2.level));
+    await act(() => Promise.resolve());
+    expect(urls).toEqual(["/viz/chunk-tuning.json"]);
+    expect(result.current?.ranks["theo_dieu-512-10"]).toBeDefined();
+  });
+
+  it("leaves the level playable when the data is missing", async () => {
+    serve(404, null);
+    const { result } = renderHook(() => useStaticViz(l2.level));
+    await act(() => Promise.resolve());
+    expect(result.current).toBeNull();
+  });
+
+  it("refuses another level's data rather than drawing it", async () => {
+    serve(200, JSON.parse(readText("public", "viz", "grounded-citation.json")));
+    const { result } = renderHook(() => useStaticViz(l2.level));
+    await act(() => Promise.resolve());
+    expect(result.current).toBeNull();
+  });
+
+  // A file missing one of its four parts would be handed on and then throw on first access,
+  // because `data.strips[variant]` reads a property of undefined.
+  it("refuses a file that is missing one of its parts", async () => {
+    const rest = Object.fromEntries(
+      Object.entries(body as Record<string, unknown>).filter(([key]) => key !== "strips"),
+    );
+    serve(200, rest);
+    const { result } = renderHook(() => useStaticViz(l2.level));
+    await act(() => Promise.resolve());
+    expect(result.current).toBeNull();
+  });
+
+  it("refuses data recorded before this version of the level", async () => {
+    serve(200);
+    const { result } = renderHook(() => useStaticViz({ ...l2.level, version: 2 }));
+    await act(() => Promise.resolve());
     expect(result.current).toBeNull();
   });
 });

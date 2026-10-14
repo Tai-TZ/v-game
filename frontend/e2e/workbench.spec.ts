@@ -1037,3 +1037,78 @@ test.describe("the cheap try (B5)", () => {
     await expect(page.getByText("Câu #7/10")).toBeVisible();
   });
 });
+
+test.describe("the blade's own strip (B6 N22)", () => {
+  const L2 = "/play/library/chunk-tuning";
+
+  /** The strip figure for one article. By role, so the figcaption and the table's own sr-only
+   *  caption -- identical words, both in the DOM on a narrow screen -- cannot both match. */
+  const strip = (page: Page, dieu: number) =>
+    page.getByRole("figure").filter({ hasText: `Dải đoạn Điều ${dieu}` });
+
+  /** The figure showing its table, whichever form it opened in. */
+  const asTable = async (figure: ReturnType<typeof strip>) => {
+    const toTable = figure.getByRole("button", { name: "Xem dạng bảng" });
+    if (await toTable.isVisible()) await toTable.click();
+    return figure.getByRole("table");
+  };
+
+  // Free, and before any run: the strip answers "what did I just do to this article" while the
+  // knob is still under the hand. It reads the static data N21 ships, so no API is involved.
+  test("draws the favoured article's real cuts, and follows the blade", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await mockWorkbenchApi(page);
+    await page.goto(L2);
+
+    // The L2 starter is co_dinh/128/0: its search favours Điều 10 of the SUPERSEDED document
+    // ("Bảo lưu kết quả học tập" -- Hà's actual question), which 128-token cuts tear into three
+    // pieces across two sentences. Every fact here is asserted by strip.e2e-facts.test.tsx
+    // against the shipped data, so a content change fails in seconds rather than ten minutes
+    // into the Playwright run.
+    //
+    // Read through the TABLE, not the drawing: below 640 px `Viz` opens these figures as their
+    // table alternative, so on the mobile project the bar and its two caption lines are not in
+    // the DOM at all -- while the table is reachable at every width. `asTable` normalises it.
+    await expect(strip(page, 10)).toBeVisible();
+    // The superseded document, named as such. qcdt-2024 has its own Điều 10, and both cut into
+    // three pieces with two severed sentences -- this line is what tells them apart on screen.
+    await expect(strip(page, 10)).toContainText("văn bản hết hiệu lực");
+    const torn = await asTable(strip(page, 10));
+    await expect(torn).toContainText("«");
+    await expect(torn.getByRole("row")).toHaveCount(4); // head + 3 pieces
+
+    // Nam châm bám Điều cuts on the article boundary: Điều 12 comes back whole.
+    //
+    // The blade's knobs are chip radios: the input itself is `peer sr-only` and its own label
+    // covers it, so `.check()` on the radio times out trying to click a hidden 1px box. The
+    // house pattern (see the slip, above) is to scope to the group and click the visible words.
+    const pick = (group: RegExp, option: string) =>
+      page.getByRole("group", { name: group }).getByText(option, { exact: true }).click();
+    await pick(/Cách chia/, "Bám điều, khoản");
+    await pick(/Cỡ đoạn/, "512 token");
+    await pick(/Chồng lấp/, "10 %");
+    await expect(strip(page, 12)).toBeVisible();
+    // Điều 12 of the document still in force, whole, and no stale warning this time.
+    await expect(strip(page, 12)).not.toContainText("văn bản hết hiệu lực");
+    const whole = await asTable(strip(page, 12));
+    await expect(whole.getByRole("row")).toHaveCount(2); // head + the one piece
+    await expect(whole).not.toContainText("«"); // nothing severed
+    await expect(whole).toContainText("Không");
+
+    // The figure carries its three parts, and the data says where it came from: computed from
+    // the shipped index, never measured from a run the player has not made.
+    await expect(page.getByText("Tính sẵn từ chỉ mục", { exact: false }).first()).toBeVisible();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("keeps the level usable when the static data is not there", async ({ page }) => {
+    await mockWorkbenchApi(page);
+    await page.route("**/viz/*.json", (route) => route.fulfill({ status: 404, body: "" }));
+    await page.goto(L2);
+
+    await expect(page.getByRole("button", { name: "Mở ca" })).toBeVisible();
+    await expect(page.getByRole("figure").filter({ hasText: "Dải đoạn" })).toHaveCount(0);
+  });
+});

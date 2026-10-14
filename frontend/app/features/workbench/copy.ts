@@ -114,6 +114,24 @@ export const SAMPLE_VI = {
   capped: "Quỹ chung của máy chủ hết giữa chừng nên lượt này không tính. Mai 07:00 có lại.",
 } as const;
 
+/** N22: one article as the current index variant really cut it. */
+export const STRIP_VI = {
+  /**
+   * The figure's name, and the only place the document can live: L2's two documents share
+   * Điều 1-16, and a narrow screen renders the table INSTEAD of the picture -- so a warning
+   * put beside the drawing is a warning a phone never shows.
+   */
+  caption: (dieu: number, inForce = true) =>
+    inForce ? `Dải đoạn Điều ${dieu}` : `Dải đoạn Điều ${dieu} (văn bản hết hiệu lực)`,
+  pieces: (dieu: number, n: number) => `Điều ${dieu} được chia thành ${n} đoạn.`,
+  severedCount: (n: number) => `${n} câu bị cắt ngang.`,
+  severedLegend: "Câu bị cắt ngang:",
+  clean: "Không",
+  piece: (n: number) => `Đoạn ${n}`,
+  stale: "Đây là văn bản hết hiệu lực, không phải bản đang áp dụng.",
+  columns: { piece: "Đoạn", chars: "Số ký tự", severed: "Cắt ngang câu" },
+} as const;
+
 /** N4: the run that already happened. Free, and the first thing the level shows. */
 export const RECORDED_VI = {
   open: "Xem lượt đã ghi",
