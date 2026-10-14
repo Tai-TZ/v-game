@@ -960,9 +960,13 @@ test.describe("the cheap try (B5)", () => {
     await page.getByRole("switch", { name: "Gắn Vòm Sao" }).check();
     await page.getByRole("button", { name: "Mở ca" }).click();
 
-    // Step one is the sample run: three cases, named as such, and no stars on offer.
-    await expect(page.getByText("Bước 1: Thử 3 câu mẫu")).toBeVisible();
-    await expect(page.getByText("không tính sao", { exact: false })).toBeVisible();
+    // Step one is the sample run. Assert on its summary, not on the running panel: a mocked
+    // stream arrives whole, so the panel naming the step is on screen for about one frame.
+    // exact:false -- the count and "không tính sao" share one paragraph, so an exact match
+    // against either half finds nothing.
+    await expect(page.getByRole("heading", { name: "Kết quả lượt mẫu" })).toBeVisible();
+    await expect(page.getByText("3/3 câu mẫu đạt.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Lượt mẫu không tính sao.", { exact: false })).toBeVisible();
 
     // Step two starts itself once all three samples pass, and the server must see the same
     // graph both times -- that identity is what makes the second step cost 7 calls, not 10.
@@ -970,7 +974,10 @@ test.describe("the cheap try (B5)", () => {
     expect(mock.posts.map((p) => p.scope)).toEqual(["mau", null]);
     expect(mock.posts[1]?.body).toBe(mock.posts[0]?.body);
     expect(mock.posts[1]?.key).not.toBe(mock.posts[0]?.key);
-    await expect(page.getByText("1/3 sao", { exact: true })).toBeVisible();
+    // From the log, not from memory: the reference run is the one the fixture captured.
+    await expect(
+      page.getByText(`${referenceFacts().score.stars}/3 sao`, { exact: true }),
+    ).toBeVisible();
     expect(consoleErrors).toEqual([]);
   });
 
@@ -981,11 +988,18 @@ test.describe("the cheap try (B5)", () => {
 
     await page.goto("/play/library/grounded-citation");
     await page.getByRole("button", { name: "Mở ca" }).click();
-    await expect(page.getByText("3/3 câu đã chấm")).toBeVisible();
+
+    // The summary says what the gate wants, and the keyboard lands on it rather than on body.
+    const summary = page.getByRole("heading", { name: "Kết quả lượt mẫu" });
+    await expect(summary).toBeFocused();
+    await expect(page.getByText("0/3 câu mẫu đạt.", { exact: false })).toBeVisible();
+    await expect(
+      page.getByText("Run chấm sao chỉ mở khi cả 3 câu mẫu đạt.", { exact: false }),
+    ).toBeVisible();
 
     // One POST, for the samples. The expensive step is the thing the gate exists to withhold.
     expect(mock.posts.map((p) => p.scope)).toEqual(["mau"]);
-    await expect(page.getByText("sao", { exact: true })).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeHidden();
   });
 
   // What covers the minute a sleeping Render takes to wake (X9): with the API answering
