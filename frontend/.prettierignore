@@ -9,4 +9,6 @@ package-lock.json
 public/models/*.json
 # Recorded static runs: canonical minified output of `uv run vgame-export-recorded-runs`
 public/runs/*.json
+# Static visualisation data: canonical minified output of `uv run vgame-export-static-viz`
+public/viz/*.json
 .vercel/
