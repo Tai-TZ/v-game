@@ -89,6 +89,11 @@ def viz_level(level_id: str, store: IndexStore, content_dir: Path) -> dict[str, 
             doc_id: [[a.dieu, a.start, a.end] for a in docs[doc_id].articles]
             for doc_id in level.corpus
         },
+        # Article numbers collide across documents -- L2 ships qcdt-2024 (Điều 1-84) and
+        # qcdt-2019 (Điều 1-16), so "Điều 10" names two different articles. A reader of this
+        # file must address an article by (doc_id, dieu), and the strip has to be able to say
+        # when the one it drew is the superseded document: that is L2's own trap (stale_doc).
+        "in_force": {doc_id: docs[doc_id].in_force for doc_id in level.corpus},
         "strips": strips,
         "ranks": ranks,
     }
