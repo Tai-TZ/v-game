@@ -9,6 +9,8 @@ export interface VizData {
   corpus: Readonly<Record<string, string>>;
   /** Per document: `[dieu, start, end]`, in order. */
   articles: Readonly<Record<string, readonly [number, number, number][]>>;
+  /** Per document: whether it is still in force. L2 ships one of each. */
+  in_force: Readonly<Record<string, boolean>>;
   /** Per variant key: `[doc_id, dieu, khoan, start, end, tokens, hieu_luc]`. */
   strips: Readonly<
     Record<string, readonly [string, number, number[], number, number, number, boolean][]>
@@ -18,45 +20,57 @@ export interface VizData {
   >;
 }
 
-export interface StripChunk {
-  start: number;
-  end: number;
-  tokens: number;
+/** Which article, in which document. Article numbers repeat across documents. */
+export interface ArticleRef {
+  docId: string;
+  dieu: number;
 }
 
-export interface ArticleStrip {
+export interface ArticleStrip extends ArticleRef {
   /** Offsets are into the document, so a chunk's own offsets can be used unchanged. */
   start: number;
   end: number;
   text: string;
-  chunks: readonly StripChunk[];
+  /** False when this is the superseded document -- L2's own trap, so the strip must say it. */
+  inForce: boolean;
+  /**
+   * Document offsets where a chunk ends strictly inside the article: the cuts the blade made
+   * THROUGH it, in reading order, deduplicated.
+   *
+   * Not "every chunk that overlaps the article": with overlap on, a second chunk can lap an
+   * article's tail without cutting it, and counting those claimed "2 đoạn" for an article the
+   * blade left whole. Pieces = cuts.length + 1.
+   */
+  cuts: readonly number[];
 }
 
-/**
- * Every chunk of `variant` that overlaps article `dieu`.
- *
- * Overlap, not the chunk's own `dieu`: that field records the article holding the chunk's
- * FIRST token, so a fixed-size cut running from Điều 11 into Điều 12 is filed under 11 and
- * would vanish from Điều 12's strip -- hiding the exact thing L2 teaches.
- */
-export function articleStrip(data: VizData, variant: string, dieu: number): ArticleStrip | null {
-  const cuts = data.strips[variant];
-  if (cuts === undefined) return null;
-  for (const [docId, articles] of Object.entries(data.articles)) {
-    const found = articles.find((a) => a[0] === dieu);
-    const text = data.corpus[docId];
-    if (found === undefined || text === undefined) continue;
-    const [, start, end] = found;
-    return {
-      start,
-      end,
-      text: text.slice(start, end),
-      chunks: cuts
-        .filter((c) => c[0] === docId && c[3] < end && start < c[4])
-        .map((c) => ({ start: c[3], end: c[4], tokens: c[5] })),
-    };
-  }
-  return null;
+export function articleStrip(
+  data: VizData,
+  variant: string,
+  docId: string,
+  dieu: number,
+): ArticleStrip | null {
+  const cutList = data.strips[variant];
+  const articles = data.articles[docId];
+  const text = data.corpus[docId];
+  if (cutList === undefined || articles === undefined || text === undefined) return null;
+  const found = articles.find((a) => a[0] === dieu);
+  if (found === undefined) return null;
+  const [, start, end] = found;
+  // Strictly inside: a chunk ending exactly at the article's edge is where the article stops,
+  // not a cut through it.
+  const inside = cutList
+    .filter((c) => c[0] === docId && start < c[4] && c[4] < end)
+    .map((c) => c[4]);
+  return {
+    docId,
+    dieu,
+    start,
+    end,
+    text: text.slice(start, end),
+    inForce: data.in_force[docId] ?? true,
+    cuts: [...new Set(inside)].sort((a, b) => a - b),
+  };
 }
 
 /** Sentence enders, plus the newline: a clause break is a boundary, not a severed sentence. */
@@ -112,12 +126,15 @@ export function variantKey(params: Readonly<Record<string, unknown>>): string | 
  * moves when the blade moves -- at `theo_dieu-512-10` Hà's question lands in Điều 12, at
  * `co_dinh-512-0` in Điều 11, the cut that swallowed Điều 12 whole.
  */
-export function focusArticle(data: VizData, variant: string, caseId: string): number | null {
+export function focusArticle(data: VizData, variant: string, caseId: string): ArticleRef | null {
   const top = data.ranks[variant]?.[caseId]?.[0];
   if (top === undefined) return null;
   const [docId, start] = top;
   const found = data.articles[docId]?.find((a) => a[1] <= start && start < a[2]);
-  return found?.[0] ?? null;
+  // The document travels with the number: on L2 "Điều 10" is both qcdt-2019's "Bảo lưu kết quả
+  // học tập" and qcdt-2024's "Khối lượng học tập trong học kỳ", and dropping the document drew
+  // the wrong one -- the in-force text standing in for the superseded one the search favoured.
+  return found === undefined ? null : { docId, dieu: found[0] };
 }
 
 export const vizUrl = (levelId: string) => `/viz/${encodeURIComponent(levelId)}.json`;
@@ -132,8 +149,10 @@ export function parseViz(levelId: string, levelVersion: number, raw: unknown): V
   if (file.format !== 1 || file.level !== levelId || file.level_version !== levelVersion) {
     return null;
   }
-  const { corpus, articles, strips, ranks } = file;
-  const objects = [corpus, articles, strips, ranks];
-  if (objects.some((part) => typeof part !== "object" || part === null)) return null;
-  return { corpus, articles, strips, ranks } as VizData;
+  const { corpus, articles, in_force: inForce, strips, ranks } = file;
+  const parts = [corpus, articles, inForce, strips, ranks];
+  // A file missing one part would be handed on and then throw on first access, because
+  // `data.strips[variant]` reads a property of undefined.
+  if (parts.some((part) => typeof part !== "object" || part === null)) return null;
+  return { corpus, articles, in_force: inForce, strips, ranks } as VizData;
 }
