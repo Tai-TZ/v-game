@@ -13,6 +13,7 @@ import {
   fmt,
   LEVEL_COPY,
   outcomeText,
+  RECORDED_VI,
   ROLE_VI,
   sameGraphNote,
   STEP_VI,
@@ -68,6 +69,10 @@ interface RunPanelProps {
   onAbandon: () => void;
   onEdit: () => void;
   onFollow: (caseId: string) => void;
+  /** N4: play the level's recorded run. Free, and it needs no awake API. */
+  onRecorded: () => void;
+  /** The recording could not be shown; the level still plays without it. */
+  recordedFailed: boolean;
 }
 
 export function RunPanel(props: RunPanelProps) {
@@ -128,6 +133,8 @@ function Editing({
   onFocusSlot,
   onRerun,
   onEdit,
+  onRecorded,
+  recordedFailed,
 }: RunPanelProps) {
   const {
     open: restoring,
@@ -283,6 +290,24 @@ function Editing({
       >
         {sending ? "Đang gửi cấu hình…" : "Mở ca"}
       </button>
+
+      {/* Only before the player's own first run: after that the bench has something truer to
+          show than the starter's log, and a second "watch a run" button competes with it. */}
+      {run === null && (
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={onRecorded}
+            disabled={sending}
+            className={buttonClass("inline", "w-full")}
+          >
+            {RECORDED_VI.open}
+          </button>
+          <p className="text-sm text-fg-muted">
+            {recordedFailed ? RECORDED_VI.failed : RECORDED_VI.note}
+          </p>
+        </div>
+      )}
 
       {notes.length > 0 && (
         <ul className="space-y-1 text-sm text-fg-muted">

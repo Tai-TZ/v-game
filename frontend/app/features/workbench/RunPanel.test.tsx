@@ -16,11 +16,15 @@ function Panel({
   env = l1,
   backToPassing = null,
   run = null,
+  onRecorded = nothing,
+  recordedFailed = false,
 }: {
   request: RequestState;
   env?: Env;
   backToPassing?: (() => void) | null;
   run?: RunView | null;
+  onRecorded?: () => void;
+  recordedFailed?: boolean;
 }) {
   const start = starterBench(env);
   if (!start) throw new Error(`${env.level.id} starter is not drawable`);
@@ -53,6 +57,8 @@ function Panel({
         onAbandon={nothing}
         onEdit={nothing}
         onFollow={nothing}
+        onRecorded={onRecorded}
+        recordedFailed={recordedFailed}
       />
     </MemoryRouter>
   );
@@ -143,5 +149,40 @@ describe("the two steps of one Mở ca are named on screen (N2)", () => {
   it("says nothing of the sort on the star run, which is the one that counts", () => {
     render(<Panel request={{ state: "idle" }} run={running()} />);
     expect(screen.queryByText(/Thử 3 câu mẫu/)).toBeNull();
+  });
+});
+
+describe("the recorded run is free and on offer (N4)", () => {
+  it("offers to play the level's recorded run before anything has been run", () => {
+    const show = vi.fn();
+    render(<Panel request={{ state: "idle" }} onRecorded={show} />);
+    fireEvent.click(screen.getByRole("button", { name: "Xem lượt đã ghi" }));
+    expect(show).toHaveBeenCalledOnce();
+  });
+
+  // It is the thing that covers a sleeping Render, so it must read as free next to Mở ca.
+  it("says the recorded run costs no AI call", () => {
+    render(<Panel request={{ state: "idle" }} />);
+    expect(screen.getByText(/0 lời gọi AI/)).toBeDefined();
+  });
+
+  it("says so plainly when the recording is not there, instead of a dead button", () => {
+    render(<Panel request={{ state: "idle" }} recordedFailed />);
+    expect(screen.getByText(/Chưa xem được lượt đã ghi/)).toBeDefined();
+  });
+
+  it("keeps the recording out of the way once a run of the player's own is on screen", () => {
+    const run = replay([
+      {
+        id: 1,
+        event: "run.started",
+        data: JSON.stringify({
+          ingestion: [],
+          cases: [{ id: "v01", role: "visible", vai: "su-kien", question: "a" }],
+        }),
+      },
+    ]);
+    render(<Panel request={{ state: "idle" }} run={run} />);
+    expect(screen.queryByRole("button", { name: "Xem lượt đã ghi" })).toBeNull();
   });
 });

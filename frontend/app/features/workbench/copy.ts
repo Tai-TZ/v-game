@@ -104,6 +104,13 @@ export const STEP_VI = {
   sampleNote: "3 lời gọi AI, không tính sao. Cả 3 câu mẫu đạt thì run chấm sao chạy tiếp.",
 } as const;
 
+/** N4: the run that already happened. Free, and the first thing the level shows. */
+export const RECORDED_VI = {
+  open: "Xem lượt đã ghi",
+  note: "Lượt chạy thật của cấu hình khởi đầu, 0 lời gọi AI.",
+  failed: "Chưa xem được lượt đã ghi của màn này. Mở ca vẫn chạy bình thường.",
+} as const;
+
 export const VIZ_STAMP = {
   run: "Đo từ lượt của bạn",
   labels: "Đo từ nhãn của bạn",
