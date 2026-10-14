@@ -384,6 +384,11 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const passing = lastPassing(history);
   useRecordHistory(level.id, run, lastBody, setHistory);
   const left = useCancelOnLeave(run);
+  // A fresh arrow each render re-runs the effect; the hook's own guard, not a trimmed dep
+  // list, is what keeps it to one star run per sample run (same rule as useRecordHistory).
+  useStarRunAfterSample(run, lastBody, (starBody) => {
+    void send(starBody, newKey());
+  });
 
   const issues = serverIssues ?? clientIssues;
   const active = isActive(run);
@@ -528,7 +533,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       focusLater("#wb-issues");
       return;
     }
-    void send(body, newKey(), before);
+    // The sample step first (N2). `useStarRunAfterSample` starts the star run behind it.
+    void send(body, newKey(), before, "mau");
   }
 
   function focusSlot(type: BlockType, param?: string) {
