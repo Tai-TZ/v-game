@@ -122,7 +122,8 @@ export const STRIP_VI = {
   severedLegend: "Câu bị cắt ngang:",
   clean: "Không",
   piece: (n: number) => `Đoạn ${n}`,
-  columns: { piece: "Đoạn", tokens: "Token", severed: "Cắt ngang câu" },
+  stale: "Đây là văn bản hết hiệu lực.",
+  columns: { piece: "Đoạn", chars: "Số ký tự", severed: "Cắt ngang câu" },
 } as const;
 
 /** N4: the run that already happened. Free, and the first thing the level shows. */

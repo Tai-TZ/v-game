@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { fmt, STRIP_VI, variantVi } from "./copy";
+import { STRIP_VI, variantVi } from "./copy";
 import { cutSentence, type ArticleStrip } from "./strip";
 import { Viz } from "./Viz";
 
@@ -11,29 +11,26 @@ import { Viz } from "./Viz";
  * `Blade` draws the whole corpus at its average and needs a run to exist; this draws one
  * article at its truth and needs nothing but the static data N21 shipped -- so it answers "what
  * does Lược dao actually do to Điều 12" before the player has spent a single AI call.
+ *
+ * A piece is what lies between two cuts, never "a chunk that overlaps the article": with
+ * overlap on, a chunk can lap an article's tail without cutting it, and counting those claimed
+ * "2 đoạn" for an article the blade left whole.
  */
-export function Strip({
-  dieu,
-  variant,
-  strip,
-}: {
-  dieu: number;
-  variant: string;
-  strip: ArticleStrip;
-}): ReactElement {
-  const span = strip.end - strip.start;
-  const pieces = strip.chunks.map((chunk) => {
-    // A chunk can begin before the article and end after it: clamp to what is on show, or a
-    // 1024-token cut would draw a piece wider than the strip it sits in.
-    const from = Math.max(0, ((chunk.start - strip.start) / span) * 100);
-    const to = Math.min(100, ((chunk.end - strip.start) / span) * 100);
+export function Strip({ strip, variant }: { strip: ArticleStrip; variant: string }): ReactElement {
+  const { dieu, start, end, cuts, inForce } = strip;
+  const span = end - start;
+  // The article's own edges plus every cut inside it: n cuts make n+1 pieces, always. Each
+  // piece lies wholly within the article, so nothing needs clamping to the bar it is drawn in.
+  const edges = [start, ...cuts, end];
+  const pieces = edges.slice(0, -1).map((from, index) => {
+    const to = edges[index + 1] ?? end;
     return {
-      chunk,
       from,
       to,
-      // `cutSentence` already answers null past the end of what it was handed, so a cut that
-      // runs out of the article needs no guard of its own here.
-      severed: cutSentence(strip.text, strip.start, chunk.end),
+      left: ((from - start) / span) * 100,
+      width: ((to - from) / span) * 100,
+      // The cut at this piece's end -- unless the piece ends where the article does.
+      severed: to === end ? null : cutSentence(strip.text, start, to),
     };
   });
   const severed = pieces.flatMap((p) => (p.severed ? [p.severed] : []));
@@ -56,7 +53,7 @@ export function Strip({
                 {STRIP_VI.columns.piece}
               </th>
               <th scope="col" className="py-1 pr-3 text-left font-medium">
-                {STRIP_VI.columns.tokens}
+                {STRIP_VI.columns.chars}
               </th>
               <th scope="col" className="py-1 text-left font-medium">
                 {STRIP_VI.columns.severed}
@@ -65,11 +62,11 @@ export function Strip({
           </thead>
           <tbody>
             {pieces.map((p, index) => (
-              <tr key={p.chunk.start} className="border-t border-line">
+              <tr key={p.from} className="border-t border-line">
                 <th scope="row" className="py-1 pr-3 text-left font-semibold whitespace-nowrap">
                   {STRIP_VI.piece(index + 1)}
                 </th>
-                <td className="py-1 pr-3 tabular-nums">{fmt(p.chunk.tokens)}</td>
+                <td className="py-1 pr-3 tabular-nums">{p.to - p.from}</td>
                 <td className="py-1">{p.severed ? `«${p.severed.text}»` : STRIP_VI.clean}</td>
               </tr>
             ))}
@@ -81,21 +78,21 @@ export function Strip({
         <div className="relative h-10 overflow-hidden rounded-sm border border-line-strong bg-subtle">
           {pieces.map((p) => (
             <span
-              key={`piece-${p.chunk.start}`}
+              key={`piece-${p.from}`}
               data-strip-piece=""
               aria-hidden="true"
-              style={{ left: `${p.from}%`, width: `${p.to - p.from}%` }}
+              style={{ left: `${p.left}%`, width: `${p.width}%` }}
               className="absolute inset-y-0 border-r border-line-strong last:border-r-0"
             />
           ))}
           {pieces
-            .filter((p) => p.to < 100)
+            .filter((p) => p.to !== end)
             .map((p) => (
               <span
-                key={`cut-${p.chunk.end}`}
+                key={`cut-${p.to}`}
                 data-strip-cut={p.severed ? "severed" : "clean"}
                 aria-hidden="true"
-                style={{ left: `${p.to}%` }}
+                style={{ left: `${p.left + p.width}%` }}
                 className={`absolute inset-y-0 w-0.5 ${p.severed ? "bg-danger" : "bg-line-strong"}`}
               />
             ))}
@@ -104,6 +101,12 @@ export function Strip({
       <p className="mt-1 max-w-prose text-sm tabular-nums">
         {STRIP_VI.pieces(dieu, pieces.length)}
       </p>
+      {/* L2's corpus holds a superseded document beside the one in force, and their Điều
+          numbers repeat. A strip of the stale document that does not say so is the stale_doc
+          trap drawn as if it were the answer. */}
+      {!inForce && (
+        <p className="mt-1 max-w-prose text-sm font-semibold text-warning">{STRIP_VI.stale}</p>
+      )}
       {severed.length > 0 && (
         <p className="mt-1 max-w-prose text-sm font-semibold text-danger">
           {STRIP_VI.severedLegend} «{severed[0]?.text}»
