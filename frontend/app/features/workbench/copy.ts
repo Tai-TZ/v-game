@@ -109,6 +109,9 @@ export const RECORDED_VI = {
   open: "Xem lượt đã ghi",
   note: "Lượt chạy thật của cấu hình khởi đầu, 0 lời gọi AI.",
   failed: "Chưa xem được lượt đã ghi của màn này. Mở ca vẫn chạy bình thường.",
+  // §8.4: next to a bench the player has already changed, the log needs to say whose
+  // configuration it is -- otherwise its numbers read as a measurement of their bench.
+  notYours: "Lượt của cấu hình khởi đầu, không phải cấu hình của bạn.",
 } as const;
 
 export const VIZ_STAMP = {

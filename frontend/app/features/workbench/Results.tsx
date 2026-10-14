@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, ChevronDownIcon, CrossIcon, StarIcon } from "~/components/ui/icons";
 
-import { domain, nodeIds, type Env } from "./bench";
+import { domain, nodeIds, sameJson, type Env } from "./bench";
 import { Bar, Grade, hasControls, rich } from "./BenchView";
 import {
   BACK_TO_LEVELS,
@@ -18,10 +18,12 @@ import {
   HISTORY_VI,
   LEVEL_COPY,
   lowerFirst,
+  RECORDED_VI,
   stepStatusText,
   TOKENS_VI,
   TOY,
   toyName,
+  VIZ_STAMP,
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
@@ -159,6 +161,12 @@ export function Results({
       <h2 id="wb-results" tabIndex={-1} className="text-2xl font-bold tracking-tight">
         Kết quả ca tối nay
       </h2>
+      {run.scope === "da_ghi" && (
+        <p className="mt-2 text-sm text-fg-muted">
+          {VIZ_STAMP.recorded}
+          {runGraph && !sameJson(runGraph, graph) && ` · ${RECORDED_VI.notYours}`}
+        </p>
+      )}
       <div className="mt-4 flex items-center gap-3">
         <span aria-hidden="true" className="flex gap-1">
           {[1, 2, 3].map((star) => (
