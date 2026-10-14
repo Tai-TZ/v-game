@@ -9,7 +9,15 @@ import { graphFromBench, setAttached, setParam, starterBench } from "./bench";
 import { runReducer, type RunView } from "./run";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
 import { loadHistory, type RunMark } from "./storage";
-import { useRecordHistory, usePreview, useRecordStars, WorkbenchPage } from "./WorkbenchPage";
+import {
+  useRecordHistory,
+  usePreview,
+  useLastSample,
+  useRecordedRun,
+  useRecordStars,
+  useStarRunAfterSample,
+  WorkbenchPage,
+} from "./WorkbenchPage";
 
 vi.mock("~/features/progress/progress", async (importOriginal) => {
   const actual = await importOriginal<typeof progress>();
@@ -441,5 +449,267 @@ describe("going back to a remembered configuration", () => {
     seed('{"schema":1,"nodes":[],"edges":[]}', 0);
     page();
     expect(screen.queryByRole("button", { name: /Quay về bản đạt/ })).toBeNull();
+  });
+});
+
+describe("useStarRunAfterSample (N2)", () => {
+  const started = (scope?: "mau") => ({
+    id: 1,
+    event: "run.started" as const,
+    data: JSON.stringify({
+      scope,
+      ingestion: [],
+      cases: [{ id: "v01", role: "visible", vai: "su-kien", question: "a" }],
+    }),
+  });
+  const graded = (passed: boolean) => ({
+    id: 2,
+    event: "case.graded" as const,
+    data: JSON.stringify({
+      case: "v01",
+      status: passed ? "ok" : "fail",
+      passed,
+      counted: true,
+      criteria: {},
+      labels: [],
+    }),
+  });
+  const done = {
+    id: 3,
+    event: "run.finished" as const,
+    data: JSON.stringify({ report: { gold: {}, diagnosis: [] }, models: {} }),
+  };
+  const sample = (passed: boolean) => replay([started("mau"), graded(passed), done]);
+  const BODY = '{"schema":1,"nodes":[],"edges":[]}';
+
+  const chain = (run: RunView | null, body: string | null = BODY) => {
+    const started: string[] = [];
+    const hook = renderHook(
+      (props: { run: RunView | null }) =>
+        useStarRunAfterSample(props.run, body, (b) => started.push(b)),
+      { initialProps: { run } },
+    );
+    return { started, hook };
+  };
+
+  it("starts the star run on the graph that cleared the gate, not the bench as it stands now", () => {
+    const { started } = chain(sample(true));
+    expect(started).toEqual([BODY]);
+  });
+
+  it("starts nothing when a sample case failed", () => {
+    expect(chain(sample(false)).started).toEqual([]);
+  });
+
+  it("starts nothing for a star run, which is already the second step", () => {
+    expect(chain(replay([started(), graded(true), done])).started).toEqual([]);
+  });
+
+  it("starts the star run once, however often the sample run re-renders", () => {
+    const { started, hook } = chain(sample(true));
+    hook.rerender({ run: sample(true) });
+    hook.rerender({ run: sample(true) });
+    expect(started).toEqual([BODY]);
+  });
+
+  it("starts nothing when nobody knows which graph ran", () => {
+    expect(chain(sample(true), null).started).toEqual([]);
+  });
+});
+
+describe("a recorded run is nobody's attempt (N4)", () => {
+  // Today every shipped log happens to score 0, so a missing guard would leave no mark and the
+  // test would pass on the content rather than on the code. Three stars makes it bite.
+  const scored = (stars: number) => ({
+    id: 2,
+    event: "run.scored" as const,
+    data: JSON.stringify({
+      score: {
+        stars,
+        s1: true,
+        s2: true,
+        s3: true,
+        normal_passed: 8,
+        normal_total: 8,
+        traps_passed: 2,
+        traps_total: 2,
+        tokens: 8800,
+        budget: 15000,
+      },
+    }),
+  });
+  const log = (scope?: "da_ghi") => [
+    {
+      id: 1,
+      event: "run.started" as const,
+      data: JSON.stringify({
+        scope,
+        ingestion: [],
+        cases: [{ id: "v01", role: "visible", vai: "su-kien", question: "a" }],
+      }),
+    },
+    scored(3),
+    {
+      id: 3,
+      event: "run.finished" as const,
+      data: JSON.stringify({ report: { gold: {}, diagnosis: [] }, models: {} }),
+    },
+  ];
+
+  it("writes no stars for a replayed log, however many it says it earned", () => {
+    renderHook(() => useRecordStars(l1.level, replay(log("da_ghi"))));
+    expect(recordStars).not.toHaveBeenCalled();
+    expect(readProgress()).toEqual({});
+  });
+
+  it("still writes the stars of the player's own star run, so the guard is not a blanket", () => {
+    renderHook(() => useRecordStars(l1.level, replay(log())));
+    expect(recordStars).toHaveBeenCalledExactlyOnceWith("library", "grounded-citation", 3);
+  });
+
+  it("puts no row in the regression strip for a run the player never made", () => {
+    renderHook(() => useRecordHistory("grounded-citation", replay(log("da_ghi")), "{}"));
+    expect(loadHistory("grounded-citation")).toEqual([]);
+  });
+
+  it("still puts the player's own star run in the strip", () => {
+    renderHook(() => useRecordHistory("grounded-citation", replay(log()), "{}"));
+    expect(loadHistory("grounded-citation")).toHaveLength(1);
+  });
+});
+
+describe("useRecordedRun (N4)", () => {
+  const body = JSON.parse(readText("public", "runs", "grounded-citation.json")) as unknown;
+
+  function serve(status: number, payload: unknown = body) {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", (url: string) => {
+      urls.push(url);
+      return Promise.resolve(new Response(JSON.stringify(payload), { status }));
+    });
+    return urls;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks nobody for anything until the player asks to see it", () => {
+    const urls = serve(200);
+    renderHook(() => useRecordedRun(l1.level));
+    expect(urls).toEqual([]);
+  });
+
+  it("plays the shipped log off the static file, not off the API", async () => {
+    const urls = serve(200);
+    const { result } = renderHook(() => useRecordedRun(l1.level));
+    await act(() => result.current.show());
+    expect(urls).toEqual(["/runs/grounded-citation.json"]);
+    expect(result.current.run?.phase).toBe("finished");
+    expect(result.current.run?.scope).toBe("da_ghi");
+  });
+
+  it("fetches once however often the player reopens it", async () => {
+    const urls = serve(200);
+    const { result } = renderHook(() => useRecordedRun(l1.level));
+    await act(() => result.current.show());
+    await act(() => result.current.show());
+    expect(urls).toHaveLength(1);
+  });
+
+  it("leaves the level playable when the file is missing", async () => {
+    serve(404, null);
+    const { result } = renderHook(() => useRecordedRun(l1.level));
+    await act(() => result.current.show());
+    expect(result.current.run).toBeNull();
+    expect(result.current.failed).toBe(true);
+  });
+
+  // The version is the level's, not a constant: a level whose cases moved on must not be
+  // answered with the run recorded against the old ones.
+  it("refuses a log recorded before this version of the level", async () => {
+    serve(200);
+    const { result } = renderHook(() => useRecordedRun({ ...l1.level, version: 2 }));
+    await act(() => result.current.show());
+    expect(result.current.run).toBeNull();
+    expect(result.current.failed).toBe(true);
+  });
+
+  it("leaves the level playable when the file is some other level's", async () => {
+    serve(200, JSON.parse(readText("public", "runs", "chunk-tuning.json")));
+    const { result } = renderHook(() => useRecordedRun(l1.level));
+    await act(() => result.current.show());
+    expect(result.current.run).toBeNull();
+    expect(result.current.failed).toBe(true);
+  });
+});
+
+describe("useLastSample (N2)", () => {
+  const started = (scope?: "mau") => ({
+    id: 1,
+    event: "run.started" as const,
+    data: JSON.stringify({
+      scope,
+      ingestion: [],
+      cases: [{ id: "v01", role: "visible", vai: "su-kien", question: "a" }],
+    }),
+  });
+  const graded = {
+    id: 2,
+    event: "case.graded" as const,
+    data: JSON.stringify({
+      case: "v01",
+      status: "ok",
+      passed: true,
+      counted: true,
+      criteria: {},
+      labels: [],
+    }),
+  };
+  const done = {
+    id: 3,
+    event: "run.finished" as const,
+    data: JSON.stringify({ report: { gold: {}, diagnosis: [] }, models: {} }),
+  };
+  const sample = () => replay([started("mau"), graded, done]);
+  const star = () => replay([started(), graded, done]);
+
+  it("remembers nothing before a sample run has finished", () => {
+    const { result } = renderHook(() => useLastSample(replay([started("mau")])));
+    expect(result.current).toBeNull();
+  });
+
+  // "Run chấm sao đang chạy tiếp" is a promise about a state the player must be able to see.
+  // Dropping the summary the moment the star run starts makes that sentence unreadable.
+  it("keeps the finished sample on screen while the star run behind it runs", () => {
+    const { result, rerender } = renderHook(
+      (props: { run: RunView | null }) => useLastSample(props.run),
+      { initialProps: { run: null as RunView | null } },
+    );
+    rerender({ run: sample() });
+    expect(result.current?.scope).toBe("mau");
+    rerender({ run: star() });
+    expect(result.current?.scope).toBe("mau");
+  });
+
+  // A second Mở ca resets the run rather than clearing it, so "null" is not the signal. While
+  // the new samples run, last shift's "Cả 3 câu mẫu đạt" would otherwise still be on screen.
+  it("forgets it the moment a new sample run starts, not when that one finishes", () => {
+    const { result, rerender } = renderHook(
+      (props: { run: RunView | null }) => useLastSample(props.run),
+      { initialProps: { run: null as RunView | null } },
+    );
+    rerender({ run: sample() });
+    expect(result.current).not.toBeNull();
+    rerender({ run: replay([started("mau")]) });
+    expect(result.current).toBeNull();
+  });
+
+  it("forgets it once a fresh Mở ca puts a new run in its place", () => {
+    const { result, rerender } = renderHook(
+      (props: { run: RunView | null }) => useLastSample(props.run),
+      { initialProps: { run: null as RunView | null } },
+    );
+    rerender({ run: sample() });
+    rerender({ run: null });
+    expect(result.current).toBeNull();
   });
 });

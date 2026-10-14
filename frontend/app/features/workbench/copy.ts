@@ -98,6 +98,40 @@ export const BLADE_VI = {
  * figure whose provenance is none of these has no stamp to wear, and inventing one is the thing
  * the rule exists to stop.
  */
+/** N2: Mở ca is two steps. Only the second one scores, and the first says so. */
+export const STEP_VI = {
+  sample: "Bước 1: Thử 3 câu mẫu",
+  sampleNote: "3 lời gọi AI, không tính sao. Cả 3 câu mẫu đạt thì run chấm sao chạy tiếp.",
+} as const;
+
+/** N2: what the sample step leaves on screen once it ends. */
+export const SAMPLE_VI = {
+  heading: "Kết quả lượt mẫu",
+  count: (passed: number, total: number) => `${passed}/${total} câu mẫu đạt.`,
+  noStars: "Lượt mẫu không tính sao.",
+  passed: "Cả 3 câu mẫu đạt, run chấm sao đang chạy tiếp.",
+  failed: "Run chấm sao chỉ mở khi cả 3 câu mẫu đạt. Sửa cấu hình rồi mở ca lại.",
+  capped: "Quỹ chung của máy chủ hết giữa chừng nên lượt này không tính. Mai 07:00 có lại.",
+} as const;
+
+/** N4: the run that already happened. Free, and the first thing the level shows. */
+export const RECORDED_VI = {
+  open: "Xem lượt đã ghi",
+  note: "Lượt chạy thật của cấu hình khởi đầu, 0 lời gọi AI.",
+  failed: "Chưa xem được lượt đã ghi của màn này. Mở ca vẫn chạy bình thường.",
+  // §8.4: next to a bench the player has already changed, the log needs to say whose
+  // configuration it is -- otherwise its numbers read as a measurement of their bench.
+  notYours: "Lượt của cấu hình khởi đầu, không phải cấu hình của bạn.",
+} as const;
+
+/** N4: walking a finished run case by case. */
+export const SCRUB_VI = {
+  label: "Tua qua từng câu của lượt này",
+  prev: "Về câu trước",
+  next: "Tới câu sau",
+  at: (n: number, total: number) => `Câu #${n}/${total}`,
+} as const;
+
 export const VIZ_STAMP = {
   run: "Đo từ lượt của bạn",
   labels: "Đo từ nhãn của bạn",

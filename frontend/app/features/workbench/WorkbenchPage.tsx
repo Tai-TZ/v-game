@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type Dispatch } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type Dispatch,
+} from "react";
 import { Link, useParams } from "react-router";
 import * as v from "valibot";
 
@@ -13,13 +21,16 @@ import { Brief } from "./Brief";
 import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
+import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
 import { lastPassing } from "./history";
 import { Results } from "./Results";
+import { SampleResult } from "./SampleResult";
 import {
   cappedRun,
   frameAction,
   isActive,
   runReducer,
+  sampleVerdict,
   type BenchRun,
   type RunAction,
   type RunView,
@@ -214,7 +225,10 @@ function useFocusLater() {
 export function useRecordStars(level: PublicLevel, run: RunView | null) {
   // §3.3: a run the server's daily cap cut short "không tính là một lần thử sao … không ghi đè
   // kết quả sao". It is still graded and still on screen; it is just not a result.
-  const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
+  //
+  // A scope at all means the run is not the player's attempt: a sample run earns no stars, and
+  // a replayed log (N4) carries the real `run.scored` of whoever recorded it.
+  const scoredRun = run?.score && run.scope === undefined && !cappedRun(run) ? run.runId : null;
   const stars = run?.score?.stars;
   useEffect(() => {
     if (!scoredRun || stars === undefined) return;
@@ -249,7 +263,7 @@ export function useRecordHistory(
 ) {
   // Same rule as the stars, and for the strip there is a second reason: a truncated run has
   // fewer rows than the others, so it would not be comparable with them.
-  const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
+  const scoredRun = run?.score && run.scope === undefined && !cappedRun(run) ? run.runId : null;
   // The run id of the entry already written. Stating the invariant this way keeps the dep list
   // complete -- a fresh `cases` object or an edited body re-runs the effect, and the guard, not
   // a hand-trimmed dep list, is what stops a second entry for one run.
@@ -277,6 +291,86 @@ export function useRecordHistory(
     // `onWritten` is in the deps, which is honest: a fresh closure re-runs the effect, and the
     // guard above -- not a trimmed dep list -- is what keeps it to one entry per run.
   }, [scoredRun, run, ranBody, levelId, onWritten]);
+}
+
+/**
+ * N2: Mở ca is one two-step run. The cheap sample run goes first; clearing its gate starts the
+ * star run, once, on `ranBody` -- the graph that actually cleared it, not the bench as it
+ * stands. A knob turned while the samples were running must not ride into the star run, and the
+ * server only prices the second step at 7 calls when the two graphs are identical (§3.1).
+ */
+export function useStarRunAfterSample(
+  run: RunView | null,
+  ranBody: string | null,
+  start: (body: string) => void,
+) {
+  const chained = useRef<string | null>(null);
+  useEffect(() => {
+    if (run === null || ranBody === null) return;
+    if (sampleVerdict(run) !== "passed" || chained.current === run.runId) return;
+    chained.current = run.runId;
+    start(ranBody);
+  }, [run, ranBody, start]);
+}
+
+/**
+ * N2: the sample run that most recently finished, kept past the star run it opened.
+ *
+ * Its summary promises "run chấm sao đang chạy tiếp"; dropping it the moment that run starts
+ * would make the sentence something nobody can read. A fresh Mở ca (run back to null) forgets
+ * it, so one shift never shows the previous shift's samples.
+ */
+export function useLastSample(run: RunView | null): RunView | null {
+  // Three stages, and the middle one is what a plain "remember the last sample" misses: a
+  // second Mở ca resets the run rather than clearing it, so while its samples are running the
+  // previous shift's "Cả 3 câu mẫu đạt" would still be sitting on screen.
+  const stage = run === null ? "gone" : sampleVerdict(run) !== null ? "done" : run.scope;
+  const [sample, setSample] = useState<RunView | null>(null);
+  const [at, setAt] = useState<string | null>(null);
+  // Adjusted during render, not in an effect: this is state derived from a change in the run,
+  // not a system being synchronised, and an effect would commit the stale value for a frame
+  // first. React re-runs the component before painting, so nobody sees the in-between.
+  const key = `${run?.runId ?? ""}:${stage ?? "sao"}`;
+  if (at !== key) {
+    setAt(key);
+    if (stage === "done") setSample(run);
+    else if (stage !== undefined) setSample(null); // "gone", or a sample run still going
+  }
+  return sample;
+}
+
+/**
+ * N4: the level's recorded run, fetched the first time the player asks for it.
+ *
+ * It comes off a static file rather than the API on purpose: it is what covers the minute a
+ * sleeping Render takes to wake (X9), so it must not need the API to be awake. A log that is
+ * missing, stale or some other level's leaves `run` null -- the level is still playable, it
+ * just opens without the replay.
+ */
+export function useRecordedRun(level: PublicLevel) {
+  const [run, setRun] = useState<RunView | null>(null);
+  const [failed, setFailed] = useState(false);
+  const asked = useRef(false);
+  const show = useCallback(async () => {
+    if (asked.current) return;
+    asked.current = true;
+    let raw: unknown;
+    try {
+      // No status check: `parseRecorded` is the one gate, and an error page is not a log --
+      // it either fails to parse as JSON here or fails the contract there.
+      raw = await (
+        await fetch(recordedUrl(level.id), { headers: { Accept: "application/json" } })
+      ).json();
+    } catch {
+      setFailed(true);
+      return;
+    }
+    const log = parseRecorded(level.id, level.version, raw);
+    const replayed = log && replayRecorded(log);
+    if (!replayed) setFailed(true);
+    setRun(replayed ?? null);
+  }, [level.id, level.version]);
+  return { run, failed, show };
 }
 
 /** The graph of the run on show; ours, so it parses, but checked like any other JSON. */
@@ -344,7 +438,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [summary, setSummary] = useState<Summary | null>(null);
   const [request, setRequest] = useState<RequestState>({ state: "idle" });
   const [notes, setNotes] = useState<Issue[]>([]);
-  const [run, dispatch] = useReducer(runReducer, null);
+  const [ours, dispatch] = useReducer(runReducer, null);
   const [lastBody, setLastBody] = useState<string | null>(null);
   const [followed, setFollowed] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<BlockType | null>(null);
@@ -357,12 +451,25 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [ranSlip, setRanSlip] = useState<{ runId: string; slip: Slip } | null>(null);
   const focusLater = useFocusLater();
 
-  useRunStream(run?.runId ?? null, attempt, dispatch);
+  // Everything that talks to the server keys off `live`, the run the reducer is driving. The
+  // recorded run has no run id on any server: streaming, cancelling or reconnecting it would
+  // call `/api/runs/da-ghi/...`.
+  useRunStream(ours?.runId ?? null, attempt, dispatch);
+  const left = useCancelOnLeave(ours);
+  const recorded = useRecordedRun(level);
+  // Everything the player looks at reads `run`: the recorded log stands in until they run
+  // something of their own, and `scope` keeps the two apart wherever that matters.
+  const run = ours ?? recorded.run;
+  const sample = useLastSample(ours);
   useRecordStars(level, run);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
   const passing = lastPassing(history);
   useRecordHistory(level.id, run, lastBody, setHistory);
-  const left = useCancelOnLeave(run);
+  // A fresh arrow each render re-runs the effect; the hook's own guard, not a trimmed dep
+  // list, is what keeps it to one star run per sample run (same rule as useRecordHistory).
+  useStarRunAfterSample(ours, lastBody, (starBody) => {
+    void send(starBody, newKey());
+  });
 
   const issues = serverIssues ?? clientIssues;
   const active = isActive(run);
@@ -404,6 +511,14 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   useEffect(() => {
     if (scoredRun) focusOn(document.getElementById("wb-results"));
   }, [scoredRun]);
+  // A sample run earns no stars, so it never reaches the line above -- and the run panel that
+  // held focus unmounts the moment it ends. Its own summary takes the focus instead (N2), but
+  // only when the shift stops there: a sample that cleared the gate hands straight over to the
+  // star run, whose own start moves focus again, and two moves in a frame is just churn.
+  const stopped = sample !== null && sampleVerdict(sample) !== "passed" ? sample.runId : null;
+  useEffect(() => {
+    if (stopped) focusOn(document.getElementById("wb-sample"));
+  }, [stopped]);
   const failedRun = run?.phase === "failed" ? run.runId : null;
   useEffect(() => {
     if (failedRun) focusOn(document.getElementById("wb-run-failed"));
@@ -465,13 +580,13 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   }
 
   /** `before`: the cancel of a lost run, so the server's single run slot is free first. */
-  async function send(sendBody: string, key: string, before?: Promise<unknown>) {
+  async function send(sendBody: string, key: string, before?: Promise<unknown>, scope?: "mau") {
     // A function, not `left.current`: TS would narrow it to false across the awaits.
     const gone = () => left.current;
     setRequest({ state: "sending", key, body: sendBody });
     await before;
     if (gone()) return;
-    const result = await postRun(level.id, sendBody, key);
+    const result = await postRun(level.id, sendBody, key, scope);
     if (gone()) {
       // The player left while the request was out: nobody will watch this run (§2.2).
       if (result.ok) void cancelRun(result.runId, { keepalive: true });
@@ -507,7 +622,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       focusLater("#wb-issues");
       return;
     }
-    void send(body, newKey(), before);
+    // The sample step first (N2). `useStarRunAfterSample` starts the star run behind it.
+    void send(body, newKey(), before, "mau");
   }
 
   function focusSlot(type: BlockType, param?: string) {
@@ -559,6 +675,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             slip={slip}
             onSlip={editSlip}
             onOpen={openShift}
+            onRecorded={() => void recorded.show()}
+            recordedFailed={recorded.failed}
             onRetry={() => {
               if (request.state === "failed") void send(request.body, request.key);
             }}
@@ -599,6 +717,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           />
         </aside>
       </div>
+      {sample && <SampleResult run={sample} />}
       {run?.score && (
         <Results
           key={run.runId}

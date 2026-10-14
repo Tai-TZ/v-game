@@ -59,6 +59,11 @@ export interface RunView {
   phase: Phase;
   cases: readonly CaseView[];
   ingestion: readonly { node: string; variant: string; chunks: number; avg_tokens: number }[];
+  /**
+   * "mau": a sample run over the 3 visible cases (N2). "da_ghi": a log replayed from a static
+   * file (N4). Absent on a star run, the only kind that is the player's own attempt.
+   */
+  scope?: "mau" | "da_ghi";
   score?: StarResult;
   report?: RunReport;
   models?: Readonly<Record<string, number>>;
@@ -83,8 +88,9 @@ function updateCase(run: RunView, id: string, update: (c: CaseView) => CaseView)
 
 function apply(run: RunView, event: RunEvent): RunView {
   switch (event.type) {
-    case "run.started":
-      return {
+    case "run.started": {
+      const scope = event.scope;
+      const started: RunView = {
         ...run,
         phase: "running",
         ingestion: event.ingestion,
@@ -99,6 +105,8 @@ function apply(run: RunView, event: RunEvent): RunView {
           tokens: { in: 0, out: 0 },
         })),
       };
+      return scope === undefined ? started : { ...started, scope };
+    }
     case "step.started":
       return updateCase(run, event.case, (c) => ({
         ...c,
@@ -291,6 +299,19 @@ export function outTokenSpread(run: RunView): { low: number; high: number; cases
  */
 export const cappedRun = (run: RunView | null): boolean =>
   run?.cases.some((c) => c.graded?.reason === "daily_cap") ?? false;
+
+/**
+ * N2: whether a finished sample run opens the star run behind it. Null while it is still
+ * running, and on a star run, which has no gate of its own to pass.
+ *
+ * "capped" over "failed" when the server's own quota skipped a case (§3.3): the star run stays
+ * shut either way, but only one of the two is something the player did.
+ */
+export function sampleVerdict(run: RunView | null): "passed" | "failed" | "capped" | null {
+  if (run?.scope !== "mau" || run.phase !== "finished") return null;
+  if (cappedRun(run)) return "capped";
+  return run.cases.every((c) => c.graded?.passed === true) ? "passed" : "failed";
+}
 
 const NOT_YOUR_FAULT = new Set(["skipped_budget", "llm_error", "timeout"]);
 /**

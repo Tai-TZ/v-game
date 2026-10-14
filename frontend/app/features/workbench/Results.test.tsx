@@ -7,6 +7,7 @@ import { Results } from "./Results";
 import type { RunView } from "./run";
 import type { RunMark } from "./storage";
 import type { GoldReveal, Graph } from "./schema";
+import { VIZ_STAMP } from "./copy";
 import { frame, parseSse, readText, replay, testEnv } from "./test-fixtures";
 
 const l1 = testEnv("grounded-citation");
@@ -515,5 +516,44 @@ describe("Debrief's picks reach the page through onDebrief", () => {
     if (!first) throw new Error("no debrief option rendered");
     fireEvent.click(first);
     expect(picks).toHaveLength(1);
+  });
+});
+
+describe("a recorded run says so on the results (N4)", () => {
+  const recorded = (): RunView => {
+    const base = finishedRun({ "lib-l1-v01": trap });
+    return { ...base, scope: "da_ghi" };
+  };
+
+  it("stamps the results as a recorded run, so no number reads as the player's own", () => {
+    show(recorded(), dense, l1, dense);
+    expect(screen.getByText(VIZ_STAMP.recorded, { exact: false })).toBeDefined();
+  });
+
+  it("does not stamp the player's own star run", () => {
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense);
+    expect(screen.queryByText(VIZ_STAMP.recorded, { exact: false })).toBeNull();
+  });
+
+  // §8.4: a log of the starter next to a bench the player has already changed needs to say
+  // whose configuration it is, or the picture looks like a reading of their bench.
+  it("says the log is not the configuration now on the bench when it is not", () => {
+    const starter = starterBench(l1);
+    if (!starter) throw new Error("L1 starter is not drawable");
+    show(
+      recorded(),
+      graphFromBench(l1, setParam(l1, starter, "vector_search", "top_k", 9)),
+      l1,
+      dense,
+    );
+    expect(screen.getByText(/không phải cấu hình của bạn/)).toBeDefined();
+  });
+
+  it("stays quiet about the configuration when the bench is still the starter", () => {
+    const starter = starterBench(l1);
+    if (!starter) throw new Error("L1 starter is not drawable");
+    const graph = graphFromBench(l1, starter);
+    show(recorded(), graph, l1, graph);
+    expect(screen.queryByText(/không phải cấu hình của bạn/)).toBeNull();
   });
 });

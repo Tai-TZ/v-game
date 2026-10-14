@@ -13,12 +13,15 @@ import {
   fmt,
   LEVEL_COPY,
   outcomeText,
+  RECORDED_VI,
   ROLE_VI,
   sameGraphNote,
+  STEP_VI,
   toyName,
   vaiVi,
 } from "./copy";
 import type { Slip } from "./guess";
+import { Scrub } from "./Scrub";
 import { GuessSlip } from "./GuessSlip";
 import { isActive, runningNodes, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, Issue } from "./schema";
@@ -67,6 +70,10 @@ interface RunPanelProps {
   onAbandon: () => void;
   onEdit: () => void;
   onFollow: (caseId: string) => void;
+  /** N4: play the level's recorded run. Free, and it needs no awake API. */
+  onRecorded: () => void;
+  /** The recording could not be shown; the level still plays without it. */
+  recordedFailed: boolean;
 }
 
 export function RunPanel(props: RunPanelProps) {
@@ -75,12 +82,23 @@ export function RunPanel(props: RunPanelProps) {
     <div className="space-y-6">
       {isActive(run) && run ? <Running {...props} run={run} /> : <Editing {...props} />}
       {run && run.cases.length > 0 && (
-        <CaseTable
-          run={run}
-          env={props.env}
-          followedId={props.followedId}
-          onFollow={props.onFollow}
-        />
+        <>
+          {/* Outside the case table's own region, not in it: that region's first button is
+              the first case's row, and two specs read it that way. A control slipped in
+              above it silently becomes "the first button" instead.
+
+              Only once the run is over, too: while it is live the follow moves on its own,
+              and a control fighting the run for it would keep snatching the view back (N4). */}
+          {!isActive(run) && (
+            <Scrub cases={run.cases} followedId={props.followedId} onFollow={props.onFollow} />
+          )}
+          <CaseTable
+            run={run}
+            env={props.env}
+            followedId={props.followedId}
+            onFollow={props.onFollow}
+          />
+        </>
       )}
     </div>
   );
@@ -127,6 +145,8 @@ function Editing({
   onFocusSlot,
   onRerun,
   onEdit,
+  onRecorded,
+  recordedFailed,
 }: RunPanelProps) {
   const {
     open: restoring,
@@ -283,6 +303,24 @@ function Editing({
         {sending ? "Đang gửi cấu hình…" : "Mở ca"}
       </button>
 
+      {/* Only before the player's own first run: after that the bench has something truer to
+          show than the starter's log, and a second "watch a run" button competes with it. */}
+      {run === null && (
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={onRecorded}
+            disabled={sending}
+            className={buttonClass("inline", "w-full")}
+          >
+            {RECORDED_VI.open}
+          </button>
+          <p className="text-sm text-fg-muted">
+            {recordedFailed ? RECORDED_VI.failed : RECORDED_VI.note}
+          </p>
+        </div>
+      )}
+
       {notes.length > 0 && (
         <ul className="space-y-1 text-sm text-fg-muted">
           {notes.map((note, index) => (
@@ -414,6 +452,12 @@ function Running({
       <h2 id="wb-running" tabIndex={-1} className="scroll-mt-4 text-2xl font-bold tracking-tight">
         Đang chạy ca
       </h2>
+      {run.scope === "mau" && (
+        <div className="rounded-md border border-line p-3 text-sm">
+          <p className="font-semibold">{STEP_VI.sample}</p>
+          <p className="mt-1 text-fg-muted">{STEP_VI.sampleNote}</p>
+        </div>
+      )}
       <p className="text-sm font-semibold tabular-nums">
         {graded}/{run.cases.length} câu đã chấm
       </p>
