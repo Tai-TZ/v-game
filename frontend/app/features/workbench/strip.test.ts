@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { articleStrip, cutSentence, type VizData } from "./strip";
+import { articleStrip, cutSentence, focusArticle, variantKey, type VizData } from "./strip";
+import { readText } from "./test-fixtures";
 
 /** One article per 100 chars, cuts wherever the test says. */
 const data = (text: string, articles: [number, number, number][], cuts: [number, number][]) =>
@@ -103,5 +104,41 @@ describe("cutSentence", () => {
   it("reads offsets against the whole document, not the slice handed in", () => {
     const strip = cutSentence(text.slice(9), 9, 16);
     expect(strip?.text).toBe("Câu hai dài hơn.");
+  });
+});
+
+describe("variantKey", () => {
+  it("builds the key the static data is filed under, from the bench's own knobs", () => {
+    expect(variantKey({ strategy: "theo_dieu", chunk_size: 512, overlap_pct: 10 })).toBe(
+      "theo_dieu-512-10",
+    );
+  });
+
+  it("has no key for a chunker whose knobs are not all set", () => {
+    expect(variantKey({ strategy: "co_dinh", chunk_size: 128 })).toBeNull();
+    expect(variantKey({})).toBeNull();
+  });
+
+  it("has no key for a knob of the wrong kind, rather than a key that cannot exist", () => {
+    expect(variantKey({ strategy: 7, chunk_size: 128, overlap_pct: 0 })).toBeNull();
+  });
+});
+
+describe("focusArticle", () => {
+  const real = JSON.parse(readText("public", "viz", "chunk-tuning.json")) as VizData;
+
+  // The lesson, read off the shipped data: the article the search brings back first moves when
+  // the blade moves. No gold is involved, so this works before any run (L2 §5).
+  it("names the article the top-ranked chunk sits in", () => {
+    expect(focusArticle(real, "theo_dieu-512-10", "lib-l2-v01")).toBe(12);
+    expect(focusArticle(real, "co_dinh-512-0", "lib-l2-v01")).toBe(11);
+  });
+
+  it("names nothing for a case the data does not rank", () => {
+    expect(focusArticle(real, "theo_dieu-512-10", "lib-l2-h01")).toBeNull();
+  });
+
+  it("names nothing for a variant nobody built", () => {
+    expect(focusArticle(real, "nope", "lib-l2-v01")).toBeNull();
   });
 });

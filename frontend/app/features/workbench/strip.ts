@@ -91,3 +91,31 @@ export function cutSentence(text: string, offset: number, at: number): CutSenten
   if (to < text.length) to += 1;
   return { text: text.slice(from, to).trim(), at };
 }
+
+/**
+ * The key N21's data is filed under, built from the chunker's own three knobs. Null when the
+ * bench does not hold all three, or holds one of the wrong kind: a half-built key would read
+ * as "variant nobody built" anyway, and silently.
+ */
+export function variantKey(params: Readonly<Record<string, unknown>>): string | null {
+  const { strategy, chunk_size: size, overlap_pct: overlap } = params;
+  if (typeof strategy !== "string" || typeof size !== "number" || typeof overlap !== "number") {
+    return null;
+  }
+  return `${strategy}-${size}-${overlap}`;
+}
+
+/**
+ * The article a sample question's search brings back first, under this variant.
+ *
+ * This is what "điều đang xem" means before a run (L2 §5): no gold is involved, and the answer
+ * moves when the blade moves -- at `theo_dieu-512-10` Hà's question lands in Điều 12, at
+ * `co_dinh-512-0` in Điều 11, the cut that swallowed Điều 12 whole.
+ */
+export function focusArticle(data: VizData, variant: string, caseId: string): number | null {
+  const top = data.ranks[variant]?.[caseId]?.[0];
+  if (top === undefined) return null;
+  const [docId, start] = top;
+  const found = data.articles[docId]?.find((a) => a[1] <= start && start < a[2]);
+  return found?.[0] ?? null;
+}
