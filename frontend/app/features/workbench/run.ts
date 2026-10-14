@@ -295,6 +295,19 @@ export function outTokenSpread(run: RunView): { low: number; high: number; cases
 export const cappedRun = (run: RunView | null): boolean =>
   run?.cases.some((c) => c.graded?.reason === "daily_cap") ?? false;
 
+/**
+ * N2: whether a finished sample run opens the star run behind it. Null while it is still
+ * running, and on a star run, which has no gate of its own to pass.
+ *
+ * "capped" over "failed" when the server's own quota skipped a case (§3.3): the star run stays
+ * shut either way, but only one of the two is something the player did.
+ */
+export function sampleVerdict(run: RunView | null): "passed" | "failed" | "capped" | null {
+  if (run?.scope !== "mau" || run.phase !== "finished") return null;
+  if (cappedRun(run)) return "capped";
+  return run.cases.every((c) => c.graded?.passed === true) ? "passed" : "failed";
+}
+
 const NOT_YOUR_FAULT = new Set(["skipped_budget", "llm_error", "timeout"]);
 /**
  * Cases that did not finish for the server's reasons (AI overloaded, daily quota, deadline).

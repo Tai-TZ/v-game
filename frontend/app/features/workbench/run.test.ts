@@ -11,6 +11,7 @@ import {
   outTokenSpread,
   runningNodes,
   runReducer,
+  sampleVerdict,
   type CaseView,
   type RunView,
   type StepView,
@@ -433,5 +434,67 @@ describe("a run the daily cap cut short", () => {
     });
     expect(cappedRun(replay(ownBudget))).toBe(false);
     expect(cappedRun(replay(short))).toBe(false);
+  });
+});
+
+describe("sampleVerdict: the gate the star run waits behind (N2)", () => {
+  const started = (scope?: "mau") =>
+    frame(1, "run.started", {
+      scope,
+      ingestion: [],
+      cases: [
+        { id: "v01", role: "visible", vai: "su-kien", question: "a" },
+        { id: "v02", role: "visible", vai: "su-kien", question: "b" },
+        { id: "v03", role: "visible", vai: "su-kien", question: "c" },
+      ],
+    });
+  const graded = (seq: number, id: string, passed: boolean, reason?: "daily_cap") =>
+    frame(seq, "case.graded", {
+      case: id,
+      status: passed ? "ok" : "fail",
+      passed,
+      counted: true,
+      criteria: {},
+      labels: [],
+      ...(reason === undefined ? {} : { reason }),
+    });
+  const done = (seq: number) =>
+    frame(seq, "run.finished", { report: { gold: {}, diagnosis: [] }, models: {} });
+
+  const sample = (passes: readonly boolean[], reason?: "daily_cap") =>
+    replay([
+      started("mau"),
+      ...passes.map((p, i) => graded(i + 2, `v0${i + 1}`, p, i === 0 ? reason : undefined)),
+      done(passes.length + 2),
+    ]);
+
+  it("opens the star run only when all three sample cases passed", () => {
+    expect(sampleVerdict(sample([true, true, true]))).toBe("passed");
+  });
+
+  it("holds the star run back when any one sample case failed", () => {
+    expect(sampleVerdict(sample([true, false, true]))).toBe("failed");
+  });
+
+  it("says nothing yet while the sample run is still going", () => {
+    expect(sampleVerdict(replay([started("mau"), graded(2, "v01", true)]))).toBeNull();
+  });
+
+  it("says nothing about a star run, which has no sample gate to pass", () => {
+    expect(sampleVerdict(replay([started(), done(2)]))).toBeNull();
+  });
+
+  // A reconnect can leave a gap: run.finished arrives, one case.graded never did. An absent
+  // grade is not a pass -- reading it as one would spend the star run's calls on a gate that
+  // was never actually cleared.
+  it("will not open the star run on a case it never saw graded", () => {
+    const run = replay([started("mau"), graded(2, "v01", true), graded(3, "v02", true), done(4)]);
+    expect(sampleVerdict(run)).toBe("failed");
+  });
+
+  // §3.3: a run the server's own quota cut short is not the player's attempt. Reading its
+  // unrun case as a failure would blame them for the server's day.
+  it("blames nobody when the server's daily cap skipped a sample case", () => {
+    expect(sampleVerdict(sample([true, true, true], "daily_cap"))).toBe("capped");
   });
 });
