@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type Env, graphFromBench, starterBench } from "./bench";
+import { SCRUB_VI } from "./copy";
 import { EMPTY_SLIP } from "./guess";
 import type { RunView } from "./run";
 import { RunPanel, type RequestState } from "./RunPanel";
@@ -184,5 +185,35 @@ describe("the recorded run is free and on offer (N4)", () => {
     ]);
     render(<Panel request={{ state: "idle" }} run={run} />);
     expect(screen.queryByRole("button", { name: "Xem lượt đã ghi" })).toBeNull();
+  });
+});
+
+describe("the scrub bar waits for the run to be over (N4)", () => {
+  const ten = Array.from({ length: 10 }, (_, i) => ({
+    id: `c${i + 1}`,
+    role: "visible",
+    vai: "su-kien",
+    question: "a",
+  }));
+  const started = {
+    id: 1,
+    event: "run.started" as const,
+    data: JSON.stringify({ ingestion: [], cases: ten }),
+  };
+  const done = {
+    id: 2,
+    event: "run.finished" as const,
+    data: JSON.stringify({ report: { gold: {}, diagnosis: [] }, models: {} }),
+  };
+
+  it("is there to walk a finished run", () => {
+    render(<Panel request={{ state: "idle" }} run={replay([started, done])} />);
+    expect(screen.getByRole("slider", { name: SCRUB_VI.label })).toBeDefined();
+  });
+
+  // A live run moves the followed case itself; a control fighting it would snatch the view.
+  it("stays out of a run still going", () => {
+    render(<Panel request={{ state: "idle" }} run={replay([started])} />);
+    expect(screen.queryByRole("slider", { name: SCRUB_VI.label })).toBeNull();
   });
 });

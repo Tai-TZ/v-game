@@ -21,6 +21,7 @@ import {
   vaiVi,
 } from "./copy";
 import type { Slip } from "./guess";
+import { Scrub } from "./Scrub";
 import { GuessSlip } from "./GuessSlip";
 import { isActive, runningNodes, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, Issue } from "./schema";
@@ -565,6 +566,9 @@ function CaseTable({
       <h3 id="wb-cases-title" tabIndex={-1} className="scroll-mt-4 text-base font-bold">
         Bảng câu
       </h3>
+      {/* Only once the run is over: while it is live the follow moves on its own, and a
+          control fighting the run for it would keep snatching the view back (N4). */}
+      {!isActive(run) && <Scrub cases={run.cases} followedId={followedId} onFollow={onFollow} />}
       <ul className="mt-2 space-y-1">
         {run.cases.map((c) => {
           const running = !c.graded && runningNodes(c).length > 0;
