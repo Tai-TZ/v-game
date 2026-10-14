@@ -114,6 +114,17 @@ export const SAMPLE_VI = {
   capped: "Quỹ chung của máy chủ hết giữa chừng nên lượt này không tính. Mai 07:00 có lại.",
 } as const;
 
+/** N22: one article as the current index variant really cut it. */
+export const STRIP_VI = {
+  caption: (dieu: number) => `Dải đoạn Điều ${dieu}`,
+  pieces: (dieu: number, n: number) => `Điều ${dieu} được chia thành ${n} đoạn.`,
+  severedCount: (n: number) => `${n} câu bị cắt ngang.`,
+  severedLegend: "Câu bị cắt ngang:",
+  clean: "Không",
+  piece: (n: number) => `Đoạn ${n}`,
+  columns: { piece: "Đoạn", tokens: "Token", severed: "Cắt ngang câu" },
+} as const;
+
 /** N4: the run that already happened. Free, and the first thing the level shows. */
 export const RECORDED_VI = {
   open: "Xem lượt đã ghi",
