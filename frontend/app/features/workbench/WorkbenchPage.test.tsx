@@ -12,6 +12,7 @@ import { loadHistory, type RunMark } from "./storage";
 import {
   useRecordHistory,
   usePreview,
+  useLastSample,
   useRecordedRun,
   useRecordStars,
   useStarRunAfterSample,
@@ -638,5 +639,77 @@ describe("useRecordedRun (N4)", () => {
     await act(() => result.current.show());
     expect(result.current.run).toBeNull();
     expect(result.current.failed).toBe(true);
+  });
+});
+
+describe("useLastSample (N2)", () => {
+  const started = (scope?: "mau") => ({
+    id: 1,
+    event: "run.started" as const,
+    data: JSON.stringify({
+      scope,
+      ingestion: [],
+      cases: [{ id: "v01", role: "visible", vai: "su-kien", question: "a" }],
+    }),
+  });
+  const graded = {
+    id: 2,
+    event: "case.graded" as const,
+    data: JSON.stringify({
+      case: "v01",
+      status: "ok",
+      passed: true,
+      counted: true,
+      criteria: {},
+      labels: [],
+    }),
+  };
+  const done = {
+    id: 3,
+    event: "run.finished" as const,
+    data: JSON.stringify({ report: { gold: {}, diagnosis: [] }, models: {} }),
+  };
+  const sample = () => replay([started("mau"), graded, done]);
+  const star = () => replay([started(), graded, done]);
+
+  it("remembers nothing before a sample run has finished", () => {
+    const { result } = renderHook(() => useLastSample(replay([started("mau")])));
+    expect(result.current).toBeNull();
+  });
+
+  // "Run chấm sao đang chạy tiếp" is a promise about a state the player must be able to see.
+  // Dropping the summary the moment the star run starts makes that sentence unreadable.
+  it("keeps the finished sample on screen while the star run behind it runs", () => {
+    const { result, rerender } = renderHook(
+      (props: { run: RunView | null }) => useLastSample(props.run),
+      { initialProps: { run: null as RunView | null } },
+    );
+    rerender({ run: sample() });
+    expect(result.current?.scope).toBe("mau");
+    rerender({ run: star() });
+    expect(result.current?.scope).toBe("mau");
+  });
+
+  // A second Mở ca resets the run rather than clearing it, so "null" is not the signal. While
+  // the new samples run, last shift's "Cả 3 câu mẫu đạt" would otherwise still be on screen.
+  it("forgets it the moment a new sample run starts, not when that one finishes", () => {
+    const { result, rerender } = renderHook(
+      (props: { run: RunView | null }) => useLastSample(props.run),
+      { initialProps: { run: null as RunView | null } },
+    );
+    rerender({ run: sample() });
+    expect(result.current).not.toBeNull();
+    rerender({ run: replay([started("mau")]) });
+    expect(result.current).toBeNull();
+  });
+
+  it("forgets it once a fresh Mở ca puts a new run in its place", () => {
+    const { result, rerender } = renderHook(
+      (props: { run: RunView | null }) => useLastSample(props.run),
+      { initialProps: { run: null as RunView | null } },
+    );
+    rerender({ run: sample() });
+    rerender({ run: null });
+    expect(result.current).toBeNull();
   });
 });

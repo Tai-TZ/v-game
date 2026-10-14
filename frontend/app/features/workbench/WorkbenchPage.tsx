@@ -314,6 +314,32 @@ export function useStarRunAfterSample(
 }
 
 /**
+ * N2: the sample run that most recently finished, kept past the star run it opened.
+ *
+ * Its summary promises "run chấm sao đang chạy tiếp"; dropping it the moment that run starts
+ * would make the sentence something nobody can read. A fresh Mở ca (run back to null) forgets
+ * it, so one shift never shows the previous shift's samples.
+ */
+export function useLastSample(run: RunView | null): RunView | null {
+  // Three stages, and the middle one is what a plain "remember the last sample" misses: a
+  // second Mở ca resets the run rather than clearing it, so while its samples are running the
+  // previous shift's "Cả 3 câu mẫu đạt" would still be sitting on screen.
+  const stage = run === null ? "gone" : sampleVerdict(run) !== null ? "done" : run.scope;
+  const [sample, setSample] = useState<RunView | null>(null);
+  const [at, setAt] = useState<string | null>(null);
+  // Adjusted during render, not in an effect: this is state derived from a change in the run,
+  // not a system being synchronised, and an effect would commit the stale value for a frame
+  // first. React re-runs the component before painting, so nobody sees the in-between.
+  const key = `${run?.runId ?? ""}:${stage ?? "sao"}`;
+  if (at !== key) {
+    setAt(key);
+    if (stage === "done") setSample(run);
+    else if (stage !== undefined) setSample(null); // "gone", or a sample run still going
+  }
+  return sample;
+}
+
+/**
  * N4: the level's recorded run, fetched the first time the player asks for it.
  *
  * It comes off a static file rather than the API on purpose: it is what covers the minute a
@@ -434,6 +460,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   // Everything the player looks at reads `run`: the recorded log stands in until they run
   // something of their own, and `scope` keeps the two apart wherever that matters.
   const run = ours ?? recorded.run;
+  const sample = useLastSample(ours);
   useRecordStars(level, run);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
   const passing = lastPassing(history);
@@ -485,11 +512,13 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     if (scoredRun) focusOn(document.getElementById("wb-results"));
   }, [scoredRun]);
   // A sample run earns no stars, so it never reaches the line above -- and the run panel that
-  // held focus unmounts the moment it ends. Its own summary takes the focus instead (N2).
-  const sampleRun = run !== null && sampleVerdict(run) !== null ? run.runId : null;
+  // held focus unmounts the moment it ends. Its own summary takes the focus instead (N2), but
+  // only when the shift stops there: a sample that cleared the gate hands straight over to the
+  // star run, whose own start moves focus again, and two moves in a frame is just churn.
+  const stopped = sample !== null && sampleVerdict(sample) !== "passed" ? sample.runId : null;
   useEffect(() => {
-    if (sampleRun) focusOn(document.getElementById("wb-sample"));
-  }, [sampleRun]);
+    if (stopped) focusOn(document.getElementById("wb-sample"));
+  }, [stopped]);
   const failedRun = run?.phase === "failed" ? run.runId : null;
   useEffect(() => {
     if (failedRun) focusOn(document.getElementById("wb-run-failed"));
@@ -688,7 +717,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           />
         </aside>
       </div>
-      {run && <SampleResult run={run} />}
+      {sample && <SampleResult run={sample} />}
       {run?.score && (
         <Results
           key={run.runId}
