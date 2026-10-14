@@ -86,6 +86,15 @@ describe("Strip", () => {
     }
   });
 
+  // A table with no caption is a grid of numbers a screen reader reaches with no idea what it
+  // is of -- and below 640 px this table IS the figure, not an alternative to it.
+  it("names its table, which is the whole figure on a narrow screen", () => {
+    draw("co_dinh-256-0");
+    fireEvent.click(screen.getByRole("button", { name: /Xem dạng bảng/ }));
+    const table = screen.getByRole("table");
+    expect(table.querySelector("caption")?.textContent).toBe(STRIP_VI.caption(12));
+  });
+
   it("answers axe's structural rules", async () => {
     const strip = articleStrip(l2, "co_dinh-256-0", 12);
     if (!strip) throw new Error("L2 has no Điều 12");

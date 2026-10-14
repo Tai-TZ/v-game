@@ -1041,6 +1041,18 @@ test.describe("the cheap try (B5)", () => {
 test.describe("the blade's own strip (B6 N22)", () => {
   const L2 = "/play/library/chunk-tuning";
 
+  /** The strip figure for one article. By role, so the figcaption and the table's own sr-only
+   *  caption -- identical words, both in the DOM on a narrow screen -- cannot both match. */
+  const strip = (page: Page, dieu: number) =>
+    page.getByRole("figure").filter({ hasText: `Dải đoạn Điều ${dieu}` });
+
+  /** The figure showing its table, whichever form it opened in. */
+  const asTable = async (figure: ReturnType<typeof strip>) => {
+    const toTable = figure.getByRole("button", { name: "Xem dạng bảng" });
+    if (await toTable.isVisible()) await toTable.click();
+    return figure.getByRole("table");
+  };
+
   // Free, and before any run: the strip answers "what did I just do to this article" while the
   // knob is still under the hand. It reads the static data N21 ships, so no API is involved.
   test("draws the favoured article's real cuts, and follows the blade", async ({
@@ -1052,11 +1064,15 @@ test.describe("the blade's own strip (B6 N22)", () => {
 
     // The L2 starter is co_dinh/128/0: its search favours Điều 10, which 128-token cuts tear
     // into three pieces across two sentences. Every number here is asserted by
-    // strip.e2e-facts.test.ts against the shipped data, so a content change fails in seconds
+    // strip.e2e-facts.test.tsx against the shipped data, so a content change fails in seconds
     // rather than ten minutes into the Playwright run.
-    await expect(page.getByText("Dải đoạn Điều 10", { exact: false })).toBeVisible();
-    await expect(page.getByText("Điều 10 được chia thành 3 đoạn.")).toBeVisible();
-    await expect(page.getByText("Câu bị cắt ngang:", { exact: false })).toBeVisible();
+    //
+    // Read through the TABLE, not the drawing: below 640 px `Viz` opens these figures as their
+    // table alternative, so on the mobile project the bar and its two caption lines are not in
+    // the DOM at all -- while the table is reachable at every width. `asTable` normalises it.
+    await expect(strip(page, 10)).toBeVisible();
+    await expect(await asTable(strip(page, 10))).toContainText("«");
+    await expect((await asTable(strip(page, 10))).getByRole("row")).toHaveCount(4); // head + 3
 
     // Nam châm bám Điều cuts on the article boundary: Điều 12 comes back whole.
     //
@@ -1068,9 +1084,11 @@ test.describe("the blade's own strip (B6 N22)", () => {
     await pick(/Cách chia/, "Bám điều, khoản");
     await pick(/Cỡ đoạn/, "512 token");
     await pick(/Chồng lấp/, "10 %");
-    await expect(page.getByText("Dải đoạn Điều 12", { exact: false })).toBeVisible();
-    await expect(page.getByText("Điều 12 được chia thành 1 đoạn.")).toBeVisible();
-    await expect(page.getByText("Câu bị cắt ngang:", { exact: false })).toBeHidden();
+    await expect(strip(page, 12)).toBeVisible();
+    const whole = await asTable(strip(page, 12));
+    await expect(whole.getByRole("row")).toHaveCount(2); // head + the one piece
+    await expect(whole).not.toContainText("«"); // nothing severed
+    await expect(whole).toContainText("Không");
 
     // The figure carries its three parts, and the data says where it came from: computed from
     // the shipped index, never measured from a run the player has not made.
@@ -1084,6 +1102,6 @@ test.describe("the blade's own strip (B6 N22)", () => {
     await page.goto(L2);
 
     await expect(page.getByRole("button", { name: "Mở ca" })).toBeVisible();
-    await expect(page.getByText("Dải đoạn", { exact: false })).toBeHidden();
+    await expect(page.getByRole("figure").filter({ hasText: "Dải đoạn" })).toHaveCount(0);
   });
 });

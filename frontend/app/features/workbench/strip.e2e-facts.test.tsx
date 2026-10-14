@@ -11,13 +11,14 @@
  * names the spec line to update.
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { starterBench } from "./bench";
 
 import { articleStrip, cutSentence, focusArticle, type VizData } from "./strip";
+import { Strip } from "./Strip";
 import { readText, testEnv } from "./test-fixtures";
 import { WorkbenchPage } from "./WorkbenchPage";
 
@@ -90,5 +91,84 @@ describe("the locators e2e/workbench.spec.ts uses on the blade", () => {
     const radio = within(fieldset).getAllByRole("radio")[0];
     expect(radio?.className).toContain("sr-only");
     expect(radio?.closest("label")).not.toBeNull();
+  });
+});
+
+/**
+ * What the spec reads out of the strip, in BOTH forms.
+ *
+ * Below 640 px `Viz` opens a figure as its table alternative, so on the mobile Playwright
+ * project the bar and the two caption lines are not in the DOM at all -- and the table's own
+ * sr-only <caption> carries the same words as the <figcaption>, which made a plain
+ * getByText("Dải đoạn Điều 10") match two elements and fail Playwright's strict mode. Both
+ * cost a CI round.
+ */
+describe("what the spec reads off the strip at both widths", () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  /** jsdom has no matchMedia; `narrow` decides what every query answers (as Viz.test.tsx). */
+  function viewport(narrow: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: narrow && query.includes("max-width"),
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+  }
+
+  function drawStrip(variant: string, narrow: boolean) {
+    viewport(narrow);
+    const dieu = focusArticle(l2, variant, "lib-l2-v01");
+    if (dieu === null) throw new Error(`${variant} ranks nothing`);
+    const strip = articleStrip(l2, variant, dieu);
+    if (strip === null) throw new Error(`${variant} has no Điều ${dieu}`);
+    render(<Strip dieu={dieu} variant={variant} strip={strip} />);
+    return dieu;
+  }
+
+  it.each([false, true])("names the figure exactly once, narrow=%s", (narrow) => {
+    const dieu = drawStrip("co_dinh-128-0", narrow);
+    // By role, the way the spec locates it: the figcaption and the table's sr-only caption
+    // hold identical words, so a text locator matches two and Playwright refuses to act.
+    const figures = screen
+      .getAllByRole("figure")
+      .filter((f) => f.textContent.includes(`Dải đoạn Điều ${dieu}`));
+    expect(figures).toHaveLength(1);
+  });
+
+  it("hides the drawn bar and its caption lines on a narrow screen", () => {
+    drawStrip("co_dinh-128-0", true);
+    expect(document.querySelectorAll("[data-strip-piece]")).toHaveLength(0);
+    expect(screen.queryByText("Điều 10 được chia thành 3 đoạn.")).toBeNull();
+    expect(screen.getByRole("table")).toBeDefined();
+  });
+
+  /**
+   * The table, which is reachable at every width -- so the spec reads the facts from it. Call
+   * once per render: the toggle renames itself to "Xem dạng hình" after the click.
+   */
+  function table(narrow: boolean) {
+    const toTable = screen.queryByRole("button", { name: "Xem dạng bảng" });
+    // Wide screens open the picture, so the toggle must be there to reach the table at all.
+    expect(toTable === null).toBe(narrow);
+    if (toTable) fireEvent.click(toTable);
+    return screen.getByRole("table");
+  }
+
+  it.each([false, true])("gives the starter 3 piece rows and a severed cell, narrow=%s", (n) => {
+    drawStrip("co_dinh-128-0", n);
+    const rows = table(n);
+    expect(rows.querySelectorAll("tr")).toHaveLength(4); // head + 3 pieces
+    expect(rows.textContent).toContain("«");
+  });
+
+  it.each([false, true])("gives the reference blade 1 row and nothing severed, narrow=%s", (n) => {
+    drawStrip("theo_dieu-512-10", n);
+    const rows = table(n);
+    expect(rows.querySelectorAll("tr")).toHaveLength(2); // head + the one piece
+    expect(rows.textContent).not.toContain("«");
+    expect(rows.textContent).toContain("Không");
   });
 });
