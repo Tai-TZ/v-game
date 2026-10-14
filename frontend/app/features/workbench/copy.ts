@@ -98,6 +98,12 @@ export const BLADE_VI = {
  * figure whose provenance is none of these has no stamp to wear, and inventing one is the thing
  * the rule exists to stop.
  */
+/** N2: Mở ca is two steps. Only the second one scores, and the first says so. */
+export const STEP_VI = {
+  sample: "Bước 1: Thử 3 câu mẫu",
+  sampleNote: "3 lời gọi AI, không tính sao. Cả 3 câu mẫu đạt thì run chấm sao chạy tiếp.",
+} as const;
+
 export const VIZ_STAMP = {
   run: "Đo từ lượt của bạn",
   labels: "Đo từ nhãn của bạn",

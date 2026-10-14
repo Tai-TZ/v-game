@@ -15,6 +15,7 @@ import {
   outcomeText,
   ROLE_VI,
   sameGraphNote,
+  STEP_VI,
   toyName,
   vaiVi,
 } from "./copy";
@@ -414,6 +415,12 @@ function Running({
       <h2 id="wb-running" tabIndex={-1} className="scroll-mt-4 text-2xl font-bold tracking-tight">
         Đang chạy ca
       </h2>
+      {run.scope === "mau" && (
+        <div className="rounded-md border border-line p-3 text-sm">
+          <p className="font-semibold">{STEP_VI.sample}</p>
+          <p className="mt-1 text-fg-muted">{STEP_VI.sampleNote}</p>
+        </div>
+      )}
       <p className="text-sm font-semibold tabular-nums">
         {graded}/{run.cases.length} câu đã chấm
       </p>

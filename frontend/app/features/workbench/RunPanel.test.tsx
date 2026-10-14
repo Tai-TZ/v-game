@@ -4,8 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type Env, graphFromBench, starterBench } from "./bench";
 import { EMPTY_SLIP } from "./guess";
+import type { RunView } from "./run";
 import { RunPanel, type RequestState } from "./RunPanel";
-import { testEnv } from "./test-fixtures";
+import { replay, testEnv } from "./test-fixtures";
 
 const l1 = testEnv("grounded-citation");
 const nothing = () => undefined;
@@ -14,10 +15,12 @@ function Panel({
   request,
   env = l1,
   backToPassing = null,
+  run = null,
 }: {
   request: RequestState;
   env?: Env;
   backToPassing?: (() => void) | null;
+  run?: RunView | null;
 }) {
   const start = starterBench(env);
   if (!start) throw new Error(`${env.level.id} starter is not drawable`);
@@ -33,7 +36,7 @@ function Panel({
         summary={null}
         request={request}
         notes={[]}
-        run={null}
+        run={run}
         stop={null}
         followedId={null}
         backTo="/play/library"
@@ -114,5 +117,31 @@ describe("going back to the last version that worked", () => {
       "disabled",
       true,
     );
+  });
+});
+
+describe("the two steps of one Mở ca are named on screen (N2)", () => {
+  const running = (scope?: "mau") =>
+    replay([
+      {
+        id: 1,
+        event: "run.started",
+        data: JSON.stringify({
+          scope,
+          ingestion: [],
+          cases: [{ id: "v01", role: "visible", vai: "su-kien", question: "a" }],
+        }),
+      },
+    ]);
+
+  it("says a sample run is the cheap step and earns no stars", () => {
+    render(<Panel request={{ state: "idle" }} run={running("mau")} />);
+    expect(screen.getByText(/Thử 3 câu mẫu/)).toBeDefined();
+    expect(screen.getByText(/không tính sao/)).toBeDefined();
+  });
+
+  it("says nothing of the sort on the star run, which is the one that counts", () => {
+    render(<Panel request={{ state: "idle" }} run={running()} />);
+    expect(screen.queryByText(/Thử 3 câu mẫu/)).toBeNull();
   });
 });
