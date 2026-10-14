@@ -5,7 +5,7 @@ description = "V-Game backend API: campus zones, levels and (later) agent compil
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "fastapi==0.142.2",
+    "fastapi==0.142.3",
     "uvicorn[standard]==0.54.0",
     "pydantic==2.13.5",
     "pydantic-settings==2.15.0",
@@ -29,7 +29,7 @@ vgame-export-static-viz = "vgame.engine.static_viz:main"
 [dependency-groups]
 # Offline only (vgame-build-index, slow tests): e5 + jina through onnxruntime. The server
 # installs with `uv sync --no-dev` and never loads a model (engine-v0.2.md §14, 2026-10-08).
-models = ["fastembed==0.8.1"]
+models = ["fastembed==0.9.0"]
 dev = [
     { include-group = "models" },
     "ruff==0.16.10",
