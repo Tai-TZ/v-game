@@ -81,6 +81,14 @@ def viz_level(level_id: str, store: IndexStore, content_dir: Path) -> dict[str, 
         "level_version": level.version,
         "corpus_sha256": store.manifest["corpus_sha256"],
         "corpus": corpus,
+        # A chunk's `dieu` is the article its FIRST token sits in, so a fixed-size cut running
+        # from Điều 11 into Điều 12 is filed under 11 -- which is exactly the lesson L2 teaches.
+        # "The strip of Điều 12" is therefore every chunk overlapping its range, and only these
+        # ranges can answer that; the chunk list alone cannot.
+        "articles": {
+            doc_id: [[a.dieu, a.start, a.end] for a in docs[doc_id].articles]
+            for doc_id in level.corpus
+        },
         "strips": strips,
         "ranks": ranks,
     }

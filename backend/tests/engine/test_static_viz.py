@@ -45,6 +45,37 @@ def test_every_variant_the_engine_knows_has_a_strip(level_id: str) -> None:
 
 
 @pytest.mark.parametrize("level_id", LEVEL_IDS)
+def test_articles_carry_the_range_the_strip_has_to_be_read_against(level_id: str) -> None:
+    """A chunk's ``dieu`` is the article its FIRST token sits in, so a fixed-size cut that runs
+    from Điều 11 into Điều 12 is filed under 11 -- which is the whole lesson of L2. Drawing
+    "the strip of Điều 12" therefore means every chunk overlapping its range, and the range
+    has to come from here: the chunk list alone cannot answer it.
+    """
+    data = _committed(level_id)
+    for doc_id, articles in data["articles"].items():
+        assert articles, f"{doc_id} has no articles"
+        text_len = len(data["corpus"][doc_id])
+        for dieu, start, end in articles:
+            assert 0 <= start < end <= text_len, f"{doc_id} Điều {dieu}: {start}-{end}"
+        # Contiguous and in order: a gap would silently drop chunks out of every strip.
+        assert [a[1] for a in articles] == sorted(a[1] for a in articles)
+
+
+@pytest.mark.parametrize("level_id", LEVEL_IDS)
+def test_a_fixed_size_cut_spanning_two_articles_is_in_both_strips(level_id: str) -> None:
+    """The gate on the overlap rule, not on the label. With `dieu` alone L2's Điều 12 comes
+    back empty at co_dinh-512-0 -- the cut covering it starts in Điều 11."""
+    data = _committed(level_id)
+    doc_id, articles = next(iter(data["articles"].items()))
+    spanning = [
+        c
+        for c in data["strips"]["co_dinh-1024-0"]
+        if c[0] == doc_id and any(c[3] < end and start < c[4] for _, start, end in articles[1:])
+    ]
+    assert spanning, "no chunk overlaps a later article, so the overlap rule is untested here"
+
+
+@pytest.mark.parametrize("level_id", LEVEL_IDS)
 def test_no_hidden_or_trap_case_appears_anywhere_in_the_file(level_id: str) -> None:
     """The one rule N21 exists under: never a score for a question the player cannot see.
 
