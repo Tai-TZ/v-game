@@ -59,8 +59,11 @@ export interface RunView {
   phase: Phase;
   cases: readonly CaseView[];
   ingestion: readonly { node: string; variant: string; chunks: number; avg_tokens: number }[];
-  /** N2: "mau" for a sample run over the 3 visible cases. Absent on a star run. */
-  scope?: "mau";
+  /**
+   * "mau": a sample run over the 3 visible cases (N2). "da_ghi": a log replayed from a static
+   * file (N4). Absent on a star run, the only kind that is the player's own attempt.
+   */
+  scope?: "mau" | "da_ghi";
   score?: StarResult;
   report?: RunReport;
   models?: Readonly<Record<string, number>>;
@@ -85,12 +88,12 @@ function updateCase(run: RunView, id: string, update: (c: CaseView) => CaseView)
 
 function apply(run: RunView, event: RunEvent): RunView {
   switch (event.type) {
-    case "run.started":
-      return {
+    case "run.started": {
+      const scope = event.scope;
+      const started: RunView = {
         ...run,
         phase: "running",
         ingestion: event.ingestion,
-        ...(event.scope === undefined ? {} : { scope: event.scope }),
         cases: event.cases.map((c, index) => ({
           id: c.id,
           n: index + 1,
@@ -102,6 +105,8 @@ function apply(run: RunView, event: RunEvent): RunView {
           tokens: { in: 0, out: 0 },
         })),
       };
+      return scope === undefined ? started : { ...started, scope };
+    }
     case "step.started":
       return updateCase(run, event.case, (c) => ({
         ...c,

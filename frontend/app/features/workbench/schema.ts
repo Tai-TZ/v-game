@@ -213,8 +213,9 @@ export type RunReport = v.InferOutput<typeof RunReportSchema>;
 
 export const EVENT_SCHEMAS = {
   "run.started": v.looseObject({
-    // N2: absent on a star run. A sample run runs the 3 visible cases only and scores nothing.
-    scope: v.optional(v.literal("mau")),
+    // Absent on a star run. "mau": the 3 visible cases only, no stars (N2). "da_ghi": a
+    // recorded run replayed from a static file, never the player's own attempt (N4).
+    scope: v.optional(v.picklist(["mau", "da_ghi"])),
     cases: v.array(
       v.looseObject({
         id: v.string(),
