@@ -215,7 +215,10 @@ function useFocusLater() {
 export function useRecordStars(level: PublicLevel, run: RunView | null) {
   // §3.3: a run the server's daily cap cut short "không tính là một lần thử sao … không ghi đè
   // kết quả sao". It is still graded and still on screen; it is just not a result.
-  const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
+  //
+  // A scope at all means the run is not the player's attempt: a sample run earns no stars, and
+  // a replayed log (N4) carries the real `run.scored` of whoever recorded it.
+  const scoredRun = run?.score && run.scope === undefined && !cappedRun(run) ? run.runId : null;
   const stars = run?.score?.stars;
   useEffect(() => {
     if (!scoredRun || stars === undefined) return;
@@ -250,7 +253,7 @@ export function useRecordHistory(
 ) {
   // Same rule as the stars, and for the strip there is a second reason: a truncated run has
   // fewer rows than the others, so it would not be comparable with them.
-  const scoredRun = run?.score && !cappedRun(run) ? run.runId : null;
+  const scoredRun = run?.score && run.scope === undefined && !cappedRun(run) ? run.runId : null;
   // The run id of the entry already written. Stating the invariant this way keeps the dep list
   // complete -- a fresh `cases` object or an edited body re-runs the effect, and the guard, not
   // a hand-trimmed dep list, is what stops a second entry for one run.

@@ -514,3 +514,64 @@ describe("useStarRunAfterSample (N2)", () => {
     expect(chain(sample(true), null).started).toEqual([]);
   });
 });
+
+describe("a recorded run is nobody's attempt (N4)", () => {
+  // Today every shipped log happens to score 0, so a missing guard would leave no mark and the
+  // test would pass on the content rather than on the code. Three stars makes it bite.
+  const scored = (stars: number) => ({
+    id: 2,
+    event: "run.scored" as const,
+    data: JSON.stringify({
+      score: {
+        stars,
+        s1: true,
+        s2: true,
+        s3: true,
+        normal_passed: 8,
+        normal_total: 8,
+        traps_passed: 2,
+        traps_total: 2,
+        tokens: 8800,
+        budget: 15000,
+      },
+    }),
+  });
+  const log = (scope?: "da_ghi") => [
+    {
+      id: 1,
+      event: "run.started" as const,
+      data: JSON.stringify({
+        scope,
+        ingestion: [],
+        cases: [{ id: "v01", role: "visible", vai: "su-kien", question: "a" }],
+      }),
+    },
+    scored(3),
+    {
+      id: 3,
+      event: "run.finished" as const,
+      data: JSON.stringify({ report: { gold: {}, diagnosis: [] }, models: {} }),
+    },
+  ];
+
+  it("writes no stars for a replayed log, however many it says it earned", () => {
+    renderHook(() => useRecordStars(l1.level, replay(log("da_ghi"))));
+    expect(recordStars).not.toHaveBeenCalled();
+    expect(readProgress()).toEqual({});
+  });
+
+  it("still writes the stars of the player's own star run, so the guard is not a blanket", () => {
+    renderHook(() => useRecordStars(l1.level, replay(log())));
+    expect(recordStars).toHaveBeenCalledExactlyOnceWith("library", "grounded-citation", 3);
+  });
+
+  it("puts no row in the regression strip for a run the player never made", () => {
+    renderHook(() => useRecordHistory("grounded-citation", replay(log("da_ghi")), "{}"));
+    expect(loadHistory("grounded-citation")).toEqual([]);
+  });
+
+  it("still puts the player's own star run in the strip", () => {
+    renderHook(() => useRecordHistory("grounded-citation", replay(log()), "{}"));
+    expect(loadHistory("grounded-citation")).toHaveLength(1);
+  });
+});
