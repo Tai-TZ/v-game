@@ -20,6 +20,7 @@ import {
   frameAction,
   isActive,
   runReducer,
+  sampleVerdict,
   type BenchRun,
   type RunAction,
   type RunView,
@@ -279,6 +280,26 @@ export function useRecordHistory(
   }, [scoredRun, run, ranBody, levelId, onWritten]);
 }
 
+/**
+ * N2: Mở ca is one two-step run. The cheap sample run goes first; clearing its gate starts the
+ * star run, once, on `ranBody` -- the graph that actually cleared it, not the bench as it
+ * stands. A knob turned while the samples were running must not ride into the star run, and the
+ * server only prices the second step at 7 calls when the two graphs are identical (§3.1).
+ */
+export function useStarRunAfterSample(
+  run: RunView | null,
+  ranBody: string | null,
+  start: (body: string) => void,
+) {
+  const chained = useRef<string | null>(null);
+  useEffect(() => {
+    if (run === null || ranBody === null) return;
+    if (sampleVerdict(run) !== "passed" || chained.current === run.runId) return;
+    chained.current = run.runId;
+    start(ranBody);
+  }, [run, ranBody, start]);
+}
+
 /** The graph of the run on show; ours, so it parses, but checked like any other JSON. */
 function parseGraph(body: string | null): Graph | null {
   if (body === null) return null;
@@ -465,13 +486,13 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   }
 
   /** `before`: the cancel of a lost run, so the server's single run slot is free first. */
-  async function send(sendBody: string, key: string, before?: Promise<unknown>) {
+  async function send(sendBody: string, key: string, before?: Promise<unknown>, scope?: "mau") {
     // A function, not `left.current`: TS would narrow it to false across the awaits.
     const gone = () => left.current;
     setRequest({ state: "sending", key, body: sendBody });
     await before;
     if (gone()) return;
-    const result = await postRun(level.id, sendBody, key);
+    const result = await postRun(level.id, sendBody, key, scope);
     if (gone()) {
       // The player left while the request was out: nobody will watch this run (§2.2).
       if (result.ok) void cancelRun(result.runId, { keepalive: true });

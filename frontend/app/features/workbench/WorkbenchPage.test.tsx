@@ -9,7 +9,13 @@ import { graphFromBench, setAttached, setParam, starterBench } from "./bench";
 import { runReducer, type RunView } from "./run";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
 import { loadHistory, type RunMark } from "./storage";
-import { useRecordHistory, usePreview, useRecordStars, WorkbenchPage } from "./WorkbenchPage";
+import {
+  useRecordHistory,
+  usePreview,
+  useRecordStars,
+  useStarRunAfterSample,
+  WorkbenchPage,
+} from "./WorkbenchPage";
 
 vi.mock("~/features/progress/progress", async (importOriginal) => {
   const actual = await importOriginal<typeof progress>();
@@ -441,5 +447,70 @@ describe("going back to a remembered configuration", () => {
     seed('{"schema":1,"nodes":[],"edges":[]}', 0);
     page();
     expect(screen.queryByRole("button", { name: /Quay về bản đạt/ })).toBeNull();
+  });
+});
+
+describe("useStarRunAfterSample (N2)", () => {
+  const started = (scope?: "mau") => ({
+    id: 1,
+    event: "run.started" as const,
+    data: JSON.stringify({
+      scope,
+      ingestion: [],
+      cases: [{ id: "v01", role: "visible", vai: "su-kien", question: "a" }],
+    }),
+  });
+  const graded = (passed: boolean) => ({
+    id: 2,
+    event: "case.graded" as const,
+    data: JSON.stringify({
+      case: "v01",
+      status: passed ? "ok" : "fail",
+      passed,
+      counted: true,
+      criteria: {},
+      labels: [],
+    }),
+  });
+  const done = {
+    id: 3,
+    event: "run.finished" as const,
+    data: JSON.stringify({ report: { gold: {}, diagnosis: [] }, models: {} }),
+  };
+  const sample = (passed: boolean) => replay([started("mau"), graded(passed), done]);
+  const BODY = '{"schema":1,"nodes":[],"edges":[]}';
+
+  const chain = (run: RunView | null, body: string | null = BODY) => {
+    const started: string[] = [];
+    const hook = renderHook(
+      (props: { run: RunView | null }) =>
+        useStarRunAfterSample(props.run, body, (b) => started.push(b)),
+      { initialProps: { run } },
+    );
+    return { started, hook };
+  };
+
+  it("starts the star run on the graph that cleared the gate, not the bench as it stands now", () => {
+    const { started } = chain(sample(true));
+    expect(started).toEqual([BODY]);
+  });
+
+  it("starts nothing when a sample case failed", () => {
+    expect(chain(sample(false)).started).toEqual([]);
+  });
+
+  it("starts nothing for a star run, which is already the second step", () => {
+    expect(chain(replay([started(), graded(true), done])).started).toEqual([]);
+  });
+
+  it("starts the star run once, however often the sample run re-renders", () => {
+    const { started, hook } = chain(sample(true));
+    hook.rerender({ run: sample(true) });
+    hook.rerender({ run: sample(true) });
+    expect(started).toEqual([BODY]);
+  });
+
+  it("starts nothing when nobody knows which graph ran", () => {
+    expect(chain(sample(true), null).started).toEqual([]);
   });
 });
