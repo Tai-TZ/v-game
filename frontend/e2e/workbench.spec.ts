@@ -946,3 +946,80 @@ test.describe("workbench", () => {
     await expect(lessons).toContainText("không chỉ ra lấy từ đâu");
   });
 });
+
+test.describe("the cheap try (B5)", () => {
+  test("Mở ca runs the samples first, then the star run on the very same graph", async ({
+    page,
+    consoleErrors,
+  }) => {
+    const mock = await mockWorkbenchApi(page, {
+      events: (n) => (n === 1 ? sse.sample() : sse.reference()),
+    });
+
+    await page.goto("/play/library/grounded-citation");
+    await page.getByRole("switch", { name: "Gắn Vòm Sao" }).check();
+    await page.getByRole("button", { name: "Mở ca" }).click();
+
+    // Step one is the sample run: three cases, named as such, and no stars on offer.
+    await expect(page.getByText("Bước 1: Thử 3 câu mẫu")).toBeVisible();
+    await expect(page.getByText("không tính sao", { exact: false })).toBeVisible();
+
+    // Step two starts itself once all three samples pass, and the server must see the same
+    // graph both times -- that identity is what makes the second step cost 7 calls, not 10.
+    await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeFocused();
+    expect(mock.posts.map((p) => p.scope)).toEqual(["mau", null]);
+    expect(mock.posts[1]?.body).toBe(mock.posts[0]?.body);
+    expect(mock.posts[1]?.key).not.toBe(mock.posts[0]?.key);
+    await expect(page.getByText("1/3 sao", { exact: true })).toBeVisible();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("holds the star run back when a sample case failed, and spends nothing more", async ({
+    page,
+  }) => {
+    const mock = await mockWorkbenchApi(page, { events: () => sse.sample(false) });
+
+    await page.goto("/play/library/grounded-citation");
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await expect(page.getByText("3/3 câu đã chấm")).toBeVisible();
+
+    // One POST, for the samples. The expensive step is the thing the gate exists to withhold.
+    expect(mock.posts.map((p) => p.scope)).toEqual(["mau"]);
+    await expect(page.getByText("sao", { exact: true })).toBeHidden();
+  });
+
+  // What covers the minute a sleeping Render takes to wake (X9): with the API answering
+  // nothing at all, the level still opens on a real run.
+  test("plays the recorded run with the API down", async ({ page }) => {
+    await mockWorkbenchApi(page, {
+      post: () => ({ status: 503, body: { detail: "Máy chủ đang ngủ." } }),
+    });
+
+    await page.goto("/play/library/grounded-citation");
+    await page.getByRole("button", { name: "Xem lượt đã ghi" }).click();
+
+    await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeVisible();
+    await expect(page.getByText("Lượt chạy đã ghi", { exact: false })).toBeVisible();
+    await expect(page.locator("article[id^='cau-']")).toHaveCount(10);
+
+    // It is nobody's attempt: no stars stored, no row in the regression strip.
+    const kept = await page.evaluate(() => ({
+      progress: window.localStorage.getItem("vg-progress-v1"),
+      history: window.localStorage.getItem("vg.history.v1.grounded-citation"),
+    }));
+    expect(kept.progress).toBeNull();
+    expect(kept.history).toBeNull();
+  });
+
+  test("walks the recorded run case by case with the scrub bar", async ({ page }) => {
+    await mockWorkbenchApi(page);
+    await page.goto("/play/library/grounded-citation");
+    await page.getByRole("button", { name: "Xem lượt đã ghi" }).click();
+
+    await expect(page.getByText("Câu #1/10")).toBeVisible();
+    await page.getByRole("button", { name: "Tới câu sau" }).click();
+    await expect(page.getByText("Câu #2/10")).toBeVisible();
+    await page.getByRole("slider", { name: "Tua qua từng câu của lượt này" }).fill("7");
+    await expect(page.getByText("Câu #7/10")).toBeVisible();
+  });
+});
