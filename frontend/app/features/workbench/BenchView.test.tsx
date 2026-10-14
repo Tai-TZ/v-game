@@ -6,6 +6,7 @@ import { BenchSection, type BenchRunView, type SlotGold } from "./BenchView";
 import type { BenchRun, StepView } from "./run";
 import type { Fact } from "./schema";
 import type { EventType } from "./schema";
+import { STRIP_VI } from "./copy";
 import type { VizData } from "./strip";
 import { frame, readText, replay, testEnv } from "./test-fixtures";
 import { validateGraph } from "./validate";
@@ -396,12 +397,56 @@ describe("the chunker's strip (N22)", () => {
     expect(screen.getByText("Dải đoạn Điều 12", { exact: false })).toBeDefined();
   });
 
+  // The starter blade favours qcdt-2019 Điều 10 ("Bảo lưu kết quả học tập" -- Hà's actual
+  // question), while qcdt-2024 has its own Điều 10 ("Khối lượng học tập"). Resolving by number
+  // alone drew the 2024 namesake, and both cut into 3 pieces with 2 severed sentences, so every
+  // count still matched. The stale-document line is what proves the right one is on screen.
+  it("draws the document the search pointed at, not its namesake in the other document", () => {
+    drawL2(starter());
+    expect(screen.getByText("Dải đoạn Điều 10", { exact: false })).toBeDefined();
+    expect(screen.getByText(STRIP_VI.stale)).toBeDefined();
+  });
+
   it("follows the blade: a different cut favours a different article", () => {
     // co_dinh-512-0 swallows Điều 12 into a cut filed under Điều 11.
     let bench = setParam(l2, starter(), "chunker", "chunk_size", 512);
     bench = setParam(l2, bench, "chunker", "overlap_pct", 0);
     drawL2(bench);
     expect(screen.getByText("Dải đoạn Điều 11", { exact: false })).toBeDefined();
+  });
+
+  // The gate is "can the player move this blade", not a hardcoded level id. L1 locks the
+  // chunker and fixes all four knobs, so a strip there is a picture of a control that cannot
+  // turn -- and it would never change, which is the one thing it exists to do. L3 leaves all
+  // three cut knobs open, so there the strip belongs.
+  it.each([
+    ["grounded-citation", false],
+    ["article-number-lookup", true],
+  ] as const)("draws on %s only when its blade can move: %s", (levelId, drawn) => {
+    const env = testEnv(levelId);
+    const bench = starterBench(env);
+    if (!bench) throw new Error(`${levelId} starter is not drawable`);
+    const graph = graphFromBench(env, bench);
+    const data = JSON.parse(readText("public", "viz", `${levelId}.json`)) as VizData;
+    render(
+      <BenchSection
+        env={env}
+        bench={bench}
+        graph={graph}
+        onChange={() => undefined}
+        locked={false}
+        issues={validateGraph(env, graph)}
+        highlight={null}
+        view={null}
+        preview={null}
+        benchRun="none"
+        viz={data}
+        vizCase={env.level.visible_cases[0]?.id ?? null}
+        saved={false}
+        discarded={false}
+      />,
+    );
+    expect(screen.queryByText("Dải đoạn", { exact: false }) !== null).toBe(drawn);
   });
 
   it("draws nothing when the static data did not load, leaving the bench usable", () => {

@@ -404,7 +404,7 @@ function Slot({
       {/* N22: free, and before any run -- the blade's real cuts through the article the search
           currently favours. It answers "what did I just do to Điều 12" while the knob is still
           under the hand, which is the only moment the answer teaches anything. */}
-      {type === "chunker" && <ChunkerStrip params={params} viz={viz} caseId={vizCase} />}
+      {type === "chunker" && <ChunkerStrip env={env} params={params} viz={viz} caseId={vizCase} />}
       <SlotIssues env={env} graph={graph} issues={own} />
       {step && (
         <StepState
@@ -939,19 +939,28 @@ export function Bar({ value, max }: { value: number; max: number }) {
 
 /** N22: the strip of whichever article this chunker's search currently favours. */
 function ChunkerStrip({
+  env,
   params,
   viz,
   caseId,
 }: {
+  env: Env;
   params: Readonly<Record<string, unknown>>;
   viz: VizData | null;
   caseId: string | null;
 }) {
   if (viz === null || caseId === null) return null;
+  // Only where the blade can actually be moved. L1 and L3 lock the chunker and fix all four of
+  // its knobs, so the strip there would be a picture of a knob that cannot turn -- and it would
+  // never change, which is the one thing it exists to do (N22 is "dải đoạn ở L2").
+  const turnable = (["strategy", "chunk_size", "overlap_pct"] as const).some(
+    (name) => domain(env, "chunker", name)?.kind !== "fixed",
+  );
+  if (isLocked(env.level, "chunker") || !turnable) return null;
   const variant = variantKey(params);
   if (variant === null) return null;
-  const dieu = focusArticle(viz, variant, caseId);
-  if (dieu === null) return null;
-  const strip = articleStrip(viz, variant, dieu);
-  return strip === null ? null : <Strip dieu={dieu} variant={variant} strip={strip} />;
+  const ref = focusArticle(viz, variant, caseId);
+  if (ref === null) return null;
+  const strip = articleStrip(viz, variant, ref.docId, ref.dieu);
+  return strip === null ? null : <Strip strip={strip} variant={variant} />;
 }
