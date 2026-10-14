@@ -206,6 +206,16 @@ describe("the scrub bar waits for the run to be over (N4)", () => {
     data: JSON.stringify({ report: { gold: {}, diagnosis: [] }, models: {} }),
   };
 
+  // Two specs read the case table's first button as the first case's row. A control put
+  // inside that region above the list silently becomes that button instead -- which is
+  // exactly what happened, and only CI caught it.
+  it("stays outside the case table's own region", () => {
+    render(<Panel request={{ state: "idle" }} run={replay([started, done])} />);
+    const region = screen.getByRole("region", { name: "Bảng câu" });
+    expect(region.querySelector("input[type='range']")).toBeNull();
+    expect(region.querySelector("button")?.textContent).not.toContain("câu");
+  });
+
   it("is there to walk a finished run", () => {
     render(<Panel request={{ state: "idle" }} run={replay([started, done])} />);
     expect(screen.getByRole("slider", { name: SCRUB_VI.label })).toBeDefined();

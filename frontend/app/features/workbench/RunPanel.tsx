@@ -82,12 +82,23 @@ export function RunPanel(props: RunPanelProps) {
     <div className="space-y-6">
       {isActive(run) && run ? <Running {...props} run={run} /> : <Editing {...props} />}
       {run && run.cases.length > 0 && (
-        <CaseTable
-          run={run}
-          env={props.env}
-          followedId={props.followedId}
-          onFollow={props.onFollow}
-        />
+        <>
+          {/* Outside the case table's own region, not in it: that region's first button is
+              the first case's row, and two specs read it that way. A control slipped in
+              above it silently becomes "the first button" instead.
+
+              Only once the run is over, too: while it is live the follow moves on its own,
+              and a control fighting the run for it would keep snatching the view back (N4). */}
+          {!isActive(run) && (
+            <Scrub cases={run.cases} followedId={props.followedId} onFollow={props.onFollow} />
+          )}
+          <CaseTable
+            run={run}
+            env={props.env}
+            followedId={props.followedId}
+            onFollow={props.onFollow}
+          />
+        </>
       )}
     </div>
   );
@@ -566,9 +577,6 @@ function CaseTable({
       <h3 id="wb-cases-title" tabIndex={-1} className="scroll-mt-4 text-base font-bold">
         Bảng câu
       </h3>
-      {/* Only once the run is over: while it is live the follow moves on its own, and a
-          control fighting the run for it would keep snatching the view back (N4). */}
-      {!isActive(run) && <Scrub cases={run.cases} followedId={followedId} onFollow={onFollow} />}
       <ul className="mt-2 space-y-1">
         {run.cases.map((c) => {
           const running = !c.graded && runningNodes(c).length > 0;
