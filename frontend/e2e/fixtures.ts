@@ -219,7 +219,42 @@ export const titleOf = (name: string) => name.charAt(0).toLocaleUpperCase("vi") 
 export const sse = {
   short: () => readText("e2e", "data", "run-l1-short.sse"),
   reference: () => readText("e2e", "data", "run-l1-reference.sse"),
+  /**
+   * The reference run as the engine streams a `scope=mau` one (N2): the 3 visible cases only,
+   * stamped on run.started, and no run.scored -- a sample run earns no stars (runtime.py).
+   */
+  sample: (pass = true) => {
+    const visible = new Set(["lib-l1-v01", "lib-l1-v02", "lib-l1-v03"]);
+    const kept = sse
+      .reference()
+      .split("\n\n")
+      .filter((frame) => frame.trim() !== "")
+      .flatMap((frame) => {
+        const line = frame.split("\n").find((l) => l.startsWith("data:")) ?? "data: {}";
+        const data = JSON.parse(line.slice(5)) as Record<string, unknown>;
+        if (frame.includes("event: run.scored")) return [];
+        if (typeof data.case === "string" && !visible.has(data.case)) return [];
+        if (frame.includes("event: run.started")) {
+          const cases = (data.cases as { id: string }[]).filter((c) => visible.has(c.id));
+          return [reframe(frame, { ...data, scope: "mau", cases })];
+        }
+        if (frame.includes("event: case.graded")) {
+          return [reframe(frame, { ...data, passed: pass, status: pass ? "ok" : "fail" })];
+        }
+        if (frame.includes("event: run.finished"))
+          return [reframe(frame, { ...data, scope: "mau" })];
+        return [frame];
+      });
+    return `${kept.join("\n\n")}\n\n`;
+  },
 };
+
+/** One SSE frame with its `data:` line replaced; the id and event lines stay as they were. */
+const reframe = (frame: string, data: unknown) =>
+  frame
+    .split("\n")
+    .map((line) => (line.startsWith("data:") ? `data: ${JSON.stringify(data)}` : line))
+    .join("\n");
 
 export const runId = (n: number) => n.toString(16).padStart(32, "0");
 
@@ -229,7 +264,7 @@ export interface WorkbenchReply extends Reply {
 
 export interface WorkbenchMock {
   /** Every POST /api/runs, in order. */
-  posts: { key: string | null; contentType: string | null; body: string }[];
+  posts: { key: string | null; contentType: string | null; body: string; scope: string | null }[];
   /** Run ids of every POST /api/runs/{id}/cancel. */
   cancels: string[];
   /** GET /api/runs/{id}/events requests so far. */
@@ -294,6 +329,7 @@ export async function mockWorkbenchApi(
         key: request.headers()["idempotency-key"] ?? null,
         contentType: request.headers()["content-type"] ?? null,
         body: request.postData() ?? "",
+        scope: new URL(request.url()).searchParams.get("scope"),
       });
       const n = mock.posts.length;
       const reply = (await options.post?.(n, request)) ?? {
