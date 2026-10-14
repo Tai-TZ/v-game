@@ -1050,9 +1050,13 @@ test.describe("the blade's own strip (B6 N22)", () => {
     await mockWorkbenchApi(page);
     await page.goto(L2);
 
-    // The L2 starter is co_dinh/128/0, whose search favours Điều 5.
-    await expect(page.getByText("Dải đoạn Điều 5", { exact: false })).toBeVisible();
-    await expect(page.getByText("Lượt chạy đã ghi", { exact: false })).toBeHidden();
+    // The L2 starter is co_dinh/128/0: its search favours Điều 10, which 128-token cuts tear
+    // into three pieces across two sentences. Every number here is asserted by
+    // strip.e2e-facts.test.ts against the shipped data, so a content change fails in seconds
+    // rather than ten minutes into the Playwright run.
+    await expect(page.getByText("Dải đoạn Điều 10", { exact: false })).toBeVisible();
+    await expect(page.getByText("Điều 10 được chia thành 3 đoạn.")).toBeVisible();
+    await expect(page.getByText("Câu bị cắt ngang:", { exact: false })).toBeVisible();
 
     // Nam châm bám Điều cuts on the article boundary: Điều 12 comes back whole. The blade's
     // knobs are radio groups, so each option is picked by the words on it.
