@@ -114,6 +114,14 @@ export const RECORDED_VI = {
   notYours: "Lượt của cấu hình khởi đầu, không phải cấu hình của bạn.",
 } as const;
 
+/** N4: walking a finished run case by case. */
+export const SCRUB_VI = {
+  label: "Tua qua từng câu của lượt này",
+  prev: "Về câu trước",
+  next: "Tới câu sau",
+  at: (n: number, total: number) => `Câu #${n}/${total}`,
+} as const;
+
 export const VIZ_STAMP = {
   run: "Đo từ lượt của bạn",
   labels: "Đo từ nhãn của bạn",
