@@ -411,7 +411,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [summary, setSummary] = useState<Summary | null>(null);
   const [request, setRequest] = useState<RequestState>({ state: "idle" });
   const [notes, setNotes] = useState<Issue[]>([]);
-  const [run, dispatch] = useReducer(runReducer, null);
+  const [ours, dispatch] = useReducer(runReducer, null);
   const [lastBody, setLastBody] = useState<string | null>(null);
   const [followed, setFollowed] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<BlockType | null>(null);
@@ -424,15 +424,22 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [ranSlip, setRanSlip] = useState<{ runId: string; slip: Slip } | null>(null);
   const focusLater = useFocusLater();
 
-  useRunStream(run?.runId ?? null, attempt, dispatch);
+  // Everything that talks to the server keys off `live`, the run the reducer is driving. The
+  // recorded run has no run id on any server: streaming, cancelling or reconnecting it would
+  // call `/api/runs/da-ghi/...`.
+  useRunStream(ours?.runId ?? null, attempt, dispatch);
+  const left = useCancelOnLeave(ours);
+  const recorded = useRecordedRun(level);
+  // Everything the player looks at reads `run`: the recorded log stands in until they run
+  // something of their own, and `scope` keeps the two apart wherever that matters.
+  const run = ours ?? recorded.run;
   useRecordStars(level, run);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
   const passing = lastPassing(history);
   useRecordHistory(level.id, run, lastBody, setHistory);
-  const left = useCancelOnLeave(run);
   // A fresh arrow each render re-runs the effect; the hook's own guard, not a trimmed dep
   // list, is what keeps it to one star run per sample run (same rule as useRecordHistory).
-  useStarRunAfterSample(run, lastBody, (starBody) => {
+  useStarRunAfterSample(ours, lastBody, (starBody) => {
     void send(starBody, newKey());
   });
 
@@ -632,6 +639,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             slip={slip}
             onSlip={editSlip}
             onOpen={openShift}
+            onRecorded={() => void recorded.show()}
+            recordedFailed={recorded.failed}
             onRetry={() => {
               if (request.state === "failed") void send(request.body, request.key);
             }}
