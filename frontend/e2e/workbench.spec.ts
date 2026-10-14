@@ -1037,3 +1037,44 @@ test.describe("the cheap try (B5)", () => {
     await expect(page.getByText("Câu #7/10")).toBeVisible();
   });
 });
+
+test.describe("the blade's own strip (B6 N22)", () => {
+  const L2 = "/play/library/chunk-tuning";
+
+  // Free, and before any run: the strip answers "what did I just do to this article" while the
+  // knob is still under the hand. It reads the static data N21 ships, so no API is involved.
+  test("draws the favoured article's real cuts, and follows the blade", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await mockWorkbenchApi(page);
+    await page.goto(L2);
+
+    // The L2 starter is co_dinh/128/0, whose search favours Điều 5.
+    await expect(page.getByText("Dải đoạn Điều 5", { exact: false })).toBeVisible();
+    await expect(page.getByText("Lượt chạy đã ghi", { exact: false })).toBeHidden();
+
+    // Nam châm bám Điều cuts on the article boundary: Điều 12 comes back whole. The blade's
+    // knobs are radio groups, so each option is picked by the words on it.
+    await page.getByRole("radio", { name: "Bám điều, khoản" }).check();
+    await page.getByRole("radio", { name: "512 token" }).check();
+    await page.getByRole("radio", { name: "10 %" }).check();
+    await expect(page.getByText("Dải đoạn Điều 12", { exact: false })).toBeVisible();
+    await expect(page.getByText("Điều 12 được chia thành 1 đoạn.")).toBeVisible();
+    await expect(page.getByText("Câu bị cắt ngang:", { exact: false })).toBeHidden();
+
+    // The figure carries its three parts, and the data says where it came from: computed from
+    // the shipped index, never measured from a run the player has not made.
+    await expect(page.getByText("Tính sẵn từ chỉ mục", { exact: false }).first()).toBeVisible();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("keeps the level usable when the static data is not there", async ({ page }) => {
+    await mockWorkbenchApi(page);
+    await page.route("**/viz/*.json", (route) => route.fulfill({ status: 404, body: "" }));
+    await page.goto(L2);
+
+    await expect(page.getByRole("button", { name: "Mở ca" })).toBeVisible();
+    await expect(page.getByText("Dải đoạn", { exact: false })).toBeHidden();
+  });
+});
