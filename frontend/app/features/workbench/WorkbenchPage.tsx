@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type Dispatch } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type Dispatch,
+} from "react";
 import { Link, useParams } from "react-router";
 import * as v from "valibot";
 
@@ -13,6 +21,7 @@ import { Brief } from "./Brief";
 import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
+import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
 import { lastPassing } from "./history";
 import { Results } from "./Results";
 import {
@@ -301,6 +310,40 @@ export function useStarRunAfterSample(
     chained.current = run.runId;
     start(ranBody);
   }, [run, ranBody, start]);
+}
+
+/**
+ * N4: the level's recorded run, fetched the first time the player asks for it.
+ *
+ * It comes off a static file rather than the API on purpose: it is what covers the minute a
+ * sleeping Render takes to wake (X9), so it must not need the API to be awake. A log that is
+ * missing, stale or some other level's leaves `run` null -- the level is still playable, it
+ * just opens without the replay.
+ */
+export function useRecordedRun(level: PublicLevel) {
+  const [run, setRun] = useState<RunView | null>(null);
+  const [failed, setFailed] = useState(false);
+  const asked = useRef(false);
+  const show = useCallback(async () => {
+    if (asked.current) return;
+    asked.current = true;
+    let raw: unknown;
+    try {
+      // No status check: `parseRecorded` is the one gate, and an error page is not a log --
+      // it either fails to parse as JSON here or fails the contract there.
+      raw = await (
+        await fetch(recordedUrl(level.id), { headers: { Accept: "application/json" } })
+      ).json();
+    } catch {
+      setFailed(true);
+      return;
+    }
+    const log = parseRecorded(level.id, level.version, raw);
+    const replayed = log && replayRecorded(log);
+    if (!replayed) setFailed(true);
+    setRun(replayed ?? null);
+  }, [level.id, level.version]);
+  return { run, failed, show };
 }
 
 /** The graph of the run on show; ours, so it parses, but checked like any other JSON. */

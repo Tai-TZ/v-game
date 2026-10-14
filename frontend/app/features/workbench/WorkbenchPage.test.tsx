@@ -12,6 +12,7 @@ import { loadHistory, type RunMark } from "./storage";
 import {
   useRecordHistory,
   usePreview,
+  useRecordedRun,
   useRecordStars,
   useStarRunAfterSample,
   WorkbenchPage,
@@ -573,5 +574,69 @@ describe("a recorded run is nobody's attempt (N4)", () => {
   it("still puts the player's own star run in the strip", () => {
     renderHook(() => useRecordHistory("grounded-citation", replay(log()), "{}"));
     expect(loadHistory("grounded-citation")).toHaveLength(1);
+  });
+});
+
+describe("useRecordedRun (N4)", () => {
+  const body = JSON.parse(readText("public", "runs", "grounded-citation.json")) as unknown;
+
+  function serve(status: number, payload: unknown = body) {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", (url: string) => {
+      urls.push(url);
+      return Promise.resolve(new Response(JSON.stringify(payload), { status }));
+    });
+    return urls;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks nobody for anything until the player asks to see it", () => {
+    const urls = serve(200);
+    renderHook(() => useRecordedRun(l1.level));
+    expect(urls).toEqual([]);
+  });
+
+  it("plays the shipped log off the static file, not off the API", async () => {
+    const urls = serve(200);
+    const { result } = renderHook(() => useRecordedRun(l1.level));
+    await act(() => result.current.show());
+    expect(urls).toEqual(["/runs/grounded-citation.json"]);
+    expect(result.current.run?.phase).toBe("finished");
+    expect(result.current.run?.scope).toBe("da_ghi");
+  });
+
+  it("fetches once however often the player reopens it", async () => {
+    const urls = serve(200);
+    const { result } = renderHook(() => useRecordedRun(l1.level));
+    await act(() => result.current.show());
+    await act(() => result.current.show());
+    expect(urls).toHaveLength(1);
+  });
+
+  it("leaves the level playable when the file is missing", async () => {
+    serve(404, null);
+    const { result } = renderHook(() => useRecordedRun(l1.level));
+    await act(() => result.current.show());
+    expect(result.current.run).toBeNull();
+    expect(result.current.failed).toBe(true);
+  });
+
+  // The version is the level's, not a constant: a level whose cases moved on must not be
+  // answered with the run recorded against the old ones.
+  it("refuses a log recorded before this version of the level", async () => {
+    serve(200);
+    const { result } = renderHook(() => useRecordedRun({ ...l1.level, version: 2 }));
+    await act(() => result.current.show());
+    expect(result.current.run).toBeNull();
+    expect(result.current.failed).toBe(true);
+  });
+
+  it("leaves the level playable when the file is some other level's", async () => {
+    serve(200, JSON.parse(readText("public", "runs", "chunk-tuning.json")));
+    const { result } = renderHook(() => useRecordedRun(l1.level));
+    await act(() => result.current.show());
+    expect(result.current.run).toBeNull();
+    expect(result.current.failed).toBe(true);
   });
 });
