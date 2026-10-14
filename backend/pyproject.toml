@@ -24,6 +24,7 @@ vgame-build-index = "vgame.engine.index:main"
 # Record the starter run of every Library level from the replay seed (no Gemini call) into
 # frontend/public/runs/<level>.json, redacted for hidden and trap cases (engine/recorded.py).
 vgame-export-recorded-runs = "vgame.engine.recorded:main"
+vgame-export-static-viz = "vgame.engine.static_viz:main"
 
 [dependency-groups]
 # Offline only (vgame-build-index, slow tests): e5 + jina through onnxruntime. The server
