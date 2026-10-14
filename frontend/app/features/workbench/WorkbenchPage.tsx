@@ -22,6 +22,7 @@ import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
 import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
+import { parseViz, vizUrl, type VizData } from "./strip";
 import { lastPassing } from "./history";
 import { Results } from "./Results";
 import { SampleResult } from "./SampleResult";
@@ -340,6 +341,36 @@ export function useLastSample(run: RunView | null): RunView | null {
 }
 
 /**
+ * N22: the level's static visualisation data (N21), loaded unprompted.
+ *
+ * It is the free deterministic preview, so by the time the player drags the blade the strip has
+ * to be able to redraw without asking anyone. Null leaves the level playable without it.
+ */
+export function useStaticViz(level: PublicLevel): VizData | null {
+  const [data, setData] = useState<VizData | null>(null);
+  useEffect(() => {
+    // An AbortController rather than an "is it still mounted" flag: leaving the level should
+    // drop the request, not just its answer.
+    const stop = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(vizUrl(level.id), {
+          headers: { Accept: "application/json" },
+          signal: stop.signal,
+        });
+        setData(parseViz(level.id, level.version, await response.json()));
+      } catch {
+        /* gone, offline, or not JSON: the level plays without the strip */
+      }
+    })();
+    return () => {
+      stop.abort();
+    };
+  }, [level.id, level.version]);
+  return data;
+}
+
+/**
  * N4: the level's recorded run, fetched the first time the player asks for it.
  *
  * It comes off a static file rather than the API on purpose: it is what covers the minute a
@@ -457,6 +488,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   useRunStream(ours?.runId ?? null, attempt, dispatch);
   const left = useCancelOnLeave(ours);
   const recorded = useRecordedRun(level);
+  const viz = useStaticViz(level);
   // Everything the player looks at reads `run`: the recorded log stands in until they run
   // something of their own, and `scope` keeps the two apart wherever that matters.
   const run = ours ?? recorded.run;
@@ -649,6 +681,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           view={benchView}
           benchRun={benchRun}
           preview={previewNodes}
+          viz={viz}
+          vizCase={previewCase}
           saved={saved}
           // Gone once an edit is saved: the two notices would contradict each other.
           discarded={initial.discarded && !saved}

@@ -119,3 +119,21 @@ export function focusArticle(data: VizData, variant: string, caseId: string): nu
   const found = data.articles[docId]?.find((a) => a[1] <= start && start < a[2]);
   return found?.[0] ?? null;
 }
+
+export const vizUrl = (levelId: string) => `/viz/${encodeURIComponent(levelId)}.json`;
+
+/**
+ * Validates a shipped data file against the level asking for it. Null on anything unexpected:
+ * drawing another level's cuts, or last month's, is worse than drawing nothing.
+ */
+export function parseViz(levelId: string, levelVersion: number, raw: unknown): VizData | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const file = raw as Record<string, unknown>;
+  if (file.format !== 1 || file.level !== levelId || file.level_version !== levelVersion) {
+    return null;
+  }
+  const { corpus, articles, strips, ranks } = file;
+  const objects = [corpus, articles, strips, ranks];
+  if (objects.some((part) => typeof part !== "object" || part === null)) return null;
+  return { corpus, articles, strips, ranks } as VizData;
+}
