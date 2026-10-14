@@ -19,6 +19,8 @@ import { CitationLedger } from "./CitationLedger";
 import { packerSaw } from "./ledger";
 import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
+import { articleStrip, focusArticle, variantKey, type VizData } from "./strip";
+import { Strip } from "./Strip";
 import {
   domain,
   isAllowed,
@@ -126,6 +128,10 @@ interface BenchProps {
   benchRun: BenchRun;
   /** What the bench would pull right now; drawn when no run step covers the slot. */
   preview: Preview | null;
+  /** N22: the static per-variant data, for the chunker's strip. Null when it did not load. */
+  viz: VizData | null;
+  /** The sample case the strip follows, so it can pick the article the search favours. */
+  vizCase: string | null;
   saved: boolean;
   discarded: boolean;
 }
@@ -287,6 +293,8 @@ function Slot({
   view,
   benchRun,
   preview,
+  viz,
+  vizCase,
 }: BenchProps & { type: BlockType }) {
   const { level, blocks } = env;
   const id = nodeIds(level)[type];
@@ -393,6 +401,10 @@ function Slot({
       </div>
 
       {type === "chunker" && view && <Ingestion run={view.run} node={id} gold={view.gold} />}
+      {/* N22: free, and before any run -- the blade's real cuts through the article the search
+          currently favours. It answers "what did I just do to Điều 12" while the knob is still
+          under the hand, which is the only moment the answer teaches anything. */}
+      {type === "chunker" && <ChunkerStrip params={params} viz={viz} caseId={vizCase} />}
       <SlotIssues env={env} graph={graph} issues={own} />
       {step && (
         <StepState
@@ -923,4 +935,23 @@ export function Bar({ value, max }: { value: number; max: number }) {
       <rect width={width} height="4" className={value > max ? "fill-danger" : "fill-brand"} />
     </svg>
   );
+}
+
+/** N22: the strip of whichever article this chunker's search currently favours. */
+function ChunkerStrip({
+  params,
+  viz,
+  caseId,
+}: {
+  params: Readonly<Record<string, unknown>>;
+  viz: VizData | null;
+  caseId: string | null;
+}) {
+  if (viz === null || caseId === null) return null;
+  const variant = variantKey(params);
+  if (variant === null) return null;
+  const dieu = focusArticle(viz, variant, caseId);
+  if (dieu === null) return null;
+  const strip = articleStrip(viz, variant, dieu);
+  return strip === null ? null : <Strip dieu={dieu} variant={variant} strip={strip} />;
 }

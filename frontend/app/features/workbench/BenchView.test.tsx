@@ -6,6 +6,7 @@ import { BenchSection, type BenchRunView, type SlotGold } from "./BenchView";
 import type { BenchRun, StepView } from "./run";
 import type { Fact } from "./schema";
 import type { EventType } from "./schema";
+import type { VizData } from "./strip";
 import { frame, readText, replay, testEnv } from "./test-fixtures";
 import { validateGraph } from "./validate";
 
@@ -28,12 +29,16 @@ function Bench({
   benchRun = "none",
   view = null,
   preview = null,
+  viz = null,
+  vizCase = null,
 }: {
   bench: Bench;
   highlight?: "chunker" | null;
   benchRun?: BenchRun;
   view?: BenchRunView | null;
   preview?: Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>> | null;
+  viz?: VizData | null;
+  vizCase?: string | null;
 }) {
   const graph = graphFromBench(l3, bench);
   return (
@@ -48,6 +53,8 @@ function Bench({
       view={view}
       preview={preview}
       benchRun={benchRun}
+      viz={viz}
+      vizCase={vizCase}
       saved={false}
       discarded={false}
     />
@@ -348,5 +355,62 @@ describe("the cut passages under the bin", () => {
     // The committed L3 run packs everything, so there is nothing on the floor and no note.
     expect(pieces).toHaveLength(0);
     expect(note).toBeNull();
+  });
+});
+
+describe("the chunker's strip (N22)", () => {
+  const l2 = testEnv("chunk-tuning");
+  const viz = JSON.parse(readText("public", "viz", "chunk-tuning.json")) as VizData;
+
+  function drawL2(bench: Bench, props: { viz?: VizData | null; vizCase?: string | null } = {}) {
+    const graph = graphFromBench(l2, bench);
+    render(
+      <BenchSection
+        env={l2}
+        bench={bench}
+        graph={graph}
+        onChange={() => undefined}
+        locked={false}
+        issues={validateGraph(l2, graph)}
+        highlight={null}
+        view={null}
+        preview={null}
+        benchRun="none"
+        viz={props.viz === undefined ? viz : props.viz}
+        vizCase={props.vizCase === undefined ? "lib-l2-v01" : props.vizCase}
+        saved={false}
+        discarded={false}
+      />,
+    );
+  }
+
+  const starter = () => {
+    const b = starterBench(l2);
+    if (!b) throw new Error("L2 starter is not drawable");
+    return b;
+  };
+
+  // The whole point of N22: free, before any run, and it moves when the blade moves.
+  it("draws the strip of the article the search favours, with no run on the bench", () => {
+    drawL2(setParam(l2, starter(), "chunker", "strategy", "theo_dieu"));
+    expect(screen.getByText("Dải đoạn Điều 12", { exact: false })).toBeDefined();
+  });
+
+  it("follows the blade: a different cut favours a different article", () => {
+    // co_dinh-512-0 swallows Điều 12 into a cut filed under Điều 11.
+    let bench = setParam(l2, starter(), "chunker", "chunk_size", 512);
+    bench = setParam(l2, bench, "chunker", "overlap_pct", 0);
+    drawL2(bench);
+    expect(screen.getByText("Dải đoạn Điều 11", { exact: false })).toBeDefined();
+  });
+
+  it("draws nothing when the static data did not load, leaving the bench usable", () => {
+    drawL2(starter(), { viz: null });
+    expect(screen.queryByText("Dải đoạn", { exact: false })).toBeNull();
+  });
+
+  it("draws nothing when no sample case is being followed", () => {
+    drawL2(starter(), { vizCase: null });
+    expect(screen.queryByText("Dải đoạn", { exact: false })).toBeNull();
   });
 });
