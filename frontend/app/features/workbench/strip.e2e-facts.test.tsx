@@ -11,10 +11,15 @@
  * names the spec line to update.
  */
 
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { starterBench } from "./bench";
 
 import { articleStrip, cutSentence, focusArticle, type VizData } from "./strip";
-import { readText } from "./test-fixtures";
+import { readText, testEnv } from "./test-fixtures";
+import { WorkbenchPage } from "./WorkbenchPage";
 
 const l2 = JSON.parse(readText("public", "viz", "chunk-tuning.json")) as VizData;
 
@@ -45,16 +50,45 @@ describe("the facts e2e/workbench.spec.ts asserts about the blade's strip", () =
   it("keeps the two apart: a fixed cut hides Điều 12 inside a piece filed under Điều 11", () => {
     expect(focusArticle(l2, "co_dinh-512-0", "lib-l2-v01")).toBe(11);
   });
+});
 
-  // The spec drives radios, not switches or sliders (which is what the first draft assumed).
-  // These are the labels it clicks, straight out of the shipped block schema.
-  it("offers the blade's options under the words the spec clicks", () => {
-    const blocks = JSON.parse(readText("e2e", "data", "blocks.json")) as {
-      blocks: { type: string; params: { properties: Record<string, { enum?: unknown[] }> } }[];
-    };
-    const chunker = blocks.blocks.find((b) => b.type === "chunker");
-    expect(chunker?.params.properties.strategy?.enum).toEqual(["co_dinh", "theo_dieu"]);
-    expect(chunker?.params.properties.chunk_size?.enum).toContain(512);
-    expect(chunker?.params.properties.overlap_pct?.enum).toContain(10);
+/**
+ * The locators the spec uses, resolved against the real page in jsdom.
+ *
+ * The blade's knobs turned out to be chip radios -- `peer sr-only` inputs covered by their own
+ * labels -- not the switches and sliders the first draft of the spec assumed, and Playwright's
+ * `.check()` on such an input times out clicking a hidden 1px box. Both facts cost a CI round.
+ */
+describe("the locators e2e/workbench.spec.ts uses on the blade", () => {
+  function page() {
+    const l2 = testEnv("chunk-tuning");
+    const starter = starterBench(l2);
+    if (!starter) throw new Error("L2 starter is not drawable");
+    return render(
+      <MemoryRouter>
+        <WorkbenchPage env={l2} starter={starter} back="/play/library" />
+      </MemoryRouter>,
+    );
+  }
+
+  afterEach(cleanup);
+
+  it.each([
+    [/Cách chia/, "Bám điều, khoản"],
+    [/Cỡ đoạn/, "512 token"],
+    [/Chồng lấp/, "10 %"],
+  ])("group %s holds exactly one option reading %s", (group, option) => {
+    page();
+    const fieldset = screen.getByRole("group", { name: group });
+    expect(within(fieldset).getAllByText(option, { exact: true })).toHaveLength(1);
+  });
+
+  // The reason the spec clicks words rather than the radio: the input cannot be clicked.
+  it("hides the radio behind its own label, which is why .check() cannot be used", () => {
+    page();
+    const fieldset = screen.getByRole("group", { name: /Cách chia/ });
+    const radio = within(fieldset).getAllByRole("radio")[0];
+    expect(radio?.className).toContain("sr-only");
+    expect(radio?.closest("label")).not.toBeNull();
   });
 });

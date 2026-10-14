@@ -1058,11 +1058,16 @@ test.describe("the blade's own strip (B6 N22)", () => {
     await expect(page.getByText("Điều 10 được chia thành 3 đoạn.")).toBeVisible();
     await expect(page.getByText("Câu bị cắt ngang:", { exact: false })).toBeVisible();
 
-    // Nam châm bám Điều cuts on the article boundary: Điều 12 comes back whole. The blade's
-    // knobs are radio groups, so each option is picked by the words on it.
-    await page.getByRole("radio", { name: "Bám điều, khoản" }).check();
-    await page.getByRole("radio", { name: "512 token" }).check();
-    await page.getByRole("radio", { name: "10 %" }).check();
+    // Nam châm bám Điều cuts on the article boundary: Điều 12 comes back whole.
+    //
+    // The blade's knobs are chip radios: the input itself is `peer sr-only` and its own label
+    // covers it, so `.check()` on the radio times out trying to click a hidden 1px box. The
+    // house pattern (see the slip, above) is to scope to the group and click the visible words.
+    const pick = (group: RegExp, option: string) =>
+      page.getByRole("group", { name: group }).getByText(option, { exact: true }).click();
+    await pick(/Cách chia/, "Bám điều, khoản");
+    await pick(/Cỡ đoạn/, "512 token");
+    await pick(/Chồng lấp/, "10 %");
     await expect(page.getByText("Dải đoạn Điều 12", { exact: false })).toBeVisible();
     await expect(page.getByText("Điều 12 được chia thành 1 đoạn.")).toBeVisible();
     await expect(page.getByText("Câu bị cắt ngang:", { exact: false })).toBeHidden();
