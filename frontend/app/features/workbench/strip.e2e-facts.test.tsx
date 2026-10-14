@@ -187,6 +187,20 @@ describe("what the spec reads off the strip at both widths", () => {
     return screen.getByRole("table");
   }
 
+  // The warning that tells L2's two Điều 10s apart. Put beside the drawing it was invisible on
+  // a phone, because a narrow screen renders the table INSTEAD of the picture -- so the one
+  // line that identifies the trap was the one line a phone never showed.
+  it.each([false, true])("says the document is superseded at narrow=%s too", (narrow) => {
+    drawStrip("co_dinh-128-0", narrow);
+    const figure = screen.getAllByRole("figure")[0];
+    expect(figure?.textContent).toContain("văn bản hết hiệu lực");
+  });
+
+  it.each([false, true])("says nothing of the sort for the in-force document, narrow=%s", (n) => {
+    drawStrip("theo_dieu-512-10", n);
+    expect(screen.getAllByRole("figure")[0]?.textContent).not.toContain("hết hiệu lực");
+  });
+
   it.each([false, true])("gives the starter 3 piece rows and a severed cell, narrow=%s", (n) => {
     drawStrip("co_dinh-128-0", n);
     const rows = table(n);

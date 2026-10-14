@@ -41,12 +41,12 @@ export function Strip({ strip, variant }: { strip: ArticleStrip; variant: string
 
   return (
     <Viz
-      caption={STRIP_VI.caption(dieu)}
+      caption={STRIP_VI.caption(dieu, inForce)}
       stamp="index"
       note={variantVi(variant)}
       table={
         <table className="text-sm">
-          <caption className="sr-only">{STRIP_VI.caption(dieu)}</caption>
+          <caption className="sr-only">{STRIP_VI.caption(dieu, inForce)}</caption>
           <thead>
             <tr>
               <th scope="col" className="py-1 pr-3 text-left font-medium">
