@@ -104,6 +104,16 @@ export const STEP_VI = {
   sampleNote: "3 lời gọi AI, không tính sao. Cả 3 câu mẫu đạt thì run chấm sao chạy tiếp.",
 } as const;
 
+/** N2: what the sample step leaves on screen once it ends. */
+export const SAMPLE_VI = {
+  heading: "Kết quả lượt mẫu",
+  count: (passed: number, total: number) => `${passed}/${total} câu mẫu đạt.`,
+  noStars: "Lượt mẫu không tính sao.",
+  passed: "Cả 3 câu mẫu đạt, run chấm sao đang chạy tiếp.",
+  failed: "Run chấm sao chỉ mở khi cả 3 câu mẫu đạt. Sửa cấu hình rồi mở ca lại.",
+  capped: "Quỹ chung của máy chủ hết giữa chừng nên lượt này không tính. Mai 07:00 có lại.",
+} as const;
+
 /** N4: the run that already happened. Free, and the first thing the level shows. */
 export const RECORDED_VI = {
   open: "Xem lượt đã ghi",
