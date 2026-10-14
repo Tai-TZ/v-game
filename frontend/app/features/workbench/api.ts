@@ -160,11 +160,22 @@ export function describePostError(
   }
 }
 
-/** `POST /api/runs?level=<id>` with the exact body and key (a retry reuses both). */
-export async function postRun(levelId: string, body: string, key: string): Promise<PostResult> {
+/**
+ * `POST /api/runs?level=<id>` with the exact body and key (a retry reuses both).
+ *
+ * `scope` is left off a star run rather than sent as "sao": the server reads its absence that
+ * way, and the key it hashes includes the scope, so the two steps of one Mở ca never collide.
+ */
+export async function postRun(
+  levelId: string,
+  body: string,
+  key: string,
+  scope?: "mau",
+): Promise<PostResult> {
+  const query = `level=${encodeURIComponent(levelId)}${scope === undefined ? "" : `&scope=${scope}`}`;
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}/api/runs?level=${encodeURIComponent(levelId)}`, {
+    response = await fetch(`${API_BASE}/api/runs?${query}`, {
       method: "POST",
       headers: {
         Accept: "application/json",

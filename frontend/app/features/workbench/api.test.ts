@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { describePostError, newKey, previewRetrieval } from "./api";
+import { describePostError, newKey, postRun, previewRetrieval } from "./api";
 
 const headers = (entries: Record<string, string> = {}) => new Headers(entries);
 const NOW = Date.parse("2026-10-08T12:00:00Z");
@@ -199,5 +199,33 @@ describe("previewRetrieval", () => {
   it("rejects a body the server did not shape as facts", async () => {
     stubFetch(200, { case: "lib-l1-v01", nodes: { vs: { kind: "retrieved", items: [{}] } } });
     expect((await previewRetrieval("grounded-citation", "lib-l1-v01", graph)).ok).toBe(false);
+  });
+});
+
+describe("postRun carries the run's scope (N2)", () => {
+  const body = '{"schema":1,"nodes":[],"edges":[]}';
+  const ok = { run_id: "0".repeat(32), created: true, issues: [] };
+
+  function stubPost() {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", (url: string) => {
+      urls.push(url);
+      return Promise.resolve(new Response(JSON.stringify(ok), { status: 202 }));
+    });
+    return urls;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks for a sample run when told to", async () => {
+    const urls = stubPost();
+    await postRun("grounded-citation", body, newKey(), "mau");
+    expect(urls[0]).toContain("scope=mau");
+  });
+
+  it("asks for a star run when not, so no url ever says scope=sao", async () => {
+    const urls = stubPost();
+    await postRun("grounded-citation", body, newKey());
+    expect(urls[0]).not.toContain("scope");
   });
 });
