@@ -1062,17 +1062,22 @@ test.describe("the blade's own strip (B6 N22)", () => {
     await mockWorkbenchApi(page);
     await page.goto(L2);
 
-    // The L2 starter is co_dinh/128/0: its search favours Điều 10, which 128-token cuts tear
-    // into three pieces across two sentences. Every number here is asserted by
-    // strip.e2e-facts.test.tsx against the shipped data, so a content change fails in seconds
-    // rather than ten minutes into the Playwright run.
+    // The L2 starter is co_dinh/128/0: its search favours Điều 10 of the SUPERSEDED document
+    // ("Bảo lưu kết quả học tập" -- Hà's actual question), which 128-token cuts tear into three
+    // pieces across two sentences. Every fact here is asserted by strip.e2e-facts.test.tsx
+    // against the shipped data, so a content change fails in seconds rather than ten minutes
+    // into the Playwright run.
     //
     // Read through the TABLE, not the drawing: below 640 px `Viz` opens these figures as their
     // table alternative, so on the mobile project the bar and its two caption lines are not in
     // the DOM at all -- while the table is reachable at every width. `asTable` normalises it.
     await expect(strip(page, 10)).toBeVisible();
-    await expect(await asTable(strip(page, 10))).toContainText("«");
-    await expect((await asTable(strip(page, 10))).getByRole("row")).toHaveCount(4); // head + 3
+    // The superseded document, named as such. qcdt-2024 has its own Điều 10, and both cut into
+    // three pieces with two severed sentences -- this line is what tells them apart on screen.
+    await expect(strip(page, 10)).toContainText("văn bản hết hiệu lực");
+    const torn = await asTable(strip(page, 10));
+    await expect(torn).toContainText("«");
+    await expect(torn.getByRole("row")).toHaveCount(4); // head + 3 pieces
 
     // Nam châm bám Điều cuts on the article boundary: Điều 12 comes back whole.
     //
@@ -1085,6 +1090,8 @@ test.describe("the blade's own strip (B6 N22)", () => {
     await pick(/Cỡ đoạn/, "512 token");
     await pick(/Chồng lấp/, "10 %");
     await expect(strip(page, 12)).toBeVisible();
+    // Điều 12 of the document still in force, whole, and no stale warning this time.
+    await expect(strip(page, 12)).not.toContainText("văn bản hết hiệu lực");
     const whole = await asTable(strip(page, 12));
     await expect(whole.getByRole("row")).toHaveCount(2); // head + the one piece
     await expect(whole).not.toContainText("«"); // nothing severed

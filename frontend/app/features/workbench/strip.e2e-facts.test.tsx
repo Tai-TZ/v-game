@@ -24,35 +24,65 @@ import { WorkbenchPage } from "./WorkbenchPage";
 
 const l2 = JSON.parse(readText("public", "viz", "chunk-tuning.json")) as VizData;
 
-/** What the strip says for one variant, following L2's first sample case. */
+/**
+ * What the strip says for one variant, following L2's first sample case.
+ *
+ * `docId` and `inForce` are in here deliberately. The first version of this gate recorded only
+ * the article NUMBER, and L2 ships two documents whose numbers collide (qcdt-2024 Điều 1-84,
+ * qcdt-2019 Điều 1-16). Both Điều 10s cut into 3 pieces with 2 severed sentences, so when the
+ * code resolved by number alone and drew the wrong document, every count here still matched.
+ * A gate blind to the identity of the thing it measures is not a gate.
+ */
 function facts(variant: string) {
-  const dieu = focusArticle(l2, variant, "lib-l2-v01");
-  if (dieu === null) return null;
-  const strip = articleStrip(l2, variant, dieu);
+  const ref = focusArticle(l2, variant, "lib-l2-v01");
+  if (ref === null) return null;
+  const strip = articleStrip(l2, variant, ref.docId, ref.dieu);
   if (strip === null) return null;
-  const severed = strip.chunks
-    .map((c) => cutSentence(strip.text, strip.start, c.end))
+  const severed = strip.cuts
+    .map((at) => cutSentence(strip.text, strip.start, at))
     .filter((c) => c !== null);
-  return { dieu, pieces: strip.chunks.length, severed: severed.length };
+  return {
+    docId: ref.docId,
+    dieu: ref.dieu,
+    inForce: strip.inForce,
+    pieces: strip.cuts.length + 1,
+    severed: severed.length,
+  };
 }
 
 describe("the facts e2e/workbench.spec.ts asserts about the blade's strip", () => {
-  // Spec: 'Dải đoạn Điều 10', 'Điều 10 được chia thành 3 đoạn.', 'Câu bị cắt ngang:' visible.
-  it("the L2 starter (co_dinh/128/0) favours Điều 10, in 3 pieces, with a severed sentence", () => {
-    expect(facts("co_dinh-128-0")).toEqual({ dieu: 10, pieces: 3, severed: 2 });
+  // Spec: 'Dải đoạn Điều 10', 3 piece rows, a «severed» cell, and the stale-document line.
+  // The starter blade cuts the very sentence that answers Hà's question, in the superseded
+  // document -- the whole lesson of the level, drawn before a single AI call.
+  it("the L2 starter favours the superseded Điều 10, in 3 pieces, 2 severed", () => {
+    expect(facts("co_dinh-128-0")).toEqual({
+      docId: "qcdt-2019",
+      dieu: 10,
+      inForce: false,
+      pieces: 3,
+      severed: 2,
+    });
   });
 
   // Spec: after picking Bám điều, khoản / 512 token / 10 %.
-  it("the reference blade (theo_dieu/512/10) favours Điều 12, whole, with nothing severed", () => {
-    expect(facts("theo_dieu-512-10")).toEqual({ dieu: 12, pieces: 1, severed: 0 });
+  it("the reference blade favours the in-force Điều 12, whole, nothing severed", () => {
+    expect(facts("theo_dieu-512-10")).toEqual({
+      docId: "qcdt-2024",
+      dieu: 12,
+      inForce: true,
+      pieces: 1,
+      severed: 0,
+    });
   });
 
   // The lesson the level is built on, and the reason the strip is worth drawing at all.
   it("keeps the two apart: a fixed cut hides Điều 12 inside a piece filed under Điều 11", () => {
-    expect(focusArticle(l2, "co_dinh-512-0", "lib-l2-v01")).toBe(11);
+    expect(focusArticle(l2, "co_dinh-512-0", "lib-l2-v01")).toEqual({
+      docId: "qcdt-2024",
+      dieu: 11,
+    });
   });
 });
-
 /**
  * The locators the spec uses, resolved against the real page in jsdom.
  *
@@ -120,12 +150,12 @@ describe("what the spec reads off the strip at both widths", () => {
 
   function drawStrip(variant: string, narrow: boolean) {
     viewport(narrow);
-    const dieu = focusArticle(l2, variant, "lib-l2-v01");
-    if (dieu === null) throw new Error(`${variant} ranks nothing`);
-    const strip = articleStrip(l2, variant, dieu);
-    if (strip === null) throw new Error(`${variant} has no Điều ${dieu}`);
-    render(<Strip dieu={dieu} variant={variant} strip={strip} />);
-    return dieu;
+    const ref = focusArticle(l2, variant, "lib-l2-v01");
+    if (ref === null) throw new Error(`${variant} ranks nothing`);
+    const strip = articleStrip(l2, variant, ref.docId, ref.dieu);
+    if (strip === null) throw new Error(`${variant} has no ${ref.docId} Điều ${ref.dieu}`);
+    render(<Strip strip={strip} variant={variant} />);
+    return ref.dieu;
   }
 
   it.each([false, true])("names the figure exactly once, narrow=%s", (narrow) => {
@@ -141,7 +171,7 @@ describe("what the spec reads off the strip at both widths", () => {
   it("hides the drawn bar and its caption lines on a narrow screen", () => {
     drawStrip("co_dinh-128-0", true);
     expect(document.querySelectorAll("[data-strip-piece]")).toHaveLength(0);
-    expect(screen.queryByText("Điều 10 được chia thành 3 đoạn.")).toBeNull();
+    expect(screen.queryByText("Điều 10 được chia thành 3 đoạn.", { exact: false })).toBeNull();
     expect(screen.getByRole("table")).toBeDefined();
   });
 
