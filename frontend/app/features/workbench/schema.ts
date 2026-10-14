@@ -213,6 +213,8 @@ export type RunReport = v.InferOutput<typeof RunReportSchema>;
 
 export const EVENT_SCHEMAS = {
   "run.started": v.looseObject({
+    // N2: absent on a star run. A sample run runs the 3 visible cases only and scores nothing.
+    scope: v.optional(v.literal("mau")),
     cases: v.array(
       v.looseObject({
         id: v.string(),

@@ -59,6 +59,8 @@ export interface RunView {
   phase: Phase;
   cases: readonly CaseView[];
   ingestion: readonly { node: string; variant: string; chunks: number; avg_tokens: number }[];
+  /** N2: "mau" for a sample run over the 3 visible cases. Absent on a star run. */
+  scope?: "mau";
   score?: StarResult;
   report?: RunReport;
   models?: Readonly<Record<string, number>>;
@@ -88,6 +90,7 @@ function apply(run: RunView, event: RunEvent): RunView {
         ...run,
         phase: "running",
         ingestion: event.ingestion,
+        ...(event.scope === undefined ? {} : { scope: event.scope }),
         cases: event.cases.map((c, index) => ({
           id: c.id,
           n: index + 1,

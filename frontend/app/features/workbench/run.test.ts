@@ -163,6 +163,26 @@ describe("runReducer", () => {
   });
 });
 
+describe("the run knows whether it is a sample run (N2)", () => {
+  it("is a star run when the server sends no scope", () => {
+    expect(replay(short)?.scope).toBeUndefined();
+  });
+
+  it("carries the scope the server stamped on run.started", () => {
+    const run = replay([frame(1, "run.started", { cases: [], ingestion: [], scope: "mau" })]);
+    expect(run?.scope).toBe("mau");
+  });
+
+  it("keeps the scope through the rest of the run, so the results can still read it", () => {
+    const started = replay([frame(1, "run.started", { cases: [], ingestion: [], scope: "mau" })]);
+    const finished = replay(
+      [frame(2, "run.finished", { report: { gold: {}, diagnosis: [] }, models: {} })],
+      started,
+    );
+    expect(finished?.scope).toBe("mau");
+  });
+});
+
 describe("frameAction", () => {
   it("turns an SSE frame into a reducer action, and drops a malformed one", () => {
     const [first] = short;
