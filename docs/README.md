@@ -29,6 +29,12 @@ V-Game là game web giáo dục cho chương trình AI 20K. Người chơi lắp
 | [content/lesson-plan-library.md](content/lesson-plan-library.md) | Giáo án 45 phút cho Thư viện L1; yêu cầu chế độ máy chiếu | v0.1, cần giảng viên đọc thử |
 | [content/corpus/README.md](content/corpus/README.md), `content/golden/` | Kho quy chế hư cấu và bộ câu hỏi vàng | Đang dùng |
 
+## Nghiên cứu
+
+| Tài liệu | Nội dung | Trạng thái |
+|---|---|---|
+| [research/evidence-dossier.md](research/evidence-dossier.md) | Hồ sơ bằng chứng khoa học cho giảng viên: ma trận cơ chế và nguồn, giới hạn, khoảng trống, thiết kế pilot tối thiểu | Viết 2026-11-01; nguồn đã đối chiếu DOI và abstract, chưa đọc toàn văn |
+
 ## Quy ước
 
 - Viết bằng tiếng Việt; thuật ngữ kỹ thuật giữ tiếng Anh.
