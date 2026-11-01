@@ -16,20 +16,30 @@ const book = (opened: number, looked: boolean, key: Target["key"] = "s1"): HintB
   fails: {},
 });
 
-function ladder(target: Target, b: HintBook, levelId = L1, gate3 = false) {
+function ladder(
+  target: Target,
+  b: HintBook,
+  levelId = L1,
+  gate3 = false,
+  variant: string | null = null,
+) {
   const onOpen = vi.fn();
   const onPointer = vi.fn();
+  const onVariant = vi.fn();
   const view = render(
     <HintLadder
       levelId={levelId}
       target={target}
       book={b}
       gate3={gate3}
+      variant={variant}
+      busy={false}
       onOpen={onOpen}
       onPointer={onPointer}
+      onVariant={onVariant}
     />,
   );
-  return { onOpen, onPointer, view };
+  return { onOpen, onPointer, onVariant, view };
 }
 
 describe("HintLadder", () => {
@@ -94,5 +104,23 @@ describe("HintLadder", () => {
   it("offers no empty box on a level with no ladder written", () => {
     const { view } = ladder(star1, book(0, false), "watchtower-l1");
     expect(view.container.innerHTML).toBe("");
+  });
+});
+
+describe("the variant after hint 3 (N16)", () => {
+  it("offers the variant once hint 3 is open, and runs it on request", () => {
+    const { onVariant } = ladder(star1, book(3, true), L1, true, "lib-l1-r01");
+    expect(screen.getByRole("heading", { name: HINTS_VI.variantHeading })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: HINTS_VI.variantRun }));
+    expect(onVariant).toHaveBeenCalledOnce();
+  });
+
+  it("offers no variant before hint 3, nor for a star that has none", () => {
+    // Hint 2 open, hint 3's gate still shut: the panel waits, and offers no variant yet.
+    ladder(star1, book(2, true), L1, false, "lib-l1-r01");
+    expect(screen.queryByRole("button", { name: HINTS_VI.variantRun })).toBeNull();
+    cleanup();
+    ladder(star1, book(3, true), L1, true, null);
+    expect(screen.queryByRole("heading", { name: HINTS_VI.variantHeading })).toBeNull();
   });
 });

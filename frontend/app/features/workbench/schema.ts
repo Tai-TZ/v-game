@@ -172,7 +172,8 @@ const Facts = v.pipe(
   ),
 );
 
-const CaseRoleSchema = v.picklist(["visible", "hidden", "trap"]);
+// "review": the one case of a variant run after hint 3 (scope "bien_the", N16).
+const CaseRoleSchema = v.picklist(["visible", "hidden", "trap", "review"]);
 export type CaseRole = v.InferOutput<typeof CaseRoleSchema>;
 
 const StarResultSchema = v.looseObject({
@@ -215,7 +216,7 @@ export const EVENT_SCHEMAS = {
   "run.started": v.looseObject({
     // Absent on a star run. "mau": the 3 visible cases only, no stars (N2). "da_ghi": a
     // recorded run replayed from a static file, never the player's own attempt (N4).
-    scope: v.optional(v.picklist(["mau", "da_ghi"])),
+    scope: v.optional(v.picklist(["mau", "da_ghi", "bien_the"])),
     cases: v.array(
       v.looseObject({
         id: v.string(),

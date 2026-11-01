@@ -105,6 +105,14 @@ export const STEP_VI = {
   sampleAloneNote: "3 lời gọi AI, không tính sao. Quỹ hôm nay chỉ đủ cho bước này.",
 } as const;
 
+/** N16: what a variant run leaves on screen. */
+export const VARIANT_VI = {
+  heading: "Kết quả câu biến thể",
+  step: "Câu biến thể: 1 lời gọi từ quỹ chung của lớp, không tính sao.",
+  passed: "Đạt. Bạn đã tự sửa được cho một câu chưa gặp.",
+  failed: "Chưa đạt. Đọc vết chạy của câu này, sửa rồi chạy lại.",
+} as const;
+
 /** N2: what the sample step leaves on screen once it ends. */
 export const SAMPLE_VI = {
   heading: "Kết quả lượt mẫu",
@@ -161,6 +169,10 @@ export const HINTS_VI = {
   waitLook:
     "Gợi ý 2 mở sau khi bạn nhìn thêm một chỗ: đổi một món trên bàn thợ, theo dõi một câu, hoặc mở vết chạy của một câu trượt.",
   example: "Gợi ý 3 · lời giải mẫu",
+  variantHeading: "Câu biến thể",
+  variantLead:
+    "Một câu mới cùng bài học này. Tự sửa cấu hình cho nó, không có gợi ý, rồi chạy riêng câu này. Lượt này lấy 1 lời gọi từ quỹ chung của lớp.",
+  variantRun: "Chạy câu biến thể",
   waitGate: (failed: number) =>
     `Gợi ý 3 là lời giải mẫu. Nó mở khi bạn đã nhìn thêm một chỗ sau gợi ý 2, và đã trượt 3 lượt chấm ở sao này trên các cấu hình khác nhau (hiện là ${failed}), hoặc khi quỹ hôm nay không đủ cho thêm một lượt.`,
   seeCase: (n: number) => `Xem câu #${n}`,
@@ -456,6 +468,7 @@ export const ROLE_VI: Readonly<Record<string, string>> = {
   visible: "Câu mẫu",
   hidden: "Câu ẩn",
   trap: "Câu bẫy",
+  review: "Câu biến thể",
 };
 
 export const VAI_VI: Readonly<Record<string, string>> = {

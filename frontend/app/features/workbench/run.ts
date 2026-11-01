@@ -63,7 +63,7 @@ export interface RunView {
    * "mau": a sample run over the 3 visible cases (N2). "da_ghi": a log replayed from a static
    * file (N4). Absent on a star run, the only kind that is the player's own attempt.
    */
-  scope?: "mau" | "da_ghi";
+  scope?: "mau" | "da_ghi" | "bien_the";
   score?: StarResult;
   report?: RunReport;
   models?: Readonly<Record<string, number>>;

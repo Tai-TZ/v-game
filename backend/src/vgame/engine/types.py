@@ -29,7 +29,8 @@ BlockType = Literal[
     "context_packer",
     "llm",
 ]
-CaseRole = Literal["visible", "hidden", "trap"]  # "review" cases are not part of level runs
+# "review" cases run only one at a time, as the variant after hint 3 (scope "bien_the").
+CaseRole = Literal["visible", "hidden", "trap", "review"]
 StopReason = Literal["end", "max_tokens", "refusal", "error"]
 StepStatus = Literal["ok", "timeout", "cancelled", "budget", "llm_error", "index_error", "refusal"]
 CaseStatus = Literal[
@@ -37,7 +38,9 @@ CaseStatus = Literal[
 ]
 Retriever = Literal["vector_search", "bm25_search", "fusion", "rerank"]
 # "mau": N2 "Thử 3 câu mẫu", the visible cases only and never a star score (roadmap-v0.4 B0).
-RunScope = Literal["mau"]
+# "mau": the 3 visible cases, no stars (N2). "bien_the": one review case after hint 3, paid from
+# the class reserve R (N16, L1 §11).
+RunScope = Literal["mau", "bien_the"]
 
 
 # --- Usage --------------------------------------------------------------------------------
@@ -181,7 +184,8 @@ class DocList:
 @dataclass(frozen=True, slots=True)
 class PublicCase:
     """Value of the ``Query`` port. ``question`` is needed to run the case but is sent to the
-    client only for ``visible`` cases (Part 3 §3.7, B6). No expect/gold/answer_points here."""
+    client only for ``visible`` cases and the ``review`` case of a variant run (Part 3 §3.7, B6;
+    L1 §11). No expect/gold/answer_points here."""
 
     id: str
     role: CaseRole
@@ -449,7 +453,7 @@ class RunFinishedEvent(TypedDict):
     # served, so without this the client cannot tell a primary answer from a fallback one.
     # Absent when nothing answered: the field describes this run, not the server's config.
     primary_model: NotRequired[str]
-    scope: NotRequired[RunScope]  # "mau": no run.scored came before it
+    scope: NotRequired[RunScope]  # no run.scored came before it
 
 
 class RunFailedEvent(TypedDict):

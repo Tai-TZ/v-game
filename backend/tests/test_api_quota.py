@@ -3,7 +3,7 @@ GET /api/quota and the reserve refund. Offline: Oracle LLM, fake models."""
 
 import asyncio
 import inspect
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -25,20 +25,6 @@ from vgame.engine.types import LLMClient, LLMMessage, LLMRequest
 from vgame.main import create_app
 
 VISIBLE = [c.id for c in spec(L1).cases if c.role == "visible"]
-
-
-@pytest.fixture
-def make_client(settings: Settings) -> Iterator[Callable[[EngineServices], TestClient]]:
-    clients: list[TestClient] = []
-
-    def make(services: EngineServices) -> TestClient:
-        client = TestClient(create_app(settings, engine=services))
-        clients.append(client.__enter__())
-        return client
-
-    yield make
-    for client in clients:
-        client.__exit__(None, None, None)
 
 
 def services(llm: LLMClient | None = None, *, reserve: int = 17) -> EngineServices:
@@ -83,9 +69,7 @@ def test_sample_run_streams_the_three_visible_cases_without_stars(
 
 def test_unknown_scope_is_a_422(make_client: Callable[[EngineServices], TestClient]) -> None:
     client = make_client(services())
-    response = client.post(
-        f"/api/runs?level={L1}&scope=bien_the", content=reference(), headers=JSON
-    )
+    response = client.post(f"/api/runs?level={L1}&scope=sao", content=reference(), headers=JSON)
     assert response.status_code == 422
     assert response.json()["fields"] == ["query.scope"]
 

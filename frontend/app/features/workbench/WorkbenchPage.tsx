@@ -60,6 +60,8 @@ import {
 import { HintLadder, useHints } from "./HintLadder";
 import { firstTouches, firstTouchTypes, type Pointer } from "./hints";
 import { useQuota } from "./useQuota";
+import { VariantResult } from "./VariantResult";
+import { loadSeen, markSeen, pickVariant } from "./variants";
 import { errorsOf, validateGraph } from "./validate";
 
 const levelsUrl = (zoneId: string | null) => (zoneId ? `/play/${zoneId}` : "/play");
@@ -488,6 +490,22 @@ function RevealGate({ onReveal }: { onReveal: () => void }) {
   );
 }
 
+/**
+ * The player's latest run that is not a variant run: the attempt the hint ladder follows.
+ * `variantId` names the variant run as soon as its POST answers -- before `run.started` brings
+ * its scope, the reset run looks like any other.
+ */
+export function useLastAttempt(
+  run: RunView | null,
+  variantId: string | null = null,
+): RunView | null {
+  const [attempt, setAttempt] = useState<RunView | null>(null);
+  const isVariant = run?.scope === "bien_the" || (run !== null && run.runId === variantId);
+  // Adjusted during render, as in useLastSample: derived from a change in the run.
+  if (!isVariant && attempt !== run) setAttempt(run);
+  return isVariant ? attempt : run;
+}
+
 export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench; back: string }) {
   const { level } = env;
   const [initial] = useState(() => loadSaved(env));
@@ -560,10 +578,13 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     slipOf,
     projector,
   });
+  // A variant run is the self-fix after hint 3: the ladder stays on the attempt it came from.
+  const [variantId, setVariantId] = useState<string | null>(null);
+  const lastAttempt = useLastAttempt(ours, variantId);
   const hints = useHints({
     levelId: level.id,
     zoneId: level.zone,
-    run: ours,
+    run: lastAttempt,
     ranBody: lastBody,
     gate: {
       left: quota.left,
@@ -619,6 +640,10 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   useEffect(() => {
     if (stopped) focusOn(document.getElementById("wb-sample"));
   }, [stopped]);
+  const variantDone = ours?.scope === "bien_the" && ours.phase === "finished" ? ours.runId : null;
+  useEffect(() => {
+    if (variantDone) focusOn(document.getElementById("wb-variant"));
+  }, [variantDone]);
   const failedRun = run?.phase === "failed" ? run.runId : null;
   useEffect(() => {
     if (failedRun) focusOn(document.getElementById("wb-run-failed"));
@@ -690,7 +715,12 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   }
 
   /** `before`: the cancel of a lost run, so the server's single run slot is free first. */
-  async function send(sendBody: string, key: string, before?: Promise<unknown>, scope?: "mau") {
+  async function send(
+    sendBody: string,
+    key: string,
+    before?: Promise<unknown>,
+    scope?: "mau" | { variant: string },
+  ) {
     // A function, not `left.current`: TS would narrow it to false across the awaits.
     const gone = () => left.current;
     setRequest({ state: "sending", key, body: sendBody });
@@ -719,6 +749,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     setRanSlip(isEmptySlip(slip) ? null : { runId: result.runId, slip });
     editSlip(EMPTY_SLIP);
     setLastBody(sendBody);
+    setVariantId(typeof scope === "object" ? result.runId : null);
     setFollowed(null);
     setAttempt(0);
     dispatch({ kind: "reset", runId: result.runId });
@@ -742,6 +773,25 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   function showRecorded() {
     if (ours !== null && !isActive(ours)) dispatch({ kind: "clear" });
     void recorded.show();
+  }
+
+  /**
+   * N16: the variant after hint 3 -- the least-met review case of the lesson, run alone on the
+   * bench as it stands, paid from the class reserve R. Marked met as it goes out, so the next
+   * variant of the same lesson is another case.
+   */
+  function runVariant() {
+    if (!hints.target) return;
+    if (errorsOf(issues).length > 0) {
+      if (!serverIssues) setSummary({ kind: "client" });
+      focusLater("#wb-issues");
+      return;
+    }
+    const caseId = pickVariant(level.id, hints.target.key, loadSeen(level.id));
+    if (caseId === null) return;
+    markSeen(level.id, caseId);
+    setSamplesOnly(false);
+    void send(body, newKey(), undefined, { variant: caseId });
   }
 
   /** Following a case puts it under the lamp: a free look toward the next hint (L1 §11). */
@@ -870,6 +920,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       </div>
       {awaitingReveal && <RevealGate onReveal={() => setRevealed(awaitingReveal)} />}
       {sample && !masked && <SampleResult run={sample} samplesOnly={samplesOnly} />}
+      {ours && !masked && <VariantResult run={ours} />}
       {run?.score && !masked && (
         <Results
           key={run.runId}
@@ -897,8 +948,11 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           target={hints.target}
           book={hints.book}
           gate3={hints.gate3}
+          variant={pickVariant(level.id, hints.target.key, loadSeen(level.id))}
+          busy={locked}
           onOpen={hints.openNext}
           onPointer={point}
+          onVariant={runVariant}
         />
       )}
       <p aria-live="polite" className="sr-only">

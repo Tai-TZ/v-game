@@ -27,6 +27,7 @@ import {
   sameGraphNote,
   STEP_VI,
   toyName,
+  VARIANT_VI,
   vaiVi,
 } from "./copy";
 import type { Slip } from "./guess";
@@ -568,6 +569,9 @@ function Running({
           </p>
         </div>
       )}
+      {run.scope === "bien_the" && (
+        <p className="rounded-md border border-line p-3 text-sm">{VARIANT_VI.step}</p>
+      )}
       <p className="text-sm font-semibold tabular-nums">
         {graded}/{run.cases.length} câu đã chấm
       </p>
@@ -656,7 +660,8 @@ function Running({
 
 /** "#3 · Câu mẫu · Hỏi một dữ kiện", plus "· Câu của Minh" on case #1 (§8.5). */
 export function caseTitle(c: CaseView, levelId: string): string {
-  const asker = c.n === 1 ? LEVEL_COPY[levelId]?.asker : undefined;
+  // The asker belongs to the level's case #1; a variant run's only case is #1 too.
+  const asker = c.n === 1 && c.role === "visible" ? LEVEL_COPY[levelId]?.asker : undefined;
   return `#${c.n} · ${ROLE_VI[c.role] ?? c.role} · ${vaiVi(c.vai)}${asker ? ` · Câu của ${asker}` : ""}`;
 }
 
