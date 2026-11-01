@@ -151,6 +151,31 @@ export const QUOTA_VI = {
     "Bạn đoán chắc và đúng, nhưng quỹ hoàn chung của lớp hôm nay đã hết: quỹ chia theo thứ tự, ai đạt trước được trước.",
 } as const;
 
+/** N16: the hint ladder (L1-L3 §11). */
+export const HINTS_VI = {
+  heading: "Gợi ý",
+  lead: (star: number) =>
+    `Gợi ý nhắm vào sao ${star}. Xem gợi ý không tốn lượt chạy và không hạ mục tiêu.`,
+  open: (n: number) => `Xem gợi ý ${n}`,
+  label: (n: number) => `Gợi ý ${n}`,
+  waitLook:
+    "Gợi ý 2 mở sau khi bạn nhìn thêm một chỗ: đổi một món trên bàn thợ, theo dõi một câu, hoặc mở vết chạy của một câu trượt.",
+  seeCase: (n: number) => `Xem câu #${n}`,
+  seeSlot: (toy: string) => `Xem ở ${toy}`,
+} as const;
+
+/** N17: one line the first time a toy is touched; never an overlay, never a help button. */
+export const FIRST_TOUCH_VI: Partial<Record<BlockType, string>> = {
+  chunker: "Lược dao cắt kho thành đoạn. Đoạn to giữ trọn ý; đoạn nhỏ dễ tìm trúng hơn.",
+  vector_search: "Vòm Sao xếp đoạn theo nghĩa gần câu hỏi. Móc kéo quyết định lấy bao nhiêu đoạn.",
+  bm25_search: "Tủ ngăn kéo tìm theo chữ trùng khớp, nên bắt được số điều và mã.",
+  fusion: "Phễu gộp hai danh sách đoạn thành một danh sách.",
+  rerank: "Kính lúp chấm lại các đoạn đã kéo về và giữ những đoạn sát câu hỏi nhất.",
+  context_packer:
+    "Thùng Context gom các đoạn vào lời gửi Bộ Óc; Máy đóng tem gắn mã cho từng đoạn.",
+  llm: "Thẻ trong Lăng kính là lời dặn Bộ Óc đọc trước mọi câu hỏi.",
+};
+
 /** Projector mode (`?chieu=1`, lesson-plan appendix R1-R10). */
 export const PROJECTOR_VI = {
   guessHeading: "Cả lớp đoán",

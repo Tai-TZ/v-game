@@ -67,6 +67,8 @@ interface ResultsProps {
   onDebrief: (extras: { why?: number; next?: NextPick }) => void;
   onEdit: () => void;
   onFocusSlot: (type: BlockType, param?: string) => void;
+  /** N16: opening a failing case's trace is a free look toward the next hint. */
+  onLook?: () => void;
 }
 
 /** Sao 3 evidence per forbidden label, in the words of `stars_vi` ("{n} câu …"). */
@@ -91,6 +93,7 @@ export function Results({
   onDebrief,
   onEdit,
   onFocusSlot,
+  onLook,
 }: ResultsProps) {
   const { level } = env;
   // §3.7: gold belongs to the sample cases. The server redacts the rest (runs.py), so this is
@@ -326,7 +329,14 @@ export function Results({
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>
       <div className="mt-3 grid gap-3 lg:grid-cols-2 chieu:lg:grid-cols-1">
         {run.cases.map((c) => (
-          <CaseCard key={c.id} env={env} c={c} gold={revealed[c.id]} runGraph={runGraph} />
+          <CaseCard
+            key={c.id}
+            env={env}
+            c={c}
+            gold={revealed[c.id]}
+            runGraph={runGraph}
+            onLook={onLook}
+          />
         ))}
       </div>
 
@@ -391,12 +401,15 @@ function CaseCard({
   c,
   gold,
   runGraph,
+  onLook,
 }: {
   env: Env;
   c: CaseView;
   gold: GoldReveal | undefined;
   runGraph: Graph | null;
+  onLook: (() => void) | undefined;
 }) {
+  const failed = c.graded?.counted === true && !c.graded.passed;
   const titleId = `cau-${c.n}-title`;
   const served = caseModel(c);
   return (
@@ -413,7 +426,13 @@ function CaseCard({
       <p data-case-tokens className="mt-2 text-sm text-fg-muted tabular-nums">
         {fmt(c.tokens.in + c.tokens.out)} token ({TOKENS_VI.usage})
       </p>
-      <details className="group mt-1 chieu:hidden">
+      <details
+        className="group mt-1 chieu:hidden"
+        onToggle={(event) => {
+          // L1 §11: the look that counts is the trace of a case that failed.
+          if (failed && event.currentTarget.open) onLook?.();
+        }}
+      >
         <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
           Xem vết chạy<span className="sr-only"> câu #{c.n}</span>
           <ChevronDownIcon />

@@ -19,7 +19,7 @@ import { cancelRun, eventsUrl, newKey, postRun, previewRetrieval, type LevelPage
 import { benchFromGraph, graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
-import { BACK_TO_LEVELS, liveMessage, PROJECTOR_VI } from "./copy";
+import { BACK_TO_LEVELS, FIRST_TOUCH_VI, liveMessage, PROJECTOR_VI } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
 import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
@@ -57,6 +57,8 @@ import {
   saveSlip,
   type RunMark,
 } from "./storage";
+import { HintLadder, useHints } from "./HintLadder";
+import { firstTouches, firstTouchTypes, type Pointer } from "./hints";
 import { useQuota } from "./useQuota";
 import { errorsOf, validateGraph } from "./validate";
 
@@ -526,6 +528,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const projector = useProjector().on;
   const [revealed, setRevealed] = useState<string | null>(null);
   const masked = projector && run !== null && run.runId !== revealed;
+  // N16: the ladder follows the player's own last run; N17: the first-touch lines of the page.
+  const hints = useHints(level.id, ours);
+  const [tips, setTips] = useState<Partial<Record<BlockType, string>>>({});
   const sample = useLastSample(ours);
   useRecordStars(level, run);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
@@ -628,6 +633,16 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const stop: StopState = stopping && stopping.runId === run?.runId ? stopping.state : null;
 
   function edit(next: Bench) {
+    const fresh = firstTouches(firstTouchTypes(graph, graphFromBench(env, next)));
+    if (fresh.length > 0) {
+      setTips((shown) => ({
+        ...shown,
+        ...Object.fromEntries(
+          fresh.flatMap((t) => (FIRST_TOUCH_VI[t] ? [[t, FIRST_TOUCH_VI[t]]] : [])),
+        ),
+      }));
+    }
+    hints.markLook(); // turning a toy is a free look (L1 §11)
     setBench(next);
     setSaved(save(level.id, level.version, graphFromBench(env, next)));
     setServerIssues(null);
@@ -720,6 +735,24 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     void recorded.show();
   }
 
+  /** Following a case puts it under the lamp: a free look toward the next hint (L1 §11). */
+  function follow(caseId: string) {
+    setFollowed(caseId);
+    hints.markLook();
+  }
+
+  /** A hint's "Xem …": the case onto the bench, or the toy's slot into view. */
+  function point(pointer: Pointer) {
+    if (pointer.kind === "case") {
+      const target = run?.cases.find((c) => c.n === pointer.n);
+      if (target) follow(target.id);
+      focusLater("#wb-bench-title");
+    } else {
+      hints.markLook();
+      focusSlot(pointer.slot, pointer.param);
+    }
+  }
+
   function focusSlot(type: BlockType, param?: string) {
     setHighlight(type);
     focusLater(slotTargets(env, type, param));
@@ -754,6 +787,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           viz={viz}
           vizCase={previewCase}
           saved={saved}
+          tips={tips}
           // Gone once an edit is saved: the two notices would contradict each other.
           discarded={initial.discarded && !saved}
         />
@@ -821,7 +855,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
               focusLater("#wb-bench-title");
             }}
             onEdit={() => focusLater("#wb-bench-title")}
-            onFollow={setFollowed}
+            onFollow={follow}
           />
         </aside>
       </div>
@@ -845,6 +879,16 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           onDuplicate={benchFrom}
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}
+          onLook={hints.markLook}
+        />
+      )}
+      {hints.target && !masked && (
+        <HintLadder
+          levelId={level.id}
+          target={hints.target}
+          book={hints.book}
+          onOpen={hints.openNext}
+          onPointer={point}
         />
       )}
       <p aria-live="polite" className="sr-only">
