@@ -1,0 +1,13 @@
+# osv-scanner reads this file for backend/uv.lock (the closest config wins).
+# Every entry names what is ignored, why it cannot reach a user, and a date to look again.
+
+[[PackageOverrides]]
+name = "pillow"
+ecosystem = "PyPI"
+vulnerability.ignore = true
+effectiveUntil = 2027-02-01
+reason = """pillow arrives only through fastembed in the offline "models" group \
+(vgame-build-index and the slow tests); the server installs with `uv sync --no-dev` and never \
+loads it, and the index build embeds text, not images. fastembed 0.8.1 caps pillow below 13. \
+Moving to fastembed 0.9.1 needs the slow bit-equality tests run on the machine that built the \
+shipped index, because the vectors must stay byte-identical."""
