@@ -115,6 +115,16 @@ describe("useQuota", () => {
     expect(result.current.left).toBe(11);
   });
 
+  it("never charges a variant run, which the class reserve pays (N16)", async () => {
+    const variant: RunView = { ...finished("v1", [true]), scope: "bien_the" };
+    const { result } = setup(variant);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(loadLedger(new Date()).pools.learner.used).toBe(0);
+    // Waited for, not read at once: the second fetch is called before its reply sets `left`,
+    // and under a full parallel run that gap lost the race and read null.
+    await waitFor(() => expect(result.current.left).toBe(13));
+  });
+
   it("drops to the samples alone when the pool no longer covers the shift", async () => {
     const { result } = setup(finished("r9", Array<boolean>(5).fill(true)));
     await waitFor(() => expect(result.current.left).toBe(8));

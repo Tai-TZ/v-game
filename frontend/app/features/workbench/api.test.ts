@@ -228,4 +228,10 @@ describe("postRun carries the run's scope (N2)", () => {
     await postRun("grounded-citation", body, newKey());
     expect(urls[0]).not.toContain("scope");
   });
+
+  it("asks for one review case as the variant after hint 3 (N16)", async () => {
+    const urls = stubPost();
+    await postRun("grounded-citation", body, newKey(), { variant: "lib-l1-r04" });
+    expect(urls[0]).toContain("scope=bien_the&case=lib-l1-r04");
+  });
 });

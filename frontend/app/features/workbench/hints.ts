@@ -34,7 +34,9 @@ const failing = (c: CaseView) => c.graded?.counted === true && !c.graded.passed;
  * daily cap cut short does not count (daily-shift §3.3).
  */
 export function hintTarget(levelId: string, run: RunView, best = 0): Target | null {
-  if (run.scope === "da_ghi" || run.phase !== "finished" || cappedRun(run)) return null;
+  // A variant run is the self-fix after hint 3, not another attempt at the star.
+  if (run.scope === "da_ghi" || run.scope === "bien_the") return null;
+  if (run.phase !== "finished" || cappedRun(run)) return null;
 
   // Stuck at the samples (L1 §11, X28; rà soát vòng 6): a failing sample counts for the lowest
   // star not yet earned on this level -- star 1 before any star, star 2 once star 1 is in --

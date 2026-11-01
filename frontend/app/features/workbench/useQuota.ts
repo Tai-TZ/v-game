@@ -99,7 +99,8 @@ export function useQuota({
   useEffect(() => {
     if (ours === null || !terminal(ours) || charged.current.has(ours.runId)) return;
     charged.current.add(ours.runId);
-    const calls = llmCalls(ours).real;
+    // A variant run draws on the class reserve R, which the server counts (N16).
+    const calls = ours.scope === "bien_the" ? 0 : llmCalls(ours).real;
     const next = calls > 0 ? spend(loadLedger(new Date()), pool, calls, "level") : null;
     if (next) saveLedger(next);
     // Both numbers move together once the server has answered, so the line never shows the

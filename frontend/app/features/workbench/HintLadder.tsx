@@ -86,16 +86,24 @@ export function HintLadder({
   target,
   book,
   gate3,
+  variant,
+  busy,
   onOpen,
   onPointer,
+  onVariant,
 }: {
   levelId: string;
   target: Target;
   book: HintBook;
   /** The rest of hint 3's gate (`hint3Gate`): failures at this star, or the pool. */
   gate3: boolean;
+  /** The review case to fix for after hint 3, or null where the star has none (daily-shift §2). */
+  variant: string | null;
+  /** A request or a run is out: the variant waits for it. */
+  busy: boolean;
   onOpen: () => void;
   onPointer: (pointer: Pointer) => void;
+  onVariant: () => void;
 }): ReactElement | null {
   const opened = book.targets[target.key]?.opened ?? 0;
   const next = canOpen(book, target.key, gate3);
@@ -146,6 +154,20 @@ export function HintLadder({
         <>
           {opened === 1 && <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitLook}</p>}
           {/* Said in full, numbers included: a gate the player cannot see reads as arbitrary. */}
+          {opened >= 3 && variant !== null && (
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="font-bold">{HINTS_VI.variantHeading}</h3>
+              <p className="mt-1 text-sm text-fg-muted">{HINTS_VI.variantLead}</p>
+              <button
+                type="button"
+                onClick={onVariant}
+                disabled={busy}
+                className={buttonClass("secondary", "mt-3")}
+              >
+                {HINTS_VI.variantRun}
+              </button>
+            </div>
+          )}
           {opened === 2 && (
             <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitGate(failures)}</p>
           )}

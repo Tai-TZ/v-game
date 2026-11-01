@@ -2,6 +2,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useHints } from "./HintLadder";
+import { useLastAttempt } from "./WorkbenchPage";
 import { configKey, loadHints } from "./hints";
 import type { CaseView, RunView } from "./run";
 
@@ -110,5 +111,38 @@ describe("useHints with a blocked store", () => {
     } finally {
       blocked.mockRestore();
     }
+  });
+});
+
+describe("useLastAttempt", () => {
+  it("keeps the attempt a variant run came from, and follows any other run", () => {
+    const attempt = failedSample("r1");
+    const variant: RunView = { ...failedSample("v1"), scope: "bien_the" };
+    const { result, rerender } = renderHook(
+      (props: { run: RunView | null }) => useLastAttempt(props.run),
+      {
+        initialProps: { run: attempt },
+      },
+    );
+    expect(result.current).toBe(attempt);
+    rerender({ run: variant });
+    expect(result.current).toBe(attempt);
+    const next = failedSample("r2");
+    rerender({ run: next });
+    expect(result.current).toBe(next);
+  });
+});
+
+describe("useLastAttempt before the variant's scope arrives", () => {
+  it("knows the variant by its run id while its stream has not started", () => {
+    const attempt = failedSample("r1");
+    const reset: RunView = { ...failedSample("v1"), phase: "waiting", cases: [] };
+    delete reset.scope;
+    const { result, rerender } = renderHook(
+      (props: { run: RunView | null }) => useLastAttempt(props.run, "v1"),
+      { initialProps: { run: attempt } },
+    );
+    rerender({ run: reset });
+    expect(result.current).toBe(attempt);
   });
 });

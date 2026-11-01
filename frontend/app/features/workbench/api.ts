@@ -171,9 +171,16 @@ export async function postRun(
   levelId: string,
   body: string,
   key: string,
-  scope?: "mau",
+  /** "mau": the samples (N2). A case id: that review case as the variant after hint 3 (N16). */
+  scope?: "mau" | { variant: string },
 ): Promise<PostResult> {
-  const query = `level=${encodeURIComponent(levelId)}${scope === undefined ? "" : `&scope=${scope}`}`;
+  const tail =
+    scope === undefined
+      ? ""
+      : scope === "mau"
+        ? "&scope=mau"
+        : `&scope=bien_the&case=${encodeURIComponent(scope.variant)}`;
+  const query = `level=${encodeURIComponent(levelId)}${tail}`;
   let response: Response;
   try {
     response = await fetch(`${API_BASE}/api/runs?${query}`, {

@@ -2,8 +2,9 @@
 
 Event order: run.started, then per case its step pairs and case.graded, then run.scored and
 run.finished; or a single run.failed. A sample run (scope "mau") runs the visible cases only
-and has no run.scored. Gold appears only in run.finished (D4). Hidden/trap
-questions never appear in any event.
+and has no run.scored; so does a variant run (scope "bien_the"), whose one review case the
+route picks. Gold appears only in run.finished (D4). Hidden/trap questions never appear in any
+event.
 """
 
 import asyncio
@@ -210,7 +211,8 @@ async def run_level(
         infos: list[CaseInfo] = []
         for c in cases:
             info: CaseInfo = {"id": c.id, "role": c.role, "vai": c.vai}
-            if c.role == "visible":
+            # A variant's question is the exercise itself (L1 §11); hidden and trap ones never show.
+            if c.role in ("visible", "review"):
                 info["question"] = c.question
             infos.append(info)
         started: RunStartedEvent = {

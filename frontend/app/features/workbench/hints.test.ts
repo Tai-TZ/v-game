@@ -128,6 +128,7 @@ describe("hintTarget", () => {
     const cases = [kase(1, "visible", false)];
     const base = starRun({ s1: false, s2: false, s3: false }, cases);
     expect(hintTarget(L1, { ...base, scope: "da_ghi" })).toBeNull();
+    expect(hintTarget(L1, { ...base, scope: "bien_the" })).toBeNull();
     expect(hintTarget(L1, { ...base, phase: "running" })).toBeNull();
     const capped = kase(1, "visible", false, {
       graded: {

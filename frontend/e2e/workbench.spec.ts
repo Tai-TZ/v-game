@@ -77,13 +77,23 @@ test.describe("workbench", () => {
     // A client-side route change moves focus to the new page's h1 (screen readers hear it).
     await expect(page.getByRole("heading", { level: 1, name: "Thôi bịa điều luật" })).toBeFocused();
 
-    // The reference solution, built with the toys.
+    // The reference solution, built with the toys. One toy is open at a time: the bench opens
+    // on the empty search socket, and the bin and the brain are opened from the machine.
     await page.getByRole("switch", { name: "Gắn Vòm Sao" }).check();
     await page.getByRole("slider", { name: /Móc kéo/ }).fill("3");
+    await page.getByRole("button", { name: "Thùng Context: Chưa chạy" }).click();
     await page.getByRole("switch", { name: /Máy đóng tem/ }).check();
-    await page.getByLabel("Khe thẻ 1").selectOption("G1");
-    await page.getByLabel("Khe thẻ 2").selectOption("G2");
-    await page.getByLabel("Khe thẻ 3").selectOption("G3");
+    await page.getByRole("button", { name: "Bộ Óc: Chưa chạy" }).click();
+    // The Lăng kính cards: the starter's two cards come out first (a full lens takes no more),
+    // then each press drops a card into the first empty slot.
+    for (const name of [/^Khe 1: thẻ/, /^Khe 2: thẻ/]) {
+      await page.getByRole("button", { name }).click();
+    }
+    const deck = page.getByRole("list", { name: "Thẻ dặn dò" });
+    for (const key of ["G1", "G2", "G3"]) {
+      await deck.getByRole("button", { name: new RegExp(`^${key}`) }).click();
+    }
+    await expect(page.getByRole("button", { name: /^Khe 3: thẻ G3/ })).toBeVisible();
     await page.getByRole("button", { name: "Mở ca" }).click();
 
     const results = page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" });
@@ -215,7 +225,10 @@ test.describe("workbench", () => {
 
     await page.getByRole("button", { name: "Chỉnh rồi chạy lại" }).click();
     await expect(page.getByRole("heading", { level: 2, name: "Bàn thợ" })).toBeFocused();
+    // The brain is still the open toy; the dome is opened from the machine.
+    await page.getByRole("button", { name: /^Vòm Sao:/ }).click();
     await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
+    // After a reload L1 opens on its search again, its first toy to turn.
     await page.reload();
     await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
     await expect(page.getByText("Đã lưu cấu hình trên máy này.")).toBeVisible();
@@ -1084,10 +1097,17 @@ test.describe("the blade's own strip (B6 N22)", () => {
     // The blade's knobs are chip radios: the input itself is `peer sr-only` and its own label
     // covers it, so `.check()` on the radio times out trying to click a hidden 1px box. The
     // house pattern (see the slip, above) is to scope to the group and click the visible words.
+    // The size is a slider over four stops, so it is set from the keyboard: Home is 128, and two
+    // steps right is 512.
     const pick = (group: RegExp, option: string) =>
       page.getByRole("group", { name: group }).getByText(option, { exact: true }).click();
     await pick(/Cách chia/, "Bám điều, khoản");
-    await pick(/Cỡ đoạn/, "512 token");
+    const blade = page.getByRole("slider", { name: /Cỡ đoạn/ });
+    await blade.focus();
+    await blade.press("Home");
+    await blade.press("ArrowRight");
+    await blade.press("ArrowRight");
+    await expect(blade).toHaveAttribute("aria-valuetext", "512 token");
     await pick(/Chồng lấp/, "10 %");
     await expect(strip(page, 12)).toBeVisible();
     // Điều 12 of the document still in force, whole, and no stale warning this time.
