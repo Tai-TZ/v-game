@@ -4,6 +4,7 @@ import { API_BASE, ApiError, getJson } from "~/lib/api";
 
 import { starterBench, type Bench, type Env } from "./bench";
 import { fmt } from "./copy";
+import { parseQuota, type ServerQuota } from "./quota";
 import {
   BLOCK_TYPES,
   BlocksResponseSchema,
@@ -170,9 +171,16 @@ export async function postRun(
   levelId: string,
   body: string,
   key: string,
-  scope?: "mau",
+  /** "mau": the samples (N2). A case id: that review case as the variant after hint 3 (N16). */
+  scope?: "mau" | { variant: string },
 ): Promise<PostResult> {
-  const query = `level=${encodeURIComponent(levelId)}${scope === undefined ? "" : `&scope=${scope}`}`;
+  const tail =
+    scope === undefined
+      ? ""
+      : scope === "mau"
+        ? "&scope=mau"
+        : `&scope=bien_the&case=${encodeURIComponent(scope.variant)}`;
+  const query = `level=${encodeURIComponent(levelId)}${tail}`;
   let response: Response;
   try {
     response = await fetch(`${API_BASE}/api/runs?${query}`, {
@@ -265,3 +273,55 @@ export function cancelRun(runId: string, options: { keepalive?: boolean } = {}):
 }
 
 export const eventsUrl = (runId: string) => `${API_BASE}/api/runs/${runId}/events`;
+
+/**
+ * `GET /api/quota` (roadmap-v0.4 §5.1). Null when the API is asleep, down or off contract: the
+ * bench then shows no number rather than a made-up one, and the server's DailyCap still holds.
+ */
+export async function fetchQuota(signal?: AbortSignal): Promise<ServerQuota | null> {
+  try {
+    const response = await fetch(`${API_BASE}/api/quota`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      ...(signal ? { signal } : {}),
+    });
+    return response.ok ? parseQuota(await response.json()) : null;
+  } catch {
+    return null;
+  }
+}
+
+const RefundOkSchema = v.object({ refunded: v.pipe(v.number(), v.integer(), v.minValue(0)) });
+const RefundRefusedSchema = v.object({ detail: v.string(), code: v.string() });
+
+export type RefundResult =
+  | { ok: true; refunded: number }
+  | { ok: false; code: string; message: string }
+  /** Network, 404 or an answer off contract: nothing was promised, so nothing is said. */
+  | { ok: false; code: null; message: null };
+
+/** `POST /api/quota/refund {run_id}`. Never rejects. */
+export async function claimRefund(runId: string): Promise<RefundResult> {
+  const unknown = { ok: false, code: null, message: null } as const;
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/quota/refund`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: runId }),
+    });
+  } catch {
+    return unknown;
+  }
+  const json: unknown = await response.json().catch(() => null);
+  if (response.ok) {
+    const parsed = v.safeParse(RefundOkSchema, json);
+    return parsed.success ? { ok: true, refunded: parsed.output.refunded } : unknown;
+  }
+  if (response.status === 409) {
+    const parsed = v.safeParse(RefundRefusedSchema, json);
+    if (parsed.success)
+      return { ok: false, code: parsed.output.code, message: parsed.output.detail };
+  }
+  return unknown;
+}

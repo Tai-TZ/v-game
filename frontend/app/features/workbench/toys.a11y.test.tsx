@@ -2,11 +2,15 @@ import { cleanup, render } from "@testing-library/react";
 import axe from "axe-core";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { setAttached, starterBench } from "./bench";
 import { Blade } from "./Blade";
 import { CitationLedger } from "./CitationLedger";
 import { ContextBin } from "./ContextBin";
+import { MachineMap } from "./MachineMap";
+import { Prism } from "./Prism";
 import { Stamps } from "./Stamps";
 import { StarDome } from "./StarDome";
+import { testEnv } from "./test-fixtures";
 
 afterEach(cleanup);
 
@@ -100,5 +104,40 @@ describe("the toys answer axe's structural rules", () => {
       />,
     );
     expect(await violations(container)).toEqual([]);
+  });
+
+  it("the Lăng kính cards and slots", async () => {
+    const env = testEnv("grounded-citation");
+    const bench = starterBench(env);
+    if (!bench) throw new Error("L1 starter is not drawable");
+    const { container } = render(
+      <Prism
+        env={env}
+        bench={{ ...bench, cards: ["G1", null, "G3"] }}
+        onChange={() => undefined}
+      />,
+    );
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it("the machine, with an empty socket and a pair of searches", async () => {
+    for (const id of ["grounded-citation", "article-number-lookup"] as const) {
+      const env = testEnv(id);
+      const start = starterBench(env);
+      if (!start) throw new Error(`${id} starter is not drawable`);
+      const { container } = render(
+        <MachineMap
+          env={env}
+          bench={setAttached(start, "vector_search", false)}
+          onChange={() => undefined}
+          disabled={false}
+          states={{}}
+          highlight={null}
+          answer={null}
+        />,
+      );
+      expect(await violations(container)).toEqual([]);
+      cleanup();
+    }
   });
 });

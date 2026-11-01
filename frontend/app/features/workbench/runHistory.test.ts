@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { graphFromBench, setCard, starterBench, type Bench } from "./bench";
-import { compare, historyMatrix, lastPassing } from "./history";
+import { compare, historyMatrix, lastPassing } from "./runHistory";
 import type { RunMark } from "./storage";
 import { testEnv } from "./test-fixtures";
 

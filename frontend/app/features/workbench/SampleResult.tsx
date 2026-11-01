@@ -11,9 +11,17 @@ import { sampleVerdict, type RunView } from "./run";
  * finishes into silence: three graded cases and nothing saying what they were for, or why the
  * star run did or did not follow.
  */
-export function SampleResult({ run }: { run: RunView }): ReactElement | null {
+export function SampleResult({
+  run,
+  samplesOnly = false,
+}: {
+  run: RunView;
+  /** The pool covered the samples alone (§5.1): a pass then ends the shift, not opens it. */
+  samplesOnly?: boolean;
+}): ReactElement | null {
   const verdict = sampleVerdict(run);
   if (verdict === null) return null;
+  const line = verdict === "passed" && samplesOnly ? SAMPLE_VI.passedAlone : SAMPLE_VI[verdict];
   const passed = run.cases.filter((c) => c.graded?.passed === true).length;
 
   return (
@@ -26,7 +34,7 @@ export function SampleResult({ run }: { run: RunView }): ReactElement | null {
       <p className="mt-2 tabular-nums">
         {SAMPLE_VI.count(passed, run.cases.length)} {SAMPLE_VI.noStars}
       </p>
-      <p className="mt-1 text-sm text-fg-muted">{SAMPLE_VI[verdict]}</p>
+      <p className="mt-1 text-sm text-fg-muted">{line}</p>
     </section>
   );
 }

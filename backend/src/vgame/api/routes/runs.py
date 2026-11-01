@@ -29,6 +29,7 @@ from vgame.engine.types import (
     EngineError,
     EngineEvent,
     LLMNotConfiguredError,
+    PublicCase,
     RunFailedEvent,
     RunFinishedEvent,
     RunReport,
@@ -43,6 +44,12 @@ RUN_ID_PATTERN: Final = r"^[0-9a-f]{32}$"
 IDEMPOTENCY_PATTERN: Final = r"^[A-Za-z0-9_-]{16,64}$"
 RUN_NOT_FOUND: Final = "Không tìm thấy lượt chạy."
 RUN_ALREADY_ENDED: Final = "Lượt chạy này đã kết thúc."
+CASE_PATTERN: Final = r"^[a-z0-9-]{1,40}$"
+VARIANT_CASE_VI: Final = "Câu biến thể phải là một ca ôn của chính màn này."
+CASE_WITHOUT_VARIANT_VI: Final = "Chỉ lượt câu biến thể (scope=bien_the) mới nhận tham số case."
+RESERVE_EMPTY_VI: Final = (
+    "Quỹ chung của lớp hôm nay đã hết nên chưa chạy được câu biến thể. Quỹ hồi lại lúc 07:00."
+)
 GRAPH_INVALID: Final = "Đồ thị chưa chạy được. Sửa các lỗi bên dưới rồi thử lại."
 JSON_ONLY: Final = "Chỉ nhận đồ thị dạng JSON (Content-Type: application/json)."
 # Idle seconds before an SSE comment line: one LLM step can stay silent for up to 20 s, longer
@@ -89,9 +96,12 @@ async def create_run(
     engine: Annotated[EngineServices, Depends(get_engine)],
     idempotency_key: Annotated[str | None, Header(pattern=IDEMPOTENCY_PATTERN)] = None,
     scope: RunScope | None = None,
+    case: Annotated[str | None, Query(pattern=CASE_PATTERN)] = None,
 ) -> JSONResponse:
     """Body: the graph JSON (Part 3 §3.4). Returns ``run_id`` and info-level issues.
-    ``scope=mau`` runs the level's 3 visible cases only and scores no stars (N2)."""
+    ``scope=mau`` runs the level's 3 visible cases only and scores no stars (N2).
+    ``scope=bien_the&case=<id>`` runs one review case of the level after hint 3, no stars, and
+    draws one call from the class reserve R (N16, L1 §11)."""
     # JSON only: a cross-site form post cannot burn the LLM budget without a CORS preflight.
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
         return _error(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, JSON_ONLY)
@@ -99,6 +109,23 @@ async def create_run(
         spec_level = load_level(level)
     except KeyError:
         return _error(status.HTTP_404_NOT_FOUND, LEVEL_NOT_FOUND)
+
+    spec = engine.spec(spec_level.id)
+    if case is not None and scope != "bien_the":
+        return _error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            CASE_WITHOUT_VARIANT_VI,
+            code="case_without_variant",
+        )
+    variant = None
+    if scope == "bien_the":
+        # Only a review case of this level: anything else would run a hidden or trap case one at
+        # a time, a scoreboard for the secret set.
+        variant = next((c for c in spec.cases if c.id == case and c.role == "review"), None)
+        if variant is None:
+            return _error(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, VARIANT_CASE_VI, code="case_not_variant"
+            )
 
     graph, issues = validate(await read_capped(request), spec_level)
     if graph is None:
@@ -126,10 +153,12 @@ async def create_run(
     if (failure := precheck(compiled, deps)) is not None:  # e.g. rerank model not downloaded
         return _error(status.HTTP_503_SERVICE_UNAVAILABLE, failure[1], code=failure[0])
 
-    spec = engine.spec(spec_level.id)
+    # Refused before anything starts, so an empty reserve never leaves a run half begun.
+    if variant is not None and engine.reserve.exhausted:
+        return _error(status.HTTP_409_CONFLICT, RESERVE_EMPTY_VI, code="reserve_empty")
     try:
-        # The scope is part of the request: one key never serves both a sample and a star run.
-        request_hash = f"{scope or 'sao'}:{graph_hash(graph)}"
+        # The scope and case are part of the request: one key never serves two kinds of run.
+        request_hash = f"{scope or 'sao'}:{case or ''}:{graph_hash(graph)}"
         run_id, is_new = engine.runs.start(spec_level.id, idempotency_key, request_hash)
     except IdempotencyConflictError as exc:
         return _error(status.HTTP_409_CONFLICT, exc.message_vi)
@@ -139,7 +168,13 @@ async def create_run(
         return _error(status.HTTP_429_TOO_MANY_REQUESTS, exc.message_vi, retry)
     if is_new:
         evaluator = LevelEvaluator(spec, spec_level.rules, engine.store)
-        cases = public_cases(spec)
+        if variant is not None:
+            # ponytail: no login before T2, so anyone can draw R down, as with refunds
+            # (quota.py); the hard ceiling stays DailyCap. One call, taken once per new run.
+            engine.reserve.take(1)
+            cases = [PublicCase(variant.id, variant.role, variant.vai, variant.question)]
+        else:
+            cases = public_cases(spec)
         secret = frozenset(c.id for c in cases if c.role != "visible")
         task = asyncio.create_task(
             run_level(

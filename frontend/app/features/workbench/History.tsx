@@ -4,7 +4,7 @@ import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, CircleDashIcon, CrossIcon } from "~/components/ui/icons";
 
 import { HISTORY_VI } from "./copy";
-import { historyMatrix, type Cell, type HistoryRow } from "./history";
+import { historyMatrix, type Cell, type HistoryRow } from "./runHistory";
 import type { RunMark } from "./storage";
 import { Viz } from "./Viz";
 

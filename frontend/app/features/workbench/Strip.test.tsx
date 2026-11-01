@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { STRIP_VI, VIZ_STAMP } from "./copy";
 import { Strip } from "./Strip";
-import { articleStrip, cutSentence, type VizData } from "./strip";
+import { articleStrip, cutSentence, type VizData } from "./vizData";
 import { readText } from "./test-fixtures";
 
 afterEach(cleanup);

@@ -1,13 +1,15 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
+import { graphFromBench, setAttached, setParam, starterBench, type Bench, type Env } from "./bench";
 import { BenchSection, type BenchRunView, type SlotGold } from "./BenchView";
 import type { BenchRun, StepView } from "./run";
-import type { Fact } from "./schema";
+import type { BlockType, Fact } from "./schema";
+
+type BlockTypeOrNull = BlockType | null;
 import type { EventType } from "./schema";
 import { STRIP_VI } from "./copy";
-import type { VizData } from "./strip";
+import type { VizData } from "./vizData";
 import { frame, readText, replay, testEnv } from "./test-fixtures";
 import { validateGraph } from "./validate";
 
@@ -34,7 +36,7 @@ function Bench({
   vizCase = null,
 }: {
   bench: Bench;
-  highlight?: "chunker" | null;
+  highlight?: BlockType | null;
   benchRun?: BenchRun;
   view?: BenchRunView | null;
   preview?: Readonly<Record<string, Extract<Fact, { kind: "retrieved" }>>> | null;
@@ -144,6 +146,7 @@ describe("the star dome in the search slot", () => {
     if (!start) throw new Error("L3 starter is not drawable");
     const { container } = render(
       <Bench
+        highlight="vector_search"
         bench={start}
         benchRun="done"
         view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, flags: [], visible: true })}
@@ -160,6 +163,7 @@ describe("the star dome in the search slot", () => {
     if (!start) throw new Error("L3 starter is not drawable");
     const { container } = render(
       <Bench
+        highlight="vector_search"
         bench={start}
         benchRun="done"
         view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, flags: [], visible: true })}
@@ -191,7 +195,9 @@ describe("the star dome in the search slot", () => {
         ],
       },
     };
-    const { container } = render(<Bench bench={start} benchRun="stale" preview={preview} />);
+    const { container } = render(
+      <Bench highlight="vector_search" bench={start} benchRun="stale" preview={preview} />,
+    );
     expect(domeLabel(container)).toBe("1 đoạn đã kéo");
     expect(screen.getByText(/Điều 47.*hạng 1.*0,910/)).toBeDefined();
   });
@@ -241,6 +247,7 @@ describe("the star dome in the search slot", () => {
     if (!start) throw new Error("L3 starter is not drawable");
     render(
       <Bench
+        highlight="llm"
         bench={start}
         benchRun="done"
         view={recordedView({ chunks: [], ranks: RANKS, flags: [], visible: true }, "lib-l3-v03")}
@@ -257,6 +264,7 @@ describe("the star dome in the search slot", () => {
     if (!start) throw new Error("L3 starter is not drawable");
     const { container } = render(
       <Bench
+        highlight="context_packer"
         bench={start}
         benchRun="done"
         view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, flags: [], visible: true })}
@@ -275,6 +283,7 @@ describe("the star dome in the search slot", () => {
     if (!start) throw new Error("L3 starter is not drawable");
     const { container } = render(
       <Bench
+        highlight="vector_search"
         bench={start}
         benchRun="done"
         view={recordedView({ chunks: ["f22a1df7"], ranks: RANKS, flags: [], visible: false })}
@@ -288,7 +297,14 @@ describe("the citation ledger on the bench", () => {
   it("lines the codes up for a sample case", () => {
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
-    render(<Bench bench={start} benchRun="done" view={recordedView(null, "lib-l3-v03")} />);
+    render(
+      <Bench
+        highlight="llm"
+        bench={start}
+        benchRun="done"
+        view={recordedView(null, "lib-l3-v03")}
+      />,
+    );
     expect(document.querySelector('[data-row="pull"]')).not.toBeNull();
     expect(document.querySelector('[data-row="cite"]')).not.toBeNull();
   });
@@ -301,7 +317,7 @@ describe("the citation ledger on the bench", () => {
     if (!start) throw new Error("L3 starter is not drawable");
     const sample = recordedView(null, "lib-l3-v03");
     const hidden = { ...sample, followed: { ...sample.followed, role: "hidden" as const } };
-    render(<Bench bench={start} benchRun="done" view={hidden} />);
+    render(<Bench highlight="llm" bench={start} benchRun="done" view={hidden} />);
     expect(document.querySelector('[data-row="pull"]')).toBeNull();
     expect(document.querySelector("[data-ledger-note]")).toBeNull();
   });
@@ -330,7 +346,14 @@ describe("the provider's token count on the bin", () => {
     // would read as "the prompt cost nothing", which is a number the run never measured.
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
-    render(<Bench bench={start} benchRun="done" view={stripLlmTokens(recordedView(null))} />);
+    render(
+      <Bench
+        highlight="context_packer"
+        bench={start}
+        benchRun="done"
+        view={stripLlmTokens(recordedView(null))}
+      />,
+    );
     expect(document.body.textContent).toContain("Chưa có số của Gemini cho câu này.");
     expect(document.body.textContent).not.toContain("tính 0 token");
   });
@@ -338,7 +361,9 @@ describe("the provider's token count on the bin", () => {
   it("prints what the provider charged once its step has finished", () => {
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
-    render(<Bench bench={start} benchRun="done" view={recordedView(null)} />);
+    render(
+      <Bench highlight="context_packer" bench={start} benchRun="done" view={recordedView(null)} />,
+    );
     expect(document.body.textContent).toContain("không chỉ phần trong thùng");
     expect(document.body.textContent).not.toContain("Chưa có số của Gemini");
   });
@@ -350,7 +375,9 @@ describe("the cut passages under the bin", () => {
     // packer was handed, which lives on another step of the same case.
     const start = starterBench(l3);
     if (!start) throw new Error("L3 starter is not drawable");
-    render(<Bench bench={start} benchRun="done" view={recordedView(null)} />);
+    render(
+      <Bench highlight="context_packer" bench={start} benchRun="done" view={recordedView(null)} />,
+    );
     const note = document.querySelector("[data-cut-note]");
     const pieces = document.querySelectorAll("[data-cut-piece]");
     // The committed L3 run packs everything, so there is nothing on the floor and no note.
@@ -415,6 +442,51 @@ describe("the chunker's strip (N22)", () => {
     expect(screen.getByText("Dải đoạn Điều 11", { exact: false })).toBeDefined();
   });
 
+  // The blade's size is a slider over the four stops the level offers, not a row of chips: the
+  // player turns it, and the stops keep the value to a size the level has.
+  it("turns the chunk size with a slider over its four stops, not a row of chips", () => {
+    drawL2(starter());
+    const control = document.querySelector('[data-param="chunk_size"]');
+    const blade = control?.querySelector('input[type="range"]') as HTMLInputElement | null;
+    expect(blade).not.toBeNull();
+    expect(control?.querySelectorAll('input[type="radio"]').length).toBe(0);
+    expect(blade?.min).toBe("0");
+    expect(blade?.max).toBe("3");
+    // The four stops are drawn, and the one the blade sits on is marked.
+    const stops = [...(control?.querySelectorAll("[data-blade-stop]") ?? [])];
+    expect(stops.map((s) => s.textContent)).toEqual(["128", "256", "512", "1.024"]);
+    const on = stops.findIndex((s) => s.getAttribute("data-blade-stop") === "on");
+    expect(on).toBe(Number(blade?.value));
+  });
+
+  it("moves the chunk size to the stop the blade lands on", () => {
+    const changes: Bench[] = [];
+    const bench = starter();
+    render(
+      <BenchSection
+        env={l2}
+        bench={bench}
+        graph={graphFromBench(l2, bench)}
+        onChange={(next) => changes.push(next)}
+        locked={false}
+        issues={validateGraph(l2, graphFromBench(l2, bench))}
+        highlight={null}
+        view={null}
+        preview={null}
+        benchRun="none"
+        viz={viz}
+        vizCase="lib-l2-v01"
+        saved={false}
+        discarded={false}
+      />,
+    );
+    const control = document.querySelector('[data-param="chunk_size"]');
+    const blade = control?.querySelector('input[type="range"]');
+    if (!blade) throw new Error("the chunk size blade is not drawn");
+    fireEvent.change(blade, { target: { value: "2" } });
+    expect(changes.at(-1)).toEqual(setParam(l2, bench, "chunker", "chunk_size", 512));
+  });
+
   // The gate is "can the player move this blade", not a hardcoded level id. L1 locks the
   // chunker and fixes all four knobs, so a strip there is a picture of a control that cannot
   // turn -- and it would never change, which is the one thing it exists to do. L3 leaves all
@@ -457,5 +529,103 @@ describe("the chunker's strip (N22)", () => {
   it("draws nothing when no sample case is being followed", () => {
     drawL2(starter(), { vizCase: null });
     expect(screen.queryByText("Dải đoạn", { exact: false })).toBeNull();
+  });
+});
+
+// One toy open at a time below the machine: its knobs and evidence in full, every other toy a
+// single line with its name, its state and, for a toy not on the bench, the switch that adds it.
+describe("the bench opens one toy at a time", () => {
+  const l1 = testEnv("grounded-citation");
+  const l2 = testEnv("chunk-tuning");
+  function drawEnv(env: Env, bench: Bench, highlight: BlockTypeOrNull = null) {
+    const graph = graphFromBench(env, bench);
+    const changes: Bench[] = [];
+    const view = render(
+      <BenchSection
+        env={env}
+        bench={bench}
+        graph={graph}
+        onChange={(next) => changes.push(next)}
+        locked={false}
+        issues={validateGraph(env, graph)}
+        highlight={highlight}
+        view={null}
+        preview={null}
+        benchRun="none"
+        viz={null}
+        vizCase={null}
+        saved={false}
+        discarded={false}
+      />,
+    );
+    return { ...view, changes };
+  }
+  const openSlots = () =>
+    [...document.querySelectorAll("section[data-slot-open='true']")].map((s) => s.id);
+  const starterOf = (env: Env) => {
+    const bench = starterBench(env);
+    if (!bench) throw new Error(`${env.level.id} starter is not drawable`);
+    return bench;
+  };
+
+  it("opens the first toy with something to turn: the blade at L2", () => {
+    drawEnv(l2, starterOf(l2));
+    expect(openSlots()).toEqual(["slot-ix"]);
+    expect(screen.queryByRole("slider", { name: /Cỡ đoạn/ })).not.toBeNull();
+    // The bin's knobs are not on screen while the blade is open.
+    expect(document.querySelector("#slot-pk [data-param]")).toBeNull();
+  });
+
+  it("opens L1 on its empty search socket", () => {
+    drawEnv(l1, setAttached(starterOf(l1), "vector_search", false));
+    expect(openSlots()).toEqual(["slot-vs"]);
+  });
+
+  it("keeps every closed toy's name, state and add switch on one line", () => {
+    drawEnv(l1, setAttached(starterOf(l1), "vector_search", false));
+    const bin = document.querySelector("#slot-pk");
+    expect(bin?.getAttribute("data-slot-open")).toBe("false");
+    expect(bin?.querySelector("h3")?.textContent).toContain("Thùng Context");
+    expect(bin?.querySelector("[data-state]")).not.toBeNull();
+  });
+
+  it("opens a toy when its line is pressed", () => {
+    drawEnv(l2, starterOf(l2));
+    fireEvent.click(screen.getByRole("button", { name: "Mở Thùng Context" }));
+    expect(openSlots()).toEqual(["slot-pk"]);
+  });
+
+  it("opens the toy a hint or a diagnosis points at", () => {
+    const { rerender } = drawEnv(l2, starterOf(l2));
+    expect(openSlots()).toEqual(["slot-ix"]);
+    const bench = starterOf(l2);
+    const graph = graphFromBench(l2, bench);
+    rerender(
+      <BenchSection
+        env={l2}
+        bench={bench}
+        graph={graph}
+        onChange={() => undefined}
+        locked={false}
+        issues={validateGraph(l2, graph)}
+        highlight="llm"
+        view={null}
+        preview={null}
+        benchRun="none"
+        viz={null}
+        vizCase={null}
+        saved={false}
+        discarded={false}
+      />,
+    );
+    expect(openSlots()).toEqual(["slot-llm"]);
+  });
+
+  it("opens a toy as soon as it is added from its switch", () => {
+    // L3 is the level with a magnifier to add.
+    const { changes } = drawEnv(l3, starterOf(l3));
+    fireEvent.click(screen.getByRole("switch", { name: "Gắn Kính lúp" }));
+    expect(changes).toHaveLength(1);
+    expect(openSlots()).toEqual(["slot-rr"]);
   });
 });

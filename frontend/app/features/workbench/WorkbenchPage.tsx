@@ -12,18 +12,19 @@ import * as v from "valibot";
 
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
+import { useProjector } from "~/features/projector/projector";
 import { recordStars, type Stars } from "~/features/progress/progress";
 
 import { cancelRun, eventsUrl, newKey, postRun, previewRetrieval, type LevelPageData } from "./api";
 import { benchFromGraph, graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
-import { BACK_TO_LEVELS, liveMessage } from "./copy";
+import { BACK_TO_LEVELS, FIRST_TOUCH_VI, liveMessage, PROJECTOR_VI } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
 import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
-import { parseViz, vizUrl, type VizData } from "./strip";
-import { lastPassing } from "./history";
+import { parseViz, vizUrl, type VizData } from "./vizData";
+import { lastPassing } from "./runHistory";
 import { Results } from "./Results";
 import { SampleResult } from "./SampleResult";
 import {
@@ -56,6 +57,11 @@ import {
   saveSlip,
   type RunMark,
 } from "./storage";
+import { HintLadder, useHints } from "./HintLadder";
+import { firstTouches, firstTouchTypes, type Pointer } from "./hints";
+import { useQuota } from "./useQuota";
+import { VariantResult } from "./VariantResult";
+import { loadSeen, markSeen, pickVariant } from "./variants";
 import { errorsOf, validateGraph } from "./validate";
 
 const levelsUrl = (zoneId: string | null) => (zoneId ? `/play/${zoneId}` : "/play");
@@ -299,19 +305,23 @@ export function useRecordHistory(
  * star run, once, on `ranBody` -- the graph that actually cleared it, not the bench as it
  * stands. A knob turned while the samples were running must not ride into the star run, and the
  * server only prices the second step at 7 calls when the two graphs are identical (§3.1).
+ *
+ * `samplesOnly`: the day's pool covered the samples and not the shift (roadmap-v0.4 §5.1), so the
+ * button said "Thử 3 câu mẫu" and the samples are all the player asked for.
  */
 export function useStarRunAfterSample(
   run: RunView | null,
   ranBody: string | null,
   start: (body: string) => void,
+  samplesOnly = false,
 ) {
   const chained = useRef<string | null>(null);
   useEffect(() => {
-    if (run === null || ranBody === null) return;
+    if (run === null || ranBody === null || samplesOnly) return;
     if (sampleVerdict(run) !== "passed" || chained.current === run.runId) return;
     chained.current = run.runId;
     start(ranBody);
-  }, [run, ranBody, start]);
+  }, [run, ranBody, start, samplesOnly]);
 }
 
 /**
@@ -457,6 +467,45 @@ export function usePreview(
   return wanted && got?.key === key ? got.nodes : null;
 }
 
+/**
+ * Lesson plan R4: the covered outcome and the one control that uncovers it. It takes focus when
+ * the run ends, so the teacher's Space or Enter opens it without reaching for the mouse.
+ */
+function RevealGate({ onReveal }: { onReveal: () => void }) {
+  return (
+    <section aria-labelledby="wb-reveal-title" className="mt-12 border-t border-line pt-8">
+      <h2 id="wb-reveal-title" className="sr-only">
+        {PROJECTOR_VI.reveal}
+      </h2>
+      <p className="max-w-prose text-fg-muted">{PROJECTOR_VI.revealNote}</p>
+      <button
+        id="wb-reveal"
+        type="button"
+        onClick={onReveal}
+        className={buttonClass("primary", "mt-4")}
+      >
+        {PROJECTOR_VI.reveal}
+      </button>
+    </section>
+  );
+}
+
+/**
+ * The player's latest run that is not a variant run: the attempt the hint ladder follows.
+ * `variantId` names the variant run as soon as its POST answers -- before `run.started` brings
+ * its scope, the reset run looks like any other.
+ */
+export function useLastAttempt(
+  run: RunView | null,
+  variantId: string | null = null,
+): RunView | null {
+  const [attempt, setAttempt] = useState<RunView | null>(null);
+  const isVariant = run?.scope === "bien_the" || (run !== null && run.runId === variantId);
+  // Adjusted during render, as in useLastSample: derived from a change in the run.
+  if (!isVariant && attempt !== run) setAttempt(run);
+  return isVariant ? attempt : run;
+}
+
 export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench; back: string }) {
   const { level } = env;
   const [initial] = useState(() => loadSaved(env));
@@ -492,15 +541,55 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   // Everything the player looks at reads `run`: the recorded log stands in until they run
   // something of their own, and `scope` keeps the two apart wherever that matters.
   const run = ours ?? recorded.run;
+  // Projector mode (lesson plan R4): every run's outcome stays covered until the teacher opens
+  // it, so the room guesses first. Keyed by run, so the next run is covered again.
+  const projector = useProjector().on;
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const masked = projector && run !== null && run.runId !== revealed;
+  // N16: the ladder follows the player's own last run; N17: the first-touch lines of the page.
+  const [tips, setTips] = useState<Partial<Record<BlockType, string>>>({});
   const sample = useLastSample(ours);
   useRecordStars(level, run);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
   const passing = lastPassing(history);
   useRecordHistory(level.id, run, lastBody, setHistory);
+  // Set by Mở ca from the pool (§5.1): when it only covers the samples, they run alone. State,
+  // not a ref, because the hook below reads it during render.
+  const [samplesOnly, setSamplesOnly] = useState(false);
   // A fresh arrow each render re-runs the effect; the hook's own guard, not a trimmed dep
   // list, is what keeps it to one star run per sample run (same rule as useRecordHistory).
-  useStarRunAfterSample(ours, lastBody, (starBody) => {
-    void send(starBody, newKey());
+  useStarRunAfterSample(
+    ours,
+    lastBody,
+    (starBody) => {
+      void send(starBody, newKey());
+    },
+    samplesOnly,
+  );
+  const slipOf = useCallback(
+    (runId: string) => (ranSlip?.runId === runId ? ranSlip.slip : null),
+    [ranSlip],
+  );
+  const quota = useQuota({
+    levelId: level.id,
+    cases: level.case_counts.normal + level.case_counts.trap + level.case_counts.info,
+    ours,
+    samplesCached: sample !== null && lastBody === body,
+    slipOf,
+    projector,
+  });
+  // A variant run is the self-fix after hint 3: the ladder stays on the attempt it came from.
+  const [variantId, setVariantId] = useState<string | null>(null);
+  const lastAttempt = useLastAttempt(ours, variantId);
+  const hints = useHints({
+    levelId: level.id,
+    zoneId: level.zone,
+    run: lastAttempt,
+    ranBody: lastBody,
+    gate: {
+      left: quota.left,
+      starPrice: level.case_counts.normal + level.case_counts.trap + level.case_counts.info,
+    },
   });
 
   const issues = serverIssues ?? clientIssues;
@@ -519,7 +608,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const followedCase = run?.cases.find((c) => c.id === followed) ?? firstVisible ?? null;
   const reveal = run?.report?.gold[followedCase?.id ?? ""];
   const benchView =
-    run && followedCase && !changed
+    run && followedCase && !changed && !masked
       ? {
           run,
           followed: followedCase,
@@ -551,6 +640,10 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   useEffect(() => {
     if (stopped) focusOn(document.getElementById("wb-sample"));
   }, [stopped]);
+  const variantDone = ours?.scope === "bien_the" && ours.phase === "finished" ? ours.runId : null;
+  useEffect(() => {
+    if (variantDone) focusOn(document.getElementById("wb-variant"));
+  }, [variantDone]);
   const failedRun = run?.phase === "failed" ? run.runId : null;
   useEffect(() => {
     if (failedRun) focusOn(document.getElementById("wb-run-failed"));
@@ -574,6 +667,16 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const stop: StopState = stopping && stopping.runId === run?.runId ? stopping.state : null;
 
   function edit(next: Bench) {
+    const fresh = firstTouches(firstTouchTypes(graph, graphFromBench(env, next)));
+    if (fresh.length > 0) {
+      setTips((shown) => ({
+        ...shown,
+        ...Object.fromEntries(
+          fresh.flatMap((t) => (FIRST_TOUCH_VI[t] ? [[t, FIRST_TOUCH_VI[t]]] : [])),
+        ),
+      }));
+    }
+    hints.markLook(); // turning a toy is a free look (L1 §11)
     setBench(next);
     setSaved(save(level.id, level.version, graphFromBench(env, next)));
     setServerIssues(null);
@@ -612,7 +715,12 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   }
 
   /** `before`: the cancel of a lost run, so the server's single run slot is free first. */
-  async function send(sendBody: string, key: string, before?: Promise<unknown>, scope?: "mau") {
+  async function send(
+    sendBody: string,
+    key: string,
+    before?: Promise<unknown>,
+    scope?: "mau" | { variant: string },
+  ) {
     // A function, not `left.current`: TS would narrow it to false across the awaits.
     const gone = () => left.current;
     setRequest({ state: "sending", key, body: sendBody });
@@ -641,6 +749,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     setRanSlip(isEmptySlip(slip) ? null : { runId: result.runId, slip });
     editSlip(EMPTY_SLIP);
     setLastBody(sendBody);
+    setVariantId(typeof scope === "object" ? result.runId : null);
     setFollowed(null);
     setAttempt(0);
     dispatch({ kind: "reset", runId: result.runId });
@@ -654,8 +763,53 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       focusLater("#wb-issues");
       return;
     }
-    // The sample step first (N2). `useStarRunAfterSample` starts the star run behind it.
+    // The sample step first (N2). `useStarRunAfterSample` starts the star run behind it, unless
+    // the day's pool only covers the samples (§5.1).
+    setSamplesOnly(quota.mode === "sample");
     void send(body, newKey(), before, "mau");
+  }
+
+  /** The pool is spent: the recorded run stands in for the player's own on the panel. */
+  function showRecorded() {
+    if (ours !== null && !isActive(ours)) dispatch({ kind: "clear" });
+    void recorded.show();
+  }
+
+  /**
+   * N16: the variant after hint 3 -- the least-met review case of the lesson, run alone on the
+   * bench as it stands, paid from the class reserve R. Marked met as it goes out, so the next
+   * variant of the same lesson is another case.
+   */
+  function runVariant() {
+    if (!hints.target) return;
+    if (errorsOf(issues).length > 0) {
+      if (!serverIssues) setSummary({ kind: "client" });
+      focusLater("#wb-issues");
+      return;
+    }
+    const caseId = pickVariant(level.id, hints.target.key, loadSeen(level.id));
+    if (caseId === null) return;
+    markSeen(level.id, caseId);
+    setSamplesOnly(false);
+    void send(body, newKey(), undefined, { variant: caseId });
+  }
+
+  /** Following a case puts it under the lamp: a free look toward the next hint (L1 §11). */
+  function follow(caseId: string) {
+    setFollowed(caseId);
+    hints.markLook();
+  }
+
+  /** A hint's "Xem …": the case onto the bench, or the toy's slot into view. */
+  function point(pointer: Pointer) {
+    if (pointer.kind === "case") {
+      const target = run?.cases.find((c) => c.n === pointer.n);
+      if (target) follow(target.id);
+      focusLater("#wb-bench-title");
+    } else {
+      hints.markLook();
+      focusSlot(pointer.slot, pointer.param);
+    }
   }
 
   function focusSlot(type: BlockType, param?: string) {
@@ -663,13 +817,21 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     focusLater(slotTargets(env, type, param));
   }
 
-  const live = liveMessage(run, followedCase?.id ?? null);
+  const live = masked ? "" : liveMessage(run, followedCase?.id ?? null);
+  const awaitingReveal = masked && run.phase === "finished" ? run.runId : null;
+  useEffect(() => {
+    if (awaitingReveal) focusOn(document.getElementById("wb-reveal"));
+  }, [awaitingReveal]);
+  useEffect(() => {
+    if (revealed)
+      focusOn(document.getElementById("wb-results") ?? document.getElementById("wb-sample"));
+  }, [revealed]);
 
   return (
     <>
       <Brief level={level} />
       {/* An explicit track below lg too: an implicit `auto` one grows to the JSON's longest line. */}
-      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-6">
+      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-6 chieu:lg:grid-cols-[minmax(0,1fr)]">
         <BenchSection
           env={env}
           bench={bench}
@@ -684,6 +846,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           viz={viz}
           vizCase={previewCase}
           saved={saved}
+          tips={tips}
           // Gone once an edit is saved: the two notices would contradict each other.
           discarded={initial.discarded && !saved}
         />
@@ -691,7 +854,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           aria-label="Mở ca và lượt chạy"
           // p-1 inside the scroll box keeps focus outlines (2 px + 2 px offset) unclipped; -m-1
           // keeps the content on the column edges.
-          className="self-start lg:sticky lg:top-6 lg:-m-1 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:p-1"
+          className="self-start lg:sticky lg:top-6 lg:-m-1 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:p-1 chieu:lg:static chieu:lg:m-0 chieu:lg:max-h-none chieu:lg:overflow-visible chieu:lg:p-0"
         >
           <RunPanel
             env={env}
@@ -709,8 +872,12 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             slip={slip}
             onSlip={editSlip}
             onOpen={openShift}
-            onRecorded={() => void recorded.show()}
+            onRecorded={showRecorded}
             recordedFailed={recorded.failed}
+            quota={quota}
+            samplesOnly={samplesOnly}
+            projector={projector}
+            masked={masked}
             onRetry={() => {
               if (request.state === "failed") void send(request.body, request.key);
             }}
@@ -747,12 +914,14 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
               focusLater("#wb-bench-title");
             }}
             onEdit={() => focusLater("#wb-bench-title")}
-            onFollow={setFollowed}
+            onFollow={follow}
           />
         </aside>
       </div>
-      {sample && <SampleResult run={sample} />}
-      {run?.score && (
+      {awaitingReveal && <RevealGate onReveal={() => setRevealed(awaitingReveal)} />}
+      {sample && !masked && <SampleResult run={sample} samplesOnly={samplesOnly} />}
+      {ours && !masked && <VariantResult run={ours} />}
+      {run?.score && !masked && (
         <Results
           key={run.runId}
           env={env}
@@ -770,6 +939,20 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           onDuplicate={benchFrom}
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}
+          onLook={hints.markLook}
+        />
+      )}
+      {hints.target && !masked && (
+        <HintLadder
+          levelId={level.id}
+          target={hints.target}
+          book={hints.book}
+          gate3={hints.gate3}
+          variant={pickVariant(level.id, hints.target.key, loadSeen(level.id))}
+          busy={locked}
+          onOpen={hints.openNext}
+          onPointer={point}
+          onVariant={runVariant}
         />
       )}
       <p aria-live="polite" className="sr-only">

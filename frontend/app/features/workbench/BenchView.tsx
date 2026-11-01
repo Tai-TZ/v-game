@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 
 import {
   AlertIcon,
@@ -14,12 +14,14 @@ import {
 } from "~/components/ui/icons";
 
 import { Blade } from "./Blade";
+import { MachineMap } from "./MachineMap";
+import { Prism } from "./Prism";
 import { Stamps } from "./Stamps";
 import { CitationLedger } from "./CitationLedger";
 import { packerSaw } from "./ledger";
 import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
-import { articleStrip, focusArticle, variantKey, type VizData } from "./strip";
+import { articleStrip, focusArticle, variantKey, type VizData } from "./vizData";
 import { Strip } from "./Strip";
 import {
   domain,
@@ -30,10 +32,8 @@ import {
   paramNames,
   roundToStep,
   setAttached,
-  setCard,
   setParam,
   slotParams,
-  systemPrompt,
   type Bench,
   type Domain,
   type Env,
@@ -134,6 +134,8 @@ interface BenchProps {
   vizCase: string | null;
   saved: boolean;
   discarded: boolean;
+  /** N17: the one-line note of each toy touched for the first time on this browser. */
+  tips?: Partial<Record<BlockType, string>>;
 }
 
 const EMPTY_TEXT: Readonly<Record<string, string>> = {
@@ -143,6 +145,20 @@ const EMPTY_TEXT: Readonly<Record<string, string>> = {
   rerank: "Không xếp hạng lại.",
 };
 
+/** Every slot in the order the question meets it. */
+const FLOW: readonly BlockType[] = [
+  "input",
+  "corpus",
+  "chunker",
+  "vector_search",
+  "bm25_search",
+  "fusion",
+  "rerank",
+  "context_packer",
+  "llm",
+  "output",
+];
+
 export function BenchSection(props: BenchProps) {
   const { env, locked, view, saved, discarded } = props;
   const { level, blocks } = env;
@@ -151,7 +167,39 @@ export function BenchSection(props: BenchProps) {
   const notOpened = (["vector_search", "bm25_search", "fusion", "rerank"] as const)
     .filter((type) => !allowed(type))
     .map((type) => TOY[type].name);
-  const slot = (type: BlockType) => <Slot key={type} type={type} {...props} />;
+  // One toy open at a time: the machine is the overview, the open slot its knobs and evidence.
+  // A level opens on the first toy it lets the player turn.
+  const [picked, setPicked] = useState<BlockType | null>(
+    () => props.highlight ?? FLOW.find((type) => allowed(type) && hasControls(env, type)) ?? null,
+  );
+  // A hint or a diagnosis lights a slot to send the hand there: that slot opens, in the same
+  // render, so the page's focus request finds its knob already drawn.
+  const [seen, setSeen] = useState(props.highlight);
+  if (props.highlight !== seen) {
+    setSeen(props.highlight);
+    if (props.highlight) setPicked(props.highlight);
+  }
+  // A toy pressed on the machine opens its slot, then takes the hand to its first control.
+  const [focusTo, setFocusTo] = useState<{ type: BlockType; n: number } | null>(null);
+  useEffect(() => {
+    if (!focusTo) return;
+    const target = slotTargets(env, focusTo.type)
+      .map((selector) => document.querySelector<HTMLElement>(selector))
+      .find((el) => el !== null);
+    document.getElementById(slotId(env, focusTo.type))?.scrollIntoView({ block: "start" });
+    target?.focus({ preventScroll: true });
+  }, [focusTo, env]);
+  const open = (type: BlockType) => {
+    setPicked(type);
+    setFocusTo((last) => ({ type, n: (last?.n ?? 0) + 1 }));
+  };
+  const slot = (type: BlockType) => (
+    <Slot key={type} type={type} {...props} open={picked === type} onPick={() => setPicked(type)} />
+  );
+  const states = Object.fromEntries(
+    (Object.keys(blocks) as BlockType[]).map((type) => [type, slotState(props, type)]),
+  ) as Record<BlockType, BlockState>;
+  const graded = view?.followed.graded;
 
   return (
     <section aria-labelledby="wb-bench-title">
@@ -180,6 +228,21 @@ export function BenchSection(props: BenchProps) {
           </a>
         </p>
       )}
+
+      <div className="mt-5 rounded-md border border-line bg-surface p-4">
+        <MachineMap
+          env={env}
+          bench={props.bench}
+          onChange={props.onChange}
+          onOpen={open}
+          onPick={setPicked}
+          disabled={locked}
+          states={states}
+          highlight={props.highlight}
+          answer={graded?.counted === true ? (graded.passed ? "pass" : "fail") : null}
+          view={view}
+        />
+      </div>
 
       <fieldset disabled={locked} className="mt-5 min-w-0">
         <legend className="sr-only">Các món trên bàn thợ</legend>
@@ -282,20 +345,34 @@ function frameClass(step: StepView | undefined, highlighted: boolean, failed: bo
   return "border-warning bg-surface";
 }
 
-function Slot({
-  type,
-  env,
-  bench,
-  graph,
-  onChange,
-  issues,
-  highlight,
-  view,
-  benchRun,
-  preview,
-  viz,
-  vizCase,
-}: BenchProps & { type: BlockType }) {
+/** N6 state of one slot for the followed case: the slot's chip and the map's tile agree. */
+function slotState({ env, view, benchRun }: BenchProps, type: BlockType): BlockState {
+  const step = view ? view.followed.steps[nodeIds(env.level)[type]] : undefined;
+  const graded = type === "output" ? view?.followed.graded : undefined;
+  return blockState(benchRun, step, {
+    started: (view?.run.cases.length ?? 0) > 0,
+    ingest: type === "corpus" || type === "chunker",
+    failedAnswer: graded?.counted === true && !graded.passed,
+  });
+}
+
+function Slot(props: BenchProps & { type: BlockType; open: boolean; onPick: () => void }) {
+  const {
+    type,
+    env,
+    bench,
+    graph,
+    onChange,
+    issues,
+    highlight,
+    view,
+    preview,
+    viz,
+    vizCase,
+    tips = {},
+    open,
+    onPick,
+  } = props;
   const { level, blocks } = env;
   const id = nodeIds(level)[type];
   const titleId = `${slotId(env, type)}-title`;
@@ -306,11 +383,16 @@ function Slot({
   const step = view ? view.followed.steps[id] : undefined;
   const own = issues.filter((issue) => issue.node === id);
   const graded = type === "output" ? view?.followed.graded : undefined;
-  const state = blockState(benchRun, step, {
-    started: (view?.run.cases.length ?? 0) > 0,
-    ingest: type === "corpus" || type === "chunker",
-    failedAnswer: graded?.counted === true && !graded.passed,
-  });
+  const state = slotState(props, type);
+  const knobs = paramNames(blocks, type)
+    .filter((name) => !(type === "fusion" && name === (params.method === "alpha" ? "k" : "alpha")))
+    .flatMap((name) => {
+      const d: Domain | null = locked
+        ? { kind: "fixed", value: params[name] ?? null }
+        : domain(env, type, name);
+      return d ? [{ name, d }] : [];
+    });
+  const fixed = knobs.filter(({ d }) => d.kind === "fixed");
 
   if (optional && !bench.attached[type]) {
     const retrievalEmpty =
@@ -325,15 +407,63 @@ function Slot({
       <section
         id={slotId(env, type)}
         aria-labelledby={titleId}
-        className={`rounded-md border-2 border-dashed p-4 ${highlight === type ? "border-brand" : "border-line-strong"}`}
+        data-slot-open={open}
+        className={`rounded-md border-2 border-dashed ${open ? "p-4" : "px-4 py-2"} ${highlight === type ? "border-brand" : "border-line-strong"}`}
       >
         <SlotHead titleId={titleId} toy={toy} type={type} env={env} />
         <AttachSwitch
           toy={toy}
           on={false}
-          onToggle={() => onChange(setAttached(bench, type, true))}
+          onToggle={() => {
+            onChange(setAttached(bench, type, true));
+            onPick();
+          }}
         />
-        <p className="mt-1 max-w-prose text-sm text-fg-muted">{fact}</p>
+        {open && <p className="mt-1 max-w-prose text-sm text-fg-muted">{fact}</p>}
+        <SlotIssues env={env} graph={graph} issues={own} />
+      </section>
+    );
+  }
+
+  const frame = frameClass(step, highlight === type, graded?.counted === true && !graded.passed);
+  const head = (
+    <SlotHead titleId={titleId} toy={toy} type={type} env={env}>
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {locked && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-fg-muted">
+            <LockIcon className="size-3.5 shrink-0" />
+            Khóa ở màn này
+          </span>
+        )}
+        <StateChip state={state} />
+        {!open && (
+          <button
+            type="button"
+            aria-expanded={false}
+            aria-label={`Mở ${toy}`}
+            onClick={onPick}
+            className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand"
+          >
+            Mở
+            <ChevronDownIcon />
+          </button>
+        )}
+      </span>
+    </SlotHead>
+  );
+
+  // Closed: one line -- the toy, its state, the verdict of the answer board and anything the
+  // validator says, which must never hide behind a closed slot.
+  if (!open) {
+    return (
+      <section
+        id={slotId(env, type)}
+        aria-labelledby={titleId}
+        data-slot-open="false"
+        className={`rounded-md border px-4 py-2 transition-colors duration-150 ${frame}`}
+      >
+        {head}
+        {graded && view && <Grade c={view.followed} />}
         <SlotIssues env={env} graph={graph} issues={own} />
       </section>
     );
@@ -343,21 +473,18 @@ function Slot({
     <section
       id={slotId(env, type)}
       aria-labelledby={titleId}
-      className={`rounded-md border p-4 transition-colors duration-150 ${frameClass(step, highlight === type, graded?.counted === true && !graded.passed)}`}
+      data-slot-open="true"
+      className={`rounded-md border p-4 transition-colors duration-150 ${frame}`}
     >
-      <SlotHead titleId={titleId} toy={toy} type={type} env={env}>
-        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {locked && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-fg-muted">
-              <LockIcon className="size-3.5 shrink-0" />
-              Khóa ở màn này
-            </span>
-          )}
-          <StateChip state={state} />
-        </span>
-      </SlotHead>
+      {head}
       {optional && (
         <AttachSwitch toy={toy} on onToggle={() => onChange(setAttached(bench, type, false))} />
+      )}
+      {/* N17: said where the hand already is, once; nothing to dismiss and nothing in the way. */}
+      {tips[type] && (
+        <p data-first-touch={type} className="mt-2 max-w-prose text-sm chieu:hidden">
+          {tips[type]}
+        </p>
       )}
 
       {graded && view && <Grade c={view.followed} />}
@@ -375,29 +502,45 @@ function Slot({
       )}
 
       <div className="mt-3 space-y-4 empty:hidden">
-        {paramNames(blocks, type)
-          .filter(
-            (name) => !(type === "fusion" && name === (params.method === "alpha" ? "k" : "alpha")),
-          )
-          .map((name) => {
-            const d = locked
-              ? ({ kind: "fixed", value: params[name] ?? null } as const)
-              : domain(env, type, name);
-            if (!d) return null;
-            return (
-              <Control
-                key={name}
-                env={env}
-                type={type}
-                param={name}
-                domain={d}
-                value={params[name] ?? null}
-                inert={LEVEL_COPY[level.id]?.inertKnobs?.[name]}
-                onValue={(value) => onChange(setParam(env, bench, type, name, value))}
-              />
-            );
-          })}
+        {knobs
+          .filter(({ d }) => d.kind !== "fixed")
+          .map(({ name, d }) => (
+            <Control
+              key={name}
+              env={env}
+              type={type}
+              param={name}
+              domain={d}
+              value={params[name] ?? null}
+              inert={LEVEL_COPY[level.id]?.inertKnobs?.[name]}
+              onValue={(value) => onChange(setParam(env, bench, type, name, value))}
+            />
+          ))}
         {type === "llm" && !locked && <Prism env={env} bench={bench} onChange={onChange} />}
+        {/* What the level holds still is worth one line, not one line per knob: the turning
+            knobs are the game, the fixed ones are there for whoever wants to check. */}
+        {fixed.length > 0 && (
+          <details data-fixed-params={fixed.length} className="group">
+            <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 text-sm text-fg-muted">
+              <LockIcon className="size-3.5 shrink-0" />
+              {fixed.length} thông số giữ cố định ở màn này
+              <ChevronDownIcon />
+            </summary>
+            <div className="mt-1 space-y-2">
+              {fixed.map(({ name, d }) => (
+                <Control
+                  key={name}
+                  env={env}
+                  type={type}
+                  param={name}
+                  domain={d}
+                  value={params[name] ?? null}
+                  onValue={() => undefined}
+                />
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
       {type === "chunker" && view && <Ingestion run={view.run} node={id} gold={view.gold} />}
@@ -546,6 +689,69 @@ function ParamLabel({ env, type, param }: { env: Env; type: BlockType; param: st
   );
 }
 
+/**
+ * Lược dao on L2: a slider over the sizes the level offers, so the player turns the blade and
+ * the value can only land on a stop. A native range keeps the arrow keys and the value the
+ * screen reader announces; the stop is the step, so no size between two stops can happen.
+ */
+function BladeStops({
+  param,
+  label,
+  options,
+  value,
+  onValue,
+}: {
+  param: string;
+  label: ReactNode;
+  options: readonly JsonValue[];
+  value: JsonValue;
+  onValue: (value: JsonValue) => void;
+}) {
+  const id = useId();
+  const index = Math.max(
+    0,
+    options.findIndex((option) => option === value),
+  );
+  const current = fmtValue(param, options[index] ?? null);
+  return (
+    <div data-param={param}>
+      <div className="flex items-baseline justify-between gap-3">
+        <label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </label>
+        {/* Not an <output>: that is a live region, and aria-valuetext already speaks it. */}
+        <span aria-hidden="true" className="text-sm font-semibold tabular-nums">
+          {current}
+        </span>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={0}
+        max={options.length - 1}
+        step={1}
+        value={index}
+        aria-valuetext={current}
+        onChange={(event) => onValue(options[Number(event.target.value)] ?? null)}
+        className="mt-1 h-11 w-full cursor-pointer accent-brand"
+      />
+      {/* The stops, so the four places the blade can land are seen before it moves. Hidden
+          from the reader: aria-valuetext already speaks the one it is on. */}
+      <ol aria-hidden="true" className="flex justify-between text-xs text-fg-muted tabular-nums">
+        {options.map((option, at) => (
+          <li
+            key={JSON.stringify(option)}
+            data-blade-stop={at === index ? "on" : ""}
+            className={at === index ? "font-semibold text-fg" : undefined}
+          >
+            {typeof option === "number" ? fmt(option) : fmtValue(param, option)}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function Control({
   env,
   type,
@@ -599,6 +805,18 @@ function Control({
         </div>
       );
     case "choice":
+      // Lược dao: the sizes are numbers in a line, so the player turns a blade over them.
+      if (param === "chunk_size") {
+        return (
+          <BladeStops
+            param={param}
+            label={label}
+            options={d.options}
+            value={value}
+            onValue={onValue}
+          />
+        );
+      }
       return (
         <fieldset data-param={param}>
           <legend className="text-sm font-medium">{label}</legend>
@@ -653,64 +871,6 @@ function Control({
       );
     }
   }
-}
-
-function Prism({
-  env,
-  bench,
-  onChange,
-}: {
-  env: Env;
-  bench: Bench;
-  onChange: (next: Bench) => void;
-}) {
-  const id = useId();
-  const cards = Object.entries(env.level.prompt_cards);
-  const length = systemPrompt(env.level, bench.cards).length;
-  return (
-    <fieldset data-param="system_prompt">
-      <legend className="text-sm font-medium">
-        Lăng kính · Dặn dò · <code className="font-mono text-xs">system_prompt</code>
-      </legend>
-      <div className="mt-2 space-y-3">
-        {([0, 1, 2] as const).map((slot) => {
-          const chosen = bench.cards[slot];
-          return (
-            <div key={slot}>
-              <label htmlFor={`${id}-${slot}`} className="text-sm">
-                Khe thẻ {slot + 1}
-              </label>
-              <select
-                id={`${id}-${slot}`}
-                value={chosen ?? ""}
-                onChange={(event) => onChange(setCard(bench, slot, event.target.value || null))}
-                className="mt-1 h-11 w-full rounded-sm border border-fg-muted bg-surface px-2 text-sm text-fg disabled:opacity-60"
-              >
-                <option value="">Trống</option>
-                {cards.map(([key, text]) => (
-                  <option
-                    key={key}
-                    value={key}
-                    disabled={chosen !== key && bench.cards.includes(key)}
-                  >
-                    {key} · {text}
-                  </option>
-                ))}
-              </select>
-              {chosen && (
-                <p className="mt-1 max-w-prose text-sm text-fg-muted">
-                  {env.level.prompt_cards[chosen]}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <p className="mt-3 text-sm text-fg-muted">
-        Dặn dò: {fmt(length)} ký tự, đi riêng ngoài thùng.
-      </p>
-    </fieldset>
-  );
 }
 
 // --- Run state of a slot (§7) ---------------------------------------------------------------

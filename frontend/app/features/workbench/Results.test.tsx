@@ -557,3 +557,65 @@ describe("a recorded run says so on the results (N4)", () => {
     expect(screen.queryByText(/không phải cấu hình của bạn/)).toBeNull();
   });
 });
+
+describe("a failing case's trace is a free look toward the next hint (N16)", () => {
+  // The short run passes every case; the first one is failed here so the two can be told apart.
+  const reference = () => {
+    const run = finishedRun({});
+    return {
+      ...run,
+      cases: run.cases.map((c, i) =>
+        i === 0 && c.graded ? { ...c, graded: { ...c.graded, passed: false } } : c,
+      ),
+    };
+  };
+
+  function openTrace(n: number) {
+    const details = document.getElementById(`cau-${n}`)?.querySelector("details");
+    if (!details) throw new Error(`no trace for case #${n}`);
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+  }
+
+  function withLook(run: RunView) {
+    const looks: number[] = [];
+    render(
+      <MemoryRouter>
+        <Results
+          env={l1}
+          run={run}
+          changed={false}
+          runGraph={dense}
+          graph={dense}
+          backTo="/play/library"
+          slip={null}
+          history={[]}
+          onDebrief={() => undefined}
+          onDuplicate={() => undefined}
+          onEdit={() => undefined}
+          onFocusSlot={() => undefined}
+          onLook={() => looks.push(1)}
+        />
+      </MemoryRouter>,
+    );
+    return looks;
+  }
+
+  it("counts opening the trace of a case that failed", () => {
+    const run = reference();
+    const failed = run.cases.find((c) => c.graded?.counted && !c.graded.passed);
+    if (!failed) throw new Error("no failing case");
+    const looks = withLook(run);
+    openTrace(failed.n);
+    expect(looks).toHaveLength(1);
+  });
+
+  it("does not count the trace of a case that passed", () => {
+    const run = reference();
+    const passed = run.cases.find((c) => c.graded?.passed);
+    if (!passed) throw new Error("no passing case");
+    const looks = withLook(run);
+    openTrace(passed.n);
+    expect(looks).toHaveLength(0);
+  });
+});

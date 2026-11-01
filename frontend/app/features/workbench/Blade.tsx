@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { bladeCuts } from "./blade";
+import { bladeCuts } from "./bladeCuts";
 import { Viz } from "./Viz";
 import { BLADE_VI, fmt, variantVi } from "./copy";
 

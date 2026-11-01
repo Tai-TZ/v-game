@@ -483,15 +483,19 @@ describe("useStarRunAfterSample (N2)", () => {
   const sample = (passed: boolean) => replay([started("mau"), graded(passed), done]);
   const BODY = '{"schema":1,"nodes":[],"edges":[]}';
 
-  const chain = (run: RunView | null, body: string | null = BODY) => {
+  const chain = (run: RunView | null, body: string | null = BODY, samplesOnly = false) => {
     const started: string[] = [];
     const hook = renderHook(
       (props: { run: RunView | null }) =>
-        useStarRunAfterSample(props.run, body, (b) => started.push(b)),
+        useStarRunAfterSample(props.run, body, (b) => started.push(b), samplesOnly),
       { initialProps: { run } },
     );
     return { started, hook };
   };
+
+  it("stops after the samples when the day's pool only covered them (§5.1)", () => {
+    expect(chain(sample(true), BODY, true).started).toEqual([]);
+  });
 
   it("starts the star run on the graph that cleared the gate, not the bench as it stands now", () => {
     const { started } = chain(sample(true));

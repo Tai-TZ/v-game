@@ -102,6 +102,15 @@ export const BLADE_VI = {
 export const STEP_VI = {
   sample: "Bước 1: Thử 3 câu mẫu",
   sampleNote: "3 lời gọi AI, không tính sao. Cả 3 câu mẫu đạt thì run chấm sao chạy tiếp.",
+  sampleAloneNote: "3 lời gọi AI, không tính sao. Quỹ hôm nay chỉ đủ cho bước này.",
+} as const;
+
+/** N16: what a variant run leaves on screen. */
+export const VARIANT_VI = {
+  heading: "Kết quả câu biến thể",
+  step: "Câu biến thể: 1 lời gọi từ quỹ chung của lớp, không tính sao.",
+  passed: "Đạt. Bạn đã tự sửa được cho một câu chưa gặp.",
+  failed: "Chưa đạt. Đọc vết chạy của câu này, sửa rồi chạy lại.",
 } as const;
 
 /** N2: what the sample step leaves on screen once it ends. */
@@ -110,6 +119,7 @@ export const SAMPLE_VI = {
   count: (passed: number, total: number) => `${passed}/${total} câu mẫu đạt.`,
   noStars: "Lượt mẫu không tính sao.",
   passed: "Cả 3 câu mẫu đạt, run chấm sao đang chạy tiếp.",
+  passedAlone: "Cả 3 câu mẫu đạt. Quỹ hôm nay không đủ cho run chấm sao; mở ca lại khi quỹ hồi.",
   failed: "Run chấm sao chỉ mở khi cả 3 câu mẫu đạt. Sửa cấu hình rồi mở ca lại.",
   capped: "Quỹ chung của máy chủ hết giữa chừng nên lượt này không tính. Mai 07:00 có lại.",
 } as const;
@@ -133,6 +143,73 @@ export const STRIP_VI = {
 } as const;
 
 /** N4: the run that already happened. Free, and the first thing the level shows. */
+/** The daily pool beside Mở ca (roadmap-v0.4 §5.1, daily-shift §3.1). */
+export const QUOTA_VI = {
+  left: (n: number) => `Còn ${fmt(n)} lời gọi hôm nay (ước tính)`,
+  refill: (at: string) => `hồi đầy lúc ${at}`,
+  cost: (n: number) => `Lượt này tốn tối đa ${fmt(n)} lời gọi.`,
+  sampleOnly: "Quỹ hôm nay chỉ đủ cho 3 câu mẫu.",
+  sampleButton: "Thử 3 câu mẫu",
+  empty: "Quỹ hôm nay đã hết. Lượt đã ghi vẫn xem được, không tốn lời gọi nào.",
+  unknown: "Chưa đọc được quỹ hôm nay từ máy chủ; mở ca vẫn chạy được.",
+  refunded: (n: number) =>
+    `Hoàn ${fmt(n)} lời gọi: bạn đoán chắc và cả 3 câu mẫu đạt ngay lượt đầu.`,
+  // daily-shift §3.1 words this one; the server's own sentence lacks the first half.
+  reserveEmpty:
+    "Bạn đoán chắc và đúng, nhưng quỹ hoàn chung của lớp hôm nay đã hết: quỹ chia theo thứ tự, ai đạt trước được trước.",
+} as const;
+
+/** N16: the hint ladder (L1-L3 §11). */
+export const HINTS_VI = {
+  heading: "Gợi ý",
+  lead: (star: number) =>
+    `Gợi ý nhắm vào sao ${star}. Xem gợi ý không tốn lượt chạy và không hạ mục tiêu.`,
+  open: (n: number) => `Xem gợi ý ${n}`,
+  label: (n: number) => `Gợi ý ${n}`,
+  waitLook:
+    "Gợi ý 2 mở sau khi bạn nhìn thêm một chỗ: đổi một món trên bàn thợ, theo dõi một câu, hoặc mở vết chạy của một câu trượt.",
+  example: "Gợi ý 3 · lời giải mẫu",
+  variantHeading: "Câu biến thể",
+  variantLead:
+    "Một câu mới cùng bài học này. Tự sửa cấu hình cho nó, không có gợi ý, rồi chạy riêng câu này. Lượt này lấy 1 lời gọi từ quỹ chung của lớp.",
+  variantRun: "Chạy câu biến thể",
+  waitGate: (failed: number) =>
+    `Gợi ý 3 là lời giải mẫu. Nó mở khi bạn đã nhìn thêm một chỗ sau gợi ý 2, và đã trượt 3 lượt chấm ở sao này trên các cấu hình khác nhau (hiện là ${failed}), hoặc khi quỹ hôm nay không đủ cho thêm một lượt.`,
+  seeCase: (n: number) => `Xem câu #${n}`,
+  seeSlot: (toy: string) => `Xem ở ${toy}`,
+} as const;
+
+/** N17: one line the first time a toy is touched; never an overlay, never a help button. */
+export const FIRST_TOUCH_VI: Partial<Record<BlockType, string>> = {
+  chunker: "Lược dao cắt kho thành đoạn. Đoạn to giữ trọn ý; đoạn nhỏ dễ tìm trúng hơn.",
+  vector_search: "Vòm Sao xếp đoạn theo nghĩa gần câu hỏi. Móc kéo quyết định lấy bao nhiêu đoạn.",
+  bm25_search: "Tủ ngăn kéo tìm theo chữ trùng khớp, nên bắt được số điều và mã.",
+  fusion: "Phễu gộp hai danh sách đoạn thành một danh sách.",
+  rerank: "Kính lúp chấm lại các đoạn đã kéo về và giữ những đoạn sát câu hỏi nhất.",
+  context_packer:
+    "Thùng Context gom các đoạn vào lời gửi Bộ Óc; Máy đóng tem gắn mã cho từng đoạn.",
+  llm: "Thẻ trong Lăng kính là lời dặn Bộ Óc đọc trước mọi câu hỏi.",
+};
+
+/** Projector mode (`?chieu=1`, lesson-plan appendix R1-R10). */
+export const PROJECTOR_VI = {
+  guessHeading: "Cả lớp đoán",
+  // The lesson plan's own question for minute 0-5.
+  guessLead: "Trợ lý sẽ trả lời câu này thế nào? Giơ tay A, B hoặc C.",
+  options: [
+    ["A", "Trả lời đúng quy chế"],
+    ["B", "Bịa ra một điều khoản"],
+    ["C", "Nói là không biết"],
+  ],
+  graded: "Đã chấm",
+  reveal: "Mở kết quả",
+  revealNote: "Kết quả đang được che để cả lớp đoán trước. Bấm nút, hoặc nhấn Space hay Enter.",
+  waking: "Đang đánh thức máy chủ",
+  wakingNote:
+    "Máy chủ ngủ sau 15 phút không ai dùng và cần khoảng một phút để dậy. Trong lúc chờ, xem lượt đã ghi.",
+  left: (n: number) => `Máy chiếu còn ${fmt(n)} lời gọi hôm nay (ước tính)`,
+} as const;
+
 export const RECORDED_VI = {
   open: "Xem lượt đã ghi",
   note: "Lượt chạy thật của cấu hình khởi đầu, 0 lời gọi AI.",
@@ -243,7 +320,7 @@ export const HISTORY_VI = {
 
 /**
  * Thẻ so lượt (N20). The label is a causality claim and rests entirely on how many turnable
- * variables changed: see history.ts `compare`. This is intentionally a different sentence from
+ * variables changed: see runHistory.ts `compare`. This is intentionally a different sentence from
  * `sameGraphNote` above -- that one is about the bench matching the run on show before a rerun;
  * this is about two REMEMBERED runs, read after the fact.
  */
@@ -351,12 +428,27 @@ export function fmtValue(param: string, value: JsonValue): string {
   return JSON.stringify(value);
 }
 
+/**
+ * The scene a level opens on (scenario §3, level-identity-v0.5 §2). Each kind is drawn as a
+ * different object, so the first screen of one level does not look like the next one's.
+ */
+export type LevelScene =
+  | { kind: "poster"; where: string; poster: string; note: string }
+  | { kind: "form"; who: string; form: string; stamp: string; note: string }
+  | {
+      kind: "dossier";
+      print: { title: string; body: string };
+      quote: { who: string; text: string };
+      facts: readonly string[];
+    };
+
 export interface LevelCopy {
   /** Asker of case #1 (scenario §4). */
   asker: string;
   intro: string;
   win1: string;
   win3: string;
+  scene: LevelScene;
   /** Knobs that do nothing at this level, by param, with why (shown dimmed, scenario §5). */
   inertKnobs?: Readonly<Record<string, string>>;
 }
@@ -369,6 +461,14 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Tối nay có mười câu hỏi. Mình cần ít nhất sáu trên tám câu thường đúng và có nguồn, còn hai câu bẫy thì nó phải biết nói 'không có'.",
     win1: "Bảng tin sạch rồi. Chú Bảy dặn lần sau in ít thôi.",
     win3: "Biết nói 'không có' đúng lúc, đó là kỹ năng mình quý nhất ở một thủ thư.",
+    scene: {
+      kind: "poster",
+      where: "Bảng Tin trước cửa Thư viện",
+      // Verbatim from build brief §3: the fabrication the level is about.
+      poster:
+        "Theo Điều 47 Quy chế đào tạo, em chỉ cần gửi email cho phòng đào tạo trước khi học kỳ kết thúc là được bảo lưu.",
+      note: "Bảng Tin dán kín những tờ giống hệt nhau. Trợ lý ở quầy đã nói câu này, nhưng quy chế không có quy định nào như vậy. Áp phích chỉ được gỡ khi trợ lý thôi bịa.",
+    },
   },
   "chunk-tuning": {
     asker: "Hà",
@@ -376,6 +476,13 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Mười ba câu tối nay: ít nhất tám trên mười câu thường phải đủ ý, và không câu nào được trả lời theo bản cũ.",
     win1: "Phòng đào tạo nhận đơn của Hà rồi. Bạn ấy gửi hộp bánh cảm ơn, mình sẽ không chia cho Bống.",
     win3: "Không một tờ giấy vàng nào lọt vào thùng. Phòng lưu trữ sẽ tự hào về bạn.",
+    scene: {
+      kind: "form",
+      who: "Hà, sinh viên năm ba, ngồi trên bậc thềm phòng đào tạo",
+      form: "Đơn xin bảo lưu kết quả học tập",
+      stamp: "QUÁ HẠN",
+      note: "Hà nằm viện hai tuần và có giấy ra viện. Quy chế cho nộp muộn trong trường hợp này, nhưng trợ lý không đọc đúng điều luật cho bạn ấy. Đêm qua kho vừa nạp thêm bản quy chế 2019, và Lược dao bị chỉnh xuống 128.",
+    },
   },
   "article-number-lookup": {
     asker: "Khang",
@@ -383,6 +490,19 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Tối nay có người hỏi bằng số điều, có người hỏi bằng lời thường. Tám trên mười câu thường phải đúng, kể cả câu của Khang, và ca của Hà hôm trước không được vỡ.",
     win1: "Hàng người giải tán rồi. Hai cách tìm, mỗi cách che điểm mù cho cách kia.",
     win3: "Ca của Hà vẫn xanh. Cái bảng đó là thứ mình xem đầu tiên mỗi khi có ai sửa trợ lý.",
+    scene: {
+      kind: "dossier",
+      print: { title: "Điều 47 khoản 2", body: "Quy chế hiện hành không có thông tin này." },
+      quote: {
+        who: "Khang, sinh viên năm nhất",
+        text: "Em hỏi hẳn số điều mà nó bảo không có thông tin này!",
+      },
+      facts: [
+        "Cả hàng người trước quầy cầm cùng một tờ in như vậy.",
+        "Cô Lan đã mở quy chế giấy đúng trang Điều 47: điều này có thật.",
+        "Tuần đăng ký học phần, câu hỏi đổ về gấp mười. Mỗi câu chỉ được kéo tối đa 5 đoạn từ Vòm Sao.",
+      ],
+    },
     inertKnobs: { only_in_force: "Kho tối nay không có văn bản hết hiệu lực." },
   },
 };
@@ -391,6 +511,7 @@ export const ROLE_VI: Readonly<Record<string, string>> = {
   visible: "Câu mẫu",
   hidden: "Câu ẩn",
   trap: "Câu bẫy",
+  review: "Câu biến thể",
 };
 
 export const VAI_VI: Readonly<Record<string, string>> = {

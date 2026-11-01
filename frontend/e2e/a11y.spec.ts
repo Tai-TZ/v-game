@@ -18,6 +18,17 @@ const VIEWPORTS = [
 ] as const;
 
 async function seriousViolations(page: Page) {
+  // Contrast is only meaningful at rest: a case row caught mid-flip (N18) reads its muted
+  // question against a half-faded tint, and the scan failed about one run in four for it.
+  // Infinite animations never finish, so only the ones that end are awaited.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   const { violations } = await new AxeBuilder({ page }).analyze();
   return violations
     .filter((violation) => violation.impact === "serious" || violation.impact === "critical")

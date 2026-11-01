@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Projector mode: the class sits on <html> (features/projector, lesson plan R1). */
+@custom-variant chieu (&:where(.chieu, .chieu *));
+
 /*
  * Design tokens. Every colour, the font family and the radii come from the active theme
  * pack (public/themes/<id>/theme.css). Tailwind's default palette is removed so only
@@ -167,6 +170,20 @@
       scroll-behavior: auto !important;
       transition-duration: 0.01ms !important;
     }
+  }
+
+  /*
+   * Projector mode (?chieu=1, lesson plan R2, R7). Every size is in rem, so one root size makes
+   * body text (text-sm) at least 24 px and headings (text-2xl) at least 40 px. Nothing loops on
+   * a projector: a loading bar shows still (its chieu: classes), anything else plays once.
+   */
+  html.chieu {
+    font-size: 175%;
+  }
+  html.chieu *,
+  html.chieu *::before,
+  html.chieu *::after {
+    animation-iteration-count: 1 !important;
   }
 
   /*

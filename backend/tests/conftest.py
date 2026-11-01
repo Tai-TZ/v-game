@@ -1,9 +1,10 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from vgame.api.engine import EngineServices
 from vgame.config import Settings
 from vgame.main import create_app
 
@@ -40,3 +41,18 @@ def settings(tmp_path: Path) -> Settings:
 def client(settings: Settings) -> Iterator[TestClient]:
     with TestClient(create_app(settings)) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def make_client(settings: Settings) -> Iterator[Callable[[EngineServices], TestClient]]:
+    """Apps over the given engine services, entered now and closed with the test."""
+    clients: list[TestClient] = []
+
+    def make(services: EngineServices) -> TestClient:
+        client = TestClient(create_app(settings, engine=services))
+        clients.append(client.__enter__())
+        return client
+
+    yield make
+    for client in clients:
+        client.__exit__(None, None, None)

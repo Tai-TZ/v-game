@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { starterBench } from "./bench";
 
-import { articleStrip, cutSentence, focusArticle, type VizData } from "./strip";
+import { articleStrip, cutSentence, focusArticle, type VizData } from "./vizData";
 import { Strip } from "./Strip";
 import { readText, testEnv } from "./test-fixtures";
 import { WorkbenchPage } from "./WorkbenchPage";
@@ -106,12 +106,19 @@ describe("the locators e2e/workbench.spec.ts uses on the blade", () => {
 
   it.each([
     [/Cách chia/, "Bám điều, khoản"],
-    [/Cỡ đoạn/, "512 token"],
     [/Chồng lấp/, "10 %"],
   ])("group %s holds exactly one option reading %s", (group, option) => {
     page();
     const fieldset = screen.getByRole("group", { name: group });
     expect(within(fieldset).getAllByText(option, { exact: true })).toHaveLength(1);
+  });
+
+  // Cỡ đoạn is the blade: a slider over its four stops, not a group of chips.
+  it("offers the chunk size as one slider over its four stops", () => {
+    page();
+    const blade = screen.getByRole("slider", { name: /Cỡ đoạn/ });
+    expect(blade.getAttribute("min")).toBe("0");
+    expect(blade.getAttribute("max")).toBe("3");
   });
 
   // The reason the spec clicks words rather than the radio: the input cannot be clicked.

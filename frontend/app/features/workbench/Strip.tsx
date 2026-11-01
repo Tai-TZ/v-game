@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import { STRIP_VI, variantVi } from "./copy";
-import { cutSentence, type ArticleStrip } from "./strip";
+import { cutSentence, type ArticleStrip } from "./vizData";
 import { Viz } from "./Viz";
 
 /**

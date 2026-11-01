@@ -106,7 +106,8 @@ const MarkSchema = v.object({
   cases: v.array(
     v.object({
       n: Count,
-      role: v.picklist(["visible", "hidden", "trap"]),
+      // "review" never reaches here (variant runs earn no stars), but the type is the run's own.
+      role: v.picklist(["visible", "hidden", "trap", "review"]),
       passed: v.boolean(),
     }),
   ),
