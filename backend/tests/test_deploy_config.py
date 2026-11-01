@@ -18,7 +18,7 @@ def test_ml_libraries_are_not_runtime_dependencies() -> None:
     pyproject = tomllib.loads((BACKEND / "pyproject.toml").read_text(encoding="utf-8"))
     assert "fastembed" not in {_name(r) for r in pyproject["project"]["dependencies"]}
     groups = pyproject["dependency-groups"]
-    assert "fastembed==0.8.1" in groups["models"]
+    assert "fastembed==0.9.1" in groups["models"]
     assert {"include-group": "models"} in groups["dev"]  # local `uv sync`, CI and slow tests
 
     lock = tomllib.loads((BACKEND / "uv.lock").read_text(encoding="utf-8"))
