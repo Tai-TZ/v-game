@@ -2,15 +2,19 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   canOpen,
+  configKey,
   firstTouches,
   firstTouchTypes,
   hintFor,
+  hint3Gate,
   hintTarget,
   loadHints,
   look,
   open,
+  recordFail,
   saveHints,
   type HintBook,
+  type Target,
 } from "./hints";
 import type { CaseView, RunView } from "./run";
 import type { Graph } from "./schema";
@@ -188,7 +192,7 @@ describe("the ladder", () => {
     saveHints(L1, open(book(), "s1", 1, 1000));
     expect(loadHints(L1).targets.s1?.opened).toBe(1);
     window.localStorage.setItem(`vg.hints.v1.${L1}`, "{nope");
-    expect(loadHints(L1)).toEqual({ targets: {}, log: [] });
+    expect(loadHints(L1)).toEqual({ targets: {}, log: [], fails: {} });
   });
 });
 
@@ -254,5 +258,123 @@ describe("firstTouches", () => {
   it("starts over on an unreadable store", () => {
     window.localStorage.setItem("vg.touched.v1", "{x");
     expect(firstTouches(["fusion"])).toEqual(["fusion"]);
+  });
+});
+
+describe("hint 3's gate (L1 §11, X28; roadmap B4 test list)", () => {
+  const L2 = "chunk-tuning";
+  const star1: Target = { key: "s1", star: 1, n: 1 };
+  // A ladder at hint 2 for star 1, with or without a look since.
+  const atTwo = (looked: boolean, b: HintBook = loadHints(L2)): HintBook => {
+    const two = open(look(open(b, "s1", 1, 1)), "s1", 1, 2);
+    return looked ? look(two) : two;
+  };
+  const gate = (b: HintBook, left: number | null, price = 13) =>
+    canOpen(b, "s1", hint3Gate(b, star1, { left, starPrice: price }));
+
+  it("L2: a sample run and a failed star run with the pool at 0 wait for a look after hint 2", () => {
+    let b = recordFail(atTwo(false), 1, "cfg-a", true);
+    b = recordFail(b, 1, "cfg-b", false);
+    expect(gate(b, 0)).toBeNull();
+    expect(gate(look(b), 0)).toBe(3);
+  });
+
+  it("stays shut with no failed graded run, even with the pool empty", () => {
+    expect(gate(atTwo(true), 0)).toBeNull();
+  });
+
+  it("stuck at the samples on L1: three failed samples on three configs open it (pool 4)", () => {
+    let b = atTwo(true, loadHints(L1));
+    for (const cfg of ["a", "b", "c"]) b = recordFail(b, 1, cfg, true);
+    expect(canOpen(b, "s1", hint3Gate(b, star1, { left: 4, starPrice: 10 }))).toBe(3);
+  });
+
+  it("stuck at the samples on L1: two failed samples (pool 7) do not", () => {
+    let b = atTwo(true, loadHints(L1));
+    for (const cfg of ["a", "b"]) b = recordFail(b, 1, cfg, true);
+    expect(canOpen(b, "s1", hint3Gate(b, star1, { left: 7, starPrice: 10 }))).toBeNull();
+  });
+
+  it("does not count the same configuration failing again", () => {
+    let b = atTwo(true);
+    for (let i = 0; i < 3; i += 1) b = recordFail(b, 1, "same", false);
+    expect(b.fails["1"]?.configs).toEqual(["same"]);
+    expect(gate(b, 13)).toBeNull();
+  });
+
+  it("opens on the third failed star run while the pool still has calls", () => {
+    let b = atTwo(true);
+    for (const cfg of ["a", "b", "c"]) b = recordFail(b, 1, cfg, false);
+    expect(gate(b, 13)).toBe(3);
+  });
+
+  it("prices the next attempt at a sample run when the latest counted failure was one", () => {
+    const b = recordFail(atTwo(true), 1, "a", true);
+    expect(gate(b, 2)).toBe(3); // less than the 3 a sample run costs
+    expect(gate(b, 5)).toBeNull(); // a sample run still fits
+    const star = recordFail(atTwo(true), 1, "a", false);
+    expect(gate(star, 12)).toBe(3); // less than a 13-call star run
+  });
+
+  it("does not open on the pool while the pool is unknown", () => {
+    const b = recordFail(atTwo(true), 1, "a", false);
+    expect(gate(b, null)).toBeNull();
+  });
+
+  it("counts failures per star, not per ladder", () => {
+    const b = recordFail(atTwo(true), 3, "a", false);
+    expect(gate(b, 0)).toBeNull();
+  });
+
+  it("keeps failures across reloads, so earlier days count", () => {
+    saveHints(L2, recordFail(loadHints(L2), 2, "a", false));
+    expect(loadHints(L2).fails["2"]).toEqual({ configs: ["a"], lastSample: false });
+  });
+
+  it("reads a book saved before failures were kept", () => {
+    window.localStorage.setItem(`vg.hints.v1.${L2}`, JSON.stringify({ targets: {}, log: [] }));
+    expect(loadHints(L2).fails).toEqual({});
+  });
+});
+
+describe("a failing sample aims at the lowest star not yet earned", () => {
+  const sample = (): RunView => {
+    const run: RunView = {
+      ...starRun({ s1: true, s2: true, s3: true }, [kase(1, "visible", false)]),
+      scope: "mau",
+    };
+    delete run.score;
+    return run;
+  };
+
+  it("is star 1 before any star, star 2 once star 1 is earned, nothing after star 3", () => {
+    expect(hintTarget(L1, sample(), 0)?.star).toBe(1);
+    expect(hintTarget(L1, sample(), 1)?.star).toBe(2);
+    expect(hintTarget(L1, sample(), 2)?.star).toBe(3);
+    expect(hintTarget(L1, sample(), 3)).toBeNull();
+  });
+});
+
+describe("hint 3 is the worked example", () => {
+  it("is written for every star of every Library level", () => {
+    for (const level of [L1, "chunk-tuning", L3]) {
+      for (const key of ["s1", "s2", "s3"] as const) {
+        const hint = hintFor(level, { key, star: 1, n: 1 }, 3);
+        expect(hint?.text.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("follows L3's trap split", () => {
+    const t02 = hintFor(L3, { key: "s3_t02", star: 3, n: null }, 3);
+    const t03 = hintFor(L3, { key: "s3_t03", star: 3, n: null }, 3);
+    expect(t02?.text).not.toBe(t03?.text);
+  });
+});
+
+describe("configKey", () => {
+  it("is stable for the same body and differs for another", () => {
+    expect(configKey('{"a":1}')).toBe(configKey('{"a":1}'));
+    expect(configKey('{"a":1}')).not.toBe(configKey('{"a":2}'));
   });
 });

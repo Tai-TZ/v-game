@@ -13,13 +13,21 @@ const star3: Target = { key: "s3", star: 3, n: null };
 const book = (opened: number, looked: boolean, key: Target["key"] = "s1"): HintBook => ({
   targets: opened === 0 ? {} : { [key]: { opened, looked } },
   log: [],
+  fails: {},
 });
 
-function ladder(target: Target, b: HintBook, levelId = L1) {
+function ladder(target: Target, b: HintBook, levelId = L1, gate3 = false) {
   const onOpen = vi.fn();
   const onPointer = vi.fn();
   const view = render(
-    <HintLadder levelId={levelId} target={target} book={b} onOpen={onOpen} onPointer={onPointer} />,
+    <HintLadder
+      levelId={levelId}
+      target={target}
+      book={b}
+      gate3={gate3}
+      onOpen={onOpen}
+      onPointer={onPointer}
+    />,
   );
   return { onOpen, onPointer, view };
 }
@@ -46,11 +54,25 @@ describe("HintLadder", () => {
     expect(screen.queryByText(HINTS_VI.waitLook)).toBeNull();
   });
 
-  it("offers nothing past hint 2, which is all this ladder has", () => {
-    ladder(star1, book(2, true));
+  it("holds hint 3 behind its gate, and says what opens it with the count so far", () => {
+    const b = { ...book(2, true), fails: { "1": { configs: ["a"], lastSample: false } } };
+    ladder(star1, b);
     expect(document.querySelectorAll("[data-hint]")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: /Xem gợi ý/ })).toBeNull();
-    expect(screen.queryByText(HINTS_VI.waitLook)).toBeNull();
+    expect(screen.getByText(HINTS_VI.waitGate(1))).toBeTruthy();
+  });
+
+  it("offers hint 3 once the gate is open", () => {
+    const { onOpen } = ladder(star1, book(2, true), L1, true);
+    fireEvent.click(screen.getByRole("button", { name: HINTS_VI.open(3) }));
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it("names hint 3 a worked example, and offers nothing past it", () => {
+    ladder(star1, book(3, true), L1, true);
+    expect(document.querySelector('[data-hint="3"]')?.textContent).toContain(HINTS_VI.example);
+    expect(screen.queryByRole("button", { name: /Xem gợi ý/ })).toBeNull();
+    expect(screen.queryByText(/Gợi ý 3 là lời giải mẫu/)).toBeNull();
   });
 
   it("points at the toy a hint names, by its own name", () => {

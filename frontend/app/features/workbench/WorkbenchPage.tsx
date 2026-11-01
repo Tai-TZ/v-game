@@ -529,7 +529,6 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [revealed, setRevealed] = useState<string | null>(null);
   const masked = projector && run !== null && run.runId !== revealed;
   // N16: the ladder follows the player's own last run; N17: the first-touch lines of the page.
-  const hints = useHints(level.id, ours);
   const [tips, setTips] = useState<Partial<Record<BlockType, string>>>({});
   const sample = useLastSample(ours);
   useRecordStars(level, run);
@@ -560,6 +559,16 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     samplesCached: sample !== null && lastBody === body,
     slipOf,
     projector,
+  });
+  const hints = useHints({
+    levelId: level.id,
+    zoneId: level.zone,
+    run: ours,
+    ranBody: lastBody,
+    gate: {
+      left: quota.left,
+      starPrice: level.case_counts.normal + level.case_counts.trap + level.case_counts.info,
+    },
   });
 
   const issues = serverIssues ?? clientIssues;
@@ -887,6 +896,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           levelId={level.id}
           target={hints.target}
           book={hints.book}
+          gate3={hints.gate3}
           onOpen={hints.openNext}
           onPointer={point}
         />

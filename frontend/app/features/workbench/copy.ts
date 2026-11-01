@@ -160,6 +160,9 @@ export const HINTS_VI = {
   label: (n: number) => `Gợi ý ${n}`,
   waitLook:
     "Gợi ý 2 mở sau khi bạn nhìn thêm một chỗ: đổi một món trên bàn thợ, theo dõi một câu, hoặc mở vết chạy của một câu trượt.",
+  example: "Gợi ý 3 · lời giải mẫu",
+  waitGate: (failed: number) =>
+    `Gợi ý 3 là lời giải mẫu. Nó mở khi bạn đã nhìn thêm một chỗ sau gợi ý 2, và đã trượt 3 lượt chấm ở sao này trên các cấu hình khác nhau (hiện là ${failed}), hoặc khi quỹ hôm nay không đủ cho thêm một lượt.`,
   seeCase: (n: number) => `Xem câu #${n}`,
   seeSlot: (toy: string) => `Xem ở ${toy}`,
 } as const;
