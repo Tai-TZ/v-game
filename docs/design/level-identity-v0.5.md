@@ -1,57 +1,55 @@
-# Bản sắc từng level: đổi thao tác và màn hình (v0.5, bản nháp)
+# Bản sắc từng level: đổi thao tác và màn hình (v0.5)
 
-> **Trạng thái:** nháp đề xuất, chưa duyệt. Phạm vi: ba level đã có nội dung của khu Thư viện (L1–L3). Chưa đụng tới khung bàn thợ chung, chưa đổi luật chấm sao, chưa đổi golden set.
-> **Ràng buộc:** [gameplay-direction](gameplay-direction.md), [library.md](../content/scenarios/library.md) §2–§3 (đồ chơi dùng chung và ẩn dụ phai dần), [art-direction](art-direction.md) §1.3 và §7 (không vòng lặp idle).
+> **Trạng thái:** đã làm phần trong mục 2 (2026-11-01). Chủ dự án duyệt hướng "đổi thao tác và màn hình, giữ khung bàn thợ chung" và giao việc chọn cách làm hợp lý nhất. Mục 3 ghi những đề xuất của bản nháp đã bỏ và lý do.
+> **Phạm vi:** ba level đã có nội dung của khu Thư viện (L1–L3). Không đổi khung bàn thợ, luật chấm sao, golden set hay engine.
+> **Ràng buộc:** [gameplay-direction](gameplay-direction.md), [library.md](../content/scenarios/library.md) §2–§3, [workbench-v0.1](workbench-v0.1.md) §2.1 (bàn thợ và nút Mở ca lên màn đầu ở 1280×800), [roadmap-v0.4](roadmap-v0.4.md) X4 (phiếu đoán cho bỏ qua), [art-direction](art-direction.md) §1.3.
 
 ## 1. Vấn đề
 
-Ba level hiện đã khác nhau về việc phải làm (lắp, chỉnh, chẩn đoán), nhưng khi mở ra người chơi gặp cùng một bố cục: bàn thợ với các slot, bảng câu bên phải, ba phiếu đoán, cùng một cách chấm sao. Thao tác khác, màn hình gần như giống. Đề xuất này giữ khung và đổi **đối tượng người chơi chạm vào** và **màn hình chính** của từng level.
+Ba level đã khác nhau về việc phải làm (lắp, chỉnh, chẩn đoán), nhưng khi mở ra người chơi gặp cùng một đầu trang và cùng một bố cục. Màn đầu của level này trông như màn đầu của level kia.
 
-## 2. Ba bản sắc
+## 2. Đã làm
 
-| Level | Thao tác chính | Màn hình chính | Cảm giác |
-|---|---|---|---|
-| L1 · Thôi bịa điều luật | **Lắp** khối và **đóng tem** nguồn | Bảng Tin với áp phích; câu trả lời hiện dần, mỗi câu phải dán tem mã đoạn | Thợ ráp, kiểm chứng từng câu |
-| L2 · Lược dao chunk | **Cắt** văn bản bằng lưỡi dao | Trang quy chế trải ra; người chơi kéo lưỡi dao xuống để cắt đoạn, dải đoạn là màn hình chính | Thợ cắt vải, nhìn đường cắt |
-| L3 · Hỏi bằng số điều | **Điều tra** hồ sơ sự cố | Hồ sơ "Điều 47 khoản 2" và hàng người; bàn thợ chỉ mở sau phiếu đoán đầu tiên | Thám tử, đọc bằng chứng trước khi sửa |
+### 2.1 Hiện trường ở đầu mỗi level
 
-## 3. Chi tiết từng level
+Mỗi level mở bằng hiện vật của chính nó, lấy từ mục 3 "Hiện trường" của kịch bản. Ba hiện vật có ba hình dạng khác nhau:
 
-### L1: lắp và đóng tem
+| Level | Hiện vật | Hình |
+|---|---|---|
+| L1 · Thôi bịa điều luật | Áp phích trên Bảng Tin, in nguyên văn câu bịa (build brief §3) | Tờ giấy có mép băng dính, chữ đậm |
+| L2 · Lược dao chunk | Đơn xin bảo lưu của Hà | Tờ đơn có dòng kẻ và dấu đỏ "QUÁ HẠN" |
+| L3 · Hỏi bằng số điều | Tờ in "Điều 47 khoản 2" mà cả hàng người cầm | Chữ đơn cách như máy in ở quầy |
 
-- **Màn hình chính:** bảng trả lời của trợ lý nằm giữa. Mỗi câu có một ô tem trống. Người chơi kéo một đoạn từ "Kệ sách" hoặc từ kết quả truy xuất sang ô tem để gắn nguồn.
-- **Bàn thợ:** vẫn là slot, nhưng chỉ có ba khối: Vòm Sao, Thùng, Bộ Óc. Lăng kính và Máy đóng tem được nhúng vào bảng trả lời thay vì nằm trên bàn.
-- **Điểm khác:** ca "không có" là một ô tem đặc biệt, gắn vào câu nói "không có thông tin". Thiếu tem là lỗi nhìn thấy được ngay trên câu.
-- **Tái dùng:** `CitationLedger`, `Stamps`, `ContextBin`.
+- Hiện trường thay chỗ khung lời cô Lan. Lời cô Lan và chuyện tối nay (ai, chuyện gì, bối cảnh) nằm trong mục mở rộng "Cô Lan kể lại chuyện tối nay".
+- Lý do: ở 1280×800, đầu trang không còn chỗ. Thêm một khối riêng đẩy nút Mở ca của L3 xuống 1041 px (màn cao 800). Lời cô Lan nhắc lại mục tiêu mà cột phải đã liệt kê, nên đưa vào mục mở rộng mất ít nhất.
+- Đã đo: với bố cục này, nút Mở ca ở đúng vị trí cũ trên cả ba level (L3 đáy nút 784 px). Ở L1 (810 px) và L2 (835 px), nút vốn đã nằm dưới mép màn từ trước, vì cột mục tiêu bên phải cao hơn. Hiện trường không làm việc này tệ hơn; sửa nó nằm ngoài phạm vi.
+- Chỉ chữ tĩnh. Lời trợ lý trong lượt đã ghi thuộc về phần phát lại và tem của nó, không đặt ở đây.
+- Code: `frontend/app/features/workbench/Scene.tsx`, nội dung ở `LEVEL_COPY[*].scene` trong `copy.ts`.
 
-### L2: cắt bằng lưỡi dao
+### 2.2 L2: Cỡ đoạn là lưỡi dao
 
-- **Màn hình chính:** `Strip` chuyển thành trang quy chế đầy đủ. Lưỡi dao (`Blade`) kéo dọc để đặt vết cắt, số token của mỗi đoạn hiện ngay dưới.
-- **Thay núm vặn:** `chunk_size`, `overlap_pct` và `strategy` không còn là ô chọn. Người chơi chọn **kiểu cắt** (cố định hoặc theo điều) bằng nút nam châm, còn kích thước và độ chồng lấp là hai nấc của lưỡi dao.
-- **Điểm khác:** kính lọc hiệu lực (`only_in_force`) hiện thành dấu gạch ngang lên các khoản bản 2019. Người chơi thấy trước đoạn nào đã bị loại.
-- **Tái dùng:** `Blade`, `Strip`, `vizData.articleStrip`.
+- `chunk_size` không còn là hàng chip. Nó là thanh trượt bốn nấc (128, 256, 512, 1.024), có nhãn từng nấc và đánh dấu nấc đang chọn. Giá trị chỉ dừng ở một nấc level cho phép.
+- Thanh trượt là `input type="range"` gốc: phím mũi tên, Home, End đều dùng được, và trình đọc màn hình đọc giá trị qua `aria-valuetext`.
+- Dải đoạn ngay bên dưới đã vẽ lại theo nấc đang chọn từ trước, nên kéo lưỡi dao là thấy vết cắt đổi.
+- Code: `BladeStops` trong `BenchView.tsx`.
 
-### L3: điều tra hồ sơ
+## 3. Đề xuất của bản nháp đã bỏ
 
-- **Màn hình chính:** hồ sơ sự cố gồm câu hỏi của Khang, đáp án đúng của cô Lan và hai cách tìm xếp cạnh nhau (`Compare`). Hành động đầu tiên là phiếu đoán: người chơi đoán vì sao Điều 47 không lên top, rồi mới mở bàn thợ.
-- **Bàn thợ:** mở sau phiếu đoán đầu tiên. Ba khối Tủ ngăn kéo, Phễu và Kính lúp được đưa ra đúng lúc cần, không phải từ đầu.
-- **Điểm khác:** `RankJourney` là màn hình chính khi chẩn đoán, không chỉ là chú thích.
-- **Tái dùng:** `Compare`, `GuessSlip`, `RankJourney`, `Debrief`.
+| Đề xuất | Lý do bỏ |
+|---|---|
+| L1: người chơi tự kéo đoạn vào ô tem của từng câu | Tem phải là bằng chứng từ trace của lượt chạy thật (`Stamps`, `CitationLedger` đã vẽ đúng điều đó). Cho người chơi tự dán tem là dựng một bức tranh không đến từ lượt chạy, trái nguyên tắc "bằng chứng từ trace" của roadmap v0.4. |
+| L3: khoá bàn thợ đến sau phiếu đoán đầu tiên | Phiếu đoán "không bắt buộc" và "cho bỏ qua" (X4, chữ trên chính phiếu). Khoá bàn thợ sau phiếu biến nó thành bắt buộc. |
+| L3: mở sẵn phiếu đoán | Phiếu được thu gọn để Mở ca lên màn đầu ở 1280×800 (§2.1). Mở sẵn sẽ đẩy Mở ca xuống. |
+| L2: nam châm thay ô chọn kiểu cắt | Kiểu cắt chỉ có hai lựa chọn; hai chip đã là cách chọn rõ nhất. |
 
-## 4. Những thứ không đổi
+## 4. Kiểm thử
 
-- Luật chấm sao (số ca, mục tiêu, ngân sách token) và golden set `docs/content/golden/*.json`.
-- Khung dữ liệu level (`allowed_blocks`, `locked_nodes`, `param_limits`) và engine.
-- Quỹ lời gọi AI và chẩn đoán cuối ca.
+- `Scene.test.tsx`: mỗi level vẽ đúng loại hiện vật; ba level ra ba loại khác nhau; có tiêu đề "Hiện trường" cho trình đọc màn hình.
+- `BenchView.test.tsx`: lưỡi dao có bốn nấc, không còn chip; kéo tới nấc 2 đặt `chunk_size` = 512; nấc đang chọn được đánh dấu.
+- Đã thử phá code để chắc test bắt được lỗi: đổi `data-scene` thành một giá trị chung, bỏ nội dung tờ in, bỏ nhánh lưỡi dao, bỏ dấu nấc đang chọn. Lần nào cũng có test đỏ.
+- e2e: bước chọn 512 ở `workbench.spec.ts` đi bằng bàn phím trên thanh trượt.
 
-## 5. Kiểm thử cần có
+## 5. Còn mở
 
-- Với mỗi level, bảng test hiện có (`BenchView.test.tsx`, `Strip.test.tsx`, `GuessSlip.test.tsx`, `Compare.test.tsx`) phải tiếp tục đạt. Các test chỉ kiểm cấu trúc DOM có thể cần cập nhật có chủ đích.
-- Một e2e mới cho mỗi level, đi đúng thao tác chính: L1 gắn tem, L2 đặt vết cắt, L3 làm phiếu đoán trước.
-- `toys.a11y.test.tsx`: thao tác kéo phải có bản thay thế bằng bàn phím (nút tăng giảm vị trí lưỡi dao, nút gắn tem theo thứ tự).
-
-## 6. Câu hỏi mở cho chủ dự án
-
-1. L2 đổi núm vặn thành lưỡi dao có làm mất tính "đo được" của ba nấc chunk hay không? Cần xác nhận trước khi làm.
-2. L3 giấu bàn thợ đến sau phiếu đoán có vượt quá quyết định "phiếu đoán trở lại ngay" (X4) không? Mình cho rằng không, vì phiếu đoán vẫn đứng trước bàn thợ.
-3. Có giữ thứ tự Đoán → Chạy → Giải thích ở L1 không, hay L1 đi thẳng vào lắp khối như hiện nay?
+- Mục 2.1: ở L1 và L2, nút Mở ca vốn đã nằm dưới mép màn 1280×800 vì cột mục tiêu. Có thể rút gọn chữ mục tiêu hoặc đổi bố cục đầu trang.
+- Hiện trường chưa có "cờ thế giới" (áp phích được gỡ khi đạt sao 1, đơn đổi thành "ĐÃ NHẬN"). Trang bàn thợ chưa biết số sao đã đạt khi dựng đầu trang.

@@ -2,6 +2,7 @@ import { ChevronDownIcon } from "~/components/ui/icons";
 import { IncidentBadge } from "~/features/zones/ui";
 
 import { LEVEL_COPY, vaiVi } from "./copy";
+import { Scene } from "./Scene";
 import type { PublicLevel } from "./schema";
 
 /**
@@ -23,15 +24,7 @@ export function Brief({ level }: { level: PublicLevel }) {
         </div>
         <p className="mt-3 text-lg text-fg-muted">{level.brief}</p>
 
-        {copy && (
-          <figure className="mt-6 rounded-md border border-line bg-surface p-4">
-            <figcaption className="text-sm">
-              <span className="font-bold">Cô Lan</span>{" "}
-              <span className="text-fg-muted">· Thủ thư ca tối</span>
-            </figcaption>
-            <blockquote className="mt-2">{copy.intro}</blockquote>
-          </figure>
-        )}
+        {copy && <Scene scene={copy.scene} lan={copy.intro} />}
       </div>
 
       <div className="max-w-prose">

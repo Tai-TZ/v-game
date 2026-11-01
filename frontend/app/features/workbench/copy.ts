@@ -428,12 +428,27 @@ export function fmtValue(param: string, value: JsonValue): string {
   return JSON.stringify(value);
 }
 
+/**
+ * The scene a level opens on (scenario §3, level-identity-v0.5 §2). Each kind is drawn as a
+ * different object, so the first screen of one level does not look like the next one's.
+ */
+export type LevelScene =
+  | { kind: "poster"; where: string; poster: string; note: string }
+  | { kind: "form"; who: string; form: string; stamp: string; note: string }
+  | {
+      kind: "dossier";
+      print: { title: string; body: string };
+      quote: { who: string; text: string };
+      facts: readonly string[];
+    };
+
 export interface LevelCopy {
   /** Asker of case #1 (scenario §4). */
   asker: string;
   intro: string;
   win1: string;
   win3: string;
+  scene: LevelScene;
   /** Knobs that do nothing at this level, by param, with why (shown dimmed, scenario §5). */
   inertKnobs?: Readonly<Record<string, string>>;
 }
@@ -446,6 +461,14 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Tối nay có mười câu hỏi. Mình cần ít nhất sáu trên tám câu thường đúng và có nguồn, còn hai câu bẫy thì nó phải biết nói 'không có'.",
     win1: "Bảng tin sạch rồi. Chú Bảy dặn lần sau in ít thôi.",
     win3: "Biết nói 'không có' đúng lúc, đó là kỹ năng mình quý nhất ở một thủ thư.",
+    scene: {
+      kind: "poster",
+      where: "Bảng Tin trước cửa Thư viện",
+      // Verbatim from build brief §3: the fabrication the level is about.
+      poster:
+        "Theo Điều 47 Quy chế đào tạo, em chỉ cần gửi email cho phòng đào tạo trước khi học kỳ kết thúc là được bảo lưu.",
+      note: "Bảng Tin dán kín những tờ giống hệt nhau. Trợ lý ở quầy đã nói câu này, nhưng quy chế không có quy định nào như vậy. Áp phích chỉ được gỡ khi trợ lý thôi bịa.",
+    },
   },
   "chunk-tuning": {
     asker: "Hà",
@@ -453,6 +476,13 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Mười ba câu tối nay: ít nhất tám trên mười câu thường phải đủ ý, và không câu nào được trả lời theo bản cũ.",
     win1: "Phòng đào tạo nhận đơn của Hà rồi. Bạn ấy gửi hộp bánh cảm ơn, mình sẽ không chia cho Bống.",
     win3: "Không một tờ giấy vàng nào lọt vào thùng. Phòng lưu trữ sẽ tự hào về bạn.",
+    scene: {
+      kind: "form",
+      who: "Hà, sinh viên năm ba, ngồi trên bậc thềm phòng đào tạo",
+      form: "Đơn xin bảo lưu kết quả học tập",
+      stamp: "QUÁ HẠN",
+      note: "Hà nằm viện hai tuần và có giấy ra viện. Quy chế cho nộp muộn trong trường hợp này, nhưng trợ lý không đọc đúng điều luật cho bạn ấy. Đêm qua kho vừa nạp thêm bản quy chế 2019, và Lược dao bị chỉnh xuống 128.",
+    },
   },
   "article-number-lookup": {
     asker: "Khang",
@@ -460,6 +490,19 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       "Tối nay có người hỏi bằng số điều, có người hỏi bằng lời thường. Tám trên mười câu thường phải đúng, kể cả câu của Khang, và ca của Hà hôm trước không được vỡ.",
     win1: "Hàng người giải tán rồi. Hai cách tìm, mỗi cách che điểm mù cho cách kia.",
     win3: "Ca của Hà vẫn xanh. Cái bảng đó là thứ mình xem đầu tiên mỗi khi có ai sửa trợ lý.",
+    scene: {
+      kind: "dossier",
+      print: { title: "Điều 47 khoản 2", body: "Quy chế hiện hành không có thông tin này." },
+      quote: {
+        who: "Khang, sinh viên năm nhất",
+        text: "Em hỏi hẳn số điều mà nó bảo không có thông tin này!",
+      },
+      facts: [
+        "Cả hàng người trước quầy cầm cùng một tờ in như vậy.",
+        "Cô Lan đã mở quy chế giấy đúng trang Điều 47: điều này có thật.",
+        "Tuần đăng ký học phần, câu hỏi đổ về gấp mười. Mỗi câu chỉ được kéo tối đa 5 đoạn từ Vòm Sao.",
+      ],
+    },
     inertKnobs: { only_in_force: "Kho tối nay không có văn bản hết hiệu lực." },
   },
 };

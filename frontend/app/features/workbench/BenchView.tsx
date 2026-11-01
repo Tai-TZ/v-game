@@ -601,9 +601,19 @@ function BladeStops({
         onChange={(event) => onValue(options[Number(event.target.value)] ?? null)}
         className="mt-1 h-11 w-full cursor-pointer accent-brand"
       />
-      <p className="text-xs text-fg-muted tabular-nums">
-        {fmtValue(param, options[0] ?? null)}–{fmtValue(param, options[options.length - 1] ?? null)}
-      </p>
+      {/* The stops, so the four places the blade can land are seen before it moves. Hidden
+          from the reader: aria-valuetext already speaks the one it is on. */}
+      <ol aria-hidden="true" className="flex justify-between text-xs text-fg-muted tabular-nums">
+        {options.map((option, at) => (
+          <li
+            key={JSON.stringify(option)}
+            data-blade-stop={at === index ? "on" : ""}
+            className={at === index ? "font-semibold text-fg" : undefined}
+          >
+            {typeof option === "number" ? fmt(option) : fmtValue(param, option)}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

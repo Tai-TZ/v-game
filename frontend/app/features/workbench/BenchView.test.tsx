@@ -425,6 +425,11 @@ describe("the chunker's strip (N22)", () => {
     expect(control?.querySelectorAll('input[type="radio"]').length).toBe(0);
     expect(blade?.min).toBe("0");
     expect(blade?.max).toBe("3");
+    // The four stops are drawn, and the one the blade sits on is marked.
+    const stops = [...(control?.querySelectorAll("[data-blade-stop]") ?? [])];
+    expect(stops.map((s) => s.textContent)).toEqual(["128", "256", "512", "1.024"]);
+    const on = stops.findIndex((s) => s.getAttribute("data-blade-stop") === "on");
+    expect(on).toBe(Number(blade?.value));
   });
 
   it("moves the chunk size to the stop the blade lands on", () => {
