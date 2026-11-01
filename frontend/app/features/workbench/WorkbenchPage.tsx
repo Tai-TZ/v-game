@@ -22,8 +22,8 @@ import { BACK_TO_LEVELS, liveMessage } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
 import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
-import { parseViz, vizUrl, type VizData } from "./strip";
-import { lastPassing } from "./history";
+import { parseViz, vizUrl, type VizData } from "./vizData";
+import { lastPassing } from "./runHistory";
 import { Results } from "./Results";
 import { SampleResult } from "./SampleResult";
 import {

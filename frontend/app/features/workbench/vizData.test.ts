@@ -7,7 +7,7 @@ import {
   parseViz,
   variantKey,
   type VizData,
-} from "./strip";
+} from "./vizData";
 import { readText } from "./test-fixtures";
 
 /** One synthetic document, one variant, cuts wherever the test says. */

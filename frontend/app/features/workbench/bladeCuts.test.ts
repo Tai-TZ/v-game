@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bladeCuts } from "./blade";
+import { bladeCuts } from "./bladeCuts";
 
 describe("bladeCuts", () => {
   it("cuts more often the smaller the pieces are", () => {

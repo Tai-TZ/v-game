@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Fact } from "./schema";
-import { starField } from "./stardome";
+import { starField } from "./starField";
 import { readText } from "./test-fixtures";
 
 type RetrievedItem = Extract<Fact, { kind: "retrieved" }>["items"][number];
