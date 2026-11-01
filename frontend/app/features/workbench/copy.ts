@@ -102,6 +102,7 @@ export const BLADE_VI = {
 export const STEP_VI = {
   sample: "Bước 1: Thử 3 câu mẫu",
   sampleNote: "3 lời gọi AI, không tính sao. Cả 3 câu mẫu đạt thì run chấm sao chạy tiếp.",
+  sampleAloneNote: "3 lời gọi AI, không tính sao. Quỹ hôm nay chỉ đủ cho bước này.",
 } as const;
 
 /** N2: what the sample step leaves on screen once it ends. */
@@ -110,6 +111,7 @@ export const SAMPLE_VI = {
   count: (passed: number, total: number) => `${passed}/${total} câu mẫu đạt.`,
   noStars: "Lượt mẫu không tính sao.",
   passed: "Cả 3 câu mẫu đạt, run chấm sao đang chạy tiếp.",
+  passedAlone: "Cả 3 câu mẫu đạt. Quỹ hôm nay không đủ cho run chấm sao; mở ca lại khi quỹ hồi.",
   failed: "Run chấm sao chỉ mở khi cả 3 câu mẫu đạt. Sửa cấu hình rồi mở ca lại.",
   capped: "Quỹ chung của máy chủ hết giữa chừng nên lượt này không tính. Mai 07:00 có lại.",
 } as const;
@@ -133,6 +135,22 @@ export const STRIP_VI = {
 } as const;
 
 /** N4: the run that already happened. Free, and the first thing the level shows. */
+/** The daily pool beside Mở ca (roadmap-v0.4 §5.1, daily-shift §3.1). */
+export const QUOTA_VI = {
+  left: (n: number) => `Còn ${fmt(n)} lời gọi hôm nay (ước tính)`,
+  refill: (at: string) => `hồi đầy lúc ${at}`,
+  cost: (n: number) => `Lượt này tốn tối đa ${fmt(n)} lời gọi.`,
+  sampleOnly: "Quỹ hôm nay chỉ đủ cho 3 câu mẫu.",
+  sampleButton: "Thử 3 câu mẫu",
+  empty: "Quỹ hôm nay đã hết. Lượt đã ghi vẫn xem được, không tốn lời gọi nào.",
+  unknown: "Chưa đọc được quỹ hôm nay từ máy chủ; mở ca vẫn chạy được.",
+  refunded: (n: number) =>
+    `Hoàn ${fmt(n)} lời gọi: bạn đoán chắc và cả 3 câu mẫu đạt ngay lượt đầu.`,
+  // daily-shift §3.1 words this one; the server's own sentence lacks the first half.
+  reserveEmpty:
+    "Bạn đoán chắc và đúng, nhưng quỹ hoàn chung của lớp hôm nay đã hết: quỹ chia theo thứ tự, ai đạt trước được trước.",
+} as const;
+
 export const RECORDED_VI = {
   open: "Xem lượt đã ghi",
   note: "Lượt chạy thật của cấu hình khởi đầu, 0 lời gọi AI.",
