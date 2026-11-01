@@ -243,7 +243,7 @@ export const HISTORY_VI = {
 
 /**
  * Thẻ so lượt (N20). The label is a causality claim and rests entirely on how many turnable
- * variables changed: see history.ts `compare`. This is intentionally a different sentence from
+ * variables changed: see runHistory.ts `compare`. This is intentionally a different sentence from
  * `sameGraphNote` above -- that one is about the bench matching the run on show before a rerun;
  * this is about two REMEMBERED runs, read after the fact.
  */

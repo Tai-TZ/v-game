@@ -7,7 +7,7 @@ import type { BenchRun, StepView } from "./run";
 import type { Fact } from "./schema";
 import type { EventType } from "./schema";
 import { STRIP_VI } from "./copy";
-import type { VizData } from "./strip";
+import type { VizData } from "./vizData";
 import { frame, readText, replay, testEnv } from "./test-fixtures";
 import { validateGraph } from "./validate";
 

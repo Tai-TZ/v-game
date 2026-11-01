@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { starterBench } from "./bench";
 
-import { articleStrip, cutSentence, focusArticle, type VizData } from "./strip";
+import { articleStrip, cutSentence, focusArticle, type VizData } from "./vizData";
 import { Strip } from "./Strip";
 import { readText, testEnv } from "./test-fixtures";
 import { WorkbenchPage } from "./WorkbenchPage";

@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, type ReactElement } from "react";
 
 import { DOME_VI, fmtCosine } from "./copy";
 import type { Fact } from "./schema";
-import { starField, type Star } from "./stardome";
+import { starField, type Star } from "./starField";
 
 type RetrievedItem = Extract<Fact, { kind: "retrieved" }>["items"][number];
 

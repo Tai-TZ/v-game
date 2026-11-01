@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import { changeName, COMPARE_VI } from "./copy";
-import { compare } from "./history";
+import { compare } from "./runHistory";
 import type { Env } from "./bench";
 import type { RunMark } from "./storage";
 

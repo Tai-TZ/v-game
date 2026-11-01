@@ -19,7 +19,7 @@ import { CitationLedger } from "./CitationLedger";
 import { packerSaw } from "./ledger";
 import { ContextBin } from "./ContextBin";
 import { StarDome } from "./StarDome";
-import { articleStrip, focusArticle, variantKey, type VizData } from "./strip";
+import { articleStrip, focusArticle, variantKey, type VizData } from "./vizData";
 import { Strip } from "./Strip";
 import {
   domain,
