@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import {
   AlertIcon,
@@ -136,6 +137,11 @@ interface BenchProps {
   discarded: boolean;
   /** N17: the one-line note of each toy touched for the first time on this browser. */
   tips?: Partial<Record<BlockType, string>>;
+  /**
+   * Where the machine is drawn: an element above both page columns, so it spans the page. The
+   * bench keeps its state either way (a portal). Absent, the machine sits at the bench's head.
+   */
+  machineHost?: HTMLElement | null;
 }
 
 const EMPTY_TEXT: Readonly<Record<string, string>> = {
@@ -201,6 +207,23 @@ export function BenchSection(props: BenchProps) {
   ) as Record<BlockType, BlockState>;
   const graded = view?.followed.graded;
 
+  const machine = (
+    <div className="mt-5 rounded-md border border-line bg-surface p-4">
+      <MachineMap
+        env={env}
+        bench={props.bench}
+        onChange={props.onChange}
+        onOpen={open}
+        onPick={setPicked}
+        disabled={locked}
+        states={states}
+        highlight={props.highlight}
+        answer={graded?.counted === true ? (graded.passed ? "pass" : "fail") : null}
+        view={view}
+      />
+    </div>
+  );
+
   return (
     <section aria-labelledby="wb-bench-title">
       <h2 id="wb-bench-title" tabIndex={-1} className="text-2xl font-bold tracking-tight">
@@ -229,20 +252,7 @@ export function BenchSection(props: BenchProps) {
         </p>
       )}
 
-      <div className="mt-5 rounded-md border border-line bg-surface p-4">
-        <MachineMap
-          env={env}
-          bench={props.bench}
-          onChange={props.onChange}
-          onOpen={open}
-          onPick={setPicked}
-          disabled={locked}
-          states={states}
-          highlight={props.highlight}
-          answer={graded?.counted === true ? (graded.passed ? "pass" : "fail") : null}
-          view={view}
-        />
-      </div>
+      {props.machineHost ? createPortal(machine, props.machineHost) : machine}
 
       <fieldset disabled={locked} className="mt-5 min-w-0">
         <legend className="sr-only">Các món trên bàn thợ</legend>

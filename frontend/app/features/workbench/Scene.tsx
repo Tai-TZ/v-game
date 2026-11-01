@@ -15,7 +15,19 @@ import type { LevelScene } from "./copy";
  *
  * Static text only: what a recorded run said belongs to the replay and its stamp, never here.
  */
-export function Scene({ scene, lan }: { scene: LevelScene; lan: string }): ReactElement {
+export function Scene({
+  scene,
+  lan,
+  won = false,
+  win,
+}: {
+  scene: LevelScene;
+  lan: string;
+  /** The level has a star: the scene shows its trouble fixed (cờ thế giới, scenario §3). */
+  won?: boolean;
+  /** Cô Lan's line for the first star (scenario §4), said once the level is won. */
+  win?: string;
+}): ReactElement {
   const id = useId();
   return (
     <section
@@ -26,7 +38,7 @@ export function Scene({ scene, lan }: { scene: LevelScene; lan: string }): React
       <h2 id={id} className="sr-only">
         Hiện trường
       </h2>
-      {object(scene)}
+      {object(scene, won)}
       <details className="group mt-1">
         <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
           Cô Lan kể lại chuyện tối nay
@@ -41,23 +53,48 @@ export function Scene({ scene, lan }: { scene: LevelScene; lan: string }): React
             </figcaption>
             <blockquote className="mt-1">{lan}</blockquote>
           </figure>
+          {won && win && (
+            <figure>
+              <figcaption>
+                <span className="font-bold">Cô Lan</span>{" "}
+                <span className="text-fg-muted">· sau sao đầu tiên</span>
+              </figcaption>
+              <blockquote className="mt-1">{win}</blockquote>
+            </figure>
+          )}
         </div>
       </details>
     </section>
   );
 }
 
-function object(scene: LevelScene): ReactElement {
+/** A stamp across the object once the trouble is fixed, in the success colour. */
+function Fixed({ text }: { text: string }) {
+  return (
+    <span
+      data-scene-won=""
+      className="absolute top-1/2 right-3 -translate-y-1/2 -rotate-6 rounded-sm border-2 border-success bg-surface px-1.5 text-xs font-bold tracking-wider text-success"
+    >
+      {text}
+    </span>
+  );
+}
+
+function object(scene: LevelScene, won: boolean): ReactElement {
   switch (scene.kind) {
     case "poster":
-      // A poster: a thick top edge like the tape that holds it.
+      // A poster: a thick top edge like the tape that holds it. Taken down, it is struck through.
       return (
-        <blockquote
-          data-scene-poster=""
-          className="rounded-sm border border-t-4 border-line-strong px-3 py-2 text-sm font-semibold"
-        >
-          «{scene.poster}»
-        </blockquote>
+        <div className="relative">
+          <blockquote
+            data-scene-poster=""
+            {...(won ? { "data-taken-down": "" } : {})}
+            className={`rounded-sm border border-t-4 border-line-strong px-3 py-2 text-sm font-semibold ${won ? "text-fg-muted line-through" : ""}`}
+          >
+            «{scene.poster}»
+          </blockquote>
+          {won && <Fixed text={scene.won} />}
+        </div>
       );
     case "form":
       // A form: its title on a ruled line and the stamp across its corner.
@@ -69,9 +106,10 @@ function object(scene: LevelScene): ReactElement {
           </div>
           <span
             data-scene-stamp=""
-            className="shrink-0 -rotate-6 rounded-sm border-2 border-danger px-1.5 text-xs font-bold tracking-wider text-danger"
+            {...(won ? { "data-scene-won": "" } : {})}
+            className={`shrink-0 -rotate-6 rounded-sm border-2 px-1.5 text-xs font-bold tracking-wider ${won ? "border-success text-success" : "border-danger text-danger"}`}
           >
-            {scene.stamp}
+            {won ? scene.won : scene.stamp}
           </span>
         </div>
       );
@@ -80,10 +118,11 @@ function object(scene: LevelScene): ReactElement {
       return (
         <div
           data-scene-print=""
-          className="rounded-sm border border-line-strong bg-subtle px-3 py-2"
+          className="relative rounded-sm border border-line-strong bg-subtle px-3 py-2"
         >
           <p className="font-mono text-sm font-semibold">{scene.print.title}</p>
           <p className="font-mono text-sm">{scene.print.body}</p>
+          {won && <Fixed text={scene.won} />}
         </div>
       );
   }

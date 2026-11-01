@@ -433,10 +433,11 @@ export function fmtValue(param: string, value: JsonValue): string {
  * different object, so the first screen of one level does not look like the next one's.
  */
 export type LevelScene =
-  | { kind: "poster"; where: string; poster: string; note: string }
-  | { kind: "form"; who: string; form: string; stamp: string; note: string }
+  | { kind: "poster"; where: string; poster: string; note: string; won: string }
+  | { kind: "form"; who: string; form: string; stamp: string; note: string; won: string }
   | {
       kind: "dossier";
+      won: string;
       print: { title: string; body: string };
       quote: { who: string; text: string };
       facts: readonly string[];
@@ -463,6 +464,7 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
     win3: "Biết nói 'không có' đúng lúc, đó là kỹ năng mình quý nhất ở một thủ thư.",
     scene: {
       kind: "poster",
+      won: "ĐÃ GỠ",
       where: "Bảng Tin trước cửa Thư viện",
       // Verbatim from build brief §3: the fabrication the level is about.
       poster:
@@ -481,6 +483,7 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       who: "Hà, sinh viên năm ba, ngồi trên bậc thềm phòng đào tạo",
       form: "Đơn xin bảo lưu kết quả học tập",
       stamp: "QUÁ HẠN",
+      won: "ĐÃ NHẬN",
       note: "Hà nằm viện hai tuần và có giấy ra viện. Quy chế cho nộp muộn trong trường hợp này, nhưng trợ lý không đọc đúng điều luật cho bạn ấy. Đêm qua kho vừa nạp thêm bản quy chế 2019, và Lược dao bị chỉnh xuống 128.",
     },
   },
@@ -492,6 +495,7 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
     win3: "Ca của Hà vẫn xanh. Cái bảng đó là thứ mình xem đầu tiên mỗi khi có ai sửa trợ lý.",
     scene: {
       kind: "dossier",
+      won: "ĐÃ XỬ LÝ",
       print: { title: "Điều 47 khoản 2", body: "Quy chế hiện hành không có thông tin này." },
       quote: {
         who: "Khang, sinh viên năm nhất",
