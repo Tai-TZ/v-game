@@ -12,13 +12,14 @@ import * as v from "valibot";
 
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
+import { useProjector } from "~/features/projector/projector";
 import { recordStars, type Stars } from "~/features/progress/progress";
 
 import { cancelRun, eventsUrl, newKey, postRun, previewRetrieval, type LevelPageData } from "./api";
 import { benchFromGraph, graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
-import { BACK_TO_LEVELS, liveMessage } from "./copy";
+import { BACK_TO_LEVELS, liveMessage, PROJECTOR_VI } from "./copy";
 import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
 import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
@@ -462,6 +463,29 @@ export function usePreview(
   return wanted && got?.key === key ? got.nodes : null;
 }
 
+/**
+ * Lesson plan R4: the covered outcome and the one control that uncovers it. It takes focus when
+ * the run ends, so the teacher's Space or Enter opens it without reaching for the mouse.
+ */
+function RevealGate({ onReveal }: { onReveal: () => void }) {
+  return (
+    <section aria-labelledby="wb-reveal-title" className="mt-12 border-t border-line pt-8">
+      <h2 id="wb-reveal-title" className="sr-only">
+        {PROJECTOR_VI.reveal}
+      </h2>
+      <p className="max-w-prose text-fg-muted">{PROJECTOR_VI.revealNote}</p>
+      <button
+        id="wb-reveal"
+        type="button"
+        onClick={onReveal}
+        className={buttonClass("primary", "mt-4")}
+      >
+        {PROJECTOR_VI.reveal}
+      </button>
+    </section>
+  );
+}
+
 export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench; back: string }) {
   const { level } = env;
   const [initial] = useState(() => loadSaved(env));
@@ -497,6 +521,11 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   // Everything the player looks at reads `run`: the recorded log stands in until they run
   // something of their own, and `scope` keeps the two apart wherever that matters.
   const run = ours ?? recorded.run;
+  // Projector mode (lesson plan R4): every run's outcome stays covered until the teacher opens
+  // it, so the room guesses first. Keyed by run, so the next run is covered again.
+  const projector = useProjector().on;
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const masked = projector && run !== null && run.runId !== revealed;
   const sample = useLastSample(ours);
   useRecordStars(level, run);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
@@ -525,6 +554,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     ours,
     samplesCached: sample !== null && lastBody === body,
     slipOf,
+    projector,
   });
 
   const issues = serverIssues ?? clientIssues;
@@ -543,7 +573,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const followedCase = run?.cases.find((c) => c.id === followed) ?? firstVisible ?? null;
   const reveal = run?.report?.gold[followedCase?.id ?? ""];
   const benchView =
-    run && followedCase && !changed
+    run && followedCase && !changed && !masked
       ? {
           run,
           followed: followedCase,
@@ -695,13 +725,21 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     focusLater(slotTargets(env, type, param));
   }
 
-  const live = liveMessage(run, followedCase?.id ?? null);
+  const live = masked ? "" : liveMessage(run, followedCase?.id ?? null);
+  const awaitingReveal = masked && run.phase === "finished" ? run.runId : null;
+  useEffect(() => {
+    if (awaitingReveal) focusOn(document.getElementById("wb-reveal"));
+  }, [awaitingReveal]);
+  useEffect(() => {
+    if (revealed)
+      focusOn(document.getElementById("wb-results") ?? document.getElementById("wb-sample"));
+  }, [revealed]);
 
   return (
     <>
       <Brief level={level} />
       {/* An explicit track below lg too: an implicit `auto` one grows to the JSON's longest line. */}
-      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-6">
+      <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-6 chieu:lg:grid-cols-[minmax(0,1fr)]">
         <BenchSection
           env={env}
           bench={bench}
@@ -723,7 +761,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           aria-label="Mở ca và lượt chạy"
           // p-1 inside the scroll box keeps focus outlines (2 px + 2 px offset) unclipped; -m-1
           // keeps the content on the column edges.
-          className="self-start lg:sticky lg:top-6 lg:-m-1 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:p-1"
+          className="self-start lg:sticky lg:top-6 lg:-m-1 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:p-1 chieu:lg:static chieu:lg:m-0 chieu:lg:max-h-none chieu:lg:overflow-visible chieu:lg:p-0"
         >
           <RunPanel
             env={env}
@@ -745,6 +783,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             recordedFailed={recorded.failed}
             quota={quota}
             samplesOnly={samplesOnly}
+            projector={projector}
+            masked={masked}
             onRetry={() => {
               if (request.state === "failed") void send(request.body, request.key);
             }}
@@ -785,8 +825,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           />
         </aside>
       </div>
-      {sample && <SampleResult run={sample} samplesOnly={samplesOnly} />}
-      {run?.score && (
+      {awaitingReveal && <RevealGate onReveal={() => setRevealed(awaitingReveal)} />}
+      {sample && !masked && <SampleResult run={sample} samplesOnly={samplesOnly} />}
+      {run?.score && !masked && (
         <Results
           key={run.runId}
           env={env}

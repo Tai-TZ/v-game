@@ -324,20 +324,21 @@ export function Results({
       )}
 
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+      <div className="mt-3 grid gap-3 lg:grid-cols-2 chieu:lg:grid-cols-1">
         {run.cases.map((c) => (
           <CaseCard key={c.id} env={env} c={c} gold={revealed[c.id]} runGraph={runGraph} />
         ))}
       </div>
 
+      {/* Projector mode keeps the score and the case grid, not one pair's history (R3, R8). */}
       {history.length > 0 && (
-        <>
+        <div className="chieu:hidden">
           <h3 className="mt-8 text-lg font-bold">{HISTORY_VI.heading}</h3>
           <History runs={history} onDuplicate={onDuplicate} />
           {/* history[0] is the run just finished (recordRun prepends), history[1] the one
               before it -- from the second run of a level on, there is a prior to compare. */}
           {history[0] && history[1] && <Compare env={env} prev={history[1]} now={history[0]} />}
-        </>
+        </div>
       )}
 
       {run.models && Object.keys(run.models).length > 0 && (
@@ -360,15 +361,18 @@ export function Results({
         </p>
       )}
 
-      <Debrief
-        env={env}
-        run={run}
-        slip={slip}
-        graph={graph}
-        ask={ask}
-        whyIndex={whyIndex}
-        onPick={onDebrief}
-      />
+      {/* cô Lan's hints are the pairs' to open at their own pace, not the room's (R3). */}
+      <div className="chieu:hidden">
+        <Debrief
+          env={env}
+          run={run}
+          slip={slip}
+          graph={graph}
+          ask={ask}
+          whyIndex={whyIndex}
+          onPick={onDebrief}
+        />
+      </div>
 
       <div className="mt-8 flex flex-wrap gap-2">
         <button type="button" onClick={onEdit} className={buttonClass("primary")}>
@@ -409,7 +413,7 @@ function CaseCard({
       <p data-case-tokens className="mt-2 text-sm text-fg-muted tabular-nums">
         {fmt(c.tokens.in + c.tokens.out)} token ({TOKENS_VI.usage})
       </p>
-      <details className="group mt-1">
+      <details className="group mt-1 chieu:hidden">
         <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
           Xem vết chạy<span className="sr-only"> câu #{c.n}</span>
           <ChevronDownIcon />
