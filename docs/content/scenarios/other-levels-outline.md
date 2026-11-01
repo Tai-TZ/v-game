@@ -1,4 +1,5 @@
 > **Trạng thái:** phác thảo v0.1, chưa viết kịch bản đầy đủ. Mỗi level ≤ ~250 chữ.
+> **Tháp canh (2026-11-02):** đặc tả đầy đủ đang chờ duyệt ở [watchtower.md](watchtower.md); nó đổi một số điểm của dàn ý dưới đây (một lời gọi mỗi ca, Chó gác tính sẵn, W3 ghép đòn từ thẻ).
 > **Nguồn:** [Phần 3](../../design/part-3-block-system.md) §3.2–3.3 và các sửa lỗi của phản biện là chuẩn; [gameplay-direction](../../design/gameplay-direction.md) chỉ dùng cho phần trình bày. Mỗi mục ghi điểm lệch đã giải quyết thế nào.
 > **Ghi chú D1:** Thư viện mở trước, nên Chợ model L1 không còn giới thiệu Thùng Context lần đầu; nó mở rộng chiếc thùng người chơi đã gặp ở Thư viện L1.
 

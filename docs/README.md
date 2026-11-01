@@ -25,6 +25,7 @@ V-Game là game web giáo dục cho chương trình AI 20K. Người chơi lắp
 |---|---|---|
 | [content/scenarios/overview.md](content/scenarios/overview.md) | Mục lục kịch bản và luật dùng chung cho mọi kịch bản | v0.1, sửa 2026-10-08 |
 | [content/scenarios/grading-room.md](content/scenarios/grading-room.md), [intake-gate.md](content/scenarios/intake-gate.md), [rush-hour.md](content/scenarios/rush-hour.md) | Kịch bản mới: Phòng chấm (khu 4), Cổng nạp liệu, Giờ cao điểm | Kịch bản 2026-10-08, chưa xây |
+| [content/scenarios/watchtower.md](content/scenarios/watchtower.md) | Đặc tả khu Tháp canh (W1–W3): guardrail, injection, PII, tấn công thử; việc phải làm cho engine, nội dung, frontend | v0.1 2026-11-02, chờ duyệt |
 | [content/course-coverage.md](content/course-coverage.md) | Bản đồ phủ 15 ngày học; cập nhật 2026 cho slide đã cũ (không sửa slide) | v0.1 |
 | [content/lesson-plan-library.md](content/lesson-plan-library.md) | Giáo án 45 phút cho Thư viện L1; yêu cầu chế độ máy chiếu | v0.1, cần giảng viên đọc thử |
 | [content/corpus/README.md](content/corpus/README.md), `content/golden/` | Kho quy chế hư cấu và bộ câu hỏi vàng | Đang dùng |
