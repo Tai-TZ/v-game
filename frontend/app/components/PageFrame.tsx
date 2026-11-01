@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigation, useRevalidator } from "react-router";
 
 import { buttonClass } from "~/components/ui/button";
 import { ChevronLeftIcon } from "~/components/ui/icons";
+import { useProjector, useProjectorClass } from "~/features/projector/projector";
 import { ThemeToggle } from "~/features/theme/ThemeToggle";
 import { AUTHOR } from "~/lib/site";
 
@@ -52,6 +53,11 @@ export function PageFrame({
   // is a revalidation, which leaves the navigation idle.
   const loading = useNavigation().state === "loading" || revalidation === "loading";
 
+  // Projector mode (lesson plan R1): the frame owns the class and the way out, so a zone page
+  // and a level behave the same.
+  const projector = useProjector();
+  useProjectorClass(projector.on);
+
   return (
     <>
       <header className="h-16 border-b border-line bg-surface">
@@ -60,7 +66,14 @@ export function PageFrame({
             <ChevronLeftIcon />
             {backLabel}
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            {projector.on && (
+              <button type="button" onClick={projector.exit} className={buttonClass("secondary")}>
+                Thoát chế độ chiếu
+              </button>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
         <p role="status" className="sr-only">
           {loading ? "Đang tải trang…" : ""}
@@ -73,7 +86,7 @@ export function PageFrame({
             aria-hidden="true"
             className="fixed inset-x-0 top-0 z-50 h-1 animate-appear overflow-hidden"
           >
-            <div className="h-full w-1/3 animate-poster-bar bg-brand motion-reduce:w-full motion-reduce:animate-none" />
+            <div className="h-full w-1/3 animate-poster-bar bg-brand motion-reduce:w-full motion-reduce:animate-none chieu:w-full chieu:animate-none" />
           </div>
         )}
       </header>

@@ -5,7 +5,7 @@ import { QUOTA_VI } from "./copy";
 import type { Slip } from "./guess";
 import { loadLedger, loadRefundMarks } from "./quota";
 import type { CaseView, RunView } from "./run";
-import { useQuota } from "./useQuota";
+import { useQuota, WAKE_POLL_MS } from "./useQuota";
 
 const LEVEL = "grounded-citation";
 const SERVER = {
@@ -170,5 +170,59 @@ describe("useQuota", () => {
     };
     const { result } = setup(finished("r1", [true, true, true], "mau"), sureOnAll);
     await waitFor(() => expect(result.current.note).toBe("Lượt này đã được hoàn rồi."));
+  });
+});
+
+describe("useQuota on the projector (lesson plan R5, R6)", () => {
+  function projector(initial: RunView | null, slip: Slip | null = null) {
+    return renderHook(
+      (props: { ours: RunView | null }) =>
+        useQuota({
+          levelId: LEVEL,
+          cases: 10,
+          ours: props.ours,
+          samplesCached: false,
+          slipOf: () => slip,
+          projector: true,
+        }),
+      { initialProps: { ours: initial } },
+    );
+  }
+
+  it("draws on its own pool of 40, never on the learner's", async () => {
+    const { result } = projector(finished("p1", [true, true, true]));
+    await waitFor(() => expect(result.current.left).toBe(37));
+    expect(result.current.pool).toBe("projector");
+    const ledger = loadLedger(new Date());
+    expect(ledger.pools.projector.used).toBe(3);
+    expect(ledger.pools.learner.used).toBe(0);
+  });
+
+  it("claims no refund for the teacher's demonstration", async () => {
+    projector(finished("p1", [true, true, true], "mau"), sureOnAll);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls.some(([url]) => url.endsWith("/refund"))).toBe(false);
+  });
+
+  it("still counts its own pool while the API sleeps, and says it is asleep", async () => {
+    quotaReply = { status: 503, body: {} };
+    const { result } = projector(null);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(result.current.awake).toBe(false);
+    expect(result.current.left).toBe(40);
+  });
+
+  it("keeps asking until the API wakes", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      quotaReply = { status: 503, body: {} };
+      const { result } = projector(null);
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      quotaReply = { status: 200, body: SERVER };
+      await vi.advanceTimersByTimeAsync(WAKE_POLL_MS);
+      await waitFor(() => expect(result.current.awake).toBe(true));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

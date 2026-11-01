@@ -151,6 +151,25 @@ export const QUOTA_VI = {
     "Bạn đoán chắc và đúng, nhưng quỹ hoàn chung của lớp hôm nay đã hết: quỹ chia theo thứ tự, ai đạt trước được trước.",
 } as const;
 
+/** Projector mode (`?chieu=1`, lesson-plan appendix R1-R10). */
+export const PROJECTOR_VI = {
+  guessHeading: "Cả lớp đoán",
+  // The lesson plan's own question for minute 0-5.
+  guessLead: "Trợ lý sẽ trả lời câu này thế nào? Giơ tay A, B hoặc C.",
+  options: [
+    ["A", "Trả lời đúng quy chế"],
+    ["B", "Bịa ra một điều khoản"],
+    ["C", "Nói là không biết"],
+  ],
+  graded: "Đã chấm",
+  reveal: "Mở kết quả",
+  revealNote: "Kết quả đang được che để cả lớp đoán trước. Bấm nút, hoặc nhấn Space hay Enter.",
+  waking: "Đang đánh thức máy chủ",
+  wakingNote:
+    "Máy chủ ngủ sau 15 phút không ai dùng và cần khoảng một phút để dậy. Trong lúc chờ, xem lượt đã ghi.",
+  left: (n: number) => `Máy chiếu còn ${fmt(n)} lời gọi hôm nay (ước tính)`,
+} as const;
+
 export const RECORDED_VI = {
   open: "Xem lượt đã ghi",
   note: "Lượt chạy thật của cấu hình khởi đầu, 0 lời gọi AI.",

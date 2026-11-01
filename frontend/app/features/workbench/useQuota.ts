@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import { PROJECTOR_SHARE } from "~/features/projector/projector";
+
 import { claimRefund, fetchQuota } from "./api";
 import { QUOTA_VI } from "./copy";
 import type { Slip } from "./guess";
@@ -17,6 +19,7 @@ import {
   spend,
   utcDay,
   type OpenMode,
+  type Pool,
   type ServerQuota,
 } from "./quota";
 import { llmCalls, type RunView } from "./run";
@@ -31,7 +34,14 @@ export interface QuotaView {
   mode: OpenMode;
   /** The outcome of a refund claim, said once. */
   note: string | null;
+  /** Whose pool: the learner's, or the projector's own on `?chieu=1` (lesson plan R5). */
+  pool: Pool;
+  /** The API answered `/api/quota`; false while it sleeps or is down (R6). */
+  awake: boolean;
 }
+
+/** How often the projector asks again while the API wakes (about a minute on Render, X9). */
+export const WAKE_POLL_MS = 10_000;
 
 const terminal = (run: RunView) => run.phase === "finished" || run.phase === "failed";
 
@@ -47,6 +57,7 @@ export function useQuota({
   ours,
   samplesCached,
   slipOf,
+  projector = false,
 }: {
   levelId: string;
   /** Every case of a star run: one call each. */
@@ -55,7 +66,10 @@ export function useQuota({
   /** A sample run of this exact configuration finished in this browser (§3.1). */
   samplesCached: boolean;
   slipOf: (runId: string) => Slip | null;
+  /** Projector mode: its own pool of PROJECTOR_SHARE calls, no refunds, and a wake-up poll. */
+  projector?: boolean;
 }): QuotaView {
+  const pool: Pool = projector ? "projector" : "learner";
   const [server, setServer] = useState<ServerQuota | null>(null);
   const [ledger, setLedger] = useState(() => loadLedger(new Date()));
   const [note, setNote] = useState<string | null>(null);
@@ -63,21 +77,30 @@ export function useQuota({
   const claimed = useRef(new Set<string>());
 
   useEffect(() => {
-    // An async body, not a helper the effect calls: the set happens after the await either way,
+    // Async bodies, not a helper the effect calls: the set happens after the await either way,
     // but this shape is the one the hooks linter can see is not a synchronous set.
     const stop = new AbortController();
-    void (async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ask = async () => {
       const quota = await fetchQuota(stop.signal);
-      if (!stop.signal.aborted) setServer(quota);
-    })();
-    return () => stop.abort();
-  }, []);
+      if (stop.signal.aborted) return;
+      setServer(quota);
+      // R6: a lesson usually starts on a sleeping API, so the projector keeps knocking until it
+      // answers; a learner's bench asks once and lets Mở ca find out.
+      if (quota === null && projector) timer = setTimeout(() => void ask(), WAKE_POLL_MS);
+    };
+    void ask();
+    return () => {
+      stop.abort();
+      clearTimeout(timer);
+    };
+  }, [projector]);
 
   useEffect(() => {
     if (ours === null || !terminal(ours) || charged.current.has(ours.runId)) return;
     charged.current.add(ours.runId);
     const calls = llmCalls(ours).real;
-    const next = calls > 0 ? spend(loadLedger(new Date()), "learner", calls, "level") : null;
+    const next = calls > 0 ? spend(loadLedger(new Date()), pool, calls, "level") : null;
     if (next) saveLedger(next);
     // Both numbers move together once the server has answered, so the line never shows the
     // player's pool already down while the server's still reads the old figure.
@@ -85,11 +108,12 @@ export function useQuota({
       setServer(quota);
       if (next) setLedger(next);
     });
-  }, [ours]);
+  }, [ours, pool]);
 
   useEffect(() => {
-    if (ours?.scope !== "mau" || ours.phase !== "finished" || claimed.current.has(ours.runId))
-      return;
+    // The projector's runs are the teacher's demonstration, not a pair's first try: no refund.
+    if (projector || ours?.scope !== "mau" || ours.phase !== "finished") return;
+    if (claimed.current.has(ours.runId)) return;
     claimed.current.add(ours.runId);
     const marks = loadRefundMarks();
     const today = utcDay(new Date());
@@ -108,16 +132,22 @@ export function useQuota({
         setNote(result.code === "reserve_empty" ? QUOTA_VI.reserveEmpty : result.message);
       }
     });
-  }, [ours, levelId, slipOf]);
+  }, [ours, levelId, slipOf, projector]);
 
   const cost = shiftCost(cases, samplesCached);
-  const left =
-    server === null ? null : remaining(ledger, "learner", server.learnerDaily, server.remaining);
+  // The projector's share is fixed (R5), so its own count stands even while the API sleeps.
+  const left = projector
+    ? remaining(ledger, pool, PROJECTOR_SHARE, server?.remaining ?? null)
+    : server === null
+      ? null
+      : remaining(ledger, pool, server.learnerDaily, server.remaining);
   return {
     left,
     refill: server === null ? null : resetsAtLabel(server.resetsAt),
     cost,
     mode: left === null ? "shift" : openMode(left, cost),
     note,
+    pool,
+    awake: server !== null,
   };
 }

@@ -1,18 +1,26 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type Env, graphFromBench, starterBench } from "./bench";
-import { SCRUB_VI } from "./copy";
+import { PROJECTOR_VI, RECORDED_VI, SCRUB_VI } from "./copy";
 import { EMPTY_SLIP } from "./guess";
 import type { RunView } from "./run";
 import { RunPanel, type RequestState } from "./RunPanel";
-import { replay, testEnv } from "./test-fixtures";
+import { parseSse, readText, replay, testEnv } from "./test-fixtures";
 import type { QuotaView } from "./useQuota";
 
 const l1 = testEnv("grounded-citation");
 const nothing = () => undefined;
-const FULL: QuotaView = { left: 13, refill: "07:00", cost: 10, mode: "shift", note: null };
+const FULL: QuotaView = {
+  left: 13,
+  refill: "07:00",
+  cost: 10,
+  mode: "shift",
+  note: null,
+  pool: "learner",
+  awake: true,
+};
 
 function Panel({
   request,
@@ -23,6 +31,8 @@ function Panel({
   onOpen = nothing,
   recordedFailed = false,
   quota = FULL,
+  projector = false,
+  masked = false,
 }: {
   request: RequestState;
   env?: Env;
@@ -32,6 +42,8 @@ function Panel({
   onOpen?: () => void;
   recordedFailed?: boolean;
   quota?: QuotaView;
+  projector?: boolean;
+  masked?: boolean;
 }) {
   const start = starterBench(env);
   if (!start) throw new Error(`${env.level.id} starter is not drawable`);
@@ -68,6 +80,8 @@ function Panel({
         recordedFailed={recordedFailed}
         quota={quota}
         samplesOnly={false}
+        projector={projector}
+        masked={masked}
       />
     </MemoryRouter>
   );
@@ -284,5 +298,69 @@ describe("the day's pool beside Mở ca (roadmap-v0.4 §5.1)", () => {
   it("reads a refund's outcome out as a status", () => {
     render(<Panel request={idle} quota={{ ...FULL, note: "Hoàn 3 lời gọi: bạn đoán chắc." }} />);
     expect(screen.getByRole("status").textContent).toBe("Hoàn 3 lời gọi: bạn đoán chắc.");
+  });
+});
+
+describe("projector mode (lesson plan R4-R6)", () => {
+  const idle: RequestState = { state: "idle" };
+  const finishedRun = () => {
+    // The captured L1 reference run: some cases pass and some fail, so a leak would show.
+    const run = replay(parseSse(readText("e2e", "data", "run-l1-reference.sse")));
+    if (!run) throw new Error("no run");
+    return run;
+  };
+
+  it("asks the room by show of hands, on a sample question, with big A, B, C", () => {
+    render(<Panel request={idle} projector />);
+    const card = screen.getByRole("region", { name: PROJECTOR_VI.guessHeading });
+    const question = l1.level.visible_cases[0]?.question ?? "";
+    expect(question).not.toBe("");
+    expect(card.textContent).toContain(question);
+    for (const [letter, text] of PROJECTOR_VI.options) {
+      expect(card.textContent).toContain(letter);
+      expect(card.textContent).toContain(text);
+    }
+  });
+
+  it("shows no hand-raise card off the projector", () => {
+    render(<Panel request={idle} />);
+    expect(screen.queryByRole("region", { name: PROJECTOR_VI.guessHeading })).toBeNull();
+  });
+
+  it("covers every graded case as 'Đã chấm' until the reveal", () => {
+    const run = finishedRun();
+    render(<Panel request={idle} projector masked run={run} />);
+    const rows = within(screen.getByRole("region", { name: "Bảng câu" })).getAllByRole("button");
+    expect(rows.length).toBe(run.cases.length);
+    for (const row of rows) {
+      expect(row.textContent).toContain(PROJECTOR_VI.graded);
+      expect(row.textContent).not.toMatch(/Đạt|Trượt/);
+    }
+  });
+
+  it("uncovers the same rows once the run is revealed", () => {
+    render(<Panel request={idle} projector run={finishedRun()} />);
+    expect(screen.queryByText(PROJECTOR_VI.graded)).toBeNull();
+  });
+
+  it("says the server is waking and offers the recorded run while it sleeps", () => {
+    const onRecorded = vi.fn();
+    render(
+      <Panel
+        request={idle}
+        projector
+        run={finishedRun()}
+        onRecorded={onRecorded}
+        quota={{ ...FULL, pool: "projector", awake: false }}
+      />,
+    );
+    expect(screen.getByText(PROJECTOR_VI.waking)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: RECORDED_VI.open }));
+    expect(onRecorded).toHaveBeenCalledOnce();
+  });
+
+  it("names the projector's own pool", () => {
+    render(<Panel request={idle} projector quota={{ ...FULL, left: 40, pool: "projector" }} />);
+    expect(screen.getByText(/^Máy chiếu còn 40 lời gọi hôm nay \(ước tính\)/)).toBeTruthy();
   });
 });

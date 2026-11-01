@@ -2,7 +2,14 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Link } from "react-router";
 
 import { buttonClass } from "~/components/ui/button";
-import { AlertIcon, CheckIcon, ChevronDownIcon, ClockIcon, PlayIcon } from "~/components/ui/icons";
+import {
+  AlertIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CircleDashIcon,
+  ClockIcon,
+  PlayIcon,
+} from "~/components/ui/icons";
 
 import type { PostError } from "./api";
 import type { Env } from "./bench";
@@ -13,6 +20,7 @@ import {
   fmt,
   LEVEL_COPY,
   outcomeText,
+  PROJECTOR_VI,
   QUOTA_VI,
   RECORDED_VI,
   ROLE_VI,
@@ -80,6 +88,10 @@ interface RunPanelProps {
   quota: QuotaView;
   /** This shift is the 3 samples alone: the pool did not cover the star run (§5.1). */
   samplesOnly: boolean;
+  /** Projector mode (`?chieu=1`): the room's guess by show of hands, the projector's pool. */
+  projector: boolean;
+  /** Projector mode before "Mở kết quả": graded cases show as graded, not passed or failed (R4). */
+  masked: boolean;
 }
 
 /**
@@ -87,6 +99,39 @@ interface RunPanelProps {
  * shift costs or why the button now offers less. "ước tính" stays until T1, since every server
  * counter lives in RAM and a Render restart zeroes it.
  */
+/**
+ * R4: the room guesses by show of hands. Nothing to type or click -- the letters are big enough
+ * to read from the back row, and the teacher counts. Only a sample question is ever shown (R8).
+ */
+function HandRaise({ env }: { env: Env }) {
+  const question = env.level.visible_cases[0]?.question;
+  return (
+    <section aria-labelledby="wb-hands" className="rounded-md border border-line bg-subtle p-4">
+      <h3 id="wb-hands" className="text-lg font-bold">
+        {PROJECTOR_VI.guessHeading}
+      </h3>
+      {question && <p className="mt-2">{question}</p>}
+      <p className="mt-2 text-sm text-fg-muted">{PROJECTOR_VI.guessLead}</p>
+      <ol className="mt-3 space-y-2">
+        {PROJECTOR_VI.options.map(([letter, text]) => (
+          <li key={letter} className="flex items-center gap-3">
+            <span
+              aria-hidden="true"
+              className="flex size-12 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-2xl font-bold"
+            >
+              {letter}
+            </span>
+            <span>
+              <span className="sr-only">{letter}. </span>
+              {text}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function QuotaLines({ quota }: { quota: QuotaView }) {
   const { left, refill, cost, mode, note } = quota;
   return (
@@ -96,7 +141,7 @@ function QuotaLines({ quota }: { quota: QuotaView }) {
       ) : (
         <>
           <p className="font-semibold">
-            {QUOTA_VI.left(left)}
+            {quota.pool === "projector" ? PROJECTOR_VI.left(left) : QUOTA_VI.left(left)}
             {refill && ` · ${QUOTA_VI.refill(refill)}`}
           </p>
           <p className="text-fg-muted">
@@ -126,11 +171,12 @@ export function RunPanel(props: RunPanelProps) {
 
               Only once the run is over, too: while it is live the follow moves on its own,
               and a control fighting the run for it would keep snatching the view back (N4). */}
-          {!isActive(run) && (
+          {!isActive(run) && !props.masked && (
             <Scrub cases={run.cases} followedId={props.followedId} onFollow={props.onFollow} />
           )}
           <CaseTable
             run={run}
+            masked={props.masked}
             env={props.env}
             followedId={props.followedId}
             onFollow={props.onFollow}
@@ -185,6 +231,7 @@ function Editing({
   onRecorded,
   recordedFailed,
   quota,
+  projector,
 }: RunPanelProps) {
   const {
     open: restoring,
@@ -322,7 +369,8 @@ function Editing({
 
       {/* Collapsed so the aside's resting height keeps Mở ca on the first screen at 1280x800
           (§2.1). Locked while the graph is out: the slip leaves with this run. */}
-      <details className="min-w-0">
+      {/* On the projector the room guesses by show of hands instead (R4): HandRaise. */}
+      <details className="min-w-0 chieu:hidden">
         <summary className="min-h-11 cursor-pointer list-none text-sm font-semibold underline underline-offset-4">
           Đoán trước khi mở ca
         </summary>
@@ -331,6 +379,17 @@ function Editing({
         </fieldset>
       </details>
 
+      {projector && <HandRaise env={env} />}
+      {projector && !quota.awake && (
+        <div
+          id="wb-waking"
+          role="status"
+          className="rounded-md border border-line bg-warning-tint p-4"
+        >
+          <p className="font-semibold">{PROJECTOR_VI.waking}</p>
+          <p className="mt-1 text-sm">{PROJECTOR_VI.wakingNote}</p>
+        </div>
+      )}
       <QuotaLines quota={quota} />
 
       <button
@@ -352,7 +411,8 @@ function Editing({
       {/* Only before the player's own first run: after that the bench has something truer to
           show than the starter's log, and a second "watch a run" button competes with it. With
           the pool spent, the main button already is that button. */}
-      {run === null && quota.mode !== "recorded" && (
+      {/* R6: on the projector a sleeping API also brings it back, whatever ran before. */}
+      {(run === null || (projector && !quota.awake)) && quota.mode !== "recorded" && (
         <div className="space-y-1">
           <button
             type="button"
@@ -376,7 +436,7 @@ function Editing({
         </ul>
       )}
 
-      <details className="group">
+      <details className="group chieu:hidden">
         <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
           Xem cấu hình JSON
           <ChevronDownIcon />
@@ -613,11 +673,13 @@ function caseState(c: CaseView, env: Env): string {
 
 function CaseTable({
   run,
+  masked,
   env,
   followedId,
   onFollow,
 }: {
   run: RunView;
+  masked: boolean;
   env: Env;
   followedId: string | null;
   onFollow: (caseId: string) => void;
@@ -630,20 +692,25 @@ function CaseTable({
       <ul className="mt-2 space-y-1">
         {run.cases.map((c) => {
           const running = !c.graded && runningNodes(c).length > 0;
-          const Icon = !c.graded
-            ? running
-              ? PlayIcon
-              : ClockIcon
-            : c.graded.passed
-              ? CheckIcon
-              : AlertIcon;
-          const tone = !c.graded
-            ? "bg-surface"
-            : !c.graded.counted
-              ? "bg-subtle"
+          // R4: on the projector a graded case says only that it was graded until the reveal.
+          const hide = masked && c.graded !== undefined;
+          const Icon = hide
+            ? CircleDashIcon
+            : !c.graded
+              ? running
+                ? PlayIcon
+                : ClockIcon
               : c.graded.passed
-                ? "bg-success-tint"
-                : "bg-danger-tint";
+                ? CheckIcon
+                : AlertIcon;
+          const tone =
+            hide || !c.graded
+              ? "bg-surface"
+              : !c.graded.counted
+                ? "bg-subtle"
+                : c.graded.passed
+                  ? "bg-success-tint"
+                  : "bg-danger-tint";
           return (
             <li key={c.id}>
               <button
@@ -657,7 +724,7 @@ function CaseTable({
                 {c.question && <span className="line-clamp-2 text-fg-muted">{c.question}</span>}
                 <span className="inline-flex items-center gap-1">
                   <Icon className="size-3.5 shrink-0" />
-                  {caseState(c, env)}
+                  {hide ? PROJECTOR_VI.graded : caseState(c, env)}
                 </span>
               </button>
             </li>
