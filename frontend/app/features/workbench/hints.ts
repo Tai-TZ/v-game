@@ -1,5 +1,6 @@
 import * as v from "valibot";
 
+import { SAMPLE_CALLS } from "./quota";
 import { cappedRun, sampleVerdict, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph } from "./schema";
 
@@ -7,7 +8,7 @@ import type { BlockType, Graph } from "./schema";
  * The hint ladder (roadmap-v0.4 N16, B4; L1-L3 §11). Hints 1 and 2 open on request after a
  * failed run; hint n+1 needs a free look -- a toy turned, a case followed, a failing case's
  * trace opened -- since hint n. No run is spent to be helped, and no hint lowers a bar.
- * Hint 3 is the worked solution behind its own three-part gate (B4b), so this ladder stops at 2.
+ * Hint 3 is the worked solution, behind its own three-part gate (X28, `hint3Gate`).
  *
  * Every opened hint is logged in this browser, because the evidence on hints is mixed: they
  * get gamed (Baker et al. 2004) and feedback on help-seeking moved behaviour but not learning
@@ -32,26 +33,37 @@ const failing = (c: CaseView) => c.graded?.counted === true && !c.graded.passed;
  * a recorded run is nobody's attempt, a run still going has no verdict, and a run the server's
  * daily cap cut short does not count (daily-shift §3.3).
  */
-export function hintTarget(levelId: string, run: RunView): Target | null {
+export function hintTarget(levelId: string, run: RunView, best = 0): Target | null {
   if (run.scope === "da_ghi" || run.phase !== "finished" || cappedRun(run)) return null;
 
-  // Stuck at the samples (L1 §11, X28): a failing sample counts for star 1, since the samples
-  // are star 1's own cases and they stand in front of every star run.
+  // Stuck at the samples (L1 §11, X28; rà soát vòng 6): a failing sample counts for the lowest
+  // star not yet earned on this level -- star 1 before any star, star 2 once star 1 is in --
+  // since the samples stand in front of every star run.
   if (run.scope === "mau") {
-    return sampleVerdict(run) === "failed" ? starOne(levelId, run) : null;
+    if (sampleVerdict(run) !== "failed" || best >= 3) return null;
+    return best === 0 ? starOne(levelId, run) : best === 1 ? starTwo(run) : starThree(levelId, run);
   }
   const score = run.score;
   if (!score) return null;
   if (!score.s1) return starOne(levelId, run);
-  if (!score.s2) {
-    const costliest = [...run.cases].sort(
-      (a, b) => b.tokens.in + b.tokens.out - (a.tokens.in + a.tokens.out),
-    )[0];
-    return { key: "s2", star: 2, n: costliest?.n ?? null };
-  }
-  if (!score.s3) return { key: starThreeKey(levelId, run), star: 3, n: null };
+  if (!score.s2) return starTwo(run);
+  if (!score.s3) return starThree(levelId, run);
   return null;
 }
+
+/** Star 2 is the run's token budget, so the case to name is the costliest. */
+function starTwo(run: RunView): Target {
+  const costliest = [...run.cases].sort(
+    (a, b) => b.tokens.in + b.tokens.out - (a.tokens.in + a.tokens.out),
+  )[0];
+  return { key: "s2", star: 2, n: costliest?.n ?? null };
+}
+
+const starThree = (levelId: string, run: RunView): Target => ({
+  key: starThreeKey(levelId, run),
+  star: 3,
+  n: null,
+});
 
 function starOne(levelId: string, run: RunView): Target {
   const first = run.cases.find((c) => c.role !== "trap" && failing(c));
@@ -86,7 +98,8 @@ export interface Hint {
 }
 
 type Line = (n: number) => { text: string; pointer: Pointer | "case" };
-type Ladder = readonly [Line, Line];
+/** Hints 1, 2 and 3; the third is the worked example. */
+type Ladder = readonly [Line, Line, Line];
 
 const slot = (s: BlockType, param?: string): Pointer => ({
   kind: "slot",
@@ -94,7 +107,7 @@ const slot = (s: BlockType, param?: string): Pointer => ({
   ...(param && { param }),
 });
 
-/** L1-L3 §11, hints 1 and 2. A "case" pointer resolves to the target's own case. */
+/** L1-L3 §11, hints 1 to 3. A "case" pointer resolves to the target's own case. */
 const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
   "grounded-citation": {
     s1: [
@@ -106,6 +119,10 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
         text: `Ở câu #${n}, thùng chia token cho ba phần: dặn dò, tài liệu, câu hỏi. Phần tài liệu được bao nhiêu token?`,
         pointer: "case",
       }),
+      () => ({
+        text: "Gắn Vòm Sao vào khe Truy xuất rồi chiếu thử câu của Minh.",
+        pointer: slot("vector_search"),
+      }),
     ],
     s1_source: [
       (n) => ({
@@ -115,6 +132,10 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
       (n) => ({
         text: `Mở thùng của câu #${n}: các đoạn trong đó có mang mã nào không?`,
         pointer: "case",
+      }),
+      () => ({
+        text: "Bật Máy đóng tem, và cho Lăng kính một thẻ đòi ghi mã.",
+        pointer: slot("context_packer", "cite_ids"),
       }),
     ],
     s3: [
@@ -126,6 +147,10 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
         text: "Cả hai ca bẫy hỏi điều mà kho không có. So các số điều đã vào thùng với điều trợ lý trích.",
         pointer: slot("context_packer"),
       }),
+      () => ({
+        text: 'Rút thẻ "kể cả khi phải suy đoán". Thêm thẻ dặn nói "không có" khi tài liệu không có.',
+        pointer: slot("llm", "system_prompt"),
+      }),
     ],
     s2: [
       (n) => ({
@@ -134,6 +159,10 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
       }),
       (n) => ({
         text: `Câu #${n} tốn nhất. Đếm số đoạn trong thùng của nó, rồi nhìn Móc kéo.`,
+        pointer: slot("vector_search", "top_k"),
+      }),
+      () => ({
+        text: 'Thử Móc kéo nhỏ hơn và bỏ thẻ "càng chi tiết càng tốt"; chiếu thử để xem đoạn đúng còn trong K không.',
         pointer: slot("vector_search", "top_k"),
       }),
     ],
@@ -148,6 +177,10 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
         text: `Xem dải đoạn ở Lược dao cho câu #${n}: ranh giới cắt nằm ở đâu, đoạn nào đã vào thùng?`,
         pointer: slot("chunker"),
       }),
+      () => ({
+        text: "Thử Nam châm bám Điều, hoặc Lược 512 kèm Băng keo 10%, rồi chiếu thử câu của Hà.",
+        pointer: slot("chunker", "strategy"),
+      }),
     ],
     s3: [
       () => ({
@@ -158,6 +191,10 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
         text: "Ở các ca bẫy, thùng mang đoạn của văn bản nào, còn hiệu lực không?",
         pointer: slot("chunker"),
       }),
+      () => ({
+        text: "Bật Kính lọc hiệu lực. Lọc trước khi tìm rẻ hơn dặn model tự chọn bản mới.",
+        pointer: slot("chunker", "only_in_force"),
+      }),
     ],
     s2: [
       (n) => ({
@@ -167,6 +204,10 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
       (n) => ({
         text: `Câu #${n} tốn nhất. So số token của nó với cỡ đoạn ở Lược dao.`,
         pointer: slot("chunker"),
+      }),
+      () => ({
+        text: "Đoạn nhỏ hơn hoặc ít đoạn hơn. Chiếu thử để chắc đoạn đúng vẫn trong K.",
+        pointer: slot("chunker", "chunk_size"),
       }),
     ],
   },
@@ -180,6 +221,10 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
         text: `Theo đường đời hạng của đoạn đáp án câu #${n}: những đoạn nào đứng trên nó?`,
         pointer: "case",
       }),
+      () => ({
+        text: "Lắp Tủ ngăn kéo cạnh Vòm Sao rồi gộp hai danh sách bằng Phễu.",
+        pointer: slot("bm25_search"),
+      }),
     ],
     s3: [
       () => ({
@@ -190,11 +235,19 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
         text: "Ở ca bẫy đó, Tủ ngăn kéo không thấy đoạn đúng, còn Vòm Sao thì thấy.",
         pointer: slot("bm25_search"),
       }),
+      () => ({
+        text: "Giữ cả Vòm Sao lẫn Tủ ngăn kéo. Hai điểm mù bù cho nhau.",
+        pointer: slot("fusion"),
+      }),
     ],
     s3_t02: [
       () => ({ text: "Ca của Hà ở màn trước cần gì để đạt?", pointer: slot("chunker") }),
       () => ({
         text: "So cách cắt của Lược dao bây giờ với cách cắt đã đạt ở màn trước.",
+        pointer: slot("chunker"),
+      }),
+      () => ({
+        text: "Đưa Lược dao về cách cắt đã đạt ở màn trước. Mỗi lần đổi, nhìn bảng hồi quy trước tiên.",
         pointer: slot("chunker"),
       }),
     ],
@@ -207,12 +260,20 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
         text: 'Ca bẫy trượt vì trợ lý không chịu nói "không có". Xem các số điều đã vào thùng.',
         pointer: slot("context_packer"),
       }),
+      () => ({
+        text: 'Cắm lại thẻ dặn nói "không có", rút thẻ bảo cứ suy đoán nếu có. Tìm giỏi hơn không có nghĩa là thôi phải biết nói "không có".',
+        pointer: slot("llm", "system_prompt"),
+      }),
     ],
     s2: [
       (n) => ({ text: `Bao nhiêu đoạn đi vào thùng ở câu #${n}?`, pointer: "case" }),
       (n) => ({
         text: `Câu #${n} tốn nhất. Xem hạng đoạn đúng sau Phễu: cần giữ bao nhiêu đoạn?`,
         pointer: slot("fusion"),
+      }),
+      () => ({
+        text: "Đặt Kính lúp giữ 3 đoạn sau Phễu, hoặc thu miệng phễu lại; chiếu thử 3 câu mẫu.",
+        pointer: slot("rerank", "top_n"),
       }),
     ],
   },
@@ -229,7 +290,7 @@ const FALLBACK: Readonly<Record<TargetKey, TargetKey>> = {
   s3_t03: "s3",
 };
 
-export function hintFor(levelId: string, target: Target, n: 1 | 2): Hint | null {
+export function hintFor(levelId: string, target: Target, n: 1 | 2 | 3): Hint | null {
   const level = HINTS[levelId];
   const ladder = level?.[target.key] ?? level?.[FALLBACK[target.key]];
   const line = ladder?.[n - 1];
@@ -248,10 +309,17 @@ export interface HintEntry {
   n: number;
 }
 
+export type StarKey = "1" | "2" | "3";
+
 export interface HintBook {
   /** Per target: hints opened so far, and whether the player looked since the last one. */
   targets: Partial<Record<TargetKey, { opened: number; looked: boolean }>>;
   log: HintEntry[];
+  /**
+   * Per star: the configurations that failed a graded run there, across days (X28), and whether
+   * the latest one counted was a sample run -- which prices the next attempt at 3, not a star run.
+   */
+  fails: Partial<Record<StarKey, { configs: string[]; lastSample: boolean }>>;
 }
 
 const LOG_LIMIT = 50;
@@ -263,6 +331,14 @@ const BookSchema = v.object({
   log: v.array(
     v.object({ at: Count, target: TargetKeySchema, star: v.picklist([1, 2, 3]), n: Count }),
   ),
+  // Optional: books written before B4b have no failures yet.
+  fails: v.optional(
+    v.record(
+      v.picklist(["1", "2", "3"]),
+      v.object({ configs: v.array(v.string()), lastSample: v.boolean() }),
+    ),
+    {},
+  ),
 });
 
 export function loadHints(levelId: string): HintBook {
@@ -273,7 +349,7 @@ export function loadHints(levelId: string): HintBook {
   } catch {
     /* blocked, full or not JSON: a fresh ladder */
   }
-  return { targets: {}, log: [] };
+  return { targets: {}, log: [], fails: {} };
 }
 
 export function saveHints(levelId: string, book: HintBook): boolean {
@@ -285,17 +361,71 @@ export function saveHints(levelId: string, book: HintBook): boolean {
   }
 }
 
-/** The hint the player may open next for this target, or null (B4a stops at 2). */
-export function canOpen(book: HintBook, target: TargetKey): 1 | 2 | null {
+/**
+ * The hint the player may open next for this target, or null. Every rung after the first needs
+ * a look since the last; hint 3 also needs `gate3`, the rest of its gate (`hint3Gate`).
+ */
+export function canOpen(book: HintBook, target: TargetKey, gate3 = false): 1 | 2 | 3 | null {
   const state = book.targets[target];
   if (!state || state.opened === 0) return 1;
-  return state.opened === 1 && state.looked ? 2 : null;
+  if (!state.looked) return null;
+  if (state.opened === 1) return 2;
+  return state.opened === 2 && gate3 ? 3 : null;
+}
+
+export interface GateContext {
+  /** Learner calls left today; null when the server could not be read. */
+  left: number | null;
+  /** The most a star run of this level costs: one call per case (L1 10, L2 and L3 13). */
+  starPrice: number;
+}
+
+/**
+ * Conditions 2 and 3 of hint 3's gate (L1 §11, X28): at least one graded run failed at this star
+ * on a configuration of its own, and either three have, or the pool cannot pay for another
+ * attempt -- a sample run when the latest counted failure was one, a star run otherwise.
+ * Condition 1, a look since hint 2, is `canOpen`'s.
+ */
+export function hint3Gate(book: HintBook, target: Target, ctx: GateContext): boolean {
+  const fails = book.fails[String(target.star) as StarKey];
+  if (!fails || fails.configs.length === 0) return false;
+  if (fails.configs.length >= 3) return true;
+  const price = fails.lastSample ? SAMPLE_CALLS : ctx.starPrice;
+  return ctx.left !== null && ctx.left < price;
+}
+
+/**
+ * The book after a graded run failed at `star` on configuration `config`. Running the same
+ * configuration again replays its answers for 0 calls, so it is not another attempt.
+ */
+export function recordFail(book: HintBook, star: 1 | 2 | 3, config: string, sample: boolean) {
+  const key = String(star) as StarKey;
+  const known = book.fails[key];
+  if (known?.configs.includes(config)) return book;
+  return {
+    ...book,
+    fails: {
+      ...book.fails,
+      [key]: { configs: [...(known?.configs ?? []), config], lastSample: sample },
+    },
+  };
+}
+
+/** A short, stable name for a configuration: FNV-1a over the graph JSON the run sent. */
+export function configKey(body: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < body.length; i += 1) {
+    hash ^= body.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 /** The book after hint n of `target` was opened at `at`. The caller checks `canOpen` first. */
 export function open(book: HintBook, target: TargetKey, star: 1 | 2 | 3, at: number): HintBook {
   const opened = (book.targets[target]?.opened ?? 0) + 1;
   return {
+    ...book,
     targets: { ...book.targets, [target]: { opened, looked: false } },
     log: [...book.log, { at, target, star, n: opened }].slice(-LOG_LIMIT),
   };

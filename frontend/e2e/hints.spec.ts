@@ -95,3 +95,59 @@ for (const viewport of [
     expect(overflow).toBeLessThanOrEqual(0);
   });
 }
+
+test("opens the worked example once the pool cannot pay for another try (X28)", async ({
+  page,
+}) => {
+  await mockWorkbenchApi(page, { events: () => sse.sample(false) });
+  // The recorded sample answers come from the replay cache, so the player's own pool does not
+  // move; the server's does. After the run it has 2 calls left: less than a sample run's 3.
+  let asked = 0;
+  await page.route(
+    (url) => url.pathname === "/api/quota",
+    (route) => {
+      asked += 1;
+      return route.fulfill({
+        json: {
+          cap: 500,
+          used: 0,
+          remaining: asked === 1 ? 500 : 2,
+          resets_at: "2026-11-02T00:00:00+00:00",
+          estimate: true,
+          reserve_left: 17,
+          learner_daily: 13,
+        },
+      });
+    },
+  );
+  await page.goto(L1);
+  await page.getByRole("button", { name: "Mở ca" }).click();
+  await expect(page.getByRole("heading", { name: "Kết quả lượt mẫu" })).toBeVisible();
+  await expect(page.getByText("Còn 2 lời gọi hôm nay", { exact: false })).toBeVisible();
+
+  const hints = page.getByRole("region", { name: "Gợi ý" });
+  await hints.getByRole("button", { name: "Xem gợi ý 1" }).click();
+  await hints.getByRole("button", { name: "Xem câu #1" }).first().click();
+  await hints.getByRole("button", { name: "Xem gợi ý 2" }).click();
+  // Hint 2 is open and no look has followed it: the gate says what it waits for, with the count.
+  await expect(hints.getByText("Gợi ý 3 là lời giải mẫu.", { exact: false })).toBeVisible();
+  await expect(hints.getByText("(hiện là 1)", { exact: false })).toBeVisible();
+
+  await hints.getByRole("button", { name: "Xem câu #1" }).last().click();
+  await hints.getByRole("button", { name: "Xem gợi ý 3" }).click();
+  await expect(hints.locator('[data-hint="3"]')).toContainText("Gợi ý 3 · lời giải mẫu");
+  await expect(hints.getByRole("button", { name: /Xem gợi ý/ })).toHaveCount(0);
+});
+
+test("keeps the worked example shut while the pool still pays for a try", async ({ page }) => {
+  await mockWorkbenchApi(page, { events: () => sse.sample(false) });
+  await page.goto(L1);
+  await page.getByRole("button", { name: "Mở ca" }).click();
+  const hints = page.getByRole("region", { name: "Gợi ý" });
+  await hints.getByRole("button", { name: "Xem gợi ý 1" }).click();
+  await hints.getByRole("button", { name: "Xem câu #1" }).first().click();
+  await hints.getByRole("button", { name: "Xem gợi ý 2" }).click();
+  await hints.getByRole("button", { name: "Xem câu #1" }).last().click();
+  await expect(hints.getByRole("button", { name: "Xem gợi ý 3" })).toHaveCount(0);
+  await expect(hints.getByText("Gợi ý 3 là lời giải mẫu.", { exact: false })).toBeVisible();
+});

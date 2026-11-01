@@ -1,16 +1,21 @@
-import { useCallback, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 
 import { buttonClass } from "~/components/ui/button";
+import { levelStars, readProgress } from "~/features/progress/progress";
 
 import { HINTS_VI, TOY } from "./copy";
 import {
   canOpen,
+  configKey,
+  hint3Gate,
   hintFor,
   hintTarget,
   loadHints,
   look,
   open,
+  recordFail,
   saveHints,
+  type GateContext,
   type HintBook,
   type Pointer,
   type Target,
@@ -18,30 +23,49 @@ import {
 import type { RunView } from "./run";
 
 /**
- * The ladder's state for one level (N16): the target the last run of the player's own leaves,
- * and the two moves that change the book -- opening the next hint, and a free look. The store is
- * re-read before every write, so a second tab is never undone.
+ * The ladder's state for one level (N16, X28): the target the player's own last run leaves, that
+ * run's failure on the book, and the two moves that change it -- opening the next hint, and a free
+ * look. Every move builds on the book in memory and then stores it, so a blocked or cleared store
+ * still walks the ladder; it only forgets it on reload.
  */
-export function useHints(levelId: string, run: RunView | null) {
+export function useHints({
+  levelId,
+  zoneId,
+  run,
+  ranBody,
+  gate,
+}: {
+  levelId: string;
+  zoneId: string;
+  run: RunView | null;
+  /** The graph JSON `run` was sent with: a failure counts once per configuration. */
+  ranBody: string | null;
+  gate: GateContext;
+}) {
   const [book, setBook] = useState<HintBook>(() => loadHints(levelId));
-  const target = run ? hintTarget(levelId, run) : null;
+  const target = run ? hintTarget(levelId, run, levelStars(readProgress(), zoneId, levelId)) : null;
+  // The run's failure goes on the book during the render that first shows the run -- state
+  // derived from a change in the run, not a system to sync -- so no frame shows a stale gate.
+  const [counted, setCounted] = useState<string | null>(null);
+  if (run && target && ranBody !== null && counted !== run.runId) {
+    setCounted(run.runId);
+    setBook(recordFail(book, target.star, configKey(ranBody), run.scope === "mau"));
+  }
+  // The store follows the book. A store that cannot be written still walks the ladder; it
+  // only forgets it on reload.
+  useEffect(() => {
+    saveHints(levelId, book);
+  }, [levelId, book]);
 
-  const write = useCallback(
-    (next: HintBook) => {
-      saveHints(levelId, next);
-      setBook(next);
-    },
-    [levelId],
-  );
+  const gate3 = target !== null && hint3Gate(book, target, gate);
   const openNext = useCallback(() => {
     if (!target) return;
-    const fresh = loadHints(levelId);
-    if (canOpen(fresh, target.key) === null) return;
-    write(open(fresh, target.key, target.star, Date.now()));
-  }, [levelId, target, write]);
-  const markLook = useCallback(() => write(look(loadHints(levelId))), [levelId, write]);
+    if (canOpen(book, target.key, hint3Gate(book, target, gate)) === null) return;
+    setBook(open(book, target.key, target.star, Date.now()));
+  }, [target, book, gate]);
+  const markLook = useCallback(() => setBook(look(book)), [book]);
 
-  return { book, target, openNext, markLook };
+  return { book, target, gate3, openNext, markLook };
 }
 
 const pointerLabel = (pointer: Pointer) =>
@@ -52,7 +76,8 @@ const pointerLabel = (pointer: Pointer) =>
       );
 
 /**
- * N16: hints 1 and 2, each naming a case and pointing at a thing on the screen. Optional by
+ * N16: hints 1 to 3, each naming a case and pointing at a thing on the screen; the third is the
+ * worked solution, behind its own gate (X28) and said to be one. Optional by
  * design -- nothing is in the way of a player who does not want them (expertise reversal,
  * Kalyuga et al. 2003) -- and hidden on the projector, where they are the pairs' to open (R3).
  */
@@ -60,18 +85,22 @@ export function HintLadder({
   levelId,
   target,
   book,
+  gate3,
   onOpen,
   onPointer,
 }: {
   levelId: string;
   target: Target;
   book: HintBook;
+  /** The rest of hint 3's gate (`hint3Gate`): failures at this star, or the pool. */
+  gate3: boolean;
   onOpen: () => void;
   onPointer: (pointer: Pointer) => void;
 }): ReactElement | null {
   const opened = book.targets[target.key]?.opened ?? 0;
-  const next = canOpen(book, target.key);
-  const shown = ([1, 2] as const)
+  const next = canOpen(book, target.key, gate3);
+  const failures = book.fails[String(target.star) as "1" | "2" | "3"]?.configs.length ?? 0;
+  const shown = ([1, 2, 3] as const)
     .filter((n) => n <= opened)
     .map((n) => ({ n, hint: hintFor(levelId, target, n) }));
   // A level with no ladder written for it offers none rather than an empty box.
@@ -92,7 +121,9 @@ export function HintLadder({
             hint ? (
               <li key={n} data-hint={n}>
                 <p>
-                  <span className="font-semibold">{HINTS_VI.label(n)}: </span>
+                  <span className="font-semibold">
+                    {n === 3 ? HINTS_VI.example : HINTS_VI.label(n)}:{" "}
+                  </span>
                   {hint.text}
                 </p>
                 <button
@@ -112,7 +143,13 @@ export function HintLadder({
           {HINTS_VI.open(next)}
         </button>
       ) : (
-        opened === 1 && <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitLook}</p>
+        <>
+          {opened === 1 && <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitLook}</p>}
+          {/* Said in full, numbers included: a gate the player cannot see reads as arbitrary. */}
+          {opened === 2 && (
+            <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitGate(failures)}</p>
+          )}
+        </>
       )}
     </section>
   );
