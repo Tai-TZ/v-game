@@ -1,0 +1,10 @@
+# osv-scanner reads this file for frontend/package-lock.json (the closest config wins).
+# Every entry names the advisory, why it cannot reach a user, and a date to look again.
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-02-01
+reason = """minimatch DoS through an attacker-controlled glob pattern. minimatch is a dev-only \
+dependency of eslint (@eslint/config-array, ^10) and eslint-plugin-jsx-a11y (^3); it only \
+matches the repo's own lint globs and never ships to the browser. Fixed only in 11.x, which \
+neither parent accepts yet."""
