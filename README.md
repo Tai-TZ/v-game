@@ -95,6 +95,37 @@ flowchart LR
   </tr>
 </table>
 
+## Học qua chơi
+
+Mỗi lần mở ca là một thí nghiệm nhỏ: người học đoán trước, chạy thật, đọc bằng chứng, rồi tự sửa.
+Từng cơ chế được chọn vì có cơ sở trong nghiên cứu về học tập, và giới hạn của cơ sở đó được ghi thẳng
+trong [hồ sơ bằng chứng](docs/research/evidence-dossier.md).
+
+| Cơ chế trên bàn thợ       | Làm gì                                                                                                         | Cơ sở                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Phiếu đoán và cược tự tin | Trước khi chạy, đoán đạt mấy câu và câu nào trượt; đặt "chắc" hay "đoán"                                       | Đoán trước rồi mới xem kết quả; lỗi sai mà tự tin cao được sửa tốt hơn |
+| Chẩn đoán từ trace        | Cô Lan chỉ ra đúng bước gây lỗi, kèm số liệu của chính lượt chạy                                               | Phản hồi càng nhiều thông tin càng hiệu quả                            |
+| Thử 3 câu mẫu             | Lượt rẻ chạy trước; chỉ khi cả 3 câu mẫu đạt thì lượt chấm sao mới chạy                                        | Thử trước khi được dạy, có bước chốt kiến thức sau đó                  |
+| Thang gợi ý ba nấc        | Gợi ý 1 khi người học hỏi; gợi ý 2 sau khi nhìn thêm một chỗ; gợi ý 3 là lời giải mẫu, chỉ mở qua cổng ba điều | Khám phá có giàn giáo; không hạ ngưỡng, không tốn lượt                 |
+| Câu biến thể              | Sau lời giải mẫu, tự sửa cho một câu chưa gặp, không gợi ý                                                     | Ví dụ mẫu rồi tự làm                                                   |
+| Quỹ lượt chạy theo ngày   | Mỗi ngày một số lời gọi AI; lượt mẫu đạt và đoán chắc đúng được hoàn                                           | Khan hiếm khiến người học đoán trước khi tiêu                          |
+
+> [!IMPORTANT]
+> Cơ sở trên là nghiên cứu ở các lĩnh vực khác (toán, khoa học, ngoại ngữ). Chưa có nghiên cứu nào đo
+> kết quả học của một game dạy RAG hay đánh giá agent; V-Game sẽ đo bằng pilot trước/sau với một lớp.
+> Nhật ký mở gợi ý được ghi lại trên trình duyệt để pilot phân biệt người dùng gợi ý để học với người lướt
+> gợi ý để lấy đáp án.
+
+## Cho giảng viên
+
+Thêm `?chieu=1` vào địa chỉ khu hoặc màn để bật chế độ máy chiếu, dùng kèm
+[giáo án 45 phút cho Thư viện L1](docs/content/lesson-plan-library.md).
+
+- Chữ to đọc được từ cuối lớp và bố cục một cột; lịch sử, gợi ý và log của từng cặp được ẩn.
+- Cả lớp đoán bằng giơ tay A, B, C. Kết quả bị che tới khi giảng viên bấm **Mở kết quả** (hoặc Enter, Space).
+- Máy chiếu dùng quỹ riêng 40 lời gọi mỗi ngày, không trừ quỹ của cặp nào.
+- Khi API đang ngủ: hiện "Đang đánh thức máy chủ" kèm nút xem lượt đã ghi, không tốn lời gọi nào.
+
 ## Hub khuôn viên
 
 Đi bằng phím mũi tên, WASD, nhấp hoặc chạm; nhân vật tự tìm đường ngắn nhất, góc nhìn xoay 360°. Cô Lan và
@@ -168,7 +199,8 @@ Mục tiêu 60 FPS trên laptop GPU tích hợp; build hoặc test thất bại 
 | ------------------------ | ------------- | -------- |
 | Draw call trong cảnh hub | ≤ 40          | 18       |
 | Tam giác trong cảnh hub  | ≤ 60.000      | ~32.000  |
-| Chunk route `/play`      | ≤ 300 kB gzip | ~293 kB  |
+| Chunk route `/play`      | ≤ 300 kB gzip | ~294 kB  |
+| Bàn thợ                  | ≤ 120 kB gzip | ~56 kB   |
 | three.js trên trang chủ  | 0 chunk       | 0        |
 | Khung hình khi đứng yên  | 0             | 0        |
 
@@ -201,7 +233,11 @@ npm run dev             # http://localhost:5173/play, /api proxy sang :8000
 - [x] Khu Thư viện: ba level L1–L3 chơi trọn trên bàn thợ, có sao và chẩn đoán
 - [x] Hub v0.4: xoay 360°, NPC, props CC0, thời tiết và giờ thật, màn chờ "Sa bàn đang dựng"
 - [x] Engine không nạp model chạy trên Render free, production ở <https://vgame.ai20k.cloud>
-- [ ] Bàn thợ đợt B: bước đoán kết quả, gợi ý, mở khoá level theo sao
+- [x] Bàn thợ đợt B: phiếu đoán và cược tự tin, bằng chứng từ trace, lịch sử 5 lượt, thử 3 câu mẫu, lượt đã ghi, dải đoạn tĩnh
+- [x] Quỹ lượt chạy theo ngày và chế độ máy chiếu cho giảng viên
+- [x] Thang gợi ý ba nấc, lời giải mẫu qua cổng, câu biến thể tự sửa; dòng hướng dẫn ở lần chạm đầu mỗi đồ chơi
+- [ ] Bài vi mô, rà chữ hiển thị, ánh sáng nướng và hậu quả trên campus khi đạt sao
+- [ ] Pilot với một lớp, đo trước/sau
 - [ ] Khu Tháp canh (guardrails) và Chợ model (token, context, chọn model)
 
 ## Tài liệu
@@ -211,6 +247,8 @@ npm run dev             # http://localhost:5173/play, /api proxy sang :8000
 | [docs/README.md](docs/README.md)                           | Mục lục toàn bộ tài liệu                          |
 | [Đặc tả tổng hợp](docs/specs/2026-10-07-v-game-design.md)  | Mục tiêu, vòng chơi, kiến trúc, phạm vi           |
 | [Lộ trình v0.4](docs/design/roadmap-v0.4.md)               | Quyết định mới nhất, kế hoạch đợt B               |
+| [Hồ sơ bằng chứng](docs/research/evidence-dossier.md)      | Cơ sở nghiên cứu của từng cơ chế, giới hạn, pilot |
+| [Giáo án Thư viện L1](docs/content/lesson-plan-library.md) | Buổi 45 phút, chế độ máy chiếu                    |
 | [Engine v0.2](docs/design/engine-v0.2.md)                  | Khối, validate, biên dịch, sự kiện SSE, chấm điểm |
 | [Kiến trúc frontend](docs/design/frontend-architecture.md) | Module, luồng dữ liệu, ngân sách                  |
 | [Deploy](docs/deploy.md)                                   | Vercel, Render, tên miền, CI/CD                   |
