@@ -77,10 +77,13 @@ test.describe("workbench", () => {
     // A client-side route change moves focus to the new page's h1 (screen readers hear it).
     await expect(page.getByRole("heading", { level: 1, name: "Thôi bịa điều luật" })).toBeFocused();
 
-    // The reference solution, built with the toys.
+    // The reference solution, built with the toys. One toy is open at a time: the bench opens
+    // on the empty search socket, and the bin and the brain are opened from the machine.
     await page.getByRole("switch", { name: "Gắn Vòm Sao" }).check();
     await page.getByRole("slider", { name: /Móc kéo/ }).fill("3");
+    await page.getByRole("button", { name: "Thùng Context: Chưa chạy" }).click();
     await page.getByRole("switch", { name: /Máy đóng tem/ }).check();
+    await page.getByRole("button", { name: "Bộ Óc: Chưa chạy" }).click();
     await page.getByLabel("Khe thẻ 1").selectOption("G1");
     await page.getByLabel("Khe thẻ 2").selectOption("G2");
     await page.getByLabel("Khe thẻ 3").selectOption("G3");
@@ -215,7 +218,10 @@ test.describe("workbench", () => {
 
     await page.getByRole("button", { name: "Chỉnh rồi chạy lại" }).click();
     await expect(page.getByRole("heading", { level: 2, name: "Bàn thợ" })).toBeFocused();
+    // The brain is still the open toy; the dome is opened from the machine.
+    await page.getByRole("button", { name: /^Vòm Sao:/ }).click();
     await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
+    // After a reload L1 opens on its search again, its first toy to turn.
     await page.reload();
     await expect(page.getByRole("slider", { name: /Móc kéo/ })).toHaveValue("3");
     await expect(page.getByText("Đã lưu cấu hình trên máy này.")).toBeVisible();

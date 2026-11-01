@@ -268,6 +268,7 @@ export function MachineMap({
   bench,
   onChange,
   onOpen,
+  onPick,
   disabled,
   states,
   highlight,
@@ -279,6 +280,8 @@ export function MachineMap({
   onChange: (next: Bench) => void;
   /** Takes the hand to the toy's slot, where its knobs are. */
   onOpen?: (type: BlockType) => void;
+  /** Opens a toy's slot without moving the hand: a toy just added from its socket. */
+  onPick?: (type: BlockType) => void;
   disabled: boolean;
   states: Partial<Record<BlockType, BlockState>>;
   highlight: BlockType | null;
@@ -452,7 +455,9 @@ export function MachineMap({
                       seeThrough={seeThrough}
                       packed={packed}
                       onAttach={() => {
-                        if (isOptional(type)) onChange(setAttached(bench, type, true));
+                        if (!isOptional(type)) return;
+                        onChange(setAttached(bench, type, true));
+                        onPick?.(type);
                       }}
                       onOpen={() => onOpen?.(type)}
                     />

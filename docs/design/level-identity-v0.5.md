@@ -45,6 +45,14 @@ Phản hồi của chủ dự án: màn chơi còn quá nhiều chữ, "khác g�
 - **Bớt chữ ở các khe:** thông số giữ cố định của mỗi món gom vào một dòng thu gọn "N thông số giữ cố định ở màn này".
 - **Một vùng live:** dòng đọc của bước không phải `aria-live` (trang giữ đúng một vùng, Q5); nút bước trỏ tới nó bằng `aria-describedby`.
 
+### 2.4 Một món mở một lúc
+
+- Dưới cỗ máy, chỉ khe của món đang chọn mở đầy đủ (núm, dải đoạn, vòm sao, thùng, sổ trích dẫn). Mọi món khác thu thành một dòng: tên, trạng thái, nút "Mở", công tắc "Gắn …" nếu món chưa có trên bàn, chấm điểm của Bảng trả lời và mọi lỗi kiểm tra (lỗi không bao giờ bị giấu sau khe đóng).
+- Món mở ban đầu là món đầu tiên người chơi được chỉnh theo dòng chảy: L1 là ổ Vòm Sao trống, L2 và L3 là Lược dao.
+- Bấm một món trên cỗ máy thì mở khe đó và đưa tay tới núm đầu tiên. Gắn một món (từ ổ trống hay công tắc) thì mở luôn khe của nó.
+- Gợi ý và chẩn đoán vẫn trỏ được tới núm: món được trỏ tới mở ngay trong cùng lượt render, trước khi trang đặt focus.
+- Đo ở L1, 1280×800: chữ trên bàn thợ từ khoảng 600 xuống 220 từ, chiều cao từ 1588 px xuống 1216 px.
+
 ## 3. Đề xuất của bản nháp đã bỏ
 
 | Đề xuất | Lý do bỏ |
