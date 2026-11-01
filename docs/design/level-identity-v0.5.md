@@ -60,6 +60,19 @@ Phản hồi của chủ dự án: màn chơi còn quá nhiều chữ, "khác g�
 - Khi ba khe đã đầy, các thẻ còn lại khóa và có dòng nhắc "Ba khe đã đầy: bấm một khe để rút thẻ ra". L1 khởi đầu với hai thẻ sai (G4, G5) nên người chơi phải rút chúng ra trước, đúng bài học của level.
 - Bấm là cách vào cho mọi người (chạm, bàn phím, trình đọc màn hình); kéo-thả chỉ là lối tắt cho chuột.
 
+### 2.6 Cỗ máy theo phong cách Colorfigures
+
+Chủ dự án lấy các hình isometric bấm được ở april-zhu.com/colorfigures-demo làm mẫu (máy giặt, máy pha cà phê, máy bán hàng...). Đã lấy:
+
+- **Chú thích hình** chữ đơn cách ở đầu: "Hình · Cỗ máy trợ lý — <tên level>".
+- **Nhãn callout**: thẻ chữ in hoa đóng khung trên đường dẫn tới từng món, hai hàng so le để không đè nhau; món phía trước của cặp tìm kiếm treo nhãn bên dưới. Ở chế độ Nhìn xuyên, nhãn đổi sang tên khối thật.
+- **Nhìn xuyên thật**: vỏ các món thành kính, lộ thứ bên trong: tờ câu hỏi, các trang sách, các mảnh do Lược dao cắt (số mảnh = số vết cắt + 1), sao trong Vòm Sao (sao được kéo sáng lên, đúng `top_k`), phiếu trong Tủ ngăn kéo, thẻ trong Lăng kính.
+- **Bong bóng tường thuật** ở dải phía trên cỗ máy ("Đang kéo đoạn…") và **tờ câu hỏi** trượt dọc băng chuyền tới món của bước vừa bấm, một lần rồi dừng. Trên màn hẹp, khung tự cuộn tới món đó.
+- **Phóng to / thu nhỏ** 100–150–200 %.
+- **Nét mực** dày hơn, rung tay nhẹ cố định (bộ lọc SVG tĩnh), **bóng đổ phẳng** lệch dưới đế, không làm mờ.
+
+Không lấy: chế độ "Turntable" (xoay liên tục, trái §1.2.6 cấm vòng lặp idle), bảng đổi màu tự do (chỉ dùng token màu của dự án), độ rung tay lớn (art bible muốn mô hình chính xác như sa bàn).
+
 ## 3. Đề xuất của bản nháp đã bỏ
 
 | Đề xuất | Lý do bỏ |

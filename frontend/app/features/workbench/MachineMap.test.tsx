@@ -48,6 +48,11 @@ function draw(
 }
 
 const tile = (type: string) => document.querySelector(`[data-tile-type="${type}"]`);
+const beatButton = (beat: string) => {
+  const found = document.querySelector<HTMLButtonElement>(`[data-beat="${beat}"]`);
+  if (!found) throw new Error(`no beat ${beat}`);
+  return found;
+};
 
 describe("the machine map at the head of the bench", () => {
   it("lays L1's toys out in the order the question flows through them", () => {
@@ -268,5 +273,105 @@ describe("the beats on a recorded run", () => {
     };
     expect(beatLine("input", l3, starter(l3), asHidden)).not.toContain("CÂU ẨN");
     expect(beatLine("llm", l3, starter(l3), asHidden)).not.toContain("ĐÁP ẨN");
+  });
+});
+
+// The Colorfigures-style dressing: a figure caption, callout labels, a see-through that shows
+// what each toy holds inside, and a question slip that travels the belt to the beat's toy.
+describe("the machine as a figure to play with", () => {
+  it("captions the figure with the level it belongs to", () => {
+    draw(l1, starter(l1));
+    expect(document.querySelector("[data-machine-figure] figcaption")?.textContent).toContain(
+      l1.level.title,
+    );
+  });
+
+  it("calls every toy out by name, and drops the callouts when labels are off", () => {
+    draw(l1, setAttached(starter(l1), "vector_search", false));
+    const callouts = [...document.querySelectorAll("[data-callout]")];
+    expect(callouts.map((c) => c.getAttribute("data-callout"))).toEqual([
+      "input",
+      "corpus",
+      "chunker",
+      "vector_search",
+      "context_packer",
+      "llm",
+      "output",
+    ]);
+    expect(document.querySelector('[data-callout="vector_search"]')?.textContent).toBe(
+      "GẮN VÒM SAO",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Nhãn" }));
+    expect(document.querySelectorAll("[data-callout]").length).toBe(0);
+  });
+
+  it("shows what each toy on the bench holds inside only when seen through", () => {
+    draw(l1, setAttached(starter(l1), "vector_search", false));
+    expect(document.querySelectorAll("[data-internal]").length).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
+    const inside = [...document.querySelectorAll("[data-internal]")].map((g) =>
+      g.getAttribute("data-internal"),
+    );
+    // Six toys on the bench; the empty socket has nothing inside to show.
+    expect(inside).toEqual(["input", "corpus", "chunker", "context_packer", "llm", "output"]);
+    expect(document.querySelectorAll("[data-glass]").length).toBe(6);
+  });
+
+  it("cuts the sheet inside the blade into as many pieces as it has cuts, plus one", () => {
+    draw(l2, setParam(l2, starter(l2), "chunker", "chunk_size", 256));
+    fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
+    const cuts = tile("chunker")?.querySelectorAll("[data-gauge-cut]").length ?? 0;
+    expect(tile("chunker")?.querySelectorAll("[data-piece]").length).toBe(cuts + 1);
+  });
+
+  it("lights as many stars inside the dome as passages it pulls", () => {
+    const bench = setParam(
+      l1,
+      setAttached(starter(l1), "vector_search", true),
+      "vector_search",
+      "top_k",
+      4,
+    );
+    draw(l1, bench);
+    fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
+    expect(tile("vector_search")?.querySelectorAll('[data-star="pulled"]').length).toBe(4);
+  });
+
+  it("sends the question slip down the belt to the toy of the pressed beat", () => {
+    draw(l1, setAttached(starter(l1), "vector_search", true));
+    expect(document.querySelector("[data-slip]")).toBeNull();
+    fireEvent.click(beatButton("search"));
+    const slip = document.querySelector("[data-slip]");
+    expect(slip?.getAttribute("data-at")).toBe("search");
+    const before = slip?.getAttribute("style");
+    fireEvent.click(beatButton("llm"));
+    expect(document.querySelector("[data-slip]")?.getAttribute("data-at")).toBe("llm");
+    expect(document.querySelector("[data-slip]")?.getAttribute("style")).not.toBe(before);
+  });
+
+  it("narrates the beat in a bubble over the machine", () => {
+    draw(l1, starter(l1));
+    expect(document.querySelector("[data-beat-bubble]")).toBeNull();
+    fireEvent.click(beatButton("context_packer"));
+    expect(document.querySelector("[data-beat-bubble]")?.textContent).toBe("Đang đóng thùng…");
+  });
+});
+
+describe("zooming the machine", () => {
+  it("zooms in by steps and back out, never below the whole machine in view", () => {
+    draw(l3, starter(l3));
+    const stage = document.querySelector("[data-zoom]");
+    const zoomOut = screen.getByRole("button", { name: "Thu nhỏ" });
+    const zoomIn = screen.getByRole("button", { name: "Phóng to" });
+    expect(stage?.getAttribute("data-zoom")).toBe("100");
+    expect(zoomOut).toHaveProperty("disabled", true);
+    fireEvent.click(zoomIn);
+    expect(stage?.getAttribute("data-zoom")).toBe("150");
+    expect(stage?.getAttribute("style")).toContain("width: 150%");
+    fireEvent.click(zoomIn);
+    expect(stage?.getAttribute("data-zoom")).toBe("200");
+    expect(zoomIn).toHaveProperty("disabled", true);
+    fireEvent.click(zoomOut);
+    expect(stage?.getAttribute("data-zoom")).toBe("150");
   });
 });

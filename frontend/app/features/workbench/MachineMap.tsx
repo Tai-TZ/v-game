@@ -1,4 +1,12 @@
-import { useId, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 import { bladeCuts } from "./bladeCuts";
 import {
@@ -64,6 +72,18 @@ export const BEAT_VI: Readonly<Record<string, string>> = {
   context_packer: "Đóng thùng",
   llm: "Bộ Óc trả lời",
   output: "Chấm câu trả lời",
+};
+
+/** The bubble over the machine while a beat plays: what the toy is doing, in a few words. */
+export const NARRATE_VI: Readonly<Record<string, string>> = {
+  input: "Khách rung chuông…",
+  chunker: "Lưỡi dao đang cắt…",
+  search: "Đang kéo đoạn…",
+  fusion: "Đang gộp hai danh sách…",
+  rerank: "Kính lúp đang soi…",
+  context_packer: "Đang đóng thùng…",
+  llm: "Bộ Óc đang đọc thùng…",
+  output: "Đang chấm…",
 };
 
 const beatOf = (col: Column): string => (col.every(isSearch) ? "search" : (col[0] ?? "input"));
@@ -215,6 +235,7 @@ function Box({
   h,
   top = "fill-surface",
   stroke = "stroke-fg",
+  glass = false,
 }: {
   x: number;
   y: number;
@@ -224,12 +245,15 @@ function Box({
   h: number;
   top?: string;
   stroke?: string;
+  /** See-through: the faces turn to glass so what the toy holds shows inside it. */
+  glass?: boolean;
 }) {
   const t = z + h;
+  const pane = glass ? "[fill-opacity:0.28]" : "";
   return (
-    <g strokeWidth="1.2" strokeLinejoin="round">
+    <g strokeWidth="1.6" strokeLinejoin="round" {...(glass ? { "data-glass": "" } : {})}>
       <polygon
-        className={`fill-line ${stroke}`}
+        className={`fill-line ${pane} ${stroke}`}
         points={pts([
           iso(x + w, y, z),
           iso(x + w, y + d, z),
@@ -238,7 +262,7 @@ function Box({
         ])}
       />
       <polygon
-        className={`fill-subtle ${stroke}`}
+        className={`fill-subtle ${pane} ${stroke}`}
         points={pts([
           iso(x, y + d, z),
           iso(x + w, y + d, z),
@@ -246,7 +270,7 @@ function Box({
           iso(x, y + d, t),
         ])}
       />
-      <polygon className={`${top} ${stroke}`} points={quad(x, y, w, d, t)} />
+      <polygon className={`${top} ${pane} ${stroke}`} points={quad(x, y, w, d, t)} />
     </g>
   );
 }
@@ -259,6 +283,9 @@ const TONE: Readonly<Record<BlockState, string>> = {
   passed: "stroke-success",
   error: "stroke-danger",
 };
+
+/** Zoom steps, in percent of the frame's width: 100 is the whole machine in view. */
+const ZOOMS = [100, 150, 200] as const;
 
 const PILL =
   "min-h-11 rounded-full border-2 border-fg px-4 text-sm font-semibold aria-pressed:bg-fg aria-pressed:text-surface disabled:cursor-not-allowed disabled:opacity-60";
@@ -294,6 +321,7 @@ export function MachineMap({
   const [beat, setBeat] = useState<string | null>(null);
   const [labels, setLabels] = useState(true);
   const [seeThrough, setSeeThrough] = useState(false);
+  const [zoom, setZoom] = useState<(typeof ZOOMS)[number]>(100);
 
   const attached = (type: BlockType) => !isOptional(type) || bench.attached[type];
   const cols = columns(env);
@@ -322,16 +350,45 @@ export function MachineMap({
     along(last, 1.4, -half, 2.2),
   ];
   const minX = Math.min(...ends.map((p) => p[0])) - 16;
-  const maxX = Math.max(...ends.map((p) => p[0])) + 16;
-  const minY = Math.min(...ends.map((p) => p[1])) - 8;
-  const maxY = Math.max(...ends.map((p) => p[1])) + 34;
+  const maxX = Math.max(...ends.map((p) => p[0])) + 28;
+  // Room above the toys for the callouts, two rows of them.
+  const minY = Math.min(...ends.map((p) => p[1])) - 58;
+  // And below, for the hanging callout of a pair's front toy.
+  const maxY = Math.max(...ends.map((p) => p[1])) + (pair ? 44 : 22);
+  const box = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 
-  const active = new Set<BlockType>(
-    beat === null ? [] : (cols.find((col) => beatOf(col) === beat) ?? []),
-  );
+  const beatIndex = beat === null ? -1 : cols.findIndex((col) => beatOf(col) === beat);
+  const active = new Set<BlockType>(beatIndex === -1 ? [] : (cols[beatIndex] ?? []));
+  // The question slip rides the belt and stops just before the toy of the beat.
+  const slipAt =
+    beatIndex === -1
+      ? null
+      : along(centre(beatIndex), beatIndex === 0 ? -1.0 : -STEP / U / 2, 0, 0);
+  // The bubble sits in the band above the machine, over the beat's toy, kept off the edges.
+  const bubbleAt =
+    beatIndex === -1
+      ? null
+      : (() => {
+          const [bx] = along(centre(beatIndex), 0, 0, 0);
+          return { left: Math.min(88, Math.max(12, ((bx - box.x) / box.w) * 100)) };
+        })();
+  const ink = `ink${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  // On a narrow screen the machine scrolls: bring the beat's toy to the middle of the frame.
+  const frame = useRef<HTMLDivElement>(null);
+  const bubbleLeft = bubbleAt?.left ?? null;
+  useEffect(() => {
+    const el = frame.current;
+    if (!el || bubbleLeft === null || el.scrollWidth <= el.clientWidth) return;
+    // A jump, not a glide: the slip already shows the move, and a jump needs no reduced-motion
+    // branch.
+    el.scrollLeft = (bubbleLeft / 100) * el.scrollWidth - el.clientWidth / 2;
+  }, [bubbleLeft, zoom]);
 
   return (
     <figure data-machine-figure="">
+      <figcaption className="mb-3 font-mono text-sm font-bold">
+        Hình · Cỗ máy trợ lý — {env.level.title}
+      </figcaption>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <ol aria-label="Cho câu hỏi chạy qua máy" className="flex flex-wrap gap-2">
           {beats.map((b, index) => (
@@ -372,101 +429,192 @@ export function MachineMap({
 
       {/* Scrolls on a phone rather than shrink the toys past reading: focusable, as it scrolls. */}
       <div
+        ref={frame}
         tabIndex={0}
         role="region"
         aria-label="Cỗ máy trợ lý"
         className="mt-3 overflow-x-auto focus-visible:outline-2 focus-visible:outline-brand"
       >
-        <svg
-          role="group"
-          aria-label="Sơ đồ trợ lý: câu hỏi đi từ trái sang phải"
-          viewBox={`${minX.toFixed(0)} ${minY.toFixed(0)} ${(maxX - minX).toFixed(0)} ${(maxY - minY).toFixed(0)}`}
-          className="h-auto w-full min-w-[38rem]"
+        {/* pt-10: a band above the machine for the beat's bubble, clear of the callouts. */}
+        <div
+          data-zoom={zoom}
+          style={{ width: `${zoom}%` }}
+          className="relative min-w-[38rem] pt-10"
         >
-          {/* The maquette base: a flat slab with square edges (art bible §1.3). */}
-          <g
-            aria-hidden="true"
-            strokeWidth="1.2"
-            strokeLinejoin="round"
-            className="stroke-line-strong"
+          <svg
+            role="group"
+            aria-label="Sơ đồ trợ lý: câu hỏi đi từ trái sang phải"
+            data-see-through={seeThrough ? "on" : "off"}
+            viewBox={`${box.x.toFixed(0)} ${box.y.toFixed(0)} ${box.w.toFixed(0)} ${box.h.toFixed(0)}`}
+            className="h-auto w-full"
           >
-            <polygon
-              className="fill-line"
-              points={pts([
-                along(first, -1.4, half, 0),
-                along(last, 1.4, half, 0),
-                along(last, 1.4, half, -0.3),
-                along(first, -1.4, half, -0.3),
-              ])}
-            />
-            <polygon
-              className="fill-subtle"
-              points={pts([
-                along(first, -1.4, half, 0),
-                along(last, 1.4, half, 0),
-                along(last, 1.4, -half, 0),
-                along(first, -1.4, -half, 0),
-              ])}
-            />
-          </g>
+            {/* Hand-inked: the outlines waver a little, the same way every time. */}
+            <defs>
+              <filter id={ink} x="-5%" y="-5%" width="110%" height="110%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="7" />
+                <feDisplacementMap
+                  in="SourceGraphic"
+                  scale="1.4"
+                  xChannelSelector="R"
+                  yChannelSelector="G"
+                />
+              </filter>
+            </defs>
 
-          {cols.map((col, index) => {
-            const key = col.join("+");
-            const broken = col.every(isSearch) && !col.some(attached);
-            const from = centre(index);
-            return (
-              <g key={key} data-column={key}>
-                {/* The belt to the next toy, cut after an empty search socket. */}
-                {index < cols.length - 1 && (
-                  <polygon
-                    aria-hidden="true"
-                    data-pipe-after={key}
-                    data-pipe={broken ? "broken" : "flow"}
-                    className={
-                      broken
-                        ? "fill-none stroke-danger [stroke-dasharray:4_3]"
-                        : "fill-line-strong stroke-fg"
-                    }
-                    strokeWidth="1.2"
-                    points={pts([
-                      along(from, 0, BELT, 0),
-                      along(from, STEP / U, BELT, 0),
-                      along(from, STEP / U, -BELT, 0),
-                      along(from, 0, -BELT, 0),
-                    ])}
-                  />
-                )}
-                {col.map((type, at) => {
-                  const [x, y] = origin(index, at, col.length);
-                  return (
-                    <Toy
-                      key={type}
-                      env={env}
-                      bench={bench}
-                      type={type}
-                      x={x}
-                      y={y}
-                      on={attached(type)}
-                      disabled={disabled}
-                      state={states[type] ?? "idle"}
-                      lit={highlight === type || active.has(type)}
-                      answer={type === "output" ? answer : null}
-                      labels={labels}
-                      seeThrough={seeThrough}
-                      packed={packed}
-                      onAttach={() => {
-                        if (!isOptional(type)) return;
-                        onChange(setAttached(bench, type, true));
-                        onPick?.(type);
-                      }}
-                      onOpen={() => onOpen?.(type)}
-                    />
-                  );
-                })}
+            <g aria-hidden="true" strokeWidth="1.6" strokeLinejoin="round">
+              {/* A flat shadow, offset, under the slab (no blur: art bible §1.3). */}
+              <polygon
+                className="fill-brand-tint"
+                transform="translate(14 10)"
+                points={pts([
+                  along(first, -1.4, half, -0.3),
+                  along(last, 1.4, half, -0.3),
+                  along(last, 1.4, -half, -0.3),
+                  along(first, -1.4, -half, -0.3),
+                ])}
+              />
+              {/* The maquette base: a flat slab with square edges. */}
+              <polygon
+                className="fill-line stroke-line-strong"
+                points={pts([
+                  along(first, -1.4, half, 0),
+                  along(last, 1.4, half, 0),
+                  along(last, 1.4, half, -0.3),
+                  along(first, -1.4, half, -0.3),
+                ])}
+              />
+              <polygon
+                className="fill-subtle stroke-line-strong"
+                points={pts([
+                  along(first, -1.4, half, 0),
+                  along(last, 1.4, half, 0),
+                  along(last, 1.4, -half, 0),
+                  along(first, -1.4, -half, 0),
+                ])}
+              />
+            </g>
+
+            <g filter={`url(#${ink})`}>
+              {cols.map((col, index) => {
+                const key = col.join("+");
+                const broken = col.every(isSearch) && !col.some(attached);
+                const from = centre(index);
+                return (
+                  <g key={key} data-column={key}>
+                    {/* The belt to the next toy, cut after an empty search socket. */}
+                    {index < cols.length - 1 && (
+                      <polygon
+                        aria-hidden="true"
+                        data-pipe-after={key}
+                        data-pipe={broken ? "broken" : "flow"}
+                        className={
+                          broken
+                            ? "fill-none stroke-danger [stroke-dasharray:4_3]"
+                            : "fill-line-strong stroke-fg"
+                        }
+                        strokeWidth="1.4"
+                        points={pts([
+                          along(from, 0, BELT, 0),
+                          along(from, STEP / U, BELT, 0),
+                          along(from, STEP / U, -BELT, 0),
+                          along(from, 0, -BELT, 0),
+                        ])}
+                      />
+                    )}
+                    {col.map((type, at) => {
+                      const [x, y] = origin(index, at, col.length);
+                      return (
+                        <Toy
+                          key={type}
+                          env={env}
+                          bench={bench}
+                          type={type}
+                          x={x}
+                          y={y}
+                          row={(index + at) % 2}
+                          front={col.length > 1 && at === 1}
+                          on={attached(type)}
+                          disabled={disabled}
+                          state={states[type] ?? "idle"}
+                          lit={highlight === type || active.has(type)}
+                          answer={type === "output" ? answer : null}
+                          labels={labels}
+                          seeThrough={seeThrough}
+                          packed={packed}
+                          onAttach={() => {
+                            if (!isOptional(type)) return;
+                            onChange(setAttached(bench, type, true));
+                            onPick?.(type);
+                          }}
+                          onOpen={() => onOpen?.(type)}
+                        />
+                      );
+                    })}
+                  </g>
+                );
+              })}
+            </g>
+
+            {/* The question as a slip of paper: it slides along the belt to the beat's toy and
+                stops there. One move per press; nothing moves on its own (§1.2.6). */}
+            {slipAt && beat !== null && (
+              <g
+                aria-hidden="true"
+                data-slip=""
+                data-at={beat}
+                style={{
+                  transform: `translate(${slipAt[0].toFixed(1)}px, ${slipAt[1].toFixed(1)}px)`,
+                }}
+                className="transition-transform duration-500 ease-out motion-reduce:transition-none"
+              >
+                <polygon
+                  className="fill-surface stroke-fg"
+                  strokeWidth="1.4"
+                  points={pts([
+                    iso(-0.3, -0.3, 0.05),
+                    iso(0.3, -0.3, 0.05),
+                    iso(0.3, 0.3, 0.05),
+                    iso(-0.3, 0.3, 0.05),
+                  ])}
+                />
+                <path d="M-6 -1h9M-4 2h7" className="stroke-fg-muted" strokeWidth="1" />
               </g>
-            );
-          })}
-        </svg>
+            )}
+          </svg>
+
+          {bubbleAt && beat !== null && (
+            <p
+              aria-hidden="true"
+              data-beat-bubble=""
+              style={{ left: `${bubbleAt.left.toFixed(1)}%` }}
+              className="absolute top-1 -translate-x-1/2 rounded-md border-2 border-fg bg-warning-tint px-3 py-1 font-mono text-xs font-bold whitespace-nowrap"
+            >
+              {NARRATE_VI[beat]}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center justify-end gap-1 text-sm">
+        <button
+          type="button"
+          aria-label="Thu nhỏ"
+          disabled={zoom === ZOOMS[0]}
+          onClick={() => setZoom(ZOOMS[Math.max(ZOOMS.indexOf(zoom) - 1, 0)] ?? 100)}
+          className="size-11 rounded-full border-2 border-fg font-bold disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          −
+        </button>
+        <span className="w-14 text-center font-mono font-bold tabular-nums">{zoom}%</span>
+        <button
+          type="button"
+          aria-label="Phóng to"
+          disabled={zoom === ZOOMS[ZOOMS.length - 1]}
+          onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.indexOf(zoom) + 1, ZOOMS.length - 1)] ?? 100)}
+          className="size-11 rounded-full border-2 border-fg font-bold disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          +
+        </button>
       </div>
 
       {/* Not a live region: the page keeps one (§8, Q5). The pressed beat points here by
@@ -492,6 +640,8 @@ function Toy({
   type,
   x,
   y,
+  row,
+  front,
   on,
   disabled,
   state,
@@ -508,6 +658,10 @@ function Toy({
   type: BlockType;
   x: number;
   y: number;
+  /** Which of the two callout rows: neighbours alternate so their labels never collide. */
+  row: number;
+  /** The front toy of a pair: its callout hangs below, clear of the one behind it. */
+  front: boolean;
   on: boolean;
   disabled: boolean;
   state: BlockState;
@@ -523,7 +677,6 @@ function Toy({
   const toy = toyName(type, params);
   const locked = isLocked(env.level, type);
   const act = on ? onOpen : onAttach;
-  const [lx, ly] = iso(x + FOOT, y + FOOT, 0);
   const footprint = quad(x, y, FOOT, FOOT, 0);
   const common = {
     role: "button",
@@ -541,21 +694,19 @@ function Toy({
     className: `group/toy outline-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`,
   } as const;
 
+  const h = HEIGHT[type];
+  // Callouts, Colorfigures-style: a capitalised tag over the toy on a leader line. Seen
+  // through, the tag gives the block's real type (library §2: the metaphor fades).
   const label = labels && (
-    <text
-      aria-hidden="true"
-      x={lx}
-      y={ly + 16}
-      textAnchor="middle"
-      className="fill-fg text-[11px] font-semibold"
-    >
-      {on ? toy : `Gắn ${toy}`}
-      {seeThrough && (
-        <tspan x={lx} dy="13" className="fill-fg-muted font-mono text-[10px] font-normal">
-          {type}
-        </tspan>
-      )}
-    </text>
+    <Callout
+      type={type}
+      text={seeThrough ? type : (on ? toy : `Gắn ${toy}`).toLocaleUpperCase("vi")}
+      from={
+        front ? iso(x + FOOT, y + FOOT, 0) : iso(x + FOOT / 2, y + FOOT / 2, on ? h + 0.9 : 0.2)
+      }
+      rise={34 + row * 22}
+      below={front}
+    />
   );
   const focusRing = (
     <polygon
@@ -586,7 +737,6 @@ function Toy({
     );
   }
 
-  const h = HEIGHT[type];
   return (
     <g
       {...common}
@@ -608,7 +758,9 @@ function Toy({
           h={h}
           top={lit ? "fill-brand-tint" : "fill-surface"}
           stroke={TONE[state]}
+          glass={seeThrough}
         />
+        {seeThrough && <Inside env={env} bench={bench} type={type} x={x} y={y} h={h} />}
         <Dress
           env={env}
           bench={bench}
@@ -624,6 +776,226 @@ function Toy({
       {label}
     </g>
   );
+}
+
+function Callout({
+  below = false,
+  type,
+  text,
+  from: [fx, fy],
+  rise,
+}: {
+  type: BlockType;
+  text: string;
+  from: P;
+  rise: number;
+  /** Hang the tag under the toy: the front one of a pair, whose tag would cover the back one. */
+  below?: boolean;
+}) {
+  const w = text.length * 6.4 + 14;
+  const top = below ? fy + 18 : fy - rise;
+  return (
+    <g aria-hidden="true" data-callout={type}>
+      <line
+        x1={fx}
+        y1={fy}
+        x2={fx}
+        y2={below ? top : top + 16}
+        className="stroke-fg"
+        strokeWidth="1"
+      />
+      <rect
+        x={fx - w / 2}
+        y={top}
+        width={w}
+        height="16"
+        rx="4"
+        className="fill-surface stroke-fg"
+        strokeWidth="1.2"
+      />
+      <text
+        x={fx}
+        y={top + 11.5}
+        textAnchor="middle"
+        className="fill-fg font-mono text-[10px] font-bold"
+      >
+        {text}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * Seen through, the toy shows what it holds: the pieces the blade cut, the stars the dome
+ * pulled, the cards in the drawer, the cards in the lens. Drawn from the bench's own setting,
+ * the same numbers its slot says in words.
+ */
+function Inside({
+  env,
+  bench,
+  type,
+  x,
+  y,
+  h,
+}: {
+  env: Env;
+  bench: Bench;
+  type: BlockType;
+  x: number;
+  y: number;
+  h: number;
+}): ReactNode {
+  const params = slotParams(env, bench, type);
+  const topK = Math.min(typeof params.top_k === "number" ? params.top_k : 0, 10);
+  const g = (children: ReactNode) => (
+    <g
+      aria-hidden="true"
+      data-internal={type}
+      strokeWidth="1"
+      strokeLinejoin="round"
+      className="stroke-fg"
+    >
+      {children}
+    </g>
+  );
+  const sheet = (x0: number, y0: number, w: number, d: number, z: number, cls = "fill-surface") => (
+    <polygon className={cls} points={quad(x0, y0, w, d, z)} />
+  );
+
+  switch (type) {
+    case "input":
+      // The question waiting on its slip.
+      return g(
+        <>
+          {sheet(x + 0.4, y + 0.4, 0.8, 0.8, 0.15)}
+          {sheet(x + 0.5, y + 0.55, 0.6, 0.06, 0.16, "fill-fg-muted")}
+          {sheet(x + 0.5, y + 0.8, 0.45, 0.06, 0.16, "fill-fg-muted")}
+        </>,
+      );
+    case "corpus":
+      // The volumes' pages, stacked.
+      return g([0.1, 0.2, 0.3].map((z) => <g key={z}>{sheet(x + 0.3, y + 0.3, 1.0, 1.0, z)}</g>));
+    case "chunker": {
+      // The sheet as the blade leaves it: one piece between every two cuts.
+      const size = typeof params.chunk_size === "number" ? params.chunk_size : 1024;
+      const edges = [0, ...bladeCuts(size), 100];
+      return g(
+        edges.slice(0, -1).map((from, i) => {
+          const to = edges[i + 1] ?? 100;
+          const x0 = x + 0.2 + (1.2 * from) / 100 + 0.02;
+          const w = Math.max((1.2 * (to - from)) / 100 - 0.04, 0.02);
+          return (
+            <polygon
+              key={from}
+              data-piece=""
+              className="fill-surface"
+              points={quad(x0, y + 0.35, w, 0.9, 0.1 + (i % 2) * 0.05)}
+            />
+          );
+        }),
+      );
+    }
+    case "vector_search": {
+      // The stars of the index; the ones the dome pulls are lit.
+      const stars = Array.from({ length: 12 }, (_, i) => {
+        const [sx, sy] = iso(x + 0.25 + (i % 4) * 0.37, y + 0.3 + Math.floor(i / 4) * 0.45, 0.35);
+        const pulled = i < topK;
+        return (
+          <circle
+            key={i}
+            data-star={pulled ? "pulled" : "left"}
+            cx={sx}
+            cy={sy}
+            r={pulled ? 2.6 : 1.8}
+            className={pulled ? "fill-brand" : "fill-surface"}
+          />
+        );
+      });
+      return g(stars);
+    }
+    case "bm25_search":
+      // The index cards standing in the drawer; the ones it pulls stand taller.
+      return g(
+        Array.from({ length: 8 }, (_, i) => {
+          const [cx, cy] = iso(x + 0.25 + i * 0.16, y + 0.8, 0.1);
+          const tall = i < topK;
+          return (
+            <rect
+              key={i}
+              data-card-index={tall ? "pulled" : "left"}
+              x={cx - 2}
+              y={cy - (tall ? 16 : 10)}
+              width="4"
+              height={tall ? 16 : 10}
+              className={tall ? "fill-brand-tint" : "fill-surface"}
+            />
+          );
+        }),
+      );
+    case "fusion": {
+      const [ax, ay] = iso(x + 0.3, y + 0.3, 0.3);
+      const [bx, by] = iso(x + 0.3, y + 1.3, 0.3);
+      const [cx, cy] = iso(x + 1.3, y + 0.8, 0.3);
+      return g(
+        <path
+          d={`M${ax} ${ay}L${cx} ${cy}L${bx} ${by}`}
+          className="fill-none stroke-brand"
+          strokeWidth="2"
+        />,
+      );
+    }
+    case "rerank":
+      return g(
+        [0, 1, 2].map((i) => (
+          <g key={i}>
+            {sheet(
+              x + 0.3,
+              y + 0.3 + i * 0.35,
+              1.0 - i * 0.25,
+              0.22,
+              0.2,
+              i === 0 ? "fill-brand-tint" : "fill-surface",
+            )}
+          </g>
+        )),
+      );
+    case "context_packer":
+      // The bin's floor, ruled: what fits in its token budget.
+      return g(
+        [0.35, 0.7, 1.05].map((d) => {
+          const [ax, ay] = iso(x + 0.2, y + d, 0.1);
+          const [bx, by] = iso(x + 1.4, y + d, 0.1);
+          return <line key={d} x1={ax} y1={ay} x2={bx} y2={by} className="stroke-fg-muted" />;
+        }),
+      );
+    case "llm":
+      // The cards behind the lens, as the slots hold them.
+      return g(
+        bench.cards.map((card, i) => {
+          const [cx, cy] = iso(x + 0.35 + i * 0.45, y + 0.8, 0.15);
+          return (
+            <rect
+              key={i}
+              data-inner-card={card === null ? "off" : "on"}
+              x={cx - 4}
+              y={cy - 14}
+              width="8"
+              height="14"
+              rx="1"
+              className={card === null ? "fill-surface [stroke-dasharray:2_2]" : "fill-brand-tint"}
+            />
+          );
+        }),
+      );
+    case "output":
+      return g(
+        [0.4, 0.7, 1.0].map((d) => (
+          <g key={d}>
+            {sheet(x + 0.3, y + d, d === 1.0 ? 0.6 : 1.0, 0.08, h * 0.5, "fill-fg-muted")}
+          </g>
+        )),
+      );
+  }
 }
 
 function Lock({ at: [x, y] }: { at: P }) {
