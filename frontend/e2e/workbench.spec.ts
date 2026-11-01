@@ -1084,10 +1084,17 @@ test.describe("the blade's own strip (B6 N22)", () => {
     // The blade's knobs are chip radios: the input itself is `peer sr-only` and its own label
     // covers it, so `.check()` on the radio times out trying to click a hidden 1px box. The
     // house pattern (see the slip, above) is to scope to the group and click the visible words.
+    // The size is a slider over four stops, so it is set from the keyboard: Home is 128, and two
+    // steps right is 512.
     const pick = (group: RegExp, option: string) =>
       page.getByRole("group", { name: group }).getByText(option, { exact: true }).click();
     await pick(/Cách chia/, "Bám điều, khoản");
-    await pick(/Cỡ đoạn/, "512 token");
+    const blade = page.getByRole("slider", { name: /Cỡ đoạn/ });
+    await blade.focus();
+    await blade.press("Home");
+    await blade.press("ArrowRight");
+    await blade.press("ArrowRight");
+    await expect(blade).toHaveAttribute("aria-valuetext", "512 token");
     await pick(/Chồng lấp/, "10 %");
     await expect(strip(page, 12)).toBeVisible();
     // Điều 12 of the document still in force, whole, and no stale warning this time.

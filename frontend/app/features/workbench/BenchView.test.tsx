@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setParam, starterBench, type Bench } from "./bench";
@@ -413,6 +413,46 @@ describe("the chunker's strip (N22)", () => {
     bench = setParam(l2, bench, "chunker", "overlap_pct", 0);
     drawL2(bench);
     expect(screen.getByText("Dải đoạn Điều 11", { exact: false })).toBeDefined();
+  });
+
+  // The blade's size is a slider over the four stops the level offers, not a row of chips: the
+  // player turns it, and the stops keep the value to a size the level has.
+  it("turns the chunk size with a slider over its four stops, not a row of chips", () => {
+    drawL2(starter());
+    const control = document.querySelector('[data-param="chunk_size"]');
+    const blade = control?.querySelector('input[type="range"]') as HTMLInputElement | null;
+    expect(blade).not.toBeNull();
+    expect(control?.querySelectorAll('input[type="radio"]').length).toBe(0);
+    expect(blade?.min).toBe("0");
+    expect(blade?.max).toBe("3");
+  });
+
+  it("moves the chunk size to the stop the blade lands on", () => {
+    const changes: Bench[] = [];
+    const bench = starter();
+    render(
+      <BenchSection
+        env={l2}
+        bench={bench}
+        graph={graphFromBench(l2, bench)}
+        onChange={(next) => changes.push(next)}
+        locked={false}
+        issues={validateGraph(l2, graphFromBench(l2, bench))}
+        highlight={null}
+        view={null}
+        preview={null}
+        benchRun="none"
+        viz={viz}
+        vizCase="lib-l2-v01"
+        saved={false}
+        discarded={false}
+      />,
+    );
+    const control = document.querySelector('[data-param="chunk_size"]');
+    const blade = control?.querySelector('input[type="range"]');
+    if (!blade) throw new Error("the chunk size blade is not drawn");
+    fireEvent.change(blade, { target: { value: "2" } });
+    expect(changes.at(-1)).toEqual(setParam(l2, bench, "chunker", "chunk_size", 512));
   });
 
   // The gate is "can the player move this blade", not a hardcoded level id. L1 locks the

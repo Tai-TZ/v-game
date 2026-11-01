@@ -555,6 +555,59 @@ function ParamLabel({ env, type, param }: { env: Env; type: BlockType; param: st
   );
 }
 
+/**
+ * Lược dao on L2: a slider over the sizes the level offers, so the player turns the blade and
+ * the value can only land on a stop. A native range keeps the arrow keys and the value the
+ * screen reader announces; the stop is the step, so no size between two stops can happen.
+ */
+function BladeStops({
+  param,
+  label,
+  options,
+  value,
+  onValue,
+}: {
+  param: string;
+  label: ReactNode;
+  options: readonly JsonValue[];
+  value: JsonValue;
+  onValue: (value: JsonValue) => void;
+}) {
+  const id = useId();
+  const index = Math.max(
+    0,
+    options.findIndex((option) => option === value),
+  );
+  const current = fmtValue(param, options[index] ?? null);
+  return (
+    <div data-param={param}>
+      <div className="flex items-baseline justify-between gap-3">
+        <label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </label>
+        {/* Not an <output>: that is a live region, and aria-valuetext already speaks it. */}
+        <span aria-hidden="true" className="text-sm font-semibold tabular-nums">
+          {current}
+        </span>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={0}
+        max={options.length - 1}
+        step={1}
+        value={index}
+        aria-valuetext={current}
+        onChange={(event) => onValue(options[Number(event.target.value)] ?? null)}
+        className="mt-1 h-11 w-full cursor-pointer accent-brand"
+      />
+      <p className="text-xs text-fg-muted tabular-nums">
+        {fmtValue(param, options[0] ?? null)}–{fmtValue(param, options[options.length - 1] ?? null)}
+      </p>
+    </div>
+  );
+}
+
 function Control({
   env,
   type,
@@ -608,6 +661,18 @@ function Control({
         </div>
       );
     case "choice":
+      // Lược dao: the sizes are numbers in a line, so the player turns a blade over them.
+      if (param === "chunk_size") {
+        return (
+          <BladeStops
+            param={param}
+            label={label}
+            options={d.options}
+            value={value}
+            onValue={onValue}
+          />
+        );
+      }
       return (
         <fieldset data-param={param}>
           <legend className="text-sm font-medium">{label}</legend>
