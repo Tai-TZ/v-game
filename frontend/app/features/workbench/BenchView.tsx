@@ -134,6 +134,8 @@ interface BenchProps {
   vizCase: string | null;
   saved: boolean;
   discarded: boolean;
+  /** N17: the one-line note of each toy touched for the first time on this browser. */
+  tips?: Partial<Record<BlockType, string>>;
 }
 
 const EMPTY_TEXT: Readonly<Record<string, string>> = {
@@ -295,6 +297,7 @@ function Slot({
   preview,
   viz,
   vizCase,
+  tips = {},
 }: BenchProps & { type: BlockType }) {
   const { level, blocks } = env;
   const id = nodeIds(level)[type];
@@ -358,6 +361,12 @@ function Slot({
       </SlotHead>
       {optional && (
         <AttachSwitch toy={toy} on onToggle={() => onChange(setAttached(bench, type, false))} />
+      )}
+      {/* N17: said where the hand already is, once; nothing to dismiss and nothing in the way. */}
+      {tips[type] && (
+        <p data-first-touch={type} className="mt-2 max-w-prose text-sm chieu:hidden">
+          {tips[type]}
+        </p>
       )}
 
       {graded && view && <Grade c={view.followed} />}
