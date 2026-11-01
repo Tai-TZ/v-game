@@ -629,3 +629,46 @@ describe("the bench opens one toy at a time", () => {
     expect(openSlots()).toEqual(["slot-rr"]);
   });
 });
+
+// The machine can be drawn above both columns of the page: the bench hands it to a host
+// element and keeps its state (the open toy, the focus) where it was.
+describe("the machine drawn outside the bench", () => {
+  it("draws into the host it is given, and nowhere in the bench", () => {
+    // jsdom has no layout, so no scrollIntoView; pressing a toy scrolls to its slot.
+    Element.prototype.scrollIntoView = () => undefined;
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const env = testEnv("chunk-tuning");
+    const bench = starterBench(env);
+    if (!bench) throw new Error("L2 starter is not drawable");
+    const graph = graphFromBench(env, bench);
+    render(
+      <BenchSection
+        env={env}
+        bench={bench}
+        graph={graph}
+        onChange={() => undefined}
+        locked={false}
+        issues={validateGraph(env, graph)}
+        highlight={null}
+        view={null}
+        preview={null}
+        benchRun="none"
+        viz={null}
+        vizCase={null}
+        saved={false}
+        discarded={false}
+        machineHost={host}
+      />,
+    );
+    expect(host.querySelector("[data-machine-figure]")).not.toBeNull();
+    const section = document.querySelector('section[aria-labelledby="wb-bench-title"]');
+    expect(section?.querySelector("[data-machine-figure]")).toBeNull();
+    // Still the bench's machine: pressing the bin on it opens the bin's slot below.
+    const bin = host.querySelector<SVGElement>('[data-tile-type="context_packer"]');
+    if (!bin) throw new Error("no bin on the machine");
+    fireEvent.click(bin);
+    expect(document.querySelector("#slot-pk")?.getAttribute("data-slot-open")).toBe("true");
+    host.remove();
+  });
+});

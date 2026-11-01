@@ -54,3 +54,42 @@ describe("the scene at the head of each level", () => {
     expect(screen.getByRole("heading", { name: "Hiện trường" })).toBeDefined();
   });
 });
+
+// Cờ thế giới (scenario §3): once the level has a star, its scene shows the trouble fixed.
+describe("the scene once the level has a star", () => {
+  function wonScene(id: Parameters<typeof testEnv>[0], won: boolean) {
+    render(<Brief level={testEnv(id).level} won={won} />);
+    const found = document.querySelector("[data-scene]");
+    if (!found) throw new Error(`${id} draws no scene`);
+    return found;
+  }
+
+  it("keeps the trouble on show before the first star", () => {
+    for (const id of ["grounded-citation", "chunk-tuning", "article-number-lookup"] as const) {
+      expect(wonScene(id, false).querySelector("[data-scene-won]")).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("takes L1's poster down", () => {
+    const found = wonScene("grounded-citation", true);
+    expect(found.querySelector("[data-scene-won]")?.textContent).toBe("ĐÃ GỠ");
+    expect(found.querySelector("[data-scene-poster]")?.getAttribute("data-taken-down")).toBe("");
+  });
+
+  it("stamps L2's form received instead of overdue", () => {
+    const found = wonScene("chunk-tuning", true);
+    expect(found.querySelector("[data-scene-stamp]")?.textContent).toBe("ĐÃ NHẬN");
+    expect(found.querySelector("[data-scene-won]")).not.toBeNull();
+  });
+
+  it("closes L3's incident file", () => {
+    const found = wonScene("article-number-lookup", true);
+    expect(found.querySelector("[data-scene-won]")?.textContent).toBe("ĐÃ XỬ LÝ");
+  });
+
+  it("lets cô Lan say the level's win line", () => {
+    wonScene("chunk-tuning", true);
+    expect(screen.getByText(/Phòng đào tạo nhận đơn của Hà rồi/)).toBeDefined();
+  });
+});

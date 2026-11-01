@@ -10,7 +10,7 @@ import type { PublicLevel } from "./schema";
  * questions sit in the right column (over the aside), so the bench and "Mở ca" reach the first
  * screen at 1280×800.
  */
-export function Brief({ level }: { level: PublicLevel }) {
+export function Brief({ level, won = false }: { level: PublicLevel; won?: boolean }) {
   const copy = LEVEL_COPY[level.id];
   const { normal, trap } = level.case_counts;
   const visible = level.visible_cases.length;
@@ -24,7 +24,7 @@ export function Brief({ level }: { level: PublicLevel }) {
         </div>
         <p className="mt-3 text-lg text-fg-muted">{level.brief}</p>
 
-        {copy && <Scene scene={copy.scene} lan={copy.intro} />}
+        {copy && <Scene scene={copy.scene} lan={copy.intro} won={won} win={copy.win1} />}
       </div>
 
       <div className="max-w-prose">

@@ -13,7 +13,7 @@ import * as v from "valibot";
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
 import { useProjector } from "~/features/projector/projector";
-import { recordStars, type Stars } from "~/features/progress/progress";
+import { levelStars, readProgress, recordStars, type Stars } from "~/features/progress/progress";
 
 import { cancelRun, eventsUrl, newKey, postRun, previewRetrieval, type LevelPageData } from "./api";
 import { benchFromGraph, graphFromBench, type Bench, type Env } from "./bench";
@@ -223,6 +223,18 @@ function useFocusLater() {
       selectors: typeof selectors === "string" ? [selectors] : selectors,
       n: (last?.n ?? 0) + 1,
     }));
+}
+
+/**
+ * The level's world flag (cờ thế giới, scenario §3): up once this browser holds a star for the
+ * level, or the moment a scored run on screen earns one. A recorded or sample run never raises
+ * it -- the same rule as `useRecordStars`, for the same reason.
+ */
+export function useLevelWon(level: PublicLevel, run: RunView | null): boolean {
+  // Read once: the workbench renders on the client only, and a star earned now comes in below.
+  const [saved] = useState(() => levelStars(readProgress(), level.zone, level.id));
+  const earned = run?.score && run.scope === undefined && !cappedRun(run) ? run.score.stars : 0;
+  return saved >= 1 || earned >= 1;
 }
 
 /**
@@ -550,6 +562,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [tips, setTips] = useState<Partial<Record<BlockType, string>>>({});
   const sample = useLastSample(ours);
   useRecordStars(level, run);
+  const won = useLevelWon(level, run);
+  // A state, not a ref: the bench re-renders into the host once it exists.
+  const [machineHost, setMachineHost] = useState<HTMLDivElement | null>(null);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
   const passing = lastPassing(history);
   useRecordHistory(level.id, run, lastBody, setHistory);
@@ -829,7 +844,11 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
 
   return (
     <>
-      <Brief level={level} />
+      <Brief level={level} won={won} />
+      {/* The machine spans both columns: the bench draws it here through a portal (owner's call,
+          2026-11-02, level-identity §2.7). Mở ca no longer reaches the first screen at 1280×800;
+          the aside is sticky, so it is one scroll away and then stays in view. */}
+      <div ref={setMachineHost} className="mt-8" />
       {/* An explicit track below lg too: an implicit `auto` one grows to the JSON's longest line. */}
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-6 chieu:lg:grid-cols-[minmax(0,1fr)]">
         <BenchSection
@@ -847,6 +866,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           vizCase={previewCase}
           saved={saved}
           tips={tips}
+          machineHost={machineHost}
           // Gone once an edit is saved: the two notices would contradict each other.
           discarded={initial.discarded && !saved}
         />
