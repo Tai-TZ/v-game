@@ -33,6 +33,18 @@ Mỗi level mở bằng hiện vật của chính nó, lấy từ mục 3 "Hiệ
 - Dải đoạn ngay bên dưới đã vẽ lại theo nấc đang chọn từ trước, nên kéo lưỡi dao là thấy vết cắt đổi.
 - Code: `BladeStops` trong `BenchView.tsx`.
 
+### 2.3 Cỗ máy isometric ở đầu bàn thợ (2026-11-01, vòng 2)
+
+Phản hồi của chủ dự án: màn chơi còn quá nhiều chữ, "khác gì một blog"; muốn chơi qua hình, tham chiếu là các hình isometric bấm được kiểu "Colorfigures" (máy pha cà phê có nút "Pull a shot", "Steam the milk"...).
+
+- **Cỗ máy:** trợ lý vẽ thành một cỗ máy isometric trên đế sa bàn (art bible §1.1), mỗi món một khối trên băng chuyền từ Chuông quầy tới Bảng trả lời. Mỗi khối mặc đúng thông số của nó: vết cắt đỏ của Lược dao theo `chunk_size`, móc dưới Vòm Sao theo `top_k`, sách 2019 màu vàng trên kệ L2, tem trên nắp Thùng khi `cite_ids`, ba khe thẻ cạnh Lăng kính, dấu ✓/✗ trên Bảng trả lời theo câu đang theo dõi.
+- **Ổ trống:** món tuỳ chọn chưa gắn là ổ đỏ nét đứt, và băng chuyền sau ổ tìm kiếm trống bị đứt (bài của L1). Bấm ổ trống là gắn món; bấm món đã gắn là nhảy tới khe của nó.
+- **Các bước (beat):** hàng nút "Khách rung chuông → Cắt kho → Kéo đoạn → … → Chấm câu trả lời". Mỗi bước nhấc món đó lên một lần (không lặp) và đọc một dòng lấy từ fact của lượt chạy cho câu đang theo dõi, hoặc từ thông số bàn thợ khi chưa chạy. Câu ẩn và câu bẫy không bao giờ lộ câu hỏi, câu trả lời hay hạng đoạn đáp án.
+- **Nhãn / Nhìn xuyên:** bật tắt tên đồ chơi, và hiện tên khối thật (`vector_search`...) theo tinh thần "ẩn dụ phai dần" (library §2).
+- **SVG, không three.js:** quy định "three.js chỉ ở chunk `/play`" và ngân sách bàn thợ 120 kB gzip nhỏ hơn riêng three.js. Hình 2.5D bằng SVG nặng thêm khoảng 3 kB, phím và trình đọc màn hình dùng được.
+- **Bớt chữ ở các khe:** thông số giữ cố định của mỗi món gom vào một dòng thu gọn "N thông số giữ cố định ở màn này".
+- **Một vùng live:** dòng đọc của bước không phải `aria-live` (trang giữ đúng một vùng, Q5); nút bước trỏ tới nó bằng `aria-describedby`.
+
 ## 3. Đề xuất của bản nháp đã bỏ
 
 | Đề xuất | Lý do bỏ |

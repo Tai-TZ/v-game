@@ -14,6 +14,7 @@ import {
 } from "~/components/ui/icons";
 
 import { Blade } from "./Blade";
+import { MachineMap } from "./MachineMap";
 import { Stamps } from "./Stamps";
 import { CitationLedger } from "./CitationLedger";
 import { packerSaw } from "./ledger";
@@ -154,6 +155,19 @@ export function BenchSection(props: BenchProps) {
     .filter((type) => !allowed(type))
     .map((type) => TOY[type].name);
   const slot = (type: BlockType) => <Slot key={type} type={type} {...props} />;
+  const states = Object.fromEntries(
+    (Object.keys(blocks) as BlockType[]).map((type) => [type, slotState(props, type)]),
+  ) as Record<BlockType, BlockState>;
+  const graded = view?.followed.graded;
+  // A tile takes the hand to its slot's first control, or to the slot when it has none.
+  const open = (type: BlockType) => {
+    const target = slotTargets(env, type)
+      .map((selector) => document.querySelector<HTMLElement>(selector))
+      .find((el) => el !== null);
+    const slotEl = document.getElementById(slotId(env, type));
+    slotEl?.scrollIntoView({ block: "start" });
+    target?.focus({ preventScroll: true });
+  };
 
   return (
     <section aria-labelledby="wb-bench-title">
@@ -182,6 +196,20 @@ export function BenchSection(props: BenchProps) {
           </a>
         </p>
       )}
+
+      <div className="mt-5 rounded-md border border-line bg-surface p-4">
+        <MachineMap
+          env={env}
+          bench={props.bench}
+          onChange={props.onChange}
+          onOpen={open}
+          disabled={locked}
+          states={states}
+          highlight={props.highlight}
+          answer={graded?.counted === true ? (graded.passed ? "pass" : "fail") : null}
+          view={view}
+        />
+      </div>
 
       <fieldset disabled={locked} className="mt-5 min-w-0">
         <legend className="sr-only">Các món trên bàn thợ</legend>
@@ -284,21 +312,32 @@ function frameClass(step: StepView | undefined, highlighted: boolean, failed: bo
   return "border-warning bg-surface";
 }
 
-function Slot({
-  type,
-  env,
-  bench,
-  graph,
-  onChange,
-  issues,
-  highlight,
-  view,
-  benchRun,
-  preview,
-  viz,
-  vizCase,
-  tips = {},
-}: BenchProps & { type: BlockType }) {
+/** N6 state of one slot for the followed case: the slot's chip and the map's tile agree. */
+function slotState({ env, view, benchRun }: BenchProps, type: BlockType): BlockState {
+  const step = view ? view.followed.steps[nodeIds(env.level)[type]] : undefined;
+  const graded = type === "output" ? view?.followed.graded : undefined;
+  return blockState(benchRun, step, {
+    started: (view?.run.cases.length ?? 0) > 0,
+    ingest: type === "corpus" || type === "chunker",
+    failedAnswer: graded?.counted === true && !graded.passed,
+  });
+}
+
+function Slot(props: BenchProps & { type: BlockType }) {
+  const {
+    type,
+    env,
+    bench,
+    graph,
+    onChange,
+    issues,
+    highlight,
+    view,
+    preview,
+    viz,
+    vizCase,
+    tips = {},
+  } = props;
   const { level, blocks } = env;
   const id = nodeIds(level)[type];
   const titleId = `${slotId(env, type)}-title`;
@@ -309,11 +348,16 @@ function Slot({
   const step = view ? view.followed.steps[id] : undefined;
   const own = issues.filter((issue) => issue.node === id);
   const graded = type === "output" ? view?.followed.graded : undefined;
-  const state = blockState(benchRun, step, {
-    started: (view?.run.cases.length ?? 0) > 0,
-    ingest: type === "corpus" || type === "chunker",
-    failedAnswer: graded?.counted === true && !graded.passed,
-  });
+  const state = slotState(props, type);
+  const knobs = paramNames(blocks, type)
+    .filter((name) => !(type === "fusion" && name === (params.method === "alpha" ? "k" : "alpha")))
+    .flatMap((name) => {
+      const d: Domain | null = locked
+        ? { kind: "fixed", value: params[name] ?? null }
+        : domain(env, type, name);
+      return d ? [{ name, d }] : [];
+    });
+  const fixed = knobs.filter(({ d }) => d.kind === "fixed");
 
   if (optional && !bench.attached[type]) {
     const retrievalEmpty =
@@ -384,29 +428,45 @@ function Slot({
       )}
 
       <div className="mt-3 space-y-4 empty:hidden">
-        {paramNames(blocks, type)
-          .filter(
-            (name) => !(type === "fusion" && name === (params.method === "alpha" ? "k" : "alpha")),
-          )
-          .map((name) => {
-            const d = locked
-              ? ({ kind: "fixed", value: params[name] ?? null } as const)
-              : domain(env, type, name);
-            if (!d) return null;
-            return (
-              <Control
-                key={name}
-                env={env}
-                type={type}
-                param={name}
-                domain={d}
-                value={params[name] ?? null}
-                inert={LEVEL_COPY[level.id]?.inertKnobs?.[name]}
-                onValue={(value) => onChange(setParam(env, bench, type, name, value))}
-              />
-            );
-          })}
+        {knobs
+          .filter(({ d }) => d.kind !== "fixed")
+          .map(({ name, d }) => (
+            <Control
+              key={name}
+              env={env}
+              type={type}
+              param={name}
+              domain={d}
+              value={params[name] ?? null}
+              inert={LEVEL_COPY[level.id]?.inertKnobs?.[name]}
+              onValue={(value) => onChange(setParam(env, bench, type, name, value))}
+            />
+          ))}
         {type === "llm" && !locked && <Prism env={env} bench={bench} onChange={onChange} />}
+        {/* What the level holds still is worth one line, not one line per knob: the turning
+            knobs are the game, the fixed ones are there for whoever wants to check. */}
+        {fixed.length > 0 && (
+          <details data-fixed-params={fixed.length} className="group">
+            <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 text-sm text-fg-muted">
+              <LockIcon className="size-3.5 shrink-0" />
+              {fixed.length} thông số giữ cố định ở màn này
+              <ChevronDownIcon />
+            </summary>
+            <div className="mt-1 space-y-2">
+              {fixed.map(({ name, d }) => (
+                <Control
+                  key={name}
+                  env={env}
+                  type={type}
+                  param={name}
+                  domain={d}
+                  value={params[name] ?? null}
+                  onValue={() => undefined}
+                />
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
       {type === "chunker" && view && <Ingestion run={view.run} node={id} gold={view.gold} />}
