@@ -56,6 +56,7 @@ import {
   saveSlip,
   type RunMark,
 } from "./storage";
+import { useQuota } from "./useQuota";
 import { errorsOf, validateGraph } from "./validate";
 
 const levelsUrl = (zoneId: string | null) => (zoneId ? `/play/${zoneId}` : "/play");
@@ -299,19 +300,23 @@ export function useRecordHistory(
  * star run, once, on `ranBody` -- the graph that actually cleared it, not the bench as it
  * stands. A knob turned while the samples were running must not ride into the star run, and the
  * server only prices the second step at 7 calls when the two graphs are identical (§3.1).
+ *
+ * `samplesOnly`: the day's pool covered the samples and not the shift (roadmap-v0.4 §5.1), so the
+ * button said "Thử 3 câu mẫu" and the samples are all the player asked for.
  */
 export function useStarRunAfterSample(
   run: RunView | null,
   ranBody: string | null,
   start: (body: string) => void,
+  samplesOnly = false,
 ) {
   const chained = useRef<string | null>(null);
   useEffect(() => {
-    if (run === null || ranBody === null) return;
+    if (run === null || ranBody === null || samplesOnly) return;
     if (sampleVerdict(run) !== "passed" || chained.current === run.runId) return;
     chained.current = run.runId;
     start(ranBody);
-  }, [run, ranBody, start]);
+  }, [run, ranBody, start, samplesOnly]);
 }
 
 /**
@@ -497,10 +502,29 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
   const passing = lastPassing(history);
   useRecordHistory(level.id, run, lastBody, setHistory);
+  // Set by Mở ca from the pool (§5.1): when it only covers the samples, they run alone. State,
+  // not a ref, because the hook below reads it during render.
+  const [samplesOnly, setSamplesOnly] = useState(false);
   // A fresh arrow each render re-runs the effect; the hook's own guard, not a trimmed dep
   // list, is what keeps it to one star run per sample run (same rule as useRecordHistory).
-  useStarRunAfterSample(ours, lastBody, (starBody) => {
-    void send(starBody, newKey());
+  useStarRunAfterSample(
+    ours,
+    lastBody,
+    (starBody) => {
+      void send(starBody, newKey());
+    },
+    samplesOnly,
+  );
+  const slipOf = useCallback(
+    (runId: string) => (ranSlip?.runId === runId ? ranSlip.slip : null),
+    [ranSlip],
+  );
+  const quota = useQuota({
+    levelId: level.id,
+    cases: level.case_counts.normal + level.case_counts.trap + level.case_counts.info,
+    ours,
+    samplesCached: sample !== null && lastBody === body,
+    slipOf,
   });
 
   const issues = serverIssues ?? clientIssues;
@@ -654,8 +678,16 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       focusLater("#wb-issues");
       return;
     }
-    // The sample step first (N2). `useStarRunAfterSample` starts the star run behind it.
+    // The sample step first (N2). `useStarRunAfterSample` starts the star run behind it, unless
+    // the day's pool only covers the samples (§5.1).
+    setSamplesOnly(quota.mode === "sample");
     void send(body, newKey(), before, "mau");
+  }
+
+  /** The pool is spent: the recorded run stands in for the player's own on the panel. */
+  function showRecorded() {
+    if (ours !== null && !isActive(ours)) dispatch({ kind: "clear" });
+    void recorded.show();
   }
 
   function focusSlot(type: BlockType, param?: string) {
@@ -709,8 +741,10 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             slip={slip}
             onSlip={editSlip}
             onOpen={openShift}
-            onRecorded={() => void recorded.show()}
+            onRecorded={showRecorded}
             recordedFailed={recorded.failed}
+            quota={quota}
+            samplesOnly={samplesOnly}
             onRetry={() => {
               if (request.state === "failed") void send(request.body, request.key);
             }}
@@ -751,7 +785,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           />
         </aside>
       </div>
-      {sample && <SampleResult run={sample} />}
+      {sample && <SampleResult run={sample} samplesOnly={samplesOnly} />}
       {run?.score && (
         <Results
           key={run.runId}

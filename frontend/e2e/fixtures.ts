@@ -293,11 +293,38 @@ export async function mockWorkbenchApi(
     cancel?: (n: number) => number | Promise<number>;
     /** Reply to the n-th retrieval preview; the default is an empty, successful one. */
     preview?: (n: number) => WorkbenchReply | undefined;
+    /** `GET /api/quota` body. The default share is far above any spec's runs, so a spec that
+     * opens several shifts never finds Mở ca turned into "Thử 3 câu mẫu" (§5.1). */
+    quota?: Record<string, unknown>;
   } = {},
 ): Promise<WorkbenchMock> {
   await mockApi(page);
   const mock: WorkbenchMock = { posts: [], cancels: [], streams: 0, previews: 0 };
   await page.route("**/api/blocks", (route) => route.fulfill({ json: blocksJson() }));
+  // Unmocked, both would leave the page, 502 and land in consoleErrors (see the preview below).
+  await page.route(
+    (url) => url.pathname === "/api/quota",
+    (route) =>
+      route.fulfill({
+        json: options.quota ?? {
+          cap: 500,
+          used: 0,
+          remaining: 500,
+          resets_at: "2026-11-02T00:00:00+00:00",
+          estimate: true,
+          reserve_left: 17,
+          learner_daily: 999,
+        },
+      }),
+  );
+  await page.route(
+    (url) => url.pathname === "/api/quota/refund",
+    (route) =>
+      route.fulfill({
+        status: 409,
+        json: { code: "not_sample_run", detail: "Chỉ hoàn lượt Thử 3 câu mẫu." },
+      }),
+  );
   await page.route("**/api/levels/*", (route) => {
     const id = new URL(route.request().url()).pathname.split("/").at(-1) ?? "";
     try {

@@ -59,6 +59,17 @@ describe("SampleResult", () => {
     expect(screen.getByText(SAMPLE_VI.passed)).toBeDefined();
   });
 
+  it("promises no star run when the day's pool only covered the samples (§5.1)", () => {
+    render(<SampleResult run={sample([true, true, true])} samplesOnly />);
+    expect(screen.getByText(SAMPLE_VI.passedAlone)).toBeDefined();
+    expect(screen.queryByText(SAMPLE_VI.passed)).toBeNull();
+  });
+
+  it("keeps the failed line in that case too: the gate, not the pool, stopped it", () => {
+    render(<SampleResult run={sample([true, false, true])} samplesOnly />);
+    expect(screen.getByText(SAMPLE_VI.failed)).toBeDefined();
+  });
+
   it("says what the gate wants when one failed, instead of leaving a dead end", () => {
     render(<SampleResult run={sample([true, false, true])} />);
     expect(screen.getByText(SAMPLE_VI.failed)).toBeDefined();

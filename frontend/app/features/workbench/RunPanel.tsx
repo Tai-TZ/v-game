@@ -13,6 +13,7 @@ import {
   fmt,
   LEVEL_COPY,
   outcomeText,
+  QUOTA_VI,
   RECORDED_VI,
   ROLE_VI,
   sameGraphNote,
@@ -25,6 +26,7 @@ import { Scrub } from "./Scrub";
 import { GuessSlip } from "./GuessSlip";
 import { isActive, runningNodes, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, Issue } from "./schema";
+import type { QuotaView } from "./useQuota";
 import { fixFor } from "./validate";
 
 export type RequestState =
@@ -74,6 +76,41 @@ interface RunPanelProps {
   onRecorded: () => void;
   /** The recording could not be shown; the level still plays without it. */
   recordedFailed: boolean;
+  /** The day's pool of fresh AI calls and what it lets Mở ca do (§5.1). */
+  quota: QuotaView;
+  /** This shift is the 3 samples alone: the pool did not cover the star run (§5.1). */
+  samplesOnly: boolean;
+}
+
+/**
+ * The pool beside Mở ca (roadmap-v0.4 §5.1): what is left and when it refills, then what this
+ * shift costs or why the button now offers less. "ước tính" stays until T1, since every server
+ * counter lives in RAM and a Render restart zeroes it.
+ */
+function QuotaLines({ quota }: { quota: QuotaView }) {
+  const { left, refill, cost, mode, note } = quota;
+  return (
+    <div id="wb-quota" className="space-y-1 text-sm">
+      {left === null ? (
+        <p className="text-fg-muted">{QUOTA_VI.unknown}</p>
+      ) : (
+        <>
+          <p className="font-semibold">
+            {QUOTA_VI.left(left)}
+            {refill && ` · ${QUOTA_VI.refill(refill)}`}
+          </p>
+          <p className="text-fg-muted">
+            {mode === "shift"
+              ? QUOTA_VI.cost(cost)
+              : mode === "sample"
+                ? QUOTA_VI.sampleOnly
+                : QUOTA_VI.empty}
+          </p>
+        </>
+      )}
+      {note && <p role="status">{note}</p>}
+    </div>
+  );
 }
 
 export function RunPanel(props: RunPanelProps) {
@@ -147,6 +184,7 @@ function Editing({
   onEdit,
   onRecorded,
   recordedFailed,
+  quota,
 }: RunPanelProps) {
   const {
     open: restoring,
@@ -293,19 +331,28 @@ function Editing({
         </fieldset>
       </details>
 
+      <QuotaLines quota={quota} />
+
       <button
         type="button"
-        onClick={onOpen}
+        onClick={quota.mode === "recorded" ? onRecorded : onOpen}
         disabled={sending}
         aria-busy={sending}
         className={buttonClass("primary", "w-full")}
       >
-        {sending ? "Đang gửi cấu hình…" : "Mở ca"}
+        {sending
+          ? "Đang gửi cấu hình…"
+          : quota.mode === "shift"
+            ? "Mở ca"
+            : quota.mode === "sample"
+              ? QUOTA_VI.sampleButton
+              : RECORDED_VI.open}
       </button>
 
       {/* Only before the player's own first run: after that the bench has something truer to
-          show than the starter's log, and a second "watch a run" button competes with it. */}
-      {run === null && (
+          show than the starter's log, and a second "watch a run" button competes with it. With
+          the pool spent, the main button already is that button. */}
+      {run === null && quota.mode !== "recorded" && (
         <div className="space-y-1">
           <button
             type="button"
@@ -433,6 +480,7 @@ function Editing({
 
 function Running({
   run,
+  samplesOnly,
   stop,
   onStop,
   onReconnect,
@@ -455,7 +503,9 @@ function Running({
       {run.scope === "mau" && (
         <div className="rounded-md border border-line p-3 text-sm">
           <p className="font-semibold">{STEP_VI.sample}</p>
-          <p className="mt-1 text-fg-muted">{STEP_VI.sampleNote}</p>
+          <p className="mt-1 text-fg-muted">
+            {samplesOnly ? STEP_VI.sampleAloneNote : STEP_VI.sampleNote}
+          </p>
         </div>
       )}
       <p className="text-sm font-semibold tabular-nums">

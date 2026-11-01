@@ -8,9 +8,11 @@ import { EMPTY_SLIP } from "./guess";
 import type { RunView } from "./run";
 import { RunPanel, type RequestState } from "./RunPanel";
 import { replay, testEnv } from "./test-fixtures";
+import type { QuotaView } from "./useQuota";
 
 const l1 = testEnv("grounded-citation");
 const nothing = () => undefined;
+const FULL: QuotaView = { left: 13, refill: "07:00", cost: 10, mode: "shift", note: null };
 
 function Panel({
   request,
@@ -18,14 +20,18 @@ function Panel({
   backToPassing = null,
   run = null,
   onRecorded = nothing,
+  onOpen = nothing,
   recordedFailed = false,
+  quota = FULL,
 }: {
   request: RequestState;
   env?: Env;
   backToPassing?: (() => void) | null;
   run?: RunView | null;
   onRecorded?: () => void;
+  onOpen?: () => void;
   recordedFailed?: boolean;
+  quota?: QuotaView;
 }) {
   const start = starterBench(env);
   if (!start) throw new Error(`${env.level.id} starter is not drawable`);
@@ -47,7 +53,7 @@ function Panel({
         backTo="/play/library"
         slip={EMPTY_SLIP}
         onSlip={nothing}
-        onOpen={nothing}
+        onOpen={onOpen}
         onRetry={nothing}
         onRestore={nothing}
         backToPassing={backToPassing}
@@ -60,6 +66,8 @@ function Panel({
         onFollow={nothing}
         onRecorded={onRecorded}
         recordedFailed={recordedFailed}
+        quota={quota}
+        samplesOnly={false}
       />
     </MemoryRouter>
   );
@@ -225,5 +233,56 @@ describe("the scrub bar waits for the run to be over (N4)", () => {
   it("stays out of a run still going", () => {
     render(<Panel request={{ state: "idle" }} run={replay([started])} />);
     expect(screen.queryByRole("slider", { name: SCRUB_VI.label })).toBeNull();
+  });
+});
+
+describe("the day's pool beside Mở ca (roadmap-v0.4 §5.1)", () => {
+  const idle: RequestState = { state: "idle" };
+
+  it("says what is left, when it refills, and what this shift costs", () => {
+    render(<Panel request={idle} />);
+    expect(screen.getByText("Còn 13 lời gọi hôm nay (ước tính) · hồi đầy lúc 07:00")).toBeTruthy();
+    expect(screen.getByText("Lượt này tốn tối đa 10 lời gọi.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mở ca" })).toBeTruthy();
+  });
+
+  it("offers the 3 samples alone when the pool covers only them", () => {
+    const onOpen = vi.fn();
+    render(<Panel request={idle} onOpen={onOpen} quota={{ ...FULL, left: 5, mode: "sample" }} />);
+    expect(screen.getByText("Quỹ hôm nay chỉ đủ cho 3 câu mẫu.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Mở ca" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Thử 3 câu mẫu" }));
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it("turns the button into the free recorded run once the pool is spent", () => {
+    const onOpen = vi.fn();
+    const onRecorded = vi.fn();
+    render(
+      <Panel
+        request={idle}
+        onOpen={onOpen}
+        onRecorded={onRecorded}
+        quota={{ ...FULL, left: 1, mode: "recorded" }}
+      />,
+    );
+    // One button: the spare "watch a run" button below would only repeat it.
+    fireEvent.click(screen.getByRole("button", { name: "Xem lượt đã ghi" }));
+    expect(onRecorded).toHaveBeenCalledOnce();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("shows no number it could not read, and still lets the shift open", () => {
+    render(<Panel request={idle} quota={{ ...FULL, left: null, refill: null }} />);
+    expect(
+      screen.getByText("Chưa đọc được quỹ hôm nay từ máy chủ; mở ca vẫn chạy được."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/lời gọi hôm nay \(ước tính\)/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Mở ca" })).toBeTruthy();
+  });
+
+  it("reads a refund's outcome out as a status", () => {
+    render(<Panel request={idle} quota={{ ...FULL, note: "Hoàn 3 lời gọi: bạn đoán chắc." }} />);
+    expect(screen.getByRole("status").textContent).toBe("Hoàn 3 lời gọi: bạn đoán chắc.");
   });
 });
