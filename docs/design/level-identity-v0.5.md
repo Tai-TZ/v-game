@@ -53,6 +53,13 @@ Phản hồi của chủ dự án: màn chơi còn quá nhiều chữ, "khác g�
 - Gợi ý và chẩn đoán vẫn trỏ được tới núm: món được trỏ tới mở ngay trong cùng lượt render, trước khi trang đặt focus.
 - Đo ở L1, 1280×800: chữ trên bàn thợ từ khoảng 600 xuống 220 từ, chiều cao từ 1588 px xuống 1216 px.
 
+### 2.5 Lăng kính là bộ thẻ
+
+- Ba ô chọn dài của Lăng kính được thay bằng ba khe hình thẻ và bộ thẻ dặn dò của level, chữ của mỗi thẻ in ngay trên thẻ.
+- Bấm một thẻ: cắm vào khe trống đầu tiên; bấm lại: rút ra; bấm một khe: rút thẻ trong khe. Trên máy tính có thể kéo thẻ vào khe, kéo thẻ đã cắm sang khe khác là chuyển chỗ.
+- Khi ba khe đã đầy, các thẻ còn lại khóa và có dòng nhắc "Ba khe đã đầy: bấm một khe để rút thẻ ra". L1 khởi đầu với hai thẻ sai (G4, G5) nên người chơi phải rút chúng ra trước, đúng bài học của level.
+- Bấm là cách vào cho mọi người (chạm, bàn phím, trình đọc màn hình); kéo-thả chỉ là lối tắt cho chuột.
+
 ## 3. Đề xuất của bản nháp đã bỏ
 
 | Đề xuất | Lý do bỏ |

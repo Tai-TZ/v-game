@@ -15,6 +15,7 @@ import {
 
 import { Blade } from "./Blade";
 import { MachineMap } from "./MachineMap";
+import { Prism } from "./Prism";
 import { Stamps } from "./Stamps";
 import { CitationLedger } from "./CitationLedger";
 import { packerSaw } from "./ledger";
@@ -31,10 +32,8 @@ import {
   paramNames,
   roundToStep,
   setAttached,
-  setCard,
   setParam,
   slotParams,
-  systemPrompt,
   type Bench,
   type Domain,
   type Env,
@@ -872,64 +871,6 @@ function Control({
       );
     }
   }
-}
-
-function Prism({
-  env,
-  bench,
-  onChange,
-}: {
-  env: Env;
-  bench: Bench;
-  onChange: (next: Bench) => void;
-}) {
-  const id = useId();
-  const cards = Object.entries(env.level.prompt_cards);
-  const length = systemPrompt(env.level, bench.cards).length;
-  return (
-    <fieldset data-param="system_prompt">
-      <legend className="text-sm font-medium">
-        Lăng kính · Dặn dò · <code className="font-mono text-xs">system_prompt</code>
-      </legend>
-      <div className="mt-2 space-y-3">
-        {([0, 1, 2] as const).map((slot) => {
-          const chosen = bench.cards[slot];
-          return (
-            <div key={slot}>
-              <label htmlFor={`${id}-${slot}`} className="text-sm">
-                Khe thẻ {slot + 1}
-              </label>
-              <select
-                id={`${id}-${slot}`}
-                value={chosen ?? ""}
-                onChange={(event) => onChange(setCard(bench, slot, event.target.value || null))}
-                className="mt-1 h-11 w-full rounded-sm border border-fg-muted bg-surface px-2 text-sm text-fg disabled:opacity-60"
-              >
-                <option value="">Trống</option>
-                {cards.map(([key, text]) => (
-                  <option
-                    key={key}
-                    value={key}
-                    disabled={chosen !== key && bench.cards.includes(key)}
-                  >
-                    {key} · {text}
-                  </option>
-                ))}
-              </select>
-              {chosen && (
-                <p className="mt-1 max-w-prose text-sm text-fg-muted">
-                  {env.level.prompt_cards[chosen]}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <p className="mt-3 text-sm text-fg-muted">
-        Dặn dò: {fmt(length)} ký tự, đi riêng ngoài thùng.
-      </p>
-    </fieldset>
-  );
 }
 
 // --- Run state of a slot (§7) ---------------------------------------------------------------

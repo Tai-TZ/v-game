@@ -84,9 +84,16 @@ test.describe("workbench", () => {
     await page.getByRole("button", { name: "Thùng Context: Chưa chạy" }).click();
     await page.getByRole("switch", { name: /Máy đóng tem/ }).check();
     await page.getByRole("button", { name: "Bộ Óc: Chưa chạy" }).click();
-    await page.getByLabel("Khe thẻ 1").selectOption("G1");
-    await page.getByLabel("Khe thẻ 2").selectOption("G2");
-    await page.getByLabel("Khe thẻ 3").selectOption("G3");
+    // The Lăng kính cards: the starter's two cards come out first (a full lens takes no more),
+    // then each press drops a card into the first empty slot.
+    for (const name of [/^Khe 1: thẻ/, /^Khe 2: thẻ/]) {
+      await page.getByRole("button", { name }).click();
+    }
+    const deck = page.getByRole("list", { name: "Thẻ dặn dò" });
+    for (const key of ["G1", "G2", "G3"]) {
+      await deck.getByRole("button", { name: new RegExp(`^${key}`) }).click();
+    }
+    await expect(page.getByRole("button", { name: /^Khe 3: thẻ G3/ })).toBeVisible();
     await page.getByRole("button", { name: "Mở ca" }).click();
 
     const results = page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" });
