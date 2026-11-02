@@ -12,14 +12,13 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 
 from vgame.api.engine import EngineServices, get_engine
-from vgame.api.routes.levels import LEVEL_NOT_FOUND
+from vgame.api.routes.levels import LEVEL_NOT_FOUND, load_open_level
 from vgame.api.routes.runs import GRAPH_INVALID, JSON_ONLY, read_capped
 from vgame.content.models import SLUG_PATTERN
 from vgame.engine.blocks import EngineDeps
 from vgame.engine.budget import RunBudget
 from vgame.engine.compiler import compile_graph
 from vgame.engine.index import IndexNotBuiltError, IndexStaleError
-from vgame.engine.levels import load_level
 from vgame.engine.retrieval import bm25_search, retrieved_fact, vector_search
 from vgame.engine.types import EngineError
 from vgame.engine.validator import validate
@@ -50,7 +49,7 @@ async def preview_retrieval(
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
         return JSONResponse({"detail": JSON_ONLY}, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
     try:
-        spec_level = load_level(level)
+        spec_level = load_open_level(level)
     except KeyError:
         return JSONResponse({"detail": LEVEL_NOT_FOUND}, status.HTTP_404_NOT_FOUND)
 

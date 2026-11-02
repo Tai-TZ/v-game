@@ -1,8 +1,13 @@
 """Validated graph -> static LangGraph StateGraph (engine-v0.2.md §7.3, E13).
 
-No guards, so no conditional edges: a static DAG with barrier fan-in, START -> input nodes and
-the single output -> END, so output runs exactly once per case. Ingestion blocks (corpus,
-chunker) become IndexHandles at compile time, never nodes.
+A static DAG with barrier fan-in, START -> input nodes and the single output -> END, so output
+runs exactly once per case. Ingestion blocks (corpus, chunker) become IndexHandles at compile
+time, tools and approval gates ToolHandles; neither is a node.
+
+Guards (Watchtower) stop a case without conditional edges: a guard writes ``halt``, every later
+node sees it and does nothing, and the output node answers with the guard's refusal. The graph
+keeps its shape, so a barrier still opens once and output still runs once (the Part 3 critic's
+"high" finding about guards before a fan-in, watchtower.md §4.3).
 """
 
 import asyncio
@@ -16,7 +21,15 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from vgame.engine.blocks import BlockCall, BlockParams, ChunkerParams, EngineDeps, StepResult
+from vgame.engine.blocks import (
+    BlockCall,
+    BlockParams,
+    ChunkerParams,
+    EngineDeps,
+    HumanApprovalParams,
+    StepResult,
+    ToolRefundParams,
+)
 from vgame.engine.constants import MAX_NODES
 from vgame.engine.graph import GraphPayload, split_ref
 from vgame.engine.levels import LevelSpec
@@ -33,6 +46,7 @@ from vgame.engine.types import (
     PublicCase,
     StepRecord,
     StepStatus,
+    ToolHandle,
     Usage,
 )
 
@@ -56,10 +70,16 @@ def merge_once(left: dict[str, PortValue], right: dict[str, PortValue]) -> dict[
     return {**left, **right}
 
 
+def first_halt(left: str | None, right: str | None) -> str | None:
+    """Two guards may stop a case in one superstep: the first refusal written stays."""
+    return left if left is not None else right
+
+
 class CaseState(TypedDict):
     case: PublicCase
     ports: Annotated[dict[str, PortValue], merge_once]  # "vs.docs" -> DocList
     answer: Answer | None  # written by the output node only (a plain key: two writes raise)
+    halt: Annotated[str | None, first_halt]  # a guard's refusal: the case stops there
 
 
 @dataclass
@@ -102,13 +122,18 @@ def instrumented(
     params: BlockParams,
     deps: EngineDeps,
     in_edges: list[InEdge],
-    handles: Mapping[str, IndexHandle],
+    handles: Mapping[str, IndexHandle | ToolHandle],
 ) -> NodeFn:
-    """A LangGraph node that always emits a step.started/step.finished pair, whatever happens."""
+    """A LangGraph node that always emits a step.started/step.finished pair, whatever happens --
+    except after a guard stopped the case: then a node does nothing and says nothing, and the
+    output node answers with the guard's refusal."""
 
     async def node(state: CaseState, config: RunnableConfig) -> dict[str, object]:
         ctx: CaseContext = config["configurable"]["case_ctx"]
         case = state["case"]
+        halt = state.get("halt")
+        if halt is not None and block != "output":
+            return {}
         ctx.emit(
             {
                 "type": "step.started",
@@ -124,10 +149,14 @@ def instrumented(
         message = ""
         try:
             inputs: dict[str, list[PortValue]] = {}
-            for src, src_port, port in in_edges:
-                value = handles[src] if src in handles else state["ports"][f"{src}.{src_port}"]
-                inputs.setdefault(port, []).append(value)
-            result = await params.run(BlockCall(node_id, case, inputs, deps))
+            if halt is not None:  # the output node of a stopped case
+                refusal = Answer(halt, (), "end", Usage(), replayed=False)
+                result = StepResult({}, "Trả lời bằng câu từ chối của cổng.", answer=refusal)
+            else:
+                for src, src_port, port in in_edges:
+                    value = handles[src] if src in handles else state["ports"][f"{src}.{src_port}"]
+                    inputs.setdefault(port, []).append(value)
+                result = await params.run(BlockCall(node_id, case, inputs, deps))
             status = result.status
         except asyncio.CancelledError:
             expired = asyncio.get_running_loop().time() + _CLOCK_RES >= ctx.deadline
@@ -169,6 +198,8 @@ def instrumented(
         }
         if result.answer is not None:
             update["answer"] = result.answer
+        if result.halt is not None:
+            update["halt"] = result.halt
         return update
 
     return node
@@ -204,16 +235,24 @@ def compile_graph(graph: GraphPayload, level: LevelSpec, deps: EngineDeps) -> Co
     ]
 
     handles: dict[str, IndexHandle] = {}
-    for n in order:
-        chunker = params[n]
-        if isinstance(chunker, ChunkerParams):
-            handles[n] = chunker.handle(level.corpus)
+    tools: dict[str, ToolHandle] = {}
+    for n in order:  # topological: a gate's tool is compiled before the gate
+        p = params[n]
+        if isinstance(p, ChunkerParams):
+            handles[n] = p.handle(level.corpus)
+        elif isinstance(p, ToolRefundParams):
+            tools[n] = p.handle()
+        elif isinstance(p, HumanApprovalParams):
+            tools[n] = p.wrap(tools[in_edges[n][0][0]])
+    compiled_values: dict[str, IndexHandle | ToolHandle] = {**handles, **tools}
     runtime = [n for n in order if REGISTRY[types[n]].runtime]
 
     builder = StateGraph(CaseState)
     for n in runtime:
-        builder.add_node(n, instrumented(n, types[n], params[n], deps, in_edges[n], handles))
-        sources = sorted({src for src, _, _ in in_edges[n] if src not in handles})
+        builder.add_node(
+            n, instrumented(n, types[n], params[n], deps, in_edges[n], compiled_values)
+        )
+        sources = sorted({src for src, _, _ in in_edges[n] if src not in compiled_values})
         if not sources:
             builder.add_edge(START, n)
         elif len(sources) == 1:

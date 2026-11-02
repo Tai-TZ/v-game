@@ -112,7 +112,11 @@ def expectations(*, real: bool) -> list[Any]:
 def test_every_level_file_is_shipped_and_loads() -> None:
     folder = resources.files("vgame.engine").joinpath("levels")
     names = sorted(f.name for f in folder.iterdir() if f.name.endswith(".json"))
-    assert names == sorted(f"{level_id}.json" for level_id in LEVEL_IDS)
+    # The Library levels run on the index; the Watchtower ones on the desk (test_watchtower.py).
+    watchtower = ["direct-injection"]
+    assert names == sorted(f"{level_id}.json" for level_id in [*LEVEL_IDS, *watchtower])
+    for level_id in watchtower:
+        assert load_level(level_id).zone == "watchtower"
 
 
 @pytest.mark.parametrize("level", LEVELS, ids=LEVEL_IDS)
