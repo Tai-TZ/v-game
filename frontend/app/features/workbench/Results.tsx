@@ -69,6 +69,8 @@ interface ResultsProps {
   onDebrief: (extras: { why?: number; next?: NextPick }) => void;
   onEdit: () => void;
   onFocusSlot: (type: BlockType, param?: string, phrase?: string | null) => void;
+  /** The hint ladder follows these results on the page: offer a way down to it. */
+  hintsBelow?: boolean;
   /** N16: opening a failing case's trace is a free look toward the next hint. */
   onLook?: () => void;
 }
@@ -98,6 +100,7 @@ export function Results({
   onEdit,
   onFocusSlot,
   onLook,
+  hintsBelow = false,
 }: ResultsProps) {
   const { level } = env;
   // §3.7: gold belongs to the sample cases. The server redacts the rest (runs.py), so this is
@@ -339,6 +342,22 @@ export function Results({
         </>
       )}
 
+      {/* What to do next sits right under the diagnosis that says why (plan v0.7 3.2): at the
+          foot of the page it came after every case and the history, 6.000-10.000 px down. */}
+      <div data-after-run-actions="" className="mt-8 flex flex-wrap gap-2">
+        <button type="button" onClick={onEdit} className={buttonClass("primary")}>
+          Chỉnh rồi chạy lại
+        </button>
+        {hintsBelow && (
+          <a href="#wb-hints" className={buttonClass("secondary")}>
+            Xem gợi ý
+          </a>
+        )}
+        <Link to={backTo} className={buttonClass("quiet")}>
+          {BACK_TO_LEVELS}
+        </Link>
+      </div>
+
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>
       <div className="mt-3 grid gap-3 lg:grid-cols-2 chieu:lg:grid-cols-1">
         {run.cases.map((c) => (
@@ -395,15 +414,6 @@ export function Results({
           whyIndex={whyIndex}
           onPick={onDebrief}
         />
-      </div>
-
-      <div className="mt-8 flex flex-wrap gap-2">
-        <button type="button" onClick={onEdit} className={buttonClass("primary")}>
-          Chỉnh rồi chạy lại
-        </button>
-        <Link to={backTo} className={buttonClass("quiet")}>
-          {BACK_TO_LEVELS}
-        </Link>
       </div>
     </section>
   );
