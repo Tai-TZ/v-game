@@ -122,3 +122,10 @@ describe("the W1 results read in Vietnamese", () => {
     expect(text).not.toContain("câu #1 (chị Thảo)");
   });
 });
+
+describe("the scale bill on a W1 result", () => {
+  it("is offered under the stars, from the run's own tokens", () => {
+    show(run([]));
+    expect(document.querySelector("[data-scale-bill]")).not.toBeNull();
+  });
+});
