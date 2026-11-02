@@ -52,6 +52,36 @@ function renderPage(data: ZonePageData, onRetry = vi.fn()) {
 afterEach(cleanup);
 
 describe("ZonePage", () => {
+  it("lists the warm-up micro lesson just before the level it prepares", () => {
+    renderPage({ kind: "open", zone: zone("watchtower") });
+    const items = [...document.querySelectorAll<HTMLElement>("ol > li")];
+    const warmup = items.findIndex((li) => li.dataset.warmupRow !== undefined);
+    const w1 = items.findIndex((li) => li.dataset.level === "direct-injection");
+    expect(warmup).toBeGreaterThanOrEqual(0);
+    expect(warmup).toBe(w1 - 1);
+    expect(
+      screen
+        .getByRole("link", { name: "Làm bài khởi động Thang rủi ro tool" })
+        .getAttribute("href"),
+    ).toBe("/play/watchtower/vi-mo/thang-rui-ro-tool");
+  });
+
+  it("draws a coming level apart from an open one", () => {
+    renderPage({ kind: "open", zone: zone("watchtower") });
+    const look = (id: string) =>
+      document.querySelector<HTMLElement>(`[data-level="${id}"]`)?.dataset.look;
+    expect(look("direct-injection")).toBe("open");
+    expect(look("poisoned-documents")).toBe("coming");
+    expect(document.querySelector('[data-level="poisoned-documents"]')?.className).toContain(
+      "border-dashed",
+    );
+  });
+
+  it("lists no warm-up in a zone without one", () => {
+    renderPage({ kind: "open", zone: zone("library") });
+    expect(document.querySelector("[data-warmup-row]")).toBeNull();
+  });
+
   it("opens the watchtower on W1 only: the levels still coming have no way in", () => {
     renderPage({ kind: "open", zone: zone("watchtower") });
 

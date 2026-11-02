@@ -1,3 +1,5 @@
+import { TOOL_RISK_LESSON } from "./registry";
+
 /**
  * Bài vi mô "Thang rủi ro tool" (research/lesson-visualization: Tháp, trước W1; course Day 4,
  * "thang rủi ro tool"). Eight jobs the support desk could hand its assistant, each placed in one
@@ -154,9 +156,6 @@ export function gradeLadder(picks: Readonly<Partial<Record<string, LaneId>>>): L
 
 /** The lesson's place: its route under the zone, and the level it warms up for. */
 export const TOOL_RISK = {
-  id: "thang-rui-ro-tool",
-  zone: "watchtower",
-  before: "direct-injection",
-  title: "Thang rủi ro tool",
+  ...TOOL_RISK_LESSON,
   lead: "Quầy hỗ trợ có thể giao tám việc cho trợ lý. Mỗi việc cần duyệt tới mức nào?",
 } as const;
