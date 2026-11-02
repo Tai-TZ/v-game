@@ -11,9 +11,10 @@ from vgame.config import Settings
 from vgame.engine.corpus import load_documents
 from vgame.engine.grading import GradingSpec, load_grading_spec
 from vgame.engine.index import IndexStore, golden_questions
+from vgame.engine.levels import library_level_ids
 from vgame.engine.types import Vectors
 
-LEVEL_IDS = ("grounded-citation", "chunk-tuning", "article-number-lookup")
+LEVEL_IDS = library_level_ids()
 CONTENT_DIR = Settings(_env_file=None).content_dir
 
 

@@ -126,6 +126,17 @@ class LevelSpec(_Strict):
         }
 
 
+def library_level_ids() -> tuple[str, ...]:
+    """The Library's open levels in play order, from zones.json (the one source of zone
+    content): what the static exporters and the retrieval test oracles cover."""
+    zone = load_catalog().find_zone("library")
+    if zone is None:
+        return ()
+    return tuple(
+        lv.id for lv in sorted(zone.levels, key=lambda lv: lv.order) if lv.status == "open"
+    )
+
+
 @cache
 def load_level(level_id: str) -> LevelSpec:
     """Raises KeyError for an unknown or malformed id (never touches paths built from it

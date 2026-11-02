@@ -30,11 +30,11 @@ from vgame.engine.constants import ALL_VARIANTS
 from vgame.engine.corpus import load_documents
 from vgame.engine.grading import load_grading_spec, public_cases
 from vgame.engine.index import IndexStore, golden_questions, rerank_questions
-from vgame.engine.levels import load_level
+from vgame.engine.levels import library_level_ids, load_level
 from vgame.engine.retrieval import vector_search
 from vgame.engine.types import IndexHandle
 
-LEVEL_IDS: Final = ("grounded-citation", "chunk-tuning", "article-number-lookup")
+LEVEL_IDS: Final = library_level_ids()
 OUT_DIR: Final = Path(__file__).resolve().parents[4] / "frontend" / "public" / "viz"
 
 #: Per file, uncompressed. The three levels land at 197-217 kB today (28-30 kB over the wire,

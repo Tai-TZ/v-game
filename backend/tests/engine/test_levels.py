@@ -55,3 +55,18 @@ def test_locked_nodes_must_exist_in_starter() -> None:
 def test_load_level_rejects_unknown_ids(level_id: str) -> None:
     with pytest.raises(KeyError):
         load_level(level_id)
+
+
+def test_library_level_ids_come_from_the_zone_catalog() -> None:
+    """The exporters (static viz, recorded runs) and the test oracles read this one list, so a
+    new Library level in zones.json is exported and tested without editing four files."""
+    from vgame.content.repository import load_catalog
+    from vgame.engine import recorded, static_viz
+    from vgame.engine.levels import library_level_ids
+
+    library = load_catalog().find_zone("library")
+    assert library is not None
+    expected = tuple(lv.id for lv in sorted(library.levels, key=lambda lv: lv.order))
+    assert library_level_ids() == expected
+    assert expected == static_viz.LEVEL_IDS
+    assert expected == recorded.LEVEL_IDS
