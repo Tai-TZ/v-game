@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import * as v from "valibot";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -77,6 +77,14 @@ describe("ZonePage", () => {
     );
   });
 
+  it("offers the session download on an open zone only", () => {
+    renderPage({ kind: "open", zone: zone("library") });
+    expect(document.querySelector("[data-session-export]")).not.toBeNull();
+    cleanup();
+    renderPage({ kind: "locked", zone: zone("market") });
+    expect(document.querySelector("[data-session-export]")).toBeNull();
+  });
+
   it("lists no warm-up in a zone without one", () => {
     renderPage({ kind: "open", zone: zone("library") });
     expect(document.querySelector("[data-warmup-row]")).toBeNull();
@@ -105,7 +113,11 @@ describe("ZonePage", () => {
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1, name: "Thư viện" })).toBeDefined();
-    const titles = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    const list = document.querySelector("ol");
+    if (!list) throw new Error("no level list");
+    const titles = within(list)
+      .getAllByRole("heading", { level: 2 })
+      .map((h) => h.textContent);
     expect(titles).toEqual(["Thôi bịa điều luật", "Lược dao chunk", "Hỏi bằng số điều"]);
     const enter = screen.getAllByRole("link", { name: /^Vào màn / });
     expect(enter.map((link) => link.getAttribute("href"))).toEqual([
