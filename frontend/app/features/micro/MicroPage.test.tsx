@@ -99,4 +99,14 @@ describe("the tool-risk micro lesson", () => {
       "/play/watchtower/direct-injection",
     );
   });
+
+  it("draws the four lanes as a scale, loosest to strictest, numbered", () => {
+    show();
+    const steps = [...row(CARDS[0]?.id ?? "").querySelectorAll<HTMLElement>("[data-step]")];
+    expect(steps.map((el) => el.dataset.step)).toEqual(["1", "2", "3", "4"]);
+    // The number is drawn but hidden from the radio's name, which stays the lane's label.
+    expect(steps.map((el) => el.textContent)).toEqual(LANES.map((l, i) => `${i + 1}${l.label}`));
+    // Each step fills as many marks as its number: order without relying on colour.
+    expect(steps.map((el) => el.querySelectorAll("[data-mark-on]").length)).toEqual([1, 2, 3, 4]);
+  });
 });
