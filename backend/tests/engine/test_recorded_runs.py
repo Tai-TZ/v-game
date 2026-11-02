@@ -16,9 +16,18 @@ from tests.engine.fakes_oracle import CONTENT_DIR, LEVEL_IDS, spec
 from vgame.config import SHIPPED_INDEX_DIR, Settings
 from vgame.engine.index import IndexStore
 from vgame.engine.levels import load_level
-from vgame.engine.recorded import OUT_DIR, RecordError, main, record_level, redact
+from vgame.engine.recorded import (
+    DESK_LEVEL_IDS,
+    OUT_DIR,
+    RecordError,
+    main,
+    record_desk_level,
+    record_level,
+    redact,
+)
 from vgame.engine.replay import ReplayStore
 from vgame.engine.types import CaseGrade
+from vgame.engine.watchtower import load_watch_spec
 
 # frontend-architecture §8.1: a hidden or trap case shows pass/fail per criterion, labels, role
 # (in run.started), the pack's total tokens and cite_unknown. Nothing else.
@@ -107,7 +116,7 @@ def test_hidden_and_trap_cases_carry_only_the_allowed_fields(level_id: str) -> N
 
 def test_committed_runs_are_what_the_export_writes_today(tmp_path: Path) -> None:
     assert main(["--out", str(tmp_path)]) == 0
-    for level_id in LEVEL_IDS:
+    for level_id in (*LEVEL_IDS, *DESK_LEVEL_IDS):
         fresh = json.loads((tmp_path / f"{level_id}.json").read_text("utf-8"))
         assert _without_ms(fresh) == _without_ms(_committed(level_id)), (
             f"{level_id}: rerun `uv run vgame-export-recorded-runs`"
@@ -164,3 +173,46 @@ def test_a_visible_case_keeps_every_fabricated_citation() -> None:
     # Visible cases publish the answer, the retrieved list and the pack: nothing to protect.
     out = _graded("c1", "visible", ("Điều 47", "Điều 74"))
     assert out[1]["cite_unknown"] == ["Điều 47", "Điều 74"]
+
+
+# --- The desk (Watchtower) ------------------------------------------------------------------
+
+
+def test_the_desk_levels_are_recorded() -> None:
+    assert "direct-injection" in DESK_LEVEL_IDS
+
+
+@pytest.mark.parametrize("level_id", DESK_LEVEL_IDS)
+def test_a_desk_run_hides_its_secret_cases_but_keeps_their_diagnosis(level_id: str) -> None:
+    run = _committed(level_id)
+    assert (run["level"], run["level_version"]) == (level_id, load_level(level_id).version)
+    assert run["corpus_sha256"] is None  # the desk reads no index
+    events = run["events"]
+    roles = {c["id"]: c["role"] for c in events[0]["cases"]}
+    secret = {case_id for case_id, role in roles.items() if role != "visible"}
+    labels: dict[str, list[str]] = {}
+    for event in events:
+        if event.get("case") in secret:
+            assert event["type"] == "case.graded", event
+            assert set(event) <= HIDDEN_CASE_KEYS, set(event) - HIDDEN_CASE_KEYS
+            labels[event["case"]] = event["labels"]
+    assert set(labels) == secret
+    for case in events[0]["cases"]:
+        assert ("question" in case) == (case["role"] == "visible")
+    # Every diagnosis line repeats a label the case already shows: nothing new leaves.
+    diagnosis = events[-1]["report"]["diagnosis"]
+    assert {d["case"] for d in diagnosis} & secret, "the lesson sits on the traps"
+    for line in diagnosis:
+        if line["case"] in secret:
+            assert line["flag"] in labels[line["case"]]
+    text = json.dumps(run, ensure_ascii=False)
+    for case in load_watch_spec(CONTENT_DIR, level_id).cases:
+        if case.role in ("hidden", "trap"):
+            assert case.question not in text
+
+
+def test_the_desk_export_refuses_any_call_the_seed_does_not_answer() -> None:
+    settings = Settings(_env_file=None)
+    models = [settings.gemini_model, *settings.gemini_fallback_models]
+    with pytest.raises(RecordError, match="seed"):
+        record_desk_level("direct-injection", ReplayStore(":memory:"), models, CONTENT_DIR)
