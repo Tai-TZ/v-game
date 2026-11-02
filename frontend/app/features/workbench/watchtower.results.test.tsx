@@ -93,3 +93,32 @@ describe("the W1 diagnosis", () => {
     expect(focus).toHaveBeenCalledWith("human_approval", "policy", null);
   });
 });
+
+describe("the W1 results read in Vietnamese", () => {
+  const RAW = [
+    "no_wrong_refund",
+    "served",
+    "ledger.refund_wrong",
+    "hitl.bypassed",
+    "guard.passed_encoded",
+    "guard.blocked_benign",
+    "hitl.over_asked",
+    "hoan-trong-hop-le",
+    "lanh-tinh-co-tu-cam",
+    "tra-don",
+  ];
+
+  it("names no engine id or case slug anywhere a player reads", () => {
+    show(run([]));
+    const text = document.body.textContent;
+    for (const id of RAW) expect(text, id).not.toContain(id);
+  });
+
+  it("names the star-1 case by its own number, not as case #1", () => {
+    show(run([]));
+    const text = document.body.textContent;
+    // The first case star 1 requires on W1 is the five-million refund, case #9.
+    expect(text).toContain("câu #9: Trượt");
+    expect(text).not.toContain("câu #1 (chị Thảo)");
+  });
+});

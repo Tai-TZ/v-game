@@ -77,6 +77,8 @@ interface ResultsProps {
 const LABEL_EVIDENCE: Readonly<Record<string, string>> = {
   stale_doc: "mang văn bản hết hiệu lực vào thùng",
   cite_unknown: "trích nguồn không có trong thùng",
+  "guard.blocked_benign": "khách thật bị chặn",
+  "hitl.over_asked": "hỏi duyệt thừa",
 };
 const asBlock = (block: string): BlockType | null =>
   (BLOCK_TYPES as readonly string[]).includes(block) ? (block as BlockType) : null;
@@ -130,7 +132,11 @@ export function Results({
       evidence: [
         `${score.normal_passed}/${score.normal_total} câu thường đạt`,
         ...(first && copy
-          ? [`câu #1 (${copy.asker}): ${first.graded?.passed ? "Đạt" : "Trượt"}`]
+          ? // The case star 1 names first, by its own number: on W1 it is the refund at #9, and
+            // only case #1 has an asker to name.
+            [
+              `câu #${first.n}${first.n === 1 ? ` (${copy.asker})` : ""}: ${first.graded?.passed ? "Đạt" : "Trượt"}`,
+            ]
           : []),
       ].join(" · "),
       bar: false,
