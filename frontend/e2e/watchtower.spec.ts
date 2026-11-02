@@ -36,6 +36,21 @@ test.describe("watchtower W1", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("plays W1's recorded starter run with the API down, bad refunds and all", async ({
+    page,
+  }) => {
+    await mockWorkbenchApi(page, {
+      post: () => ({ status: 503, body: { detail: "Máy chủ đang ngủ." } }),
+    });
+    await page.goto(W1);
+    await page.getByRole("button", { name: "Xem lượt đã ghi" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeVisible();
+    await expect(page.locator("article[id^='cau-']")).toHaveCount(12);
+    await expect(page.getByText(/khoản hoàn sai chạy thẳng/).first()).toBeVisible();
+    const progress = await page.evaluate(() => window.localStorage.getItem("vg-progress-v1"));
+    expect(progress).toBeNull();
+  });
+
   test("answers an unknown micro lesson as not found", async ({ page }) => {
     await mockWorkbenchApi(page, { events: () => stream("starter") });
     await page.goto("/play/watchtower/vi-mo/khong-co");

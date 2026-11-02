@@ -126,15 +126,19 @@ class LevelSpec(_Strict):
         }
 
 
-def library_level_ids() -> tuple[str, ...]:
-    """The Library's open levels in play order, from zones.json (the one source of zone
-    content): what the static exporters and the retrieval test oracles cover."""
-    zone = load_catalog().find_zone("library")
+def open_level_ids(zone_id: str) -> tuple[str, ...]:
+    """A zone's open levels in play order, from zones.json (the one source of zone content)."""
+    zone = load_catalog().find_zone(zone_id)
     if zone is None:
         return ()
     return tuple(
         lv.id for lv in sorted(zone.levels, key=lambda lv: lv.order) if lv.status == "open"
     )
+
+
+def library_level_ids() -> tuple[str, ...]:
+    """What the static exporters and the retrieval test oracles cover."""
+    return open_level_ids("library")
 
 
 @cache
