@@ -72,7 +72,8 @@ export function PageFrame({
                 Thoát chế độ chiếu
               </button>
             )}
-            <ThemeToggle />
+            {/* Icon only below `sm`: at 375 px the theme's name pushed "Về …" onto two lines. */}
+            <ThemeToggle compact />
           </div>
         </div>
         <p role="status" className="sr-only">

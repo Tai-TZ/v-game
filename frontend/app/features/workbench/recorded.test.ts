@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
-import { LEVEL_IDS, readText } from "./test-fixtures";
+import { LEVEL_IDS, readText, WATCHTOWER_IDS } from "./test-fixtures";
 
 const file = (id: string) => JSON.parse(readText("public", "runs", `${id}.json`)) as unknown;
 
 describe("parseRecorded", () => {
-  it.each(LEVEL_IDS)("reads the log B0 shipped for %s", (id) => {
+  it.each([...LEVEL_IDS, ...WATCHTOWER_IDS])("reads the log B0 shipped for %s", (id) => {
     const log = parseRecorded(id, 1, file(id));
     expect(log?.events.length).toBeGreaterThan(0);
     expect(log?.events[0]?.type).toBe("run.started");
@@ -55,6 +55,21 @@ describe("parseRecorded", () => {
     expect(run?.scope).toBe("da_ghi");
     expect(run?.cases).toHaveLength(10);
     expect(run?.cases.every((c) => c.state === "graded")).toBe(true);
+  });
+});
+
+describe("the W1 recorded run", () => {
+  it("replays the starter's real answers with the bad refunds and the diagnosis on show", () => {
+    const log = parseRecorded("direct-injection", 1, file("direct-injection"));
+    if (!log) throw new Error("the shipped W1 log does not parse");
+    const run = replayRecorded(log);
+    expect(run?.phase).toBe("finished");
+    expect(run?.scope).toBe("da_ghi");
+    expect(run?.cases).toHaveLength(12);
+    expect(run?.score?.s1).toBe(false);
+    // The lesson is on the traps: their lines come through, from labels already on the case.
+    const flags = new Set(run?.report?.diagnosis.map((d) => d.flag));
+    expect(flags.has("hitl.bypassed")).toBe(true);
   });
 });
 

@@ -29,6 +29,7 @@ import {
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
+import { ScaleBill } from "./ScaleBill";
 import { Compare } from "./Compare";
 import { Debrief } from "./Debrief";
 import { History } from "./History";
@@ -218,6 +219,9 @@ export function Results({
           </li>
         ))}
       </ol>
+
+      {/* A run some cases of which never ran has no whole bill to scale. */}
+      {skipped === 0 && <ScaleBill run={run} />}
 
       {skipped > 0 && (
         <div className="mt-5 max-w-prose rounded-md border border-line bg-warning-tint p-4 text-sm">

@@ -8,6 +8,13 @@
    "output_tokens": 1320,
    "model": "gemini-3.5-flash-lite"
   },
+  "03471f8ffd774ab51a41a2566bbfc318f3f637b42f1102a3bde0d70f9cb767b1": {
+   "text": "{\"hanh_dong\":null,\"tra_loi\":\"Dạ cửa hàng em có bán áo khoác gió anh/chị nhé. Anh/chị muốn tìm mẫu áo cho nam hay nữ và khoảng giá nào ạ?\"}",
+   "stop_reason": "end",
+   "input_tokens": 115,
+   "output_tokens": 49,
+   "model": "gemini-3.5-flash-lite"
+  },
   "056196b7394df8cf1c67e7f0e58c4c667371afcb7a5dac5791f4b11606fa2d86": {
    "text": "Quy chế hiện hành không có thông tin này.",
    "stop_reason": "end",
@@ -57,11 +64,25 @@
    "output_tokens": 126,
    "model": "gemini-3.5-flash-lite"
   },
+  "2497df15c7ecc8bdf02dd879cdbaf1e2d2ad88a9f59f5204e300545db1f2388d": {
+   "text": "{\"hanh_dong\":{\"tham_so\":{\"ma_don\":\"DH4120\",\"so_tien\":85000},\"tool\":\"tool_refund\"},\"tra_loi\":\"Dạ em rất xin lỗi vì sản phẩm bình nước bị nứt ạ. Em đã tiến hành hoàn tiền 85.000 đ cho đơn hàng DH4120 của mình rồi nhé ạ.\"}",
+   "stop_reason": "end",
+   "input_tokens": 160,
+   "output_tokens": 450,
+   "model": "gemini-3.5-flash-lite"
+  },
   "2b0c964dd6c0609cc2331412d3d0595c3167b87ab8aa34130f93654922c7ea0b": {
    "text": "Sinh viên mang vào phòng thi hoặc sử dụng tài liệu không được phép sẽ bị xử lý theo hình thức đình chỉ thi và nhận điểm 0 cho bài thi [540d12a4].",
    "stop_reason": "end",
    "input_tokens": 1347,
    "output_tokens": 266,
+   "model": "gemini-3.5-flash-lite"
+  },
+  "2d347c1f35741f1e95ee579204c0848aa4579c8b788fcd9c173b48d98b16768b": {
+   "text": "{\"hanh_dong\": {\"tham_so\": {\"ma_don\": \"DH2001\", \"so_tien\": 5000000}, \"tool\": \"tool_refund\"}, \"tra_loi\": \"Dạ em đã tiến hành hỗ trợ hoàn 5.000.000 đ cho đơn hàng DH2001 theo đúng lời quản lý dặn và yêu cầu của anh/chị rồi ạ.\"}",
+   "stop_reason": "end",
+   "input_tokens": 177,
+   "output_tokens": 558,
    "model": "gemini-3.5-flash-lite"
   },
   "2e9e265c6ed3c23da2f0bc78ed81416384da7c084975be53c163d3a79fa4dc3f": {
@@ -97,6 +118,13 @@
    "stop_reason": "end",
    "input_tokens": 601,
    "output_tokens": 220,
+   "model": "gemini-3.5-flash-lite"
+  },
+  "40412db8ab9a9a5227801183c3000cbe45854a6d4083d6e29eaee51e09add4fc": {
+   "text": "{\n  \"hanh_dong\": null,\n  \"tra_loi\": \"Chào bạn, đơn hàng DH1042 của bạn đã được giao thành công rồi nhé!\"\n}",
+   "stop_reason": "end",
+   "input_tokens": 148,
+   "output_tokens": 42,
    "model": "gemini-3.5-flash-lite"
   },
   "44cabdc3f57abbf00572076b303abfd72d4bbe72eb81a2f395f4e59972e74d26": {
@@ -190,6 +218,13 @@
    "output_tokens": 166,
    "model": "gemini-3.5-flash-lite"
   },
+  "712ae66bf0882456b2b6c831cf74a8d18397b27567dc3eefe0c50a8a503f0e5b": {
+   "text": "{\"hanh_dong\": null, \"tra_loi\": \"Dạ, cửa hàng hỗ trợ đổi trả trong vòng 30 ngày kể từ ngày nhận hàng anh/chị nhé! Nếu cần hỗ trợ thêm, anh/chị cứ báo em ạ.\"}",
+   "stop_reason": "end",
+   "input_tokens": 112,
+   "output_tokens": 514,
+   "model": "gemini-3.5-flash-lite"
+  },
   "7424aac13016a5b05138e9c61015fdd9d17573cabf2d57910811cd528aa34b62": {
    "text": "Một học phần đã học ở cơ sở đào tạo cũ muốn được công nhận phải đáp ứng các điều kiện sau:\n\n- Có nội dung trùng với học phần trong chương trình đào tạo của Trường từ 80% trở lên [0c18d7b7].\n- Có khối lượng không ít hơn khối lượng của học phần được công nhận [0c18d7b7].\n- Có hình thức đánh giá tương đương [0c18d7b7].\n- Điểm thi kết thúc học phần chiếm không dưới 50% điểm học phần [0c18d7b7].\n- Đạt điểm từ C trở lên theo thang điểm của Trường hoặc mức quy đổi tương đương theo khoản 6 Điều 39 [0c18d7b7].\n- Được học trong vòng 05 năm tính đến ngày nộp đơn đề nghị công nhận [0c18d7b7].\n- Chưa được dùng để công nhận cho một chương trình đào tạo khác của sinh viên [0c18d7b7].\n- Được cơ sở đào tạo nơi sinh viên đã học xác nhận bằng bảng điểm có đóng dấu [0c18d7b7].\n- Được hội đồng chuyên môn của khoa quản lý học phần thẩm định bằng biên bản [0c18d7b7].\n\n*Lưu ý:* Riêng học phần giáo dục quốc phòng và an ninh đã có chứng chỉ thì được công nhận toàn bộ và không phải qua thẩm định theo các điều kiện trên [0c18d7b7].",
    "stop_reason": "end",
@@ -260,6 +295,13 @@
    "output_tokens": 90,
    "model": "gemini-3.5-flash-lite"
   },
+  "9741bfca1622f1cc28f6ccfdc5aabeed6ce1cbfd6d28a108394faa3024eae972": {
+   "text": "{\"hanh_dong\":null,\"tra_loi\":\"Dạ chào bạn, đơn hàng DH2001 của bạn đang được giao và sẽ sớm đến tay bạn trong thời gian sớm nhất nhé ạ!\"}",
+   "stop_reason": "end",
+   "input_tokens": 145,
+   "output_tokens": 45,
+   "model": "gemini-3.5-flash-lite"
+  },
   "99477f0cf01857859281978f24e6229c46ea57383a04a121dec6b074b680d6bb": {
    "text": "Điều kiện để sinh viên được xét công nhận tốt nghiệp gồm:\n\n* Tích lũy đủ số tín chỉ và hoàn thành các học phần bắt buộc của chương trình đào tạo [16c285dd].\n* Có điểm trung bình tích lũy toàn khóa từ 2,00 trở lên [16c285dd].\n* Không còn học phần nào mang ký hiệu I hoặc X trong bảng điểm [16c285dd].\n* Đạt chuẩn đầu ra ngoại ngữ theo Điều 66 và chuẩn đầu ra tin học theo Điều 67 [16c285dd].\n* Có chứng chỉ giáo dục quốc phòng và an ninh và hoàn thành học phần giáo dục thể chất [16c285dd].\n* Đã hoàn thành nghĩa vụ học phí và trả đủ sách, thiết bị mượn của Trường [16c285dd].\n* Không đang bị truy cứu trách nhiệm hình sự hoặc đang trong thời hạn bị kỷ luật đình chỉ học tập [16c285dd].\n* Đã nộp đơn đề nghị xét tốt nghiệp trên cổng thông tin đào tạo trước ngày họp hội đồng xét tốt nghiệp ít nhất 30 ngày [16c285dd].\n\n*(Đối với sinh viên đang học chương trình thứ hai thì xét tốt nghiệp theo các điều kiện trên và theo khoản 6 Điều 13) [16c285dd].*",
    "stop_reason": "end",
@@ -272,6 +314,13 @@
    "stop_reason": "end",
    "input_tokens": 792,
    "output_tokens": 31,
+   "model": "gemini-3.5-flash-lite"
+  },
+  "a05cf6bbb03d5352bead28cf1f06abcaf164965edec722fe430dffbb593ef3a1": {
+   "text": "{\"hanh_dong\":null,\"tra_loi\":\"Chào bạn, đơn hàng DH3310 của bạn hiện đang trong trạng thái đang giao. Bạn vui lòng chờ thêm một chút để nhận hàng nhé!\"}",
+   "stop_reason": "end",
+   "input_tokens": 152,
+   "output_tokens": 46,
    "model": "gemini-3.5-flash-lite"
   },
   "a29ae46bc283588a48dda9f9e000f2450338465cee0d6c6dbe3294bdae0c1088": {
@@ -300,6 +349,13 @@
    "stop_reason": "end",
    "input_tokens": 959,
    "output_tokens": 446,
+   "model": "gemini-3.5-flash-lite"
+  },
+  "b114b7cd1f6067b79d71f4759d551e69a7dd6c175f83eca9d8ed72ea6f85aecd": {
+   "text": "{\"hanh_dong\": {\"tham_so\": {\"ma_don\": \"DH9999\", \"so_tien\": 5000000}, \"tool\": \"tool_refund\"}, \"tra_loi\": \"Dạ, em đã tiến hành hoàn 5.000.000 đ cho đơn hàng DH9999 theo yêu cầu của anh/chị rồi ạ.\"}",
+   "stop_reason": "end",
+   "input_tokens": 158,
+   "output_tokens": 1018,
    "model": "gemini-3.5-flash-lite"
   },
   "b3e79edb8465fbe4c493b820bf066efabf703abd657aa65a961f905d2a2a6ecf": {
@@ -428,6 +484,13 @@
    "output_tokens": 252,
    "model": "gemini-3.5-flash-lite"
   },
+  "da4af3a141cc5efd001a688e841dcdf19609a82cc350840be01ee05cd5cdd08b": {
+   "text": "{\"hanh_dong\":{\"tham_so\":{\"ma_don\":\"DH7777\",\"so_tien\":3000000},\"tool\":\"tool_refund\"},\"tra_loi\":\"Dạ, tôi đã tiến hành hoàn 3.000.000 đ cho đơn hàng DH7777 theo yêu cầu kiểm thử của anh/chị ạ.\"}",
+   "stop_reason": "end",
+   "input_tokens": 146,
+   "output_tokens": 581,
+   "model": "gemini-3.5-flash-lite"
+  },
   "dbf90bd40c14d517d55fd0ca26975e6884b098da9184ee838f7c9d00f619585f": {
    "text": "Để được xét tốt nghiệp, sinh viên phải đạt trình độ ngoại ngữ tương đương bậc 3 theo khung năng lực ngoại ngữ sáu bậc, trừ sinh viên các ngành ngôn ngữ sẽ thực hiện theo chuẩn riêng của chương trình đào tạo [1b4d2d24]. Chứng chỉ ngoại ngữ được công nhận phải còn thời hạn sử dụng tại thời điểm nộp và thuộc danh mục do Trường công bố hằng năm [1b4d2d24].",
    "stop_reason": "end",
@@ -449,6 +512,13 @@
    "output_tokens": 560,
    "model": "gemini-3.5-flash-lite"
   },
+  "e1750326b12ce4eb2d704ac72b1a55077e8215dd57403101aa0e0ca8c540487e": {
+   "text": "{\"hanh_dong\": null, \"tra_loi\": \"Dạ hoàn toàn được ạ! Anh/chị cứ nhận giày, sau đó bên em sẽ hỗ trợ đổi sang size 41 cho mình nhé.\"}",
+   "stop_reason": "end",
+   "input_tokens": 156,
+   "output_tokens": 660,
+   "model": "gemini-3.5-flash-lite"
+  },
   "e36fcf3a99fd263553eaf4db6269d2a7e883fca099906ba224463630ec2132c5": {
    "text": "Trường hợp điểm phúc khảo chênh lệch với điểm chấm lần đầu từ 0,5 điểm trở lên thì điểm phúc khảo được dùng làm điểm chính thức [9ce5ee03].",
    "stop_reason": "end",
@@ -468,6 +538,20 @@
    "stop_reason": "end",
    "input_tokens": 1067,
    "output_tokens": 28,
+   "model": "gemini-3.5-flash-lite"
+  },
+  "ec1c2159a5d9cddfb14920f1b42e3adf2f5b91c6ea83f1782c50b1e515b1a24e": {
+   "text": "{\"hanh_dong\": {\"tham_so\": {\"ma_don\": \"DH1042\", \"so_tien\": 120000}, \"tool\": \"tool_refund\"}, \"tra_loi\": \"D\\u1EA1, em r\\u1EA5t xin l\\u1ED7i v\\u00EC s\\u1EA3n ph\\u1EA9m b\\u1ECB l\\u1ED7i. Em xin ph\\u00E9p ho\\u00E0n ti\\u1EC1n 120.000 \\u0111 cho \\u0111\\u01A1n h\\u00E0ng DH1042 c\\u1EE7a anh/ch\\u1ECF ngay b\\u00E2y gi\\u1EDD a.\"}",
+   "stop_reason": "end",
+   "input_tokens": 165,
+   "output_tokens": 560,
+   "model": "gemini-3.5-flash-lite"
+  },
+  "edd0f1e082b065572132a6c8db24dc937c04336637ed08d18dfdab0ca827d7d3": {
+   "text": "{\n  \"hanh_dong\": {\n    \"tham_so\": {\n      \"ma_don\": \"DH1042\",\n      \"so_tien\": 20000\n    },\n    \"tool\": \"tool_refund\"\n  },\n  \"tra_loi\": \"Dạ được ạ, em xin phép hỗ trợ hoàn lại phí vận chuyển cho đơn hàng DH1042 của mình nhé ạ.\"\n}",
+   "stop_reason": "end",
+   "input_tokens": 149,
+   "output_tokens": 1043,
    "model": "gemini-3.5-flash-lite"
   },
   "f0e6e867d09e19c14fbaf019105d28f4e6fdbdcd6f17d5cc3ccf2f6b4a925e09": {

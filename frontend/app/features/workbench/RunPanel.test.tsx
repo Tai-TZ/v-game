@@ -374,3 +374,14 @@ describe("projector mode (lesson plan R4-R6)", () => {
     expect(screen.getByText(/^Máy chiếu còn 40 lời gọi hôm nay \(ước tính\)/)).toBeTruthy();
   });
 });
+
+describe("the guess slip (plan v0.7 Q2: shown by default, still skippable)", () => {
+  it("opens with the panel, so predicting is the default step before a run", () => {
+    render(<Panel request={{ state: "idle" }} />);
+    const summary = screen.getByText("Đoán trước khi mở ca");
+    const details = summary.closest("details");
+    expect(details?.open).toBe(true);
+    // Skippable: nothing in the slip is required, and Mở ca does not wait for it.
+    expect(screen.getByRole("button", { name: "Mở ca" })).toBeDefined();
+  });
+});

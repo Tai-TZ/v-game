@@ -142,3 +142,10 @@ describe("what to do next sits right under the diagnosis (plan v0.7 3.2)", () =>
     expect(screen.queryByRole("link", { name: "Xem gợi ý" })).toBeNull();
   });
 });
+
+describe("the scale bill on a W1 result", () => {
+  it("is offered under the stars, from the run's own tokens", () => {
+    show(run([]));
+    expect(document.querySelector("[data-scale-bill]")).not.toBeNull();
+  });
+});
