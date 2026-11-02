@@ -10,6 +10,7 @@ V-Game là game web giáo dục cho chương trình AI 20K. Người chơi lắp
 | [design/roadmap-v0.4.md](design/roadmap-v0.4.md) | Lộ trình v0.4: quyết định 2026-10-08, 28 xung đột đã gỡ, trạng thái N1–N25 (và T, D), kế hoạch đợt B cho bàn thợ | Đã duyệt 2026-10-08; thứ tự xây ở X24 và X26–X28 chốt tạm (Q9) |
 | [design/part-3-block-system.md](design/part-3-block-system.md) | Phần 3: hệ khối, validation, biên dịch LangGraph, sandbox, instrumentation; kèm vấn đề của agent phản biện | Thiết kế; engine v0.2 đã hiện thực phần Thư viện |
 | [design/interactive-levels-v0.6.md](design/interactive-levels-v0.6.md) | Đề xuất màn mới lấp chỗ trống khoá học (Ngày 1, 4), chế độ Hai bàn song song, đồ họa mang thông tin thật; ICAP đặt lên V-Game | Đề xuất 2026-11-02, chưa duyệt |
+| [design/upgrade-plan-v0.7.md](design/upgrade-plan-v0.7.md) | Kế hoạch nâng cấp tổng hợp 6 hướng nghiên cứu: bằng chứng mới, đợt sửa nhanh, sẵn sàng pilot, bước "đoán và giải thích", giao diện theo ảnh chụp, đường tới W2; 5 quyết định | Đề xuất 2026-11-02, chưa duyệt |
 | [design/gameplay-direction.md](design/gameplay-direction.md) | Hướng gameplay "Xưởng Đồ Chơi Trực Ca" | Đề xuất, chờ chủ dự án duyệt; build brief dùng phần trình bày |
 | [design/build-brief-v0.1.md](design/build-brief-v0.1.md) | Brief lát cắt dọc Thư viện: quyết định D1–D7, neo nội dung, ngân sách, nghiệm thu | Đang dùng |
 | [design/engine-v0.2.md](design/engine-v0.2.md) | Engine khu Thư viện: model Gemini và chuỗi dự phòng, chỉ mục, chấm, SSE, `DailyCap`, replay cache | Đã xây |
