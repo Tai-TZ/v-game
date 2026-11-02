@@ -57,6 +57,8 @@ const SlipSchema = v.object({
   passed: v.nullable(Count),
   failing: v.array(Count),
   bets: v.record(v.string(), v.object({ pass: v.boolean(), confidence: v.picklist(CONFIDENCE) })),
+  // Optional: drafts written before the levels had questions of their own have none.
+  asks: v.optional(v.record(v.string(), Count)),
 });
 
 /** The draft slip of a level, or an empty one when there is none or it cannot be read. */
@@ -64,7 +66,9 @@ export function loadSlip(levelId: string): Slip {
   try {
     const raw = window.localStorage.getItem(slipKey(levelId));
     const parsed = raw === null ? null : v.safeParse(SlipSchema, JSON.parse(raw));
-    return parsed?.success ? parsed.output : EMPTY_SLIP;
+    if (!parsed?.success) return EMPTY_SLIP;
+    const { asks, ...rest } = parsed.output;
+    return asks === undefined ? rest : { ...rest, asks };
   } catch {
     return EMPTY_SLIP;
   }

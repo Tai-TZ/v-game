@@ -8,6 +8,7 @@ import { domain, nodeIds, sameJson, type Env } from "./bench";
 import { Bar, Grade, hasControls, rich } from "./BenchView";
 import {
   BACK_TO_LEVELS,
+  blockedPhrase,
   diagnosisTarget,
   FLAG_VI,
   fmt,
@@ -67,7 +68,7 @@ interface ResultsProps {
   /** Persists the debrief's picks (N20) onto the run just recorded. */
   onDebrief: (extras: { why?: number; next?: NextPick }) => void;
   onEdit: () => void;
-  onFocusSlot: (type: BlockType, param?: string) => void;
+  onFocusSlot: (type: BlockType, param?: string, phrase?: string | null) => void;
   /** N16: opening a failing case's trace is a free look toward the next hint. */
   onLook?: () => void;
 }
@@ -232,7 +233,7 @@ export function Results({
           : `Lượt này gọi AI thật ${calls.real} lần${calls.replayed > 0 ? `, ${calls.replayed} câu lấy kết quả đã lưu` : ""}.`}
       </p>
 
-      {slip && <SlipResult slip={slip} run={run} />}
+      {slip && <SlipResult slip={slip} run={run} levelId={level.id} />}
 
       <h3 id="wb-diagnosis-title" tabIndex={-1} className="mt-8 text-lg font-bold">
         {copy ? npcOf(copy).name : "Cô Lan"} chẩn đoán
@@ -274,6 +275,9 @@ export function Results({
                 return c ? [c] : [];
               });
               const target = diagnosisTarget(env, group, revealed, runGraph);
+              // The blocked customer's lesson opens the very phrase that stopped them.
+              const phrase =
+                group.flag === "guard.blocked_benign" && first ? blockedPhrase(first) : null;
               const showSlot = target !== null && hasControls(env, target.slot);
               const attached = graph.nodes.some((node) => node.type === target?.slot);
               return (
@@ -310,12 +314,14 @@ export function Results({
                       {showSlot && (
                         <button
                           type="button"
-                          onClick={() => onFocusSlot(target.slot, target.param)}
+                          onClick={() => onFocusSlot(target.slot, target.param, phrase)}
                           className={buttonClass("inline")}
                         >
-                          {attached
-                            ? `Xem ở ${knobName(target.slot, target.param)}`
-                            : `Thử gắn ${TOY[target.slot].name}`}
+                          {phrase
+                            ? `Xem cụm «${phrase}»`
+                            : attached
+                              ? `Xem ở ${knobName(target.slot, target.param)}`
+                              : `Thử gắn ${TOY[target.slot].name}`}
                         </button>
                       )}
                     </div>

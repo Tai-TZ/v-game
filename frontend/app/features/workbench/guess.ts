@@ -21,12 +21,70 @@ export interface Slip {
   failing: readonly number[];
   /** Bets on the sample cases, by case id. */
   bets: Readonly<Record<string, Bet>>;
+  /** The level's own questions (`ASKS`): the index of the option picked, by question id. */
+  asks?: Readonly<Record<string, number>>;
 }
 
 export const EMPTY_SLIP: Slip = { passed: null, failing: [], bets: {} };
 
 export const isEmptySlip = (slip: Slip) =>
-  slip.passed === null && slip.failing.length === 0 && Object.keys(slip.bets).length === 0;
+  slip.passed === null &&
+  slip.failing.length === 0 &&
+  Object.keys(slip.bets).length === 0 &&
+  Object.keys(slip.asks ?? {}).length === 0;
+
+/** A question only one level asks, answered from the facts its run already streamed. */
+export interface Ask {
+  id: string;
+  legend: string;
+  /** A closed set; the option at the true index is the answer. */
+  options: readonly string[];
+}
+
+/**
+ * Watchtower W1's two questions (watchtower.md §3.6). The attacks are `rules.s1_required` of
+ * direct-injection.json (a test keeps the two in step).
+ */
+export const W1_ATTACKS: readonly string[] = ["wt-w1-t01", "wt-w1-t02", "wt-w1-t03"];
+
+export const ASKS: Readonly<Record<string, readonly Ask[]>> = {
+  "direct-injection": [
+    {
+      id: "net_catches",
+      legend: "Lưới chặn được mấy đòn trên 3?",
+      options: ["0", "1", "2", "3"],
+    },
+    {
+      id: "blocks_customer",
+      legend: "Có khách thật nào bị chặn nhầm không?",
+      options: ["Không", "Có"],
+    },
+  ],
+};
+
+const guards = (c: CaseView) =>
+  Object.values(c.steps)
+    .flatMap((step) => step.facts ?? [])
+    .filter((f) => f.kind === "guard");
+
+/**
+ * The index of the true option for `id`, or null before the run is finished (or for a question
+ * this level does not ask). Graded on the client from the run's own facts: no new AI call.
+ */
+export function askGrade(levelId: string, id: string, run: RunView): number | null {
+  if (run.phase !== "finished" || !ASKS[levelId]?.some((ask) => ask.id === id)) return null;
+  if (id === "net_catches") {
+    return run.cases.filter(
+      (c) =>
+        W1_ATTACKS.includes(c.id) &&
+        guards(c).some((f) => f.by === "pattern" && f.decision === "block"),
+    ).length;
+  }
+  if (id === "blocks_customer") {
+    return run.cases.some((c) => c.graded?.labels.includes("guard.blocked_benign")) ? 1 : 0;
+  }
+  return null;
+}
 
 export interface Prediction {
   c: CaseView;
@@ -43,11 +101,13 @@ export interface SlipGrade {
   predictions: Prediction[];
   /** "Bất ngờ": a sure bet that was wrong (N19). */
   surprises: Prediction[];
+  /** The level's own questions the player answered, with the truth. */
+  asks: { ask: Ask; guess: number; actual: number }[];
   /** Cases the server did not finish (AI overloaded, daily cap): left out of the grade. */
   unfinished: number;
 }
 
-export function gradeSlip(slip: Slip, run: RunView): SlipGrade | null {
+export function gradeSlip(slip: Slip, run: RunView, levelId?: string): SlipGrade | null {
   if (run.phase !== "finished") return null;
   const skipped = new Set(unfinished(run).map((c) => c.id));
   const predictions: Prediction[] = [];
@@ -76,6 +136,11 @@ export function gradeSlip(slip: Slip, run: RunView): SlipGrade | null {
     count: slip.passed === null ? null : { guess: slip.passed, actual, total: graded.length },
     predictions,
     surprises: predictions.filter((p) => p.confidence === "high" && !p.right),
+    asks: (levelId ? (ASKS[levelId] ?? []) : []).flatMap((ask) => {
+      const guess = slip.asks?.[ask.id];
+      const actual = askGrade(levelId ?? "", ask.id, run);
+      return guess === undefined || actual === null ? [] : [{ ask, guess, actual }];
+    }),
     unfinished: skipped.size,
   };
 }

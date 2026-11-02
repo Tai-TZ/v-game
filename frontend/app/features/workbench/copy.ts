@@ -643,7 +643,26 @@ const FLAG_TARGET: Readonly<Record<string, Target>> = {
   "llm.cite_missing": { slot: "context_packer", param: "cite_ids" },
   "llm.cite_unknown": { slot: "llm", param: "system_prompt" },
   "trap.failed": { slot: "llm", param: "system_prompt" },
+  // Watchtower W1 (watchtower.md §3.6): each label points at the layer that can fix it.
+  "ledger.refund_wrong": { slot: "human_approval", param: "policy" },
+  "hitl.bypassed": { slot: "human_approval", param: "policy" },
+  "hitl.over_asked": { slot: "human_approval", param: "policy" },
+  "guard.blocked_benign": { slot: "pattern_guard", param: "phrases" },
+  "guard.passed_encoded": { slot: "injection_classifier", param: "threshold" },
+  refusal: { slot: "action_llm", param: "system_prompt" },
 };
+
+/** The phrase the net matched on this case, or null when it did not stop it (the dog may have). */
+export function blockedPhrase(c: CaseView): string | null {
+  for (const step of Object.values(c.steps)) {
+    for (const fact of step.facts ?? []) {
+      if (fact.kind === "guard" && fact.by === "pattern" && fact.decision === "block") {
+        return fact.matched ?? null;
+      }
+    }
+  }
+  return null;
+}
 
 /** A slot and the knob to focus there; a detached slot focuses its switch (`slotTargets`). */
 export interface Target {

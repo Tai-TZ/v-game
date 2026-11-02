@@ -827,9 +827,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
     }
   }
 
-  function focusSlot(type: BlockType, param?: string) {
+  function focusSlot(type: BlockType, param?: string, phrase?: string | null) {
     setHighlight(type);
-    focusLater(slotTargets(env, type, param));
+    focusLater(slotTargets(env, type, param, phrase));
   }
 
   const live = masked ? "" : liveMessage(run, followedCase?.id ?? null);
