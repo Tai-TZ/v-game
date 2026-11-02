@@ -7,6 +7,7 @@ import type { Env } from "./bench";
 import { CHIP } from "./BenchView";
 import { CONFIDENCE_VI, evidenceText, type WhyMenu as Menu } from "./copy";
 import {
+  ASKS,
   CONFIDENCE,
   EMPTY_SLIP,
   gradeSlip,
@@ -95,6 +96,24 @@ export function GuessSlip({
           ))}
         </div>
       </fieldset>
+
+      {(ASKS[level.id] ?? []).map((ask) => (
+        <fieldset key={ask.id} data-ask={ask.id}>
+          <legend className="text-sm font-medium">{ask.legend}</legend>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {ask.options.map((option, index) => (
+              <Chip
+                key={option}
+                name={`${id}-${ask.id}`}
+                checked={slip.asks?.[ask.id] === index}
+                onChange={() => onChange({ ...slip, asks: { ...slip.asks, [ask.id]: index } })}
+              >
+                {option}
+              </Chip>
+            ))}
+          </div>
+        </fieldset>
+      ))}
 
       {samples.map((sample, index) => {
         const n = index + 1;
@@ -189,10 +208,10 @@ const CaseLink = ({ c }: { c: CaseView }) => (
 );
 
 /** The slip graded against case.graded, after run.finished: hits, misses, surprises (B1). */
-export function SlipResult({ slip, run }: { slip: Slip; run: RunView }) {
-  const grade = gradeSlip(slip, run);
+export function SlipResult({ slip, run, levelId }: { slip: Slip; run: RunView; levelId: string }) {
+  const grade = gradeSlip(slip, run, levelId);
   if (!grade) return null;
-  const { count, predictions, surprises } = grade;
+  const { count, predictions, surprises, asks } = grade;
   // Correct "will pass" calls are the bulk and carry no lesson: count them, list the rest.
   const listed = predictions.filter((p) => !p.right || !p.pass);
   const right = predictions.filter((p) => p.right).length;
@@ -209,6 +228,17 @@ export function SlipResult({ slip, run }: { slip: Slip; run: RunView }) {
             : `Lệch ${Math.abs(count.guess - count.actual)} câu.`}
         </p>
       )}
+      {asks.map(({ ask, guess, actual }) => (
+        <p
+          key={ask.id}
+          data-ask-result={ask.id}
+          data-right={guess === actual}
+          className="mt-1 text-sm"
+        >
+          {ask.legend} Bạn đoán {ask.options[guess]}; thực tế {ask.options[actual]}.{" "}
+          {guess === actual ? "Khớp." : "Lệch."}
+        </p>
+      ))}
       {predictions.length > 0 && (
         <p className="mt-1 text-sm tabular-nums">
           Đoán đúng {right}/{predictions.length} câu đã đoán.

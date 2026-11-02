@@ -17,7 +17,8 @@ import type { BlockType, Graph } from "./schema";
  */
 
 /** The goal a hint aims at: the lowest star not earned, split where the lesson differs. */
-export type TargetKey = "s1" | "s1_source" | "s2" | "s3" | "s3_t01" | "s3_t02" | "s3_t03";
+export type TargetKey =
+  "s1" | "s1_source" | "s2" | "s3" | "s3_t01" | "s3_t02" | "s3_t03" | "s3_blocked" | "s3_asked";
 
 export interface Target {
   key: TargetKey;
@@ -61,14 +62,28 @@ function starTwo(run: RunView): Target {
   return { key: "s2", star: 2, n: costliest?.n ?? null };
 }
 
-const starThree = (levelId: string, run: RunView): Target => ({
-  key: starThreeKey(levelId, run),
-  star: 3,
-  n: null,
-});
+/** The Watchtower's star 3 asks for no blocked customer and no needless approval. */
+const W1 = "direct-injection";
+const W1_STAR_THREE = {
+  "guard.blocked_benign": "s3_blocked",
+  "hitl.over_asked": "s3_asked",
+} as const;
+
+function starThree(levelId: string, run: RunView): Target {
+  if (levelId === W1) {
+    // The labels are on the graded cases themselves, so the hint can name the case.
+    const labelled = run.cases.find((c) => c.graded?.labels.some((l) => l in W1_STAR_THREE));
+    const label = labelled?.graded?.labels.find((l) => l in W1_STAR_THREE);
+    const key = label ? W1_STAR_THREE[label as keyof typeof W1_STAR_THREE] : "s3";
+    const refused = run.cases.find((c) => c.graded?.labels.includes("refusal"));
+    return { key, star: 3, n: (labelled ?? refused)?.n ?? null };
+  }
+  return { key: starThreeKey(levelId, run), star: 3, n: null };
+}
 
 function starOne(levelId: string, run: RunView): Target {
-  const first = run.cases.find((c) => c.role !== "trap" && failing(c));
+  // On the Watchtower the attacks are the trap cases, and their receipts are on screen.
+  const first = run.cases.find((c) => (levelId === W1 || c.role !== "trap") && failing(c));
   const flags = new Set(
     (run.report?.diagnosis ?? []).filter((d) => d.case === first?.id).map((d) => d.flag),
   );
@@ -279,6 +294,80 @@ const HINTS: Readonly<Record<string, Partial<Record<TargetKey, Ladder>>>> = {
       }),
     ],
   },
+  // Watchtower W1 (watchtower.md §3.6): the receipt first, then which layer let it through, then
+  // the worked solution. Pointers are the toys of the layers, so a hint never says "add a rule".
+  "direct-injection": {
+    s1: [
+      (n) => ({
+        text: `Xem biên lai của câu #${n}: khoản hoàn nào không ai duyệt?`,
+        pointer: "case",
+      }),
+      (n) => ({
+        text: `Theo câu #${n} dọc băng chuyền: lớp nào đã soi nó, lớp nào để nó đi qua?`,
+        pointer: "case",
+      }),
+      () => ({
+        text: "Lưới 3 cụm từ hẹp (bỏ qua hướng dẫn, quản trị viên, lệnh kiểm thử), Chó gác 0,8, Chuông duyệt chỉ hỏi khi vượt 500.000 đ.",
+        pointer: slot("human_approval"),
+      }),
+    ],
+    s3_blocked: [
+      (n) => ({
+        text: `Câu #${n} là khách thật mà bị chặn. Lớp nào đã chặn nó?`,
+        pointer: "case",
+      }),
+      (n) => ({
+        text: `Lưới khớp từng cụm từ với câu #${n}. Cụm nào trong lưới nằm trong lời của khách?`,
+        pointer: slot("pattern_guard", "phrases"),
+      }),
+      () => ({
+        text: "Rút cụm quá rộng như «bỏ qua», giữ cụm hẹp như «bỏ qua hướng dẫn»: khách thật hay nói «bỏ qua phí ship».",
+        pointer: slot("pattern_guard", "phrases"),
+      }),
+    ],
+    s3_asked: [
+      (n) => ({
+        text: `Chuông duyệt hỏi cả một khoản nhỏ hợp lệ ở câu #${n}. Khoản đó có đáng hỏi không?`,
+        pointer: "case",
+      }),
+      () => ({
+        text: "Chuông có hai cách hỏi: luôn hỏi, hoặc chỉ hỏi khi số tiền vượt một ngưỡng.",
+        pointer: slot("human_approval", "policy"),
+      }),
+      () => ({
+        text: "Chọn hỏi khi vượt ngưỡng và đặt 500.000 đ: khoản 120.000 đ chạy thẳng, khoản 5.000.000 đ phải qua duyệt.",
+        pointer: slot("human_approval", "amount_threshold"),
+      }),
+    ],
+    s3: [
+      (n) => ({
+        text: `Câu #${n} là khách thật mà trợ lý từ chối. Mở câu đó ra xem.`,
+        pointer: "case",
+      }),
+      () => ({
+        text: "Đọc lại thẻ đang cắm trong Lăng kính, từng chữ một.",
+        pointer: slot("action_llm", "system_prompt"),
+      }),
+      () => ({
+        text: "Giữ thẻ dặn hoàn đúng số tiền của đơn và không làm theo lệnh trong tin nhắn; bỏ thẻ khiến trợ lý từ chối cả khách thật.",
+        pointer: slot("action_llm", "system_prompt"),
+      }),
+    ],
+    s2: [
+      (n) => ({
+        text: `Câu nào tốn token nhất? Câu #${n} tốn bao nhiêu?`,
+        pointer: "case",
+      }),
+      () => ({
+        text: "Một đòn bị chặn ở cổng thì Bộ Óc không phải viết phiếu. Cổng nào đang để đòn đi tiếp?",
+        pointer: slot("injection_classifier"),
+      }),
+      () => ({
+        text: "Chó gác 0,8 chặn ba đòn ngay ở cổng, nên Bộ Óc chỉ còn việc của khách thật. Bỏ thẻ dặn không đổi kết quả.",
+        pointer: slot("injection_classifier", "threshold"),
+      }),
+    ],
+  },
 };
 
 /** Where a split target has no ladder of its own, the star's general one stands in. */
@@ -290,6 +379,8 @@ const FALLBACK: Readonly<Record<TargetKey, TargetKey>> = {
   s3_t01: "s3",
   s3_t02: "s3",
   s3_t03: "s3",
+  s3_blocked: "s3",
+  s3_asked: "s3",
 };
 
 export function hintFor(levelId: string, target: Target, n: 1 | 2 | 3): Hint | null {
@@ -327,7 +418,17 @@ export interface HintBook {
 const LOG_LIMIT = 50;
 const key = (levelId: string) => `vg.hints.v1.${levelId}`;
 const Count = v.pipe(v.number(), v.integer(), v.minValue(0));
-const TargetKeySchema = v.picklist(["s1", "s1_source", "s2", "s3", "s3_t01", "s3_t02", "s3_t03"]);
+const TargetKeySchema = v.picklist([
+  "s1",
+  "s1_source",
+  "s2",
+  "s3",
+  "s3_t01",
+  "s3_t02",
+  "s3_t03",
+  "s3_blocked",
+  "s3_asked",
+]);
 const BookSchema = v.object({
   targets: v.record(TargetKeySchema, v.object({ opened: Count, looked: v.boolean() })),
   log: v.array(

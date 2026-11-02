@@ -86,9 +86,20 @@ const CONTROL = ':is(input:not([type="radio"]), input:checked, select, button):n
  * or the knob is fixed at this level), then the slot's first control (the attach switch of a
  * detached slot).
  */
-export function slotTargets(env: Env, type: BlockType, param?: string): string[] {
+export function slotTargets(
+  env: Env,
+  type: BlockType,
+  param?: string,
+  phrase?: string | null,
+): string[] {
   const slot = `#${slotId(env, type)}`;
-  return [...(param ? [`${slot} [data-param="${param}"] ${CONTROL}`] : []), `${slot} ${CONTROL}`];
+  // A chip of the net's tray: the phrase that blocked a customer, found by its text.
+  const chip = phrase ? `${slot} [data-phrase="${phrase.replace(/["\\]/g, "\\$&")}"]` : null;
+  return [
+    ...(chip ? [chip] : []),
+    ...(param ? [`${slot} [data-param="${param}"] ${CONTROL}`] : []),
+    `${slot} ${CONTROL}`,
+  ];
 }
 
 /** Slots that can be focused from a diagnosis: shown, unlocked and with a control. */
@@ -760,7 +771,7 @@ function PhraseTray({
   const id = useId();
   const tray = env.level.phrase_tray;
   return (
-    <div data-phrase-tray="">
+    <div data-phrase-tray="" data-param="phrases">
       <p id={id} className="text-sm font-medium">
         {DESK_VI.tray(bench.phrases.length, tray.length)}
       </p>

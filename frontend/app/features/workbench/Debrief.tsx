@@ -37,7 +37,7 @@ export function Debrief({
   whyIndex: number | null;
   onPick: (extras: { why?: number; next?: NextPick }) => void;
 }): ReactElement | null {
-  const grade = slip ? gradeSlip(slip, run) : null;
+  const grade = slip ? gradeSlip(slip, run, env.level.id) : null;
   const [chosen, setChosen] = useState<NextPick | null>(null);
   const options = nextPickOptions(env, graph);
   const reason = whyIndex !== null ? ask?.menu.options[whyIndex] : undefined;
