@@ -59,3 +59,20 @@ test.describe("zone page", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Thư viện" })).toBeVisible();
   });
 });
+
+test.describe("the page header at 375 px", () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test("keeps the way back on one line, the theme button down to its icon", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/play/library");
+    const header = page.locator("header").first();
+    const back = header.getByRole("link", { name: "Về khuôn viên" });
+    const box = await back.boundingBox();
+    // One line of text inside a 44 px control; a wrapped label grows past it.
+    expect(box?.height ?? 0).toBeLessThanOrEqual(44);
+    const theme = header.getByRole("button", { name: /Đổi giao diện/ });
+    const width = (await theme.boundingBox())?.width ?? 0;
+    expect(width).toBeLessThanOrEqual(48);
+  });
+});
