@@ -176,8 +176,9 @@ def _ports(ports: Mapping[str, PortSpec]) -> dict[str, JsonValue]:
     }
 
 
-def registry_json() -> dict[str, JsonValue]:
-    """Payload of ``GET /api/blocks``: JSON Schema (Vietnamese titles) + port matrix per block."""
+def registry_json(*, include_unreleased: bool = False) -> dict[str, JsonValue]:
+    """Payload of ``GET /api/blocks``: JSON Schema (Vietnamese titles) + port matrix per block.
+    ``include_unreleased``: every block, for the frontend's test fixtures, never the route."""
     return {
         "blocks": [
             {
@@ -191,6 +192,6 @@ def registry_json() -> dict[str, JsonValue]:
                 "concepts": list(s.concepts),
             }
             for s in REGISTRY.values()
-            if s.type not in UNRELEASED
+            if include_unreleased or s.type not in UNRELEASED
         ]
     }

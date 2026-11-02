@@ -35,6 +35,15 @@ export const TOY: Readonly<Record<BlockType, { name: string; params?: Record<str
   rerank: { name: "Kính lúp", params: { top_n: "Số đoạn giữ lại" } },
   context_packer: { name: "Thùng Context", params: { cite_ids: "Máy đóng tem" } },
   llm: { name: "Bộ Óc", params: { system_prompt: "Lăng kính", profile: "Mức suy nghĩ" } },
+  // Watchtower W1 (docs/content/scenarios/watchtower.md §3.2).
+  pattern_guard: { name: "Lưới cụm từ" },
+  injection_classifier: { name: "Chó gác", params: { threshold: "Ngưỡng sủa" } },
+  tool_refund: { name: "Bàn hoàn tiền" },
+  human_approval: {
+    name: "Chuông duyệt",
+    params: { policy: "Khi nào hỏi", amount_threshold: "Ngưỡng tiền" },
+  },
+  action_llm: { name: "Bộ Óc", params: { system_prompt: "Lăng kính", profile: "Mức suy nghĩ" } },
   output: { name: "Bảng trả lời" },
 };
 
@@ -61,6 +70,8 @@ export const ENUM_VI: Readonly<Record<string, string>> = {
   can_bang: "cân bằng",
   sau: "sâu",
   cat_duoi: "cắt đuôi",
+  luon_hoi: "Luôn hỏi",
+  hoi_neu_vuot: "Hỏi khi vượt ngưỡng",
 };
 
 /** Vòm Sao (vom-sao-v0.1 §7): the drawing never passes itself off as a measurement. */
@@ -415,6 +426,7 @@ const UNIT: Readonly<Record<string, string>> = {
   chunk_size: "token",
   token_budget: "token",
   overlap_pct: "%",
+  amount_threshold: "đ",
 };
 
 /** A param value as the player reads it: "3 đoạn", "512 token", "10 %", "0,15", "bật". */
@@ -440,7 +452,23 @@ export type LevelScene =
       print: { title: string; body: string };
       quote: { who: string; text: string };
       facts: readonly string[];
+    }
+  | {
+      kind: "receipt";
+      where: string;
+      /** The roll's lines, oldest first; the last, `total`, is printed bold. */
+      lines: readonly string[];
+      total: string;
+      note: string;
     };
+
+/** Who tells a level's story and says its win lines. */
+export interface Npc {
+  name: string;
+  role: string;
+}
+const LAN: Npc = { name: "Cô Lan", role: "Thủ thư ca tối" };
+export const npcOf = (copy: LevelCopy): Npc => copy.npc ?? LAN;
 
 export interface LevelCopy {
   /** Asker of case #1 (scenario §4). */
@@ -449,6 +477,8 @@ export interface LevelCopy {
   win1: string;
   win3: string;
   scene: LevelScene;
+  /** Cô Lan unless said otherwise: the Watchtower has anh Quân (npc-cast). */
+  npc?: Npc;
   /** Knobs that do nothing at this level, by param, with why (shown dimmed, scenario §5). */
   inertKnobs?: Readonly<Record<string, string>>;
 }
@@ -504,6 +534,22 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       ],
     },
     inertKnobs: { only_in_force: "Kho tối nay không có văn bản hết hiệu lực." },
+  },
+  "direct-injection": {
+    asker: "chị Thảo",
+    npc: { name: "Anh Quân", role: "Bảo vệ ca đêm, Tháp canh" },
+    intro:
+      "Mười hai khách tối nay. Ít nhất bảy trên tám khách thật phải được phục vụ, và sổ không được có khoản hoàn sai nào. Chặn hết thì dễ. Chặn đúng mới khó.",
+    win1: "Sổ sạch rồi. Tờ biên lai năm triệu anh giữ lại, để nhớ.",
+    win3: "Không chặn nhầm ai, không hỏi thừa ai. Một lưới thì thủng một chỗ. Ba lưới thì phải thủng ba chỗ cùng lúc.",
+    scene: {
+      kind: "receipt",
+      where: "Máy in ở quầy hỗ trợ khách, chân Tháp canh",
+      lines: ["DH1042 · Áo thun · hoàn 120.000 đ", "DH4120 · Bình nước · hoàn 85.000 đ"],
+      // Verbatim from watchtower.md §3.1: the refund the level is about.
+      total: "HOÀN TIỀN 5.000.000 đ · lý do: khách xác nhận đã được quản lý đồng ý",
+      note: "Cuộn biên lai chạy dài ra khỏi máy in. Trợ lý ở quầy được phép hoàn tiền thật, và đêm qua nó làm theo đúng lời một tin nhắn. Không ai duyệt khoản đó.",
+    },
   },
 };
 
@@ -830,3 +876,37 @@ export const WHY_MENU: Readonly<Record<string, Readonly<Partial<Record<Why, WhyM
     },
   },
 };
+
+// --- Watchtower W1 --------------------------------------------------------------------------
+
+export const DESK_VI = {
+  branch: "Phiếu hành động → Chuông duyệt → Bàn hoàn tiền",
+  precomputed:
+    "Điểm của từng câu đã chấm sẵn bằng model, một lần, trước ca: kéo ngưỡng không tốn lượt gọi AI.",
+  tray: (on: number, of: number) => `Khay cụm từ · ${fmt(on)}/${fmt(of)} cụm đang trong lưới`,
+  match: "Lưới khớp không phân biệt hoa thường, có dấu hay không dấu.",
+} as const;
+
+export const GUARD_VI = {
+  precomputed: "điểm chấm sẵn bằng model",
+} as const;
+
+const APPROVAL_VI: Readonly<Record<string, string>> = {
+  none: "không qua cổng duyệt",
+  auto: "dưới ngưỡng, tự chạy",
+  approved: "người duyệt đồng ý",
+  denied: "người duyệt từ chối",
+  no_tool: "không có công cụ trên bàn",
+};
+
+/** 120000 -> "120.000 đ". */
+export const fmtMoney = (amount: number) => `${fmt(amount)} đ`;
+
+export const LEDGER_BOOK_VI = {
+  label: "Sổ ghi",
+  empty: "Sổ: không ghi gì.",
+  line: (e: { ma_don: string; so_tien: number; approval: string; executed: boolean }) =>
+    `Hoàn ${fmtMoney(e.so_tien)} · ${e.ma_don} · ${APPROVAL_VI[e.approval] ?? e.approval} · ${
+      e.executed ? "đã chạy" : "không chạy"
+    }`,
+} as const;

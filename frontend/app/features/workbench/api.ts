@@ -6,7 +6,6 @@ import { starterBench, type Bench, type Env } from "./bench";
 import { fmt } from "./copy";
 import { parseQuota, type ServerQuota } from "./quota";
 import {
-  BLOCK_TYPES,
   BlocksResponseSchema,
   FactSchema,
   IssueSchema,
@@ -39,7 +38,11 @@ export async function loadLevelPage(
     ]);
     if (level.zone !== zone) return { kind: "not-found", zoneId: zone };
     const byType = new Map(list.map((block) => [block.type, block]));
-    if (!BLOCK_TYPES.every((type) => byType.has(type))) return { kind: "error", zoneId: zone };
+    // Only the level's own blocks: the server hides the ones not yet released (registry
+    // UNRELEASED), and every lookup into env.blocks is for a type the level allows.
+    if (!level.allowed_blocks.every((type) => byType.has(type))) {
+      return { kind: "error", zoneId: zone };
+    }
     const env: Env = {
       level,
       blocks: Object.fromEntries(byType) as Record<BlockType, BlockSpec>,

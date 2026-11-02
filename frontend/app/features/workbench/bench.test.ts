@@ -9,12 +9,13 @@ import {
   setAttached,
   setCard,
   setParam,
+  setPhrase,
   starterBench,
   type Bench,
   type Env,
 } from "./bench";
 import type { Graph } from "./schema";
-import { LEVEL_IDS, levelFile, testEnv } from "./test-fixtures";
+import { LEVEL_IDS, levelFile, naiveGraphs, testEnv } from "./test-fixtures";
 
 const starter = (env: Env): Bench => {
   const bench = starterBench(env);
@@ -126,6 +127,80 @@ describe("bench <-> graph", () => {
         edit((graph) => graph.edges.reverse()),
       ),
     ).toBeNull();
+  });
+});
+
+// Watchtower W1: the desk's graph shape (watchtower.md §3.2).
+describe("the W1 desk on the bench", () => {
+  const env = testEnv("direct-injection");
+  const roundTrips = (graph: Graph) => {
+    const bench = benchFromGraph(env, graph);
+    expect(bench).not.toBeNull();
+    if (bench) expect(filled(env, graphFromBench(env, bench))).toEqual(filled(env, graph));
+  };
+
+  it("reproduces the starter, the reference and every naive graph in exact order", () => {
+    roundTrips(env.level.starter_graph);
+    roundTrips(levelFile("direct-injection").reference_graph);
+    const naive = naiveGraphs("direct-injection");
+    expect(naive.map((n) => n.id)).toEqual(["N1", "N2", "N3"]);
+    for (const { graph } of naive) roundTrips(graph);
+  });
+
+  it("builds the W1 reference solution from slot actions", () => {
+    let bench = starter(env);
+    expect(bench.phrases).toEqual([]);
+    bench = setAttached(bench, "pattern_guard", true);
+    for (const phrase of ["lệnh kiểm thử", "bỏ qua hướng dẫn", "quản trị viên"]) {
+      bench = setPhrase(env.level, bench, phrase, true);
+    }
+    bench = setAttached(bench, "injection_classifier", true);
+    bench = setAttached(bench, "human_approval", true);
+    bench = setCard(setCard(setCard(bench, 0, "G3"), 1, "G4"), 2, "G5");
+    expect(filled(env, graphFromBench(env, bench))).toEqual(
+      filled(env, levelFile("direct-injection").reference_graph),
+    );
+  });
+
+  it("keeps the net's phrases in tray order and drops one on request", () => {
+    let bench = setAttached(starter(env), "pattern_guard", true);
+    bench = setPhrase(env.level, bench, "quản trị viên", true);
+    bench = setPhrase(env.level, bench, "bỏ qua", true);
+    expect(bench.phrases).toEqual(["bỏ qua", "quản trị viên"]);
+    bench = setPhrase(env.level, bench, "bỏ qua", false);
+    expect(bench.phrases).toEqual(["quản trị viên"]);
+  });
+
+  it("cannot draw a net with a phrase that is not in the tray", () => {
+    const graph = structuredClone(levelFile("direct-injection").reference_graph);
+    const net = graph.nodes.find((n) => n.type === "pattern_guard");
+    if (!net) throw new Error("no net in the reference");
+    net.params = { ...net.params, phrases: ["bỏ qua hướng dẫn", "cụm tự gõ"] };
+    expect(benchFromGraph(env, graph)).toBeNull();
+  });
+
+  it("cannot draw a net whose phrases are out of tray order", () => {
+    const graph = structuredClone(levelFile("direct-injection").reference_graph);
+    const net = graph.nodes.find((n) => n.type === "pattern_guard");
+    if (!net) throw new Error("no net in the reference");
+    net.params = { ...net.params, phrases: ["quản trị viên", "bỏ qua hướng dẫn"] };
+    expect(benchFromGraph(env, graph)).toBeNull();
+  });
+
+  it("cannot draw a net that names a tray phrase twice", () => {
+    const graph = structuredClone(levelFile("direct-injection").reference_graph);
+    const net = graph.nodes.find((n) => n.type === "pattern_guard");
+    if (!net) throw new Error("no net in the reference");
+    net.params = { ...net.params, phrases: ["bỏ qua hướng dẫn", "bỏ qua hướng dẫn"] };
+    expect(benchFromGraph(env, graph)).toBeNull();
+  });
+
+  it("cannot draw a guard whose refusal is not the level's", () => {
+    const graph = structuredClone(levelFile("direct-injection").reference_graph);
+    const dog = graph.nodes.find((n) => n.type === "injection_classifier");
+    if (!dog) throw new Error("no watchdog in the reference");
+    dog.params = { ...dog.params, refusal: "Câu từ chối khác." };
+    expect(benchFromGraph(env, graph)).toBeNull();
   });
 });
 

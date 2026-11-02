@@ -4,9 +4,9 @@ import re
 from collections.abc import Sequence
 from functools import cache
 from importlib import resources
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints, model_validator
 
 from vgame.content.repository import load_catalog
 from vgame.engine.graph import GraphPayload
@@ -67,6 +67,10 @@ class LevelSpec(_Strict):
     rules: LevelRules
     stars_vi: list[str]
     orders: list[OrderSpec] = Field(default_factory=list)  # Watchtower only
+    # The phrases the net offers to pick from (watchtower.md §3.2: picked, never typed).
+    phrase_tray: list[Annotated[str, StringConstraints(min_length=1, max_length=50)]] = Field(
+        default_factory=list, max_length=40
+    )
 
     def order_book(self) -> dict[str, Order]:
         return {o.ma_don: Order(o.ma_don, o.mat_hang, o.gia, o.trang_thai) for o in self.orders}
@@ -112,6 +116,7 @@ class LevelSpec(_Strict):
                 for c in cases
                 if c.role == "visible"
             ],
+            **({"phrase_tray": list(self.phrase_tray)} if self.phrase_tray else {}),
             "case_counts": {
                 "normal": sum(c.role in ("visible", "hidden") for c in cases),
                 "trap": sum(c.role == "trap" and c.id not in info for c in cases),

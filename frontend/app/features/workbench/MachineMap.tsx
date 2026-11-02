@@ -20,9 +20,11 @@ import {
   type Env,
 } from "./bench";
 import type { BenchRunView } from "./BenchView";
-import { BLOCK_STATE_VI, fmt, fmtValue, toyName } from "./copy";
+import { BLOCK_STATE_VI, fmt, fmtMoney, fmtValue, LEDGER_BOOK_VI, toyName } from "./copy";
 import type { BlockState } from "./run";
 import type { BlockType, Fact } from "./schema";
+
+type LedgerEntry = Extract<Fact, { kind: "ledger" }>["entries"][number];
 
 /**
  * Sơ đồ máy: the assistant as one isometric machine on a maquette base (art bible §1.1), the
@@ -43,9 +45,21 @@ type Column = readonly BlockType[];
 
 const isSearch = (type: BlockType) => type === "vector_search" || type === "bm25_search";
 
+/** A Watchtower desk: the action slip's model and its tool branch (watchtower.md §3.7). */
+const isDesk = (env: Env) => isAllowed(env.level, "action_llm");
+
 /** Columns in flow order: a column of two is two searches side by side. */
 export function columns(env: Env): Column[] {
   const allowed = (type: BlockType) => isAllowed(env.level, type);
+  if (isDesk(env)) {
+    return [
+      ["input"],
+      ...(allowed("pattern_guard") ? [["pattern_guard"] as const] : []),
+      ...(allowed("injection_classifier") ? [["injection_classifier"] as const] : []),
+      ["action_llm"],
+      ["output"],
+    ];
+  }
   const searches = (["vector_search", "bm25_search"] as const).filter(allowed);
   return [
     ["input"],
@@ -60,6 +74,27 @@ export function columns(env: Env): Column[] {
   ];
 }
 
+/**
+ * The tool branch, the first fork of the belt: off the desk's model, down past the approval bell
+ * to the refund desk and its ledger. Empty for a library level.
+ */
+export function branch(env: Env): BlockType[] {
+  if (!isDesk(env)) return [];
+  return isAllowed(env.level, "human_approval")
+    ? ["human_approval", "tool_refund"]
+    : ["tool_refund"];
+}
+
+/** The beats in the order the followed case meets them: the branch right after the desk. */
+export function beats(env: Env): string[] {
+  const main = columns(env)
+    .filter((col) => col[0] !== "corpus")
+    .map(beatOf);
+  const at = main.indexOf("action_llm");
+  if (at === -1) return main;
+  return [...main.slice(0, at + 1), ...branch(env), ...main.slice(at + 1)];
+}
+
 // --- the beats ------------------------------------------------------------------------------
 
 /** One beat per column but the shelf: the shelf only holds the books the blade cuts. */
@@ -71,6 +106,11 @@ export const BEAT_VI: Readonly<Record<string, string>> = {
   rerank: "Soi lại hạng",
   context_packer: "Đóng thùng",
   llm: "Bộ Óc trả lời",
+  pattern_guard: "Lưới soi",
+  injection_classifier: "Chó gác ngửi",
+  action_llm: "Bộ Óc viết phiếu",
+  human_approval: "Chuông duyệt",
+  tool_refund: "Sổ ghi",
   output: "Chấm câu trả lời",
 };
 
@@ -83,6 +123,11 @@ export const NARRATE_VI: Readonly<Record<string, string>> = {
   rerank: "Kính lúp đang soi…",
   context_packer: "Đang đóng thùng…",
   llm: "Bộ Óc đang đọc thùng…",
+  pattern_guard: "Lưới đang soi…",
+  injection_classifier: "Chó gác đang ngửi…",
+  action_llm: "Bộ Óc đang viết phiếu…",
+  human_approval: "Chuông đang hỏi…",
+  tool_refund: "Đang ghi sổ…",
   output: "Đang chấm…",
 };
 
@@ -168,6 +213,60 @@ export function beatLine(beat: string, env: Env, bench: Bench, view: BenchRunVie
         ? `Bộ Óc ${cited}: «${clip(view.followed.answer, 140)}»`
         : `Bộ Óc ${cited}.`;
     }
+    case "pattern_guard": {
+      if (!on("pattern_guard")) return "Không có Lưới: mọi tin nhắn đi thẳng vào.";
+      const got = view ? factOf(view, ids.pattern_guard, "guard") : undefined;
+      if (!got) return `Lưới có ${fmt(bench.phrases.length)} cụm từ.`;
+      return got.decision === "block"
+        ? `Lưới chặn: khớp «${got.matched ?? ""}». Câu này dừng ở đây.`
+        : `Lưới cho qua: không khớp cụm nào trong ${fmt(bench.phrases.length)} cụm.`;
+    }
+    case "injection_classifier": {
+      if (!on("injection_classifier")) return "Không có Chó gác: không ai đọc ý của tin nhắn.";
+      const threshold = fmt(Number(params("injection_classifier").threshold ?? 0));
+      if (!view) return `Chó gác sủa khi điểm tấn công từ ${threshold} trở lên.`;
+      const got = factOf(view, ids.injection_classifier, "guard");
+      if (!got) return STOPPED_VI;
+      const score = fmt(got.score ?? 0);
+      return got.decision === "block"
+        ? `Chó gác sủa: điểm ${score}, ngưỡng ${threshold}. Câu này dừng ở đây.`
+        : `Chó gác im: điểm ${score}, dưới ngưỡng ${threshold}.`;
+    }
+    case "action_llm": {
+      const cards = bench.cards.filter((c) => c !== null).length;
+      if (!view)
+        return `Bộ Óc đọc tin nhắn qua Lăng kính có ${fmt(cards)}/3 thẻ và viết một phiếu.`;
+      const said = factOf(view, ids.action_llm, "llm");
+      if (!said) return STOPPED_VI;
+      const entry = factOf(view, ids.action_llm, "ledger")?.entries[0];
+      const asked = entry
+        ? `phiếu đòi hoàn ${fmtMoney(entry.so_tien)} cho ${entry.ma_don}`
+        : "phiếu không đòi làm gì";
+      return visible && view.followed.answer
+        ? `Bộ Óc viết ${asked}: «${clip(view.followed.answer, 120)}»`
+        : `Bộ Óc viết ${asked}.`;
+    }
+    case "human_approval": {
+      if (!on("human_approval")) return "Không có Chuông duyệt: phiếu hoàn chạy thẳng tới sổ.";
+      const p = params("human_approval");
+      const rule =
+        p.policy === "luon_hoi"
+          ? "Chuông hỏi người duyệt mọi khoản hoàn."
+          : `Chuông hỏi người duyệt khi khoản hoàn vượt ${fmtMoney(Number(p.amount_threshold ?? 0))}.`;
+      if (!view) return rule;
+      const entry = factOf(view, ids.action_llm, "ledger")?.entries[0];
+      if (!factOf(view, ids.action_llm, "llm")) return STOPPED_VI;
+      if (!entry) return "Không có phiếu hoàn nào qua chuông.";
+      return APPROVAL_LINE_VI[entry.approval] ?? rule;
+    }
+    case "tool_refund": {
+      if (!view) return "Bàn hoàn tiền chỉ chạy phiếu nào qua được chuông, rồi ghi vào sổ.";
+      if (!factOf(view, ids.action_llm, "llm")) return STOPPED_VI;
+      const entries = factOf(view, ids.action_llm, "ledger")?.entries ?? [];
+      return entries.length === 0
+        ? LEDGER_BOOK_VI.empty
+        : `Sổ: ${entries.map(LEDGER_BOOK_VI.line).join("; ")}.`;
+    }
     case "output": {
       const graded = view?.followed.graded;
       if (!graded) return "Bảng trả lời chờ được chấm.";
@@ -179,6 +278,26 @@ export function beatLine(beat: string, env: Env, bench: Bench, view: BenchRunVie
     default:
       return "";
   }
+}
+
+const STOPPED_VI = "Câu này không tới đây: cổng trước đã chặn.";
+
+const APPROVAL_LINE_VI: Readonly<Record<string, string>> = {
+  none: "Phiếu không qua chuông nào.",
+  auto: "Khoản nhỏ, dưới ngưỡng: chuông để chạy, không hỏi.",
+  approved: "Chuông hỏi, người duyệt đồng ý: mã đơn khớp và số tiền không quá giá đơn.",
+  denied: "Chuông hỏi, người duyệt từ chối: khoản này không khớp đơn nào.",
+  no_tool: "Phiếu đòi một công cụ không có trên bàn.",
+};
+
+/** Which guard stopped the followed case, if one did. */
+function stopper(env: Env, view: BenchRunView | null): BlockType | null {
+  if (!view) return null;
+  const ids = nodeIds(env.level);
+  for (const type of ["pattern_guard", "injection_classifier"] as const) {
+    if (factOf(view, ids[type], "guard")?.decision === "block") return type;
+  }
+  return null;
 }
 
 /** One line of the answer: markdown marks and line breaks dropped, cut at `max`. */
@@ -222,8 +341,16 @@ const HEIGHT: Readonly<Record<BlockType, number>> = {
   rerank: 0.9,
   context_packer: 1.4,
   llm: 1.2,
+  pattern_guard: 1.1,
+  injection_classifier: 0.6,
+  tool_refund: 0.8,
+  human_approval: 0.7,
+  action_llm: 1.2,
   output: 0.7,
 };
+
+/** Distance between two toys of the tool branch, per axis, across the belt. */
+const FORK = 2.1;
 
 /** Three faces of a box: the top in its own token, the two sides darker by a fixed rule. */
 function Box({
@@ -325,11 +452,13 @@ export function MachineMap({
 
   const attached = (type: BlockType) => !isOptional(type) || bench.attached[type];
   const cols = columns(env);
+  const fork = branch(env);
   const pair = cols.some((col) => col.length > 1);
-  const beats = cols.filter((col) => col[0] !== "corpus").map(beatOf);
-  const packed = view
-    ? (factOf(view, nodeIds(env.level).context_packer, "pack")?.included.length ?? 0)
-    : 0;
+  const steps = beats(env);
+  const ids = nodeIds(env.level);
+  const packed = view ? (factOf(view, ids.context_packer, "pack")?.included.length ?? 0) : 0;
+  const entries = view ? (factOf(view, ids.action_llm, "ledger")?.entries ?? []) : [];
+  const stopped = stopper(env, view);
 
   // The belt runs left to right across the screen: along (1, -1) in the model, so every toy
   // stands at the same depth and none hides another. A pair of searches splits across it.
@@ -343,11 +472,17 @@ export function MachineMap({
   const first = centre(0);
   const last = centre(cols.length - 1);
   const half = pair ? 2.1 : 1.3;
+  // The tool branch hangs off the desk, across the belt, one toy every FORK.
+  const deskIndex = cols.findIndex((col) => col[0] === "action_llm");
+  const desk = centre(Math.max(deskIndex, 0));
+  const forkCentre = (k: number): P => [desk[0] + (k + 1) * FORK, desk[1] + (k + 1) * FORK];
+  const forkEnd = fork.length > 0 ? forkCentre(fork.length - 1) : null;
   const ends = [
     along(first, -1.4, half, -0.3),
     along(first, -1.4, -half, 2.2),
     along(last, 1.4, half, -0.3),
     along(last, 1.4, -half, 2.2),
+    ...(forkEnd ? [along(forkEnd, 1.2, 1.3, -0.3), along(forkEnd, -1.2, 1.3, -0.3)] : []),
   ];
   const minX = Math.min(...ends.map((p) => p[0])) - 16;
   const maxX = Math.max(...ends.map((p) => p[0])) + 28;
@@ -358,20 +493,27 @@ export function MachineMap({
   const box = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 
   const beatIndex = beat === null ? -1 : cols.findIndex((col) => beatOf(col) === beat);
-  const active = new Set<BlockType>(beatIndex === -1 ? [] : (cols[beatIndex] ?? []));
-  // The question slip rides the belt and stops just before the toy of the beat.
+  const forkIndex = beat === null ? -1 : fork.indexOf(beat as BlockType);
+  const active = new Set<BlockType>(
+    forkIndex !== -1 ? fork.slice(forkIndex, forkIndex + 1) : (cols[beatIndex] ?? []),
+  );
+  // The question slip rides the belt and stops just before the toy of the beat; on the branch
+  // it is the slip the desk wrote, riding down to the bell and the refund desk.
   const slipAt =
-    beatIndex === -1
-      ? null
-      : along(centre(beatIndex), beatIndex === 0 ? -1.0 : -STEP / U / 2, 0, 0);
+    forkIndex !== -1
+      ? along(forkCentre(forkIndex), 0, -FORK / U / 2, 0)
+      : beatIndex === -1
+        ? null
+        : along(centre(beatIndex), beatIndex === 0 ? -1.0 : -STEP / U / 2, 0, 0);
   // The bubble sits in the band above the machine, over the beat's toy, kept off the edges.
+  const beatX =
+    forkIndex !== -1
+      ? along(forkCentre(forkIndex), 0, 0, 0)[0]
+      : beatIndex === -1
+        ? null
+        : along(centre(beatIndex), 0, 0, 0)[0];
   const bubbleAt =
-    beatIndex === -1
-      ? null
-      : (() => {
-          const [bx] = along(centre(beatIndex), 0, 0, 0);
-          return { left: Math.min(88, Math.max(12, ((bx - box.x) / box.w) * 100)) };
-        })();
+    beatX === null ? null : { left: Math.min(88, Math.max(12, ((beatX - box.x) / box.w) * 100)) };
   const ink = `ink${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   // On a narrow screen the machine scrolls: bring the beat's toy to the middle of the frame.
   const frame = useRef<HTMLDivElement>(null);
@@ -391,7 +533,7 @@ export function MachineMap({
       </figcaption>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <ol aria-label="Cho câu hỏi chạy qua máy" className="flex flex-wrap gap-2">
-          {beats.map((b, index) => (
+          {steps.map((b, index) => (
             <li key={b}>
               <button
                 type="button"
@@ -402,7 +544,7 @@ export function MachineMap({
                 className={PILL}
               >
                 <span className="sr-only">Bước {index + 1}: </span>
-                {BEAT_VI[b]}
+                {b === "input" && isDesk(env) ? "Khách gõ cửa" : BEAT_VI[b]}
               </button>
             </li>
           ))}
@@ -492,9 +634,74 @@ export function MachineMap({
                   along(first, -1.4, -half, 0),
                 ])}
               />
+              {forkEnd && (
+                <g data-branch-base="">
+                  <polygon
+                    className="fill-brand-tint"
+                    transform="translate(14 10)"
+                    points={pts([
+                      along(desk, -1.2, half, -0.3),
+                      along(desk, 1.2, half, -0.3),
+                      along(forkEnd, 1.2, 1.3, -0.3),
+                      along(forkEnd, -1.2, 1.3, -0.3),
+                    ])}
+                  />
+                  <polygon
+                    className="fill-line stroke-line-strong"
+                    points={pts([
+                      along(forkEnd, -1.2, 1.3, 0),
+                      along(forkEnd, 1.2, 1.3, 0),
+                      along(forkEnd, 1.2, 1.3, -0.3),
+                      along(forkEnd, -1.2, 1.3, -0.3),
+                    ])}
+                  />
+                  <polygon
+                    className="fill-line stroke-line-strong"
+                    points={pts([
+                      along(desk, 1.2, half, 0),
+                      along(forkEnd, 1.2, 1.3, 0),
+                      along(forkEnd, 1.2, 1.3, -0.3),
+                      along(desk, 1.2, half, -0.3),
+                    ])}
+                  />
+                  <polygon
+                    className="fill-subtle stroke-line-strong"
+                    points={pts([
+                      along(desk, -1.2, half, 0),
+                      along(desk, 1.2, half, 0),
+                      along(forkEnd, 1.2, 1.3, 0),
+                      along(forkEnd, -1.2, 1.3, 0),
+                    ])}
+                  />
+                </g>
+              )}
             </g>
 
             <g filter={`url(#${ink})`}>
+              {/* The tool branch's belt, under the desk. With no bell on it, the slip runs
+                  straight to the money: a red line, like L1's cut pipe. */}
+              {fork.map((type, k) => {
+                const gated = fork.includes("human_approval") && attached("human_approval");
+                const from = k === 0 ? desk : forkCentre(k - 1);
+                return (
+                  <polygon
+                    key={type}
+                    aria-hidden="true"
+                    data-pipe-branch={type}
+                    data-pipe={gated ? "gated" : "unguarded"}
+                    className={
+                      gated ? "fill-line-strong stroke-fg" : "fill-danger-tint stroke-danger"
+                    }
+                    strokeWidth="1.4"
+                    points={pts([
+                      along(from, BELT, 0, 0),
+                      along(from, BELT, FORK / U, 0),
+                      along(from, -BELT, FORK / U, 0),
+                      along(from, -BELT, 0, 0),
+                    ])}
+                  />
+                );
+              })}
               {cols.map((col, index) => {
                 const key = col.join("+");
                 const broken = col.every(isSearch) && !col.some(attached);
@@ -541,6 +748,8 @@ export function MachineMap({
                           labels={labels}
                           seeThrough={seeThrough}
                           packed={packed}
+                          entries={entries}
+                          stopped={stopped}
                           onAttach={() => {
                             if (!isOptional(type)) return;
                             onChange(setAttached(bench, type, true));
@@ -550,6 +759,39 @@ export function MachineMap({
                         />
                       );
                     })}
+                  </g>
+                );
+              })}
+              {fork.map((type, k) => {
+                const [cx, cy] = forkCentre(k);
+                return (
+                  <g key={type} data-column={type} data-branch="">
+                    <Toy
+                      env={env}
+                      bench={bench}
+                      type={type}
+                      x={cx - FOOT / 2}
+                      y={cy - FOOT / 2}
+                      row={0}
+                      front={false}
+                      side
+                      on={attached(type)}
+                      disabled={disabled}
+                      state={states[type] ?? "idle"}
+                      lit={highlight === type || active.has(type)}
+                      answer={null}
+                      labels={labels}
+                      seeThrough={seeThrough}
+                      packed={packed}
+                      entries={entries}
+                      stopped={stopped}
+                      onAttach={() => {
+                        if (!isOptional(type)) return;
+                        onChange(setAttached(bench, type, true));
+                        onPick?.(type);
+                      }}
+                      onOpen={() => onOpen?.(type)}
+                    />
                   </g>
                 );
               })}
@@ -642,6 +884,7 @@ function Toy({
   y,
   row,
   front,
+  side = false,
   on,
   disabled,
   state,
@@ -650,6 +893,8 @@ function Toy({
   labels,
   seeThrough,
   packed,
+  entries,
+  stopped,
   onAttach,
   onOpen,
 }: {
@@ -662,6 +907,8 @@ function Toy({
   row: number;
   /** The front toy of a pair: its callout hangs below, clear of the one behind it. */
   front: boolean;
+  /** A toy of the tool branch: its callout stands to its left, clear of the toy below. */
+  side?: boolean;
   on: boolean;
   disabled: boolean;
   state: BlockState;
@@ -670,6 +917,8 @@ function Toy({
   labels: boolean;
   seeThrough: boolean;
   packed: number;
+  entries: readonly LedgerEntry[];
+  stopped: BlockType | null;
   onAttach: () => void;
   onOpen: () => void;
 }) {
@@ -702,10 +951,15 @@ function Toy({
       type={type}
       text={seeThrough ? type : (on ? toy : `Gắn ${toy}`).toLocaleUpperCase("vi")}
       from={
-        front ? iso(x + FOOT, y + FOOT, 0) : iso(x + FOOT / 2, y + FOOT / 2, on ? h + 0.9 : 0.2)
+        side
+          ? iso(x, y + FOOT, on ? h / 2 : 0)
+          : front
+            ? iso(x + FOOT, y + FOOT, 0)
+            : iso(x + FOOT / 2, y + FOOT / 2, on ? h + 0.9 : 0.2)
       }
       rise={34 + row * 22}
       below={front}
+      left={side}
     />
   );
   const focusRing = (
@@ -770,6 +1024,8 @@ function Toy({
           h={h}
           answer={answer}
           packed={packed}
+          entries={entries}
+          stopped={stopped}
         />
         {locked && <Lock at={iso(x, y + FOOT, h)} />}
       </g>
@@ -780,6 +1036,7 @@ function Toy({
 
 function Callout({
   below = false,
+  left = false,
   type,
   text,
   from: [fx, fy],
@@ -791,8 +1048,35 @@ function Callout({
   rise: number;
   /** Hang the tag under the toy: the front one of a pair, whose tag would cover the back one. */
   below?: boolean;
+  /** Stand the tag to the left of the toy, on a level leader: a toy of the tool branch. */
+  left?: boolean;
 }) {
   const w = text.length * 6.4 + 14;
+  if (left) {
+    const end = fx - 14;
+    return (
+      <g aria-hidden="true" data-callout={type}>
+        <line x1={fx} y1={fy} x2={end} y2={fy} className="stroke-fg" strokeWidth="1" />
+        <rect
+          x={end - w}
+          y={fy - 8}
+          width={w}
+          height="16"
+          rx="4"
+          className="fill-surface stroke-fg"
+          strokeWidth="1.2"
+        />
+        <text
+          x={end - w / 2}
+          y={fy + 3.5}
+          textAnchor="middle"
+          className="fill-fg font-mono text-[10px] font-bold"
+        >
+          {text}
+        </text>
+      </g>
+    );
+  }
   const top = below ? fy + 18 : fy - rise;
   return (
     <g aria-hidden="true" data-callout={type}>
@@ -968,7 +1252,33 @@ function Inside({
           return <line key={d} x1={ax} y1={ay} x2={bx} y2={by} className="stroke-fg-muted" />;
         }),
       );
+    case "injection_classifier": {
+      // The score scale, 0 at the floor to 1 at the lid, and the bark line at the threshold.
+      const t = typeof params.threshold === "number" ? params.threshold : 0.8;
+      const [ax, ay] = iso(x + 0.3, y + 1.3, 0.05);
+      const [, top] = iso(x + 0.3, y + 1.3, h - 0.05);
+      const [mx, my] = iso(x + 0.3, y + 1.3, 0.05 + t * (h - 0.1));
+      return g(
+        <>
+          <line x1={ax} y1={ay} x2={ax} y2={top} className="stroke-fg-muted" strokeWidth="2" />
+          <line
+            data-internal-threshold={t}
+            x1={mx - 6}
+            y1={my}
+            x2={mx + 6}
+            y2={my}
+            className="stroke-danger"
+            strokeWidth="2"
+          />
+        </>,
+      );
+    }
+    case "pattern_guard":
+    case "tool_refund":
+    case "human_approval":
+      return null;
     case "llm":
+    case "action_llm":
       // The cards behind the lens, as the slots hold them.
       return g(
         bench.cards.map((card, i) => {
@@ -1007,6 +1317,21 @@ function Lock({ at: [x, y] }: { at: P }) {
   );
 }
 
+/** The bar across a guard that stopped the followed case. */
+function Stop({ from: [ax, ay], to: [bx, by] }: { from: P; to: P }) {
+  return (
+    <line
+      data-gauge-stop=""
+      x1={ax}
+      y1={ay}
+      x2={bx}
+      y2={by}
+      className="stroke-danger"
+      strokeWidth="3"
+    />
+  );
+}
+
 /** What stands on a toy's box: its setting as a picture. Every value here is said in its slot. */
 function Dress({
   env,
@@ -1017,6 +1342,8 @@ function Dress({
   h,
   answer,
   packed,
+  entries,
+  stopped,
 }: {
   env: Env;
   bench: Bench;
@@ -1026,6 +1353,10 @@ function Dress({
   h: number;
   answer: "pass" | "fail" | null;
   packed: number;
+  /** The followed case's ledger: the refund desk shows one slip per entry. */
+  entries: readonly LedgerEntry[];
+  /** The guard that stopped the followed case: a red bar across it. */
+  stopped: BlockType | null;
 }): ReactNode {
   const params = slotParams(env, bench, type);
   const [tx, ty] = iso(x + FOOT / 2, y + FOOT / 2, h);
@@ -1167,7 +1498,115 @@ function Dress({
           )}
         </>,
       );
+    case "pattern_guard": {
+      // An upright net: one tag hangs in its mesh for every phrase in it.
+      const plane = (u: number, z: number) => iso(x + 0.2 + u * 1.2, y + 0.8, h + z);
+      const tags = Math.min(bench.phrases.length, 12);
+      return g(
+        <>
+          <polygon
+            className="fill-surface"
+            points={pts([plane(0, 0), plane(1, 0), plane(1, 1.0), plane(0, 1.0)])}
+          />
+          {[0.25, 0.5, 0.75].map((u) => {
+            const [ax, ay] = plane(u, 0);
+            const [bx, by] = plane(u, 1.0);
+            return <line key={u} x1={ax} y1={ay} x2={bx} y2={by} className="stroke-fg-muted" />;
+          })}
+          {[0.33, 0.66].map((z) => {
+            const [ax, ay] = plane(0, z);
+            const [bx, by] = plane(1, z);
+            return <line key={z} x1={ax} y1={ay} x2={bx} y2={by} className="stroke-fg-muted" />;
+          })}
+          {Array.from({ length: tags }, (_, i) => {
+            const [cx, cy] = plane(0.12 + (i % 4) * 0.25, 0.85 - Math.floor(i / 4) * 0.33);
+            return (
+              <rect
+                key={i}
+                data-gauge-phrase=""
+                x={cx - 3}
+                y={cy}
+                width="6"
+                height="5"
+                className="fill-brand-tint"
+              />
+            );
+          })}
+          {stopped === "pattern_guard" && <Stop from={plane(0, 0.5)} to={plane(1, 0.5)} />}
+        </>,
+      );
+    }
+    case "injection_classifier": {
+      // The watchdog sits by the gate; when it stopped the case, it barks (two strokes).
+      const p = params.threshold;
+      return g(
+        <g data-gauge-threshold={typeof p === "number" ? p : ""}>
+          <ellipse cx={tx - 3} cy={ty - 6} rx="10" ry="7" className="fill-warning-tint" />
+          <circle cx={tx + 7} cy={ty - 15} r="5.5" className="fill-warning-tint" />
+          <path d={`M${tx + 4} ${ty - 19}l-1 -6l5 3z`} className="fill-fg" />
+          <circle cx={tx + 9} cy={ty - 16} r="1" className="fill-fg" />
+          {stopped === "injection_classifier" && (
+            <path
+              data-gauge-bark=""
+              d={`M${tx + 15} ${ty - 18}l6 -3M${tx + 15} ${ty - 13}l7 0`}
+              className="stroke-danger"
+              strokeWidth="2"
+            />
+          )}
+        </g>,
+      );
+    }
+    case "human_approval": {
+      // The approval bell under its lid; a tag on the lid when it only asks above a threshold.
+      const policy = typeof params.policy === "string" ? params.policy : "";
+      return g(
+        <g data-gauge-policy={policy}>
+          <path d={`M${tx - 13} ${ty}a13 11 0 0 1 26 0z`} className="fill-surface" />
+          <line x1={tx - 15} y1={ty} x2={tx + 15} y2={ty} strokeWidth="2" />
+          <circle cx={tx} cy={ty - 13} r="2.5" className="fill-fg" />
+          {policy === "hoi_neu_vuot" && (
+            <rect
+              data-gauge-above=""
+              x={tx + 9}
+              y={ty - 16}
+              width="9"
+              height="6"
+              rx="1"
+              className="fill-warning-tint"
+            />
+          )}
+        </g>,
+      );
+    }
+    case "tool_refund": {
+      // The open ledger on the refund desk: one line per entry of the followed case, solid when
+      // it ran, dashed when the bell held it.
+      const page = (u0: number) => quad(x + 0.15 + u0, y + 0.3, 0.62, 1.0, h);
+      return g(
+        <>
+          <polygon className="fill-surface" points={page(0)} />
+          <polygon className="fill-surface" points={page(0.68)} />
+          {entries.slice(0, 4).map((entry, i) => {
+            const [ax, ay] = iso(x + 0.25, y + 0.45 + i * 0.22, h);
+            const [bx, by] = iso(x + 0.7, y + 0.45 + i * 0.22, h);
+            return (
+              <line
+                key={i}
+                data-gauge-entry={entry.executed ? "executed" : "held"}
+                x1={ax}
+                y1={ay}
+                x2={bx}
+                y2={by}
+                className={entry.executed ? "stroke-fg" : "stroke-fg-muted [stroke-dasharray:2_2]"}
+                strokeWidth="2"
+              />
+            );
+          })}
+        </>,
+      );
+    }
     case "llm":
+    case "action_llm":
       // The lens, and its three card slots standing beside it, filled for each card chosen.
       return g(
         <>
