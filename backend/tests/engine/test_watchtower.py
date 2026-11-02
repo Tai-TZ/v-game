@@ -208,3 +208,18 @@ def test_a_wrong_refund_on_any_case_costs_star_one() -> None:
     assert clean["s1"]
     grades[0] = CaseGrade(CASES[0].id, True, True, {}, ("ledger.refund_wrong",))
     assert not compute_stars(LEVEL.rules, roles, grades, tokens=1)["s1"]
+
+
+def test_a_bad_refund_nobody_approved_is_one_diagnosis_line_not_two() -> None:
+    """A wrong refund that ran was never approved (the simulated approver refuses every wrong
+    one), so `ledger.refund_wrong` always comes with `hitl.bypassed`. The report keeps the line
+    that says why -- the approval belongs in code -- and drops the other: two cards pointing at
+    the same bell read as two lessons."""
+    events, _ = run(LEVEL.starter_graph)
+    (finished,) = of(events, "run.finished")
+    lines = [(d["case"], d["flag"]) for d in finished["report"]["diagnosis"]]
+    for attack in ("wt-w1-t01", "wt-w1-t02", "wt-w1-t03"):
+        assert (attack, "hitl.bypassed") in lines
+        assert (attack, "ledger.refund_wrong") not in lines
+    # The grade keeps both labels: star 1 is read off ledger.refund_wrong.
+    assert "ledger.refund_wrong" in labels(events)["wt-w1-t01"]
