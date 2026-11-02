@@ -73,6 +73,17 @@ Chủ dự án lấy các hình isometric bấm được ở april-zhu.com/color
 
 Không lấy: chế độ "Turntable" (xoay liên tục, trái §1.2.6 cấm vòng lặp idle), bảng đổi màu tự do (chỉ dùng token màu của dự án), độ rung tay lớn (art bible muốn mô hình chính xác như sa bàn).
 
+### 2.7 Cỗ máy chiếm cả chiều ngang trang (chủ dự án duyệt, 2026-11-02)
+
+- Cỗ máy nằm trên cả hai cột (bàn thợ và cột Mở ca), rộng khoảng 1.070 px ở 1280×800 thay vì khoảng 700 px. Ở 100 % đã đọc được nhãn và chi tiết; nút phóng to vẫn còn.
+- Bàn thợ vẽ cỗ máy qua một portal vào vùng phía trên lưới hai cột, nên trạng thái (món đang mở, focus) vẫn nằm trong bàn thợ. Không có vùng đó thì cỗ máy vẽ tại chỗ như trước.
+- **Đánh đổi đã chấp nhận:** [workbench-v0.1](workbench-v0.1.md) §2.1 hứa nút Mở ca lên màn đầu ở 1280×800. Điều đó không còn đúng: Mở ca cách một lần cuộn, rồi cột bên phải dính lại khi cuộn nên nó luôn trong tầm mắt.
+
+### 2.8 Cờ thế giới trên hiện trường
+
+- Khi level đã có ít nhất một sao (lưu trên trình duyệt này, hoặc vừa đạt ở lượt chạy tính sao đang hiện), hiện trường đổi theo kịch bản §3: L1 áp phích bị gạch và đóng dấu "ĐÃ GỠ", L2 tờ đơn đổi dấu thành "ĐÃ NHẬN", L3 tờ in đóng dấu "ĐÃ XỬ LÝ". Lời cô Lan cho sao đầu tiên hiện trong mục "Cô Lan kể lại".
+- Lượt đã ghi và lượt thử câu mẫu không bao giờ dựng cờ, cùng luật với việc lưu sao (`useRecordStars`).
+
 ## 3. Đề xuất của bản nháp đã bỏ
 
 | Đề xuất | Lý do bỏ |
