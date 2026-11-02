@@ -81,9 +81,9 @@ Luật giữ nguyên: SVG ở bàn thợ (three.js chỉ ở chunk `/play`), kh�
 | # | Đề xuất | Thông tin thật mà hình mang | Tốn gì |
 |---|---|---|---|
 | G1 | **Hạt token chạy dọc băng chuyền**, mỗi hạt = 100 token, chạy một lần theo bước | `tokens.in` / `tokens.out` của từng step | SVG, vài chục phần tử; không vòng lặp |
-| G2 | **Xem trước tức thì cho mọi núm số**: kéo ngưỡng, thấy ca nào đổi trạng thái ngay | Chó gác đã có (điểm tính sẵn); mở rộng cho `top_k`, cỡ đoạn | Tính tất định ở client, 0 lời gọi |
+| G2 | ~~**Xem trước tức thì cho mọi núm số**~~ **Đã có, bỏ (2026-11-02):** Vòm Sao xem trước truy xuất (`/api/preview/retrieval`), Lược dao vẽ lại vết cắt, Chó gác có thang điểm và vạch ngưỡng. Ở W1 chỉ được dùng điểm của 3 câu mẫu (câu ẩn, câu bẫy giữ kín), và cả ba là khách thật điểm ≤ 0,01, nên xem trước ngưỡng không cho thấy gì | | |
 | G3 | **Bấm hạt hay đoạn để nhảy tới nguồn** trong trace | Chuỗi nhân quả từ đầu ra về đầu vào | Liên kết trong dữ liệu đã có |
-| G4 | **Thanh ngân sách đổ đầy khi máy chạy**, có vạch sao 2 | Token tích luỹ so với `token_budget` | Có sẵn `Bar`; thêm vạch |
+| G4 | **Thanh ngân sách đổ đầy khi máy chạy**, có vạch sao 2. **Đã làm (2026-11-02):** `BudgetMeter` trong "Đang chạy ca", chỉ ở lượt tính sao | Token tích luỹ so với `token_budget` | Thang chạy tới 1,25 × ngân sách để vạch nằm trong thanh |
 | G5 | **Kéo thả cụm từ vào lưới** (W1), bấm vẫn là lối chính | Số cụm = số thẻ treo | Kéo là lối tắt cho chuột (đã là quy ước của Lăng kính) |
 | G6 | **Âm thanh tuỳ chọn, tắt mặc định**: vài tiếng (chuông, dấu) | Chỉ xác nhận sự kiện đã có hình | Plass 2015 liệt kê nhạc là yếu tố thiết kế nhưng chưa có bằng chứng cho riêng nó ở đây; làm sau cùng |
 | G7 | **Cờ thế giới tổng hợp thành bảng tháp** | Các sao đạt được trên campus | Đã có Báo Tường trong đặc tả; chưa xây |
@@ -94,7 +94,7 @@ Luật giữ nguyên: SVG ở bàn thợ (three.js chỉ ở chunk `/play`), kh�
 
 Thứ tự đề xuất, vì rủi ro tăng dần:
 
-1. G2, G4: nhỏ, 0 lời gọi, dùng dữ liệu có sẵn.
+1. ~~G2~~ (đã có), G4 (đã làm): nhỏ, 0 lời gọi, dùng dữ liệu có sẵn.
 2. 3.3 Hoá đơn 1.000 khách: 0 lời gọi, không cần hiệu chỉnh model.
 3. 3.1 Hai bàn song song: dùng lại `diffGraphs` và phát lại.
 4. 3.2 và 3.4: lấp Ngày 4, cần cổng hiệu chỉnh với Gemini thật.
