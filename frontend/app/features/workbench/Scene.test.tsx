@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Brief } from "./Brief";
@@ -7,7 +8,11 @@ import { testEnv } from "./test-fixtures";
 afterEach(cleanup);
 
 function scene(id: Parameters<typeof testEnv>[0]) {
-  render(<Brief level={testEnv(id).level} />);
+  render(
+    <MemoryRouter>
+      <Brief level={testEnv(id).level} />
+    </MemoryRouter>,
+  );
   const found = document.querySelector("[data-scene]");
   if (!found) throw new Error(`${id} draws no scene`);
   return found;
@@ -58,7 +63,11 @@ describe("the scene at the head of each level", () => {
 // Cờ thế giới (scenario §3): once the level has a star, its scene shows the trouble fixed.
 describe("the scene once the level has a star", () => {
   function wonScene(id: Parameters<typeof testEnv>[0], won: boolean) {
-    render(<Brief level={testEnv(id).level} won={won} />);
+    render(
+      <MemoryRouter>
+        <Brief level={testEnv(id).level} won={won} />
+      </MemoryRouter>,
+    );
     const found = document.querySelector("[data-scene]");
     if (!found) throw new Error(`${id} draws no scene`);
     return found;

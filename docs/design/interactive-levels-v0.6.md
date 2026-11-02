@@ -95,7 +95,7 @@ Luật giữ nguyên: SVG ở bàn thợ (three.js chỉ ở chunk `/play`), kh�
 Thứ tự đề xuất, vì rủi ro tăng dần:
 
 1. ~~G2~~ (đã có), G4 (đã làm): nhỏ, 0 lời gọi, dùng dữ liệu có sẵn.
-2. 3.3 Hoá đơn 1.000 khách: 0 lời gọi, không cần hiệu chỉnh model.
+2. 3.3 Hoá đơn 1.000 khách: 0 lời gọi, không cần hiệu chỉnh model. **Hoãn (2026-11-02):** bài thuộc khu Chợ đang đóng. Chủ dự án chọn làm trước khung bài vi mô với bài "Thang rủi ro tool" cho W1 ([micro-lessons.md](../content/scenarios/micro-lessons.md)).
 3. 3.1 Hai bàn song song: dùng lại `diffGraphs` và phát lại.
 4. 3.2 và 3.4: lấp Ngày 4, cần cổng hiệu chỉnh với Gemini thật.
 5. G1, G3, G5, G6, G7 và 3.5.

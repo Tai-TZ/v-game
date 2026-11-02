@@ -485,6 +485,8 @@ export interface LevelCopy {
   npc?: Npc;
   /** Knobs that do nothing at this level, by param, with why (shown dimmed, scenario §5). */
   inertKnobs?: Readonly<Record<string, string>>;
+  /** An optional micro lesson before the level (roadmap X18): never in the way of the bench. */
+  warmup?: { href: string; label: string };
 }
 
 /** Cô Lan's lines per level, verbatim from each scenario §4 (beats 3 and 12). */
@@ -544,6 +546,10 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
   },
   "direct-injection": {
     asker: "chị Thảo",
+    warmup: {
+      href: "/play/watchtower/vi-mo/thang-rui-ro-tool",
+      label: "Khởi động 2 phút: Thang rủi ro tool",
+    },
     npc: { name: "Anh Quân", role: "Bảo vệ ca đêm, Tháp canh" },
     intro:
       "Mười hai khách tối nay. Ít nhất bảy trên tám khách thật phải được phục vụ, và sổ không được có khoản hoàn sai nào. Chặn hết thì dễ. Chặn đúng mới khó.",
