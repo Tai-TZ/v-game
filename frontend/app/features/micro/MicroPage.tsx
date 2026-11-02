@@ -19,6 +19,14 @@ import {
 
 const LEVEL_URL = `/play/${TOOL_RISK.zone}/${TOOL_RISK.before}`;
 
+/**
+ * On top of the shared chip: a full-width cell holding number, label and marks, and the picked
+ * lane kept at full strength once the ladder is checked (the fieldset locks; a dimmed pick read
+ * as unselected next to its verdict).
+ */
+const LANE_CHIP =
+  "h-auto min-h-11 w-full flex-wrap justify-start gap-x-2 gap-y-1 py-2 text-left peer-checked:peer-disabled:opacity-100";
+
 const laneLabel = (id: LaneId) => LANES.find((l) => l.id === id)?.label ?? id;
 
 const VERDICT_VI: Readonly<Record<Verdict, string>> = {
@@ -68,9 +76,12 @@ export function ToolRiskPage() {
                 <legend className="font-semibold">
                   <span className="text-fg-muted tabular-nums">{index + 1}.</span> {card.text}
                 </legend>
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {LANES.map((lane) => (
-                    <label key={lane.id} className="cursor-pointer">
+                {/* A scale, not four equal buttons: numbered loosest to strictest, each with as
+                    many marks as its step (order without relying on colour), 2x2 on a phone. */}
+                <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4">
+                  {LANES.map((lane, index) => (
+                    // A grid of one, so the chip fills the row's height: equal cells.
+                    <label key={lane.id} className="grid cursor-pointer">
                       <input
                         type="radio"
                         name={`${id}-${card.id}`}
@@ -78,7 +89,21 @@ export function ToolRiskPage() {
                         onChange={() => setPicks({ ...picks, [card.id]: lane.id })}
                         className="peer sr-only"
                       />
-                      <span className={CHIP}>{lane.label}</span>
+                      <span data-step={index + 1} className={`${CHIP} ${LANE_CHIP}`}>
+                        <span aria-hidden="true" className="font-semibold tabular-nums">
+                          {index + 1}
+                        </span>
+                        {lane.label}
+                        <span aria-hidden="true" className="flex gap-0.5">
+                          {LANES.map((_, mark) =>
+                            mark <= index ? (
+                              <span key={mark} data-mark-on="" className="size-1.5 bg-current" />
+                            ) : (
+                              <span key={mark} className="size-1.5 bg-line" />
+                            ),
+                          )}
+                        </span>
+                      </span>
                     </label>
                   ))}
                 </div>

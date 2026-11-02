@@ -20,7 +20,7 @@ test.describe("watchtower W1", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Thang rủi ro tool" })).toBeVisible();
     // Every job set to "Tự chạy": the read-only ones are right, the rest let something through.
     for (const card of await page.locator("[data-card]").all()) {
-      await card.getByText("Tự chạy", { exact: true }).click();
+      await card.getByRole("radio", { name: "Tự chạy", exact: true }).check({ force: true });
     }
     await page.getByRole("button", { name: "Kiểm tra" }).click();
     const grade = page.locator("[data-grade]");
@@ -34,6 +34,18 @@ test.describe("watchtower W1", () => {
     await grade.getByRole("link", { name: "Vào màn Cổng thành" }).click();
     await expect(page).toHaveURL(W1);
     expect(consoleErrors).toEqual([]);
+  });
+
+  test("keeps the picked lane at full strength once the ladder is checked", async ({ page }) => {
+    await mockWorkbenchApi(page, { events: () => stream("starter") });
+    await page.goto("/play/watchtower/vi-mo/thang-rui-ro-tool");
+    await expect(page.getByRole("heading", { level: 1, name: "Thang rủi ro tool" })).toBeVisible();
+    for (const card of await page.locator("[data-card]").all()) {
+      await card.getByRole("radio", { name: "Tự chạy", exact: true }).check({ force: true });
+    }
+    await page.getByRole("button", { name: "Kiểm tra" }).click();
+    const picked = page.locator("[data-card]").first().locator("input:checked + span");
+    await expect(picked).toHaveCSS("opacity", "1");
   });
 
   test("answers an unknown micro lesson as not found", async ({ page }) => {
