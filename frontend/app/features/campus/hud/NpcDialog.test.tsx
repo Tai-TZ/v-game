@@ -5,7 +5,8 @@ import { NPC_ROLES } from "../npcs";
 import { siteInfo, type SiteInfo } from "../sites";
 import { NpcDialog } from "./NpcDialog";
 
-const watchtower = siteInfo(null).watchtower;
+// A zone not open yet: the market is the one still coming once the watchtower opened.
+const watchtower: SiteInfo = { ...siteInfo(null).watchtower, status: "coming_soon" };
 
 function show(props: { visits?: number; site?: SiteInfo | null; who?: "guard" | "registrar" }) {
   const onEnter = vi.fn();

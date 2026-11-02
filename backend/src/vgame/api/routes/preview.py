@@ -11,7 +11,7 @@ from typing import Annotated, Final
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 
-from vgame.api.engine import EngineServices, get_engine
+from vgame.api.engine import EngineServices, get_engine, is_desk
 from vgame.api.routes.levels import LEVEL_NOT_FOUND, load_open_level
 from vgame.api.routes.runs import GRAPH_INVALID, JSON_ONLY, read_capped
 from vgame.content.models import SLUG_PATTERN
@@ -52,6 +52,10 @@ async def preview_retrieval(
         spec_level = load_open_level(level)
     except KeyError:
         return JSONResponse({"detail": LEVEL_NOT_FOUND}, status.HTTP_404_NOT_FOUND)
+
+    # The desk retrieves nothing, so there is nothing for this preview to show.
+    if is_desk(spec_level):
+        return JSONResponse({"detail": CASE_NOT_PREVIEWABLE}, status.HTTP_404_NOT_FOUND)
 
     question = next(
         (

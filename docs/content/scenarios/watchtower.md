@@ -213,6 +213,7 @@ Ba điều dưới đây làm đặc tả khác dàn ý gốc. Chúng không ph�
 1. ~~Spike structured output~~ **xong 2026-11-02** (mục 1.3): phiếu hành động dùng được.
 2. Engine gói 1 + 2 + khối W1 → W1 chạy được với FakeLLM.
 3. Nội dung W1 + frontend W1 + cổng hiệu chỉnh → **phát hành W1 riêng**.
+   - **Phát hành (2026-11-02):** khu `watchtower` mở, chỉ W1 vào được; W2 và W3 hiện "Sắp mở" (trường `status` của level trong `zones.json`). Khi chuẩn bị phát hành mới thấy API chưa nối W1: `GET /api/levels/direct-injection` trả 500 vì route đọc golden kiểu Thư viện, còn route chạy đòi index. Đã nối route level, route chạy và preview cho "quầy" (không index, không gold, chấm theo sổ). Chẩn đoán của ca bẫy W1 được giữ lại cho client, vì mỗi dòng chỉ dựng từ nhãn client đã có.
 4. Sửa biên dịch (gói 1 đã xong) + khối W2 + kho chính sách → W2.
 5. W3 sau cùng (cần canary, che trace, ghép đòn).
 

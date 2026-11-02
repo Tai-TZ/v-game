@@ -28,6 +28,8 @@ class Level(ContentModel):
     brief: Text
     concepts: list[Text]
     kind: LevelKind
+    # A level of an open zone may still be coming: the zone page lists it without "Vào màn".
+    status: ZoneStatus = "open"
 
 
 class Zone(ContentModel):
@@ -47,6 +49,12 @@ class Zone(ContentModel):
             raise ValueError(
                 f"zone {self.id!r}: level orders must be {expected} in listed order, got {orders}"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _open_zone_starts_on_an_open_level(self) -> Self:
+        if self.status == "open" and self.levels and self.levels[0].status != "open":
+            raise ValueError(f"zone {self.id!r} is open but its first level is not")
         return self
 
 

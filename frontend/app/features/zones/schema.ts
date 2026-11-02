@@ -13,6 +13,8 @@ export const LevelSchema = v.object({
   brief: v.string(),
   concepts: v.array(v.string()),
   kind: v.picklist(["standard", "incident"]),
+  /** A level of an open zone can still be coming (Watchtower: W1 opens first). */
+  status: v.optional(ZoneStatusSchema, "open"),
 });
 
 const zoneFields = {

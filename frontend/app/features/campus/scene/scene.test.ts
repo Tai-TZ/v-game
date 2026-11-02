@@ -543,7 +543,7 @@ describe("zone building looks (N9)", () => {
     const stars = { "thu-vien": { "grounded-citation": 1 as const }, cho: { routing: 3 as const } };
     expect(siteLooks(sites, stars, true)).toEqual({
       library: "lit",
-      watchtower: "coming_soon",
+      watchtower: "open", // open by default (zones.json seed), no star under its id
       market: "coming_soon",
     });
     // Stars stored under the location instead of the zone id do not count.
@@ -554,7 +554,7 @@ describe("zone building looks (N9)", () => {
     // No star can be earned until the workbench calls recordStars: dark windows would be a loss.
     expect(siteLooks(sites, {}, false)).toEqual({
       library: "lit",
-      watchtower: "coming_soon",
+      watchtower: "lit",
       market: "coming_soon",
     });
     expect(siteLooks(sites, {})).toEqual(siteLooks(sites, {}, STARS_SAVED));

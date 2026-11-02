@@ -284,7 +284,8 @@ test.describe("campus hub", () => {
 
     // World labels are decoration for assistive tech, but a click on one walks to its door.
     await page.locator("button", { hasText: "Tháp canh" }).click();
-    await expect(hint("Tháp canh · Sắp mở")).toBeVisible();
+    // The watchtower is open: its hint is the action itself, a button, not a live-region line.
+    await expect(page.getByRole("button", { name: "Nhấn E để vào Tháp canh" })).toBeVisible();
 
     await page.getByText("!", { exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Cô Lan" })).toBeVisible();
@@ -303,7 +304,7 @@ test.describe("campus hub", () => {
     const looks = (library: string) =>
       expect(page.locator("html")).toHaveAttribute(
         "data-looks",
-        `library:${library} watchtower:coming_soon market:coming_soon`,
+        `library:${library} watchtower:${STARS_SAVED ? "open" : "lit"} market:coming_soon`,
       );
     // No star yet: open, or lit while nothing saves stars (STARS_SAVED, QA r3). With the flag
     // off this pair cannot tell a broken storage → siteLooks path; flipping it checks both.
@@ -349,7 +350,7 @@ test.describe("campus hub", () => {
     // The inherited name is no library star: open (lit only while STARS_SAVED is off).
     await expect(page.locator("html")).toHaveAttribute(
       "data-looks",
-      `library:${STARS_SAVED ? "open" : "lit"} watchtower:coming_soon market:coming_soon`,
+      `library:${STARS_SAVED ? "open" : "lit"} watchtower:${STARS_SAVED ? "open" : "lit"} market:coming_soon`,
     );
     expect(consoleErrors).toEqual([]);
   });
@@ -415,12 +416,12 @@ test.describe("campus hub", () => {
     expect(zones.x - (chip.x + chip.width)).toBeGreaterThanOrEqual(48);
   });
 
-  test("shows the watchtower and the market as coming soon, without a way in", async ({ page }) => {
+  test("shows the market as coming soon, without a way in", async ({ page }) => {
     await mockApi(page);
     await page.goto("/play");
     await page.getByRole("button", { name: "Các khu" }).click();
     const list = page.locator("#hub-zone-list");
-    for (const name of ["Tháp canh", "Chợ model"]) {
+    for (const name of ["Chợ model"]) {
       const card = list.getByRole("article").filter({ has: page.getByRole("heading", { name }) });
       await expect(card.getByText("Sắp mở")).toBeVisible();
       await expect(card.getByRole("link")).toHaveCount(0);
@@ -433,6 +434,14 @@ test.describe("campus hub", () => {
     await expect(library.getByRole("link", { name: "Vào Thư viện" })).toHaveAttribute(
       "href",
       "/play/library",
+    );
+    const tower = list
+      .getByRole("article")
+      .filter({ has: page.getByRole("heading", { name: "Tháp canh" }) });
+    await expect(tower.getByText("Đang mở")).toBeVisible();
+    await expect(tower.getByRole("link", { name: "Vào Tháp canh" })).toHaveAttribute(
+      "href",
+      "/play/watchtower",
     );
   });
 

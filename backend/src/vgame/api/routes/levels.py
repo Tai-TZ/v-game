@@ -6,7 +6,6 @@ from pydantic import JsonValue
 from vgame.api.engine import EngineServices, get_engine
 from vgame.content.models import SLUG_PATTERN
 from vgame.content.repository import load_catalog
-from vgame.engine.grading import public_cases
 from vgame.engine.levels import LevelSpec, load_level
 from vgame.engine.registry import registry_json
 
@@ -14,12 +13,16 @@ LEVEL_NOT_FOUND = "Không tìm thấy level."
 
 
 def load_open_level(level_id: str) -> LevelSpec:
-    """A level the API serves: its file exists and its zone is open. A level can ship in the
-    engine before its zone opens (Watchtower W1); until then it is not found, never a 500.
+    """A level the API serves: its file exists, and its zone and its own entry in zones.json are
+    open. A level can ship in the engine before it opens; until then it is not found, never a 500.
     Raises KeyError like ``load_level``."""
     level = load_level(level_id)
     zone = load_catalog().find_zone(level.zone)
     if zone is None or zone.status != "open":
+        raise KeyError(level_id)
+    # The zone can open before all its levels (Watchtower: W1 first).
+    meta = next((lv for lv in zone.levels if lv.id == level_id), None)
+    if meta is None or meta.status != "open":
         raise KeyError(level_id)
     return level
 
@@ -49,4 +52,4 @@ async def get_level(
         level = load_open_level(level_id)
     except KeyError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, LEVEL_NOT_FOUND) from None
-    return level.public(public_cases(engine.spec(level.id)))
+    return level.public(engine.level_cases(level))

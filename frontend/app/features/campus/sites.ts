@@ -9,7 +9,7 @@ import { SITES, SPEAKERS, type NpcId, type Speaker, type Vec2 } from "./layout";
  */
 export const DEFAULT_STATUS: Readonly<Record<ZoneLocation, ZoneStatus>> = {
   library: "open",
-  watchtower: "coming_soon",
+  watchtower: "open",
   market: "coming_soon",
 };
 

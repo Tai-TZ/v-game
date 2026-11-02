@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 
 import { NPCS } from "../app/features/campus/layout";
 import { NPC_ROLES } from "../app/features/campus/npcs";
+import { DEFAULT_STATUS } from "../app/features/campus/sites";
 import { expect, mockApi, npcNames, test, titleOf, waitForIdleScene } from "./fixtures";
 
 /*
@@ -53,7 +54,14 @@ test.describe("hub NPCs", () => {
       for (const line of NPC_ROLES[id].greeting) {
         await expect(dialog.getByText(line, { exact: true })).toBeVisible();
       }
-      await expect(dialog.getByRole("button", { name: "Để sau" })).toBeFocused();
+      // An open zone is offered first (the guard's watchtower); otherwise "Để sau" takes focus.
+      const zone = NPC_ROLES[id].zone;
+      const opens = zone !== null && DEFAULT_STATUS[zone] === "open";
+      await expect(
+        opens
+          ? dialog.getByRole("button", { name: /^Vào / })
+          : dialog.getByRole("button", { name: "Để sau" }),
+      ).toBeFocused();
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
       await expect(row).toBeFocused();

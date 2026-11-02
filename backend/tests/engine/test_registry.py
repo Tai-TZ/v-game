@@ -85,4 +85,11 @@ def test_unreleased_blocks_stay_off_the_client_payload() -> None:
         "context_packer",
         "llm",
     }
-    assert listed == library
+    watchtower_w1 = {
+        "pattern_guard",
+        "injection_classifier",
+        "tool_refund",
+        "human_approval",
+        "action_llm",
+    }
+    assert listed == library | watchtower_w1

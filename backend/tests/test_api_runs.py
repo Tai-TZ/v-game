@@ -24,8 +24,10 @@ from tests.engine.fakes_oracle import (
 )
 from tests.engine.fakes_retrieval import HashingEmbedder, OverlapReranker
 from vgame.api.engine import EngineServices
+from vgame.api.routes import levels as levels_route
 from vgame.api.routes import runs
 from vgame.config import Settings
+from vgame.content.repository import load_catalog
 from vgame.engine.constants import IndexVariant
 from vgame.engine.corpus import load_documents
 from vgame.engine.index import (
@@ -106,11 +108,11 @@ def parse_events(text: str) -> list[Event]:
 # --- Blocks and levels ---------------------------------------------------------------------
 
 
-def test_blocks_lists_the_ten_library_blocks(api: TestClient) -> None:
+def test_blocks_lists_the_library_and_watchtower_w1_blocks(api: TestClient) -> None:
     response = api.get("/api/blocks")
     assert response.status_code == 200
     blocks = response.json()["blocks"]
-    assert len(blocks) == 10
+    assert len(blocks) == 15  # ten of the Library, five of Watchtower W1
     llm = next(b for b in blocks if b["type"] == "llm")
     assert llm["inputs"]["context"]["type"] == "Context"
     assert "temperature" not in json.dumps(llm["params"])
@@ -145,9 +147,44 @@ def test_unknown_or_malformed_level(api: TestClient, path: str, code: int) -> No
         assert response.json() == {"detail": "Không tìm thấy level."}
 
 
-def test_a_level_of_a_zone_not_yet_open_is_not_found(api: TestClient) -> None:
-    """The Watchtower's W1 ships in the engine before its zone opens (zones.json coming_soon):
-    until then the API answers as if the level did not exist, never a 500."""
+def test_watchtower_w1_is_served_once_its_zone_opens(api: TestClient) -> None:
+    response = api.get("/api/levels/direct-injection")
+    assert response.status_code == 200
+    assert response.json()["id"] == "direct-injection"
+
+
+@pytest.mark.parametrize(
+    ("zone_status", "level_status"),
+    [("coming_soon", "open"), ("open", "coming_soon")],
+    ids=["zone-shut", "level-shut"],
+)
+def test_a_level_not_yet_open_is_not_found(
+    api: TestClient, monkeypatch: pytest.MonkeyPatch, zone_status: str, level_status: str
+) -> None:
+    """A level can ship in the engine before it opens (its zone, or itself in zones.json): until
+    then the API answers as if the level did not exist, never a 500."""
+    catalog = load_catalog()
+    shut = catalog.model_copy(
+        update={
+            "zones": [
+                zone.model_copy(
+                    update={
+                        "status": zone_status,
+                        "levels": [
+                            lv.model_copy(update={"status": level_status})
+                            if lv.id == "direct-injection"
+                            else lv
+                            for lv in zone.levels
+                        ],
+                    }
+                )
+                if zone.id == "watchtower"
+                else zone
+                for zone in catalog.zones
+            ]
+        }
+    )
+    monkeypatch.setattr(levels_route, "load_catalog", lambda: shut)
     response = api.get("/api/levels/direct-injection")
     assert response.status_code == 404
     assert response.json() == {"detail": "Không tìm thấy level."}
