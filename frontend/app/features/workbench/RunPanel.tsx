@@ -395,6 +395,7 @@ function Editing({
       <QuotaLines quota={quota} />
 
       <button
+        id="wb-open-button"
         type="button"
         onClick={quota.mode === "recorded" ? onRecorded : onOpen}
         disabled={sending}
