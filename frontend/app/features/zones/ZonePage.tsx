@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
 import { microHref, warmupsBefore } from "~/features/micro/registry";
+import { SessionExport } from "~/features/session/SessionExport";
 
 import type { ZonePageData } from "./api";
 import type { Zone } from "./schema";
@@ -110,6 +111,7 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
               </li>,
             ])}
           </ol>
+          <SessionExport />
           <Link to={hubAt(data.zone)} className={buttonClass("secondary", "mt-10")}>
             {BACK_LABEL}
           </Link>

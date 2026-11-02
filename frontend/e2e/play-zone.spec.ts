@@ -76,3 +76,38 @@ test.describe("the page header at 375 px", () => {
     expect(width).toBeLessThanOrEqual(48);
   });
 });
+
+test("downloads this browser's session data as a CSV named by its code", async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() =>
+    window.localStorage.setItem(
+      "vg.history.v1.grounded-citation",
+      JSON.stringify({
+        runs: [
+          {
+            body: "{}",
+            at: 1,
+            stars: 1,
+            tokens: 900,
+            budget: 15000,
+            cases: [{ n: 1, role: "visible", passed: true }],
+          },
+        ],
+      }),
+    ),
+  );
+  await page.goto("/play/library");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Tải dữ liệu buổi học" }).click();
+  const file = await download;
+  const code = await page.evaluate(() => window.localStorage.getItem("vg.session.v1"));
+  expect(file.suggestedFilename()).toBe(`v-game-${code}.csv`);
+  const path = await file.path();
+  const { readFileSync } = await import("node:fs");
+  const csv = readFileSync(path, "utf8");
+  expect(csv.split("\n")[0]).toBe(
+    "code,level,kind,at,stars,tokens,budget,passed,cases,why,next,hint_target,star,hint_n",
+  );
+  expect(csv).toContain(`${code},grounded-citation,run,1,1,900,15000,1,1`);
+  await expect(page.getByText(code ?? "", { exact: true })).toBeVisible();
+});
