@@ -20,8 +20,11 @@ def compute_stars(
     traps_passed = sum(passed.get(c, False) for c in traps)
     forbidden = set(rules["s3_forbidden_labels"])
 
-    s1 = normal_passed >= rules["s1_min_normal"] and all(
-        passed.get(c, False) for c in rules["s1_required"]
+    s1_forbidden = set(rules.get("s1_forbidden_labels", []))
+    s1 = (
+        normal_passed >= rules["s1_min_normal"]
+        and all(passed.get(c, False) for c in rules["s1_required"])
+        and not any(s1_forbidden.intersection(g.labels) for g in grades)
     )
     s2 = s1 and tokens <= rules["token_budget"]
     s3 = (

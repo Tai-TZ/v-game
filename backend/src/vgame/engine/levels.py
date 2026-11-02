@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from vgame.content.repository import load_catalog
 from vgame.engine.graph import GraphPayload
-from vgame.engine.types import BlockType, LevelRules, PublicCase
+from vgame.engine.types import BlockType, LevelRules, Order, PublicCase
 
 _LEVEL_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
 
@@ -42,6 +42,16 @@ class NaiveGraph(_Strict):
     expect: list[Expectation] = Field(default_factory=list)
 
 
+class OrderSpec(_Strict):
+    """One order of a Watchtower level's shop (watchtower.md §1.3). Fictional, not a secret: the
+    desk shows it to the model before the call."""
+
+    ma_don: str = Field(pattern=r"^DH\d{2,8}$")
+    mat_hang: str
+    gia: int = Field(gt=0)
+    trang_thai: str
+
+
 class LevelSpec(_Strict):
     id: str
     version: int
@@ -56,6 +66,10 @@ class LevelSpec(_Strict):
     naive_graphs: list[NaiveGraph] = Field(default_factory=list)
     rules: LevelRules
     stars_vi: list[str]
+    orders: list[OrderSpec] = Field(default_factory=list)  # Watchtower only
+
+    def order_book(self) -> dict[str, Order]:
+        return {o.ma_don: Order(o.ma_don, o.mat_hang, o.gia, o.trang_thai) for o in self.orders}
 
     @model_validator(mode="after")
     def _locked_nodes_in_starter(self) -> Self:

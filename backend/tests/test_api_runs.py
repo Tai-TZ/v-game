@@ -145,6 +145,17 @@ def test_unknown_or_malformed_level(api: TestClient, path: str, code: int) -> No
         assert response.json() == {"detail": "Không tìm thấy level."}
 
 
+def test_a_level_of_a_zone_not_yet_open_is_not_found(api: TestClient) -> None:
+    """The Watchtower's W1 ships in the engine before its zone opens (zones.json coming_soon):
+    until then the API answers as if the level did not exist, never a 500."""
+    response = api.get("/api/levels/direct-injection")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Không tìm thấy level."}
+    graph = load_level("direct-injection").reference_graph.model_dump(mode="json", by_alias=True)
+    run = post_run(api, json.dumps(graph), level="direct-injection")
+    assert run.status_code == 404
+
+
 # --- Runs and SSE --------------------------------------------------------------------------
 
 

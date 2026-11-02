@@ -51,6 +51,7 @@ INTERNAL_ERROR_VI = "Máy chủ gặp lỗi khi chạy lượt này. Bạn thử
 CANCELLED_VI = "Lượt chạy bị dừng giữa chừng. Bạn thử chạy lại nhé."
 VIETNAM_UTC_OFFSET = timedelta(hours=7)  # no daylight saving time
 _RETRIEVERS: frozenset[BlockType] = frozenset({"vector_search", "bm25_search"})
+_LLM_BLOCKS: frozenset[BlockType] = frozenset({"llm", "action_llm"})
 
 
 class Evaluator(Protocol):
@@ -74,7 +75,7 @@ def precheck(compiled: CompiledLevelGraph, deps: EngineDeps) -> tuple[str, str] 
         return "index_missing", IndexNotBuiltError.message_vi
     if "rerank" in compiled.blocks and deps.reranker is None:
         return "rerank_unavailable", RerankerUnavailableError.message_vi
-    if "llm" in compiled.blocks and deps.llm is None:
+    if compiled.blocks & _LLM_BLOCKS and deps.llm is None:
         return "llm_not_configured", LLMNotConfiguredError.message_vi
     return None
 
@@ -110,7 +111,7 @@ async def _run_case(run: _Run, case: PublicCase) -> CaseTrace:
     started = time.perf_counter()
     status: CaseStatus = "ok"
     answer = None
-    state: CaseState = {"case": case, "ports": {}, "answer": None}
+    state: CaseState = {"case": case, "ports": {}, "answer": None, "halt": None}
     try:
         async with asyncio.timeout_at(ctx.deadline):
             final = await run.compiled.graph.ainvoke(
@@ -160,7 +161,7 @@ def _llm_unavailable(traces: Sequence[CaseTrace], daily_cap_hit: bool) -> bool:
     the AI."""
     if daily_cap_hit or any(t.status == "llm_error" for t in traces):
         return True
-    llm_steps = [s for t in traces for s in t.steps if s.block == "llm"]
+    llm_steps = [s for t in traces for s in t.steps if s.block in _LLM_BLOCKS]
     answered = any(s.status in ("ok", "refusal") for s in llm_steps)
     return not answered and any(s.status == "timeout" for s in llm_steps)
 
@@ -234,7 +235,7 @@ async def run_level(
         if any(t.status == "index_error" for t in ordered):
             emit(_failed(run_id, "index_stale", IndexStaleError.message_vi))
             return
-        if "llm" in compiled.blocks and _llm_unavailable(ordered, run.daily_cap_hit):
+        if compiled.blocks & _LLM_BLOCKS and _llm_unavailable(ordered, run.daily_cap_hit):
             message = llm_unavailable_vi(run.daily_cap_hit, datetime.now(UTC))
             emit(_failed(run_id, "llm_unavailable", message))
             return
