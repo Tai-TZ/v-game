@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
+import { microHref, warmupsBefore } from "~/features/micro/registry";
 
 import type { ZonePageData } from "./api";
 import type { Zone } from "./schema";
@@ -45,12 +46,38 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
         <Frame back={hubAt(data.zone)}>
           <ZoneHeader zone={data.zone} />
           <ol className="mt-10 space-y-4">
-            {byOrder(data.zone).map((level, index) => (
+            {byOrder(data.zone).flatMap((level, index) => [
+              // A warm-up micro lesson sits just before the level it prepares: optional, never a
+              // step in the way (roadmap X18).
+              ...warmupsBefore(data.zone.id, level.id).map((lesson) => (
+                <li
+                  key={`vi-mo-${lesson.id}`}
+                  data-warmup-row=""
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md border border-line px-5 py-3"
+                >
+                  <p className="text-sm">
+                    <span className="font-semibold">Khởi động 2 phút</span>
+                    <span className="text-fg-muted"> · {lesson.title} · không tính sao</span>
+                  </p>
+                  <Link
+                    to={microHref(lesson)}
+                    aria-label={`Làm bài khởi động ${lesson.title}`}
+                    className={buttonClass("quiet")}
+                  >
+                    Làm bài khởi động
+                  </Link>
+                </li>
+              )),
               <li
                 key={level.id}
                 data-level={level.id}
                 data-level-status={level.status}
-                className="grid grid-cols-[2rem_1fr] gap-x-4 rounded-md border border-line bg-surface p-5 sm:grid-cols-[2rem_1fr_auto]"
+                data-look={level.status === "open" ? "open" : "coming"}
+                className={`grid grid-cols-[2rem_1fr] gap-x-4 rounded-md border p-5 sm:grid-cols-[2rem_1fr_auto] ${
+                  level.status === "open"
+                    ? "border-line bg-surface"
+                    : "border-dashed border-fg-muted bg-subtle text-fg-muted"
+                }`}
               >
                 <span aria-hidden="true" className="text-2xl font-bold text-fg-muted tabular-nums">
                   {level.order}
@@ -80,8 +107,8 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
                     </Link>
                   )}
                 </div>
-              </li>
-            ))}
+              </li>,
+            ])}
           </ol>
           <Link to={hubAt(data.zone)} className={buttonClass("secondary", "mt-10")}>
             {BACK_LABEL}
