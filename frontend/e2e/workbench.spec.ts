@@ -863,13 +863,12 @@ test.describe("workbench", () => {
     // N6: before any run every slot says so, in words beside its icon.
     await expect(page.locator("#slot-vs [data-state]")).toHaveText("Trạng thái khối: Chưa chạy");
 
-    // N1 + N19: one click per answer, nothing required. The slip ships collapsed so the aside
-    // keeps Mở ca on the first screen at 1280x800 (workbench-v0.1 §2.1, §19.1), and a closed
-    // <details> is hidden from the accessibility tree, so getByRole cannot see inside it.
+    // N1 + N19: one click per answer, nothing required. The slip ships open (plan v0.7 Q2);
+    // a closed <details> would hide it from the accessibility tree.
     const disclosure = page.locator("details", {
       has: page.locator("summary", { hasText: "Đoán trước khi mở ca" }),
     });
-    await expect(disclosure).not.toHaveAttribute("open", "");
+    await expect(disclosure).toHaveAttribute("open", "");
     // Set rather than clicked: clicking toggles, so calling this twice would close it again.
     const openSlip = () => disclosure.evaluate((d) => d.setAttribute("open", ""));
     await openSlip();
