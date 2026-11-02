@@ -12,7 +12,7 @@ from typing import Annotated, Final
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from vgame.api.engine import EngineServices, get_engine
+from vgame.api.engine import EngineServices, get_engine, is_desk
 from vgame.api.routes.levels import LEVEL_NOT_FOUND, load_open_level
 from vgame.content.models import SLUG_PATTERN
 from vgame.engine.blocks import EngineDeps
@@ -21,9 +21,10 @@ from vgame.engine.compiler import compile_graph
 from vgame.engine.constants import MAX_PAYLOAD_BYTES, RUN_DEADLINE_S
 from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import graph_hash
+from vgame.engine.guard_scores import load_guard_scores
 from vgame.engine.index import IndexNotBuiltError, IndexStaleError
 from vgame.engine.run_store import IdempotencyConflictError, RunBusyError
-from vgame.engine.runtime import CANCELLED_VI, precheck, run_level
+from vgame.engine.runtime import CANCELLED_VI, Evaluator, precheck, run_level
 from vgame.engine.types import (
     EngineError,
     EngineEvent,
@@ -35,6 +36,7 @@ from vgame.engine.types import (
     RunScope,
 )
 from vgame.engine.validator import validate
+from vgame.engine.watchtower import WatchtowerEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +111,9 @@ async def create_run(
     except KeyError:
         return _error(status.HTTP_404_NOT_FOUND, LEVEL_NOT_FOUND)
 
-    spec = engine.spec(spec_level.id)
+    # The Watchtower desk has no index, no gold and no review case (watchtower.md §3).
+    desk = is_desk(spec_level)
+    spec = None if desk else engine.spec(spec_level.id)
     if case is not None and scope != "bien_the":
         return _error(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -120,7 +124,11 @@ async def create_run(
     if scope == "bien_the":
         # Only a review case of this level: anything else would run a hidden or trap case one at
         # a time, a scoreboard for the secret set.
-        variant = next((c for c in spec.cases if c.id == case and c.role == "review"), None)
+        variant = (
+            None
+            if spec is None
+            else next((c for c in spec.cases if c.id == case and c.role == "review"), None)
+        )
         if variant is None:
             return _error(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, VARIANT_CASE_VI, code="case_not_variant"
@@ -136,15 +144,38 @@ async def create_run(
             LLMNotConfiguredError.message_vi,
             code="llm_not_configured",
         )
-    if engine.store is None:
-        if engine.index_stale:
-            return _error(
-                status.HTTP_503_SERVICE_UNAVAILABLE, IndexStaleError.message_vi, code="index_stale"
-            )
-        return _error(
-            status.HTTP_503_SERVICE_UNAVAILABLE, IndexNotBuiltError.message_vi, code="index_missing"
+    # The evaluator and the cases are built here, before the run starts: building them has no
+    # side effect, and each branch narrows what it needs (no index for the desk).
+    evaluator: Evaluator
+    if desk:
+        cases = engine.level_cases(spec_level)
+        orders = spec_level.order_book()
+        deps = EngineDeps(
+            None,
+            engine.llm,
+            None,
+            RunBudget(),
+            guard_scores=load_guard_scores(spec_level.id, cases),
+            orders=orders,
         )
-    deps = EngineDeps(engine.store, engine.llm, engine.reranker, RunBudget())
+        evaluator = WatchtowerEvaluator(engine.watch_spec(spec_level.id), spec_level.rules, orders)
+    else:
+        if engine.store is None:
+            if engine.index_stale:
+                return _error(
+                    status.HTTP_503_SERVICE_UNAVAILABLE,
+                    IndexStaleError.message_vi,
+                    code="index_stale",
+                )
+            return _error(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                IndexNotBuiltError.message_vi,
+                code="index_missing",
+            )
+        library = engine.spec(spec_level.id)
+        cases = public_cases(library)
+        deps = EngineDeps(engine.store, engine.llm, engine.reranker, RunBudget())
+        evaluator = LevelEvaluator(library, spec_level.rules, engine.store)
     try:
         compiled = compile_graph(graph, spec_level, deps)
     except EngineError as exc:  # a chunker variant missing from the built index
@@ -166,15 +197,14 @@ async def create_run(
         retry = {"Retry-After": str(math.ceil(RUN_DEADLINE_S))}
         return _error(status.HTTP_429_TOO_MANY_REQUESTS, exc.message_vi, retry)
     if is_new:
-        evaluator = LevelEvaluator(spec, spec_level.rules, engine.store)
         if variant is not None:
             # ponytail: no login before T2, so anyone can draw R down, as with refunds
             # (quota.py); the hard ceiling stays DailyCap. One call, taken once per new run.
             engine.reserve.take(1)
             cases = [PublicCase(variant.id, variant.role, variant.vai, variant.question)]
-        else:
-            cases = public_cases(spec)
-        secret = frozenset(c.id for c in cases if c.role != "visible")
+        # A desk diagnosis line is built only from labels the client already has (no gold Điều),
+        # and W1's lesson sits on its trap cases: nothing to redact there.
+        secret = frozenset() if desk else frozenset(c.id for c in cases if c.role != "visible")
         task = asyncio.create_task(
             run_level(
                 run_id,

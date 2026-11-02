@@ -11,7 +11,7 @@ from fastapi import Request
 from vgame.config import Settings
 from vgame.engine.budget import DailyCap
 from vgame.engine.corpus import load_documents
-from vgame.engine.grading import GradingSpec, load_grading_spec
+from vgame.engine.grading import GradingSpec, load_grading_spec, public_cases
 from vgame.engine.index import (
     IndexNotBuiltError,
     IndexStaleError,
@@ -19,10 +19,12 @@ from vgame.engine.index import (
     golden_questions,
     rerank_questions,
 )
+from vgame.engine.levels import LevelSpec
 from vgame.engine.llm import build_llm_client
 from vgame.engine.replay import SEED_PATH, ReplayStore
 from vgame.engine.run_store import RunStore
-from vgame.engine.types import LLMClient, LLMNotConfiguredError, Reranker
+from vgame.engine.types import LLMClient, LLMNotConfiguredError, PublicCase, Reranker
+from vgame.engine.watchtower import WatchSpec, load_watch_spec, watch_public_cases
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,15 @@ class EngineServices:
     def spec(self, level_id: str) -> GradingSpec:
         return _spec(self.content_dir, level_id)
 
+    def watch_spec(self, level_id: str) -> WatchSpec:
+        return _watch_spec(self.content_dir, level_id)
+
+    def level_cases(self, level: LevelSpec) -> list[PublicCase]:
+        """The cases a run of this level plays, from the golden file of its kind."""
+        if is_desk(level):
+            return watch_public_cases(self.watch_spec(level.id))
+        return public_cases(self.spec(level.id))
+
     async def aclose(self) -> None:
         for task in list(self.tasks.values()):
             task.cancel()
@@ -60,6 +71,16 @@ class EngineServices:
 @cache
 def _spec(content_dir: Path, level_id: str) -> GradingSpec:
     return load_grading_spec(content_dir, level_id)
+
+
+@cache
+def _watch_spec(content_dir: Path, level_id: str) -> WatchSpec:
+    return load_watch_spec(content_dir, level_id)
+
+
+def is_desk(level: LevelSpec) -> bool:
+    """A Watchtower level: the support desk, graded on its ledger, with no index or gold."""
+    return level.zone == "watchtower"
 
 
 def build_engine(settings: Settings) -> EngineServices:

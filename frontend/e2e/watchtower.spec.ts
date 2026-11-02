@@ -2,14 +2,29 @@ import { readText } from "../app/features/workbench/test-fixtures";
 import { expect, mockWorkbenchApi, test } from "./fixtures";
 
 /**
- * Watchtower W1 on the bench (watchtower.md §3). The level's zone is not open yet, so no link
- * leads here; the page opens by its address. The streams are the engine's own runs of the
- * starter and the reference graph with a scripted model (e2e/data/README.md).
+ * Watchtower W1 on the bench (watchtower.md §3), reached from the open zone page; W2 and W3 are
+ * listed there as coming. The streams are the engine's own runs of the starter and the
+ * reference graph with a scripted model (e2e/data/README.md).
  */
 const W1 = "/play/watchtower/direct-injection";
 const stream = (name: "starter" | "reference") => readText("e2e", "data", `run-w1-${name}.sse`);
 
 test.describe("watchtower W1", () => {
+  test("is reached from the zone page, where the levels still coming have no way in", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await mockWorkbenchApi(page, { events: () => stream("starter") });
+    await page.goto("/play/watchtower");
+    const coming = page.locator('[data-level-status="coming_soon"]');
+    await expect(coming).toHaveCount(2);
+    await expect(coming.getByRole("link")).toHaveCount(0);
+    await page.getByRole("link", { name: "Vào màn Cổng thành" }).click();
+    await expect(page).toHaveURL(W1);
+    await expect(page.locator("[data-scene-total]")).toHaveText(/HOÀN TIỀN 5\.000\.000 đ/);
+    expect(consoleErrors).toEqual([]);
+  });
+
   test("builds the desk's fences with the toys and reads the ledger of a run", async ({
     page,
     consoleErrors,

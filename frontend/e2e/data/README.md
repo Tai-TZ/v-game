@@ -17,6 +17,6 @@ Without a running backend, the JSON files can be captured from the same app with
 `create_app(Settings(_env_file=None, gemini_api_key=None))`, write `json.dumps(body,
 ensure_ascii=False, indent=2)`, then run Prettier. Last capture: 2026-10-09.
 
-`blocks.json` holds every block, the unreleased Watchtower ones included (`registry_json(include_unreleased=True)`):
-the W1 specs need them. The live server hides them until W1 ships; `api.test.ts` covers a library
-level loading against that shorter list.
+`blocks.json` holds every block (`registry_json(include_unreleased=True)`). Since W1 shipped
+(2026-11-02) the live server lists the same blocks; `api.test.ts` still covers a level loading
+against a shorter list, for the next block held back in `registry.UNRELEASED`.

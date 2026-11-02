@@ -48,6 +48,8 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
             {byOrder(data.zone).map((level, index) => (
               <li
                 key={level.id}
+                data-level={level.id}
+                data-level-status={level.status}
                 className="grid grid-cols-[2rem_1fr] gap-x-4 rounded-md border border-line bg-surface p-5 sm:grid-cols-[2rem_1fr_auto]"
               >
                 <span aria-hidden="true" className="text-2xl font-bold text-fg-muted tabular-nums">
@@ -62,17 +64,21 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
                   <ConceptChips concepts={level.concepts} className="mt-3" />
                 </div>
                 <div className="col-span-2 mt-4 sm:col-span-1 sm:mt-0">
-                  <Link
-                    to={`/play/${data.zone.id}/${level.id}`}
-                    aria-label={`Vào màn ${level.title}`}
-                    // No progress is stored yet, so the first level is the one to start with.
-                    className={buttonClass(
-                      index === 0 ? "primary" : "secondary",
-                      "w-full sm:w-auto",
-                    )}
-                  >
-                    Vào màn
-                  </Link>
+                  {level.status !== "open" ? (
+                    <ZoneStatusText status={level.status} className="text-sm" />
+                  ) : (
+                    <Link
+                      to={`/play/${data.zone.id}/${level.id}`}
+                      aria-label={`Vào màn ${level.title}`}
+                      // No progress is stored yet, so the first level is the one to start with.
+                      className={buttonClass(
+                        index === 0 ? "primary" : "secondary",
+                        "w-full sm:w-auto",
+                      )}
+                    >
+                      Vào màn
+                    </Link>
+                  )}
                 </div>
               </li>
             ))}

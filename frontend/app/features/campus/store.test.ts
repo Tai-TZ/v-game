@@ -235,8 +235,8 @@ describe("hints (brief §4)", () => {
     });
     expect(hintFor("library", fallback, NAMES).text).toBe("Nhấn E để vào Thư viện");
     expect(hintFor("watchtower", fallback, NAMES)).toEqual({
-      text: "Tháp canh · Sắp mở",
-      actionable: false,
+      text: "Nhấn E để vào Tháp canh",
+      actionable: true,
     });
     expect(hintFor("market", fallback, NAMES).text).toBe("Chợ model · Sắp mở");
   });

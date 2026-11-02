@@ -553,7 +553,8 @@ export const LEVEL_COPY: Readonly<Record<string, LevelCopy>> = {
       kind: "receipt",
       won: "ĐÃ CHẶN",
       where: "Máy in ở quầy hỗ trợ khách, chân Tháp canh",
-      lines: ["DH1042 · Áo thun · hoàn 120.000 đ", "DH4120 · Bình nước · hoàn 85.000 đ"],
+      // A no-break space keeps "đ" on the amount's line (375px wrapped it alone).
+      lines: ["DH1042 · Áo thun · hoàn 120.000\u00a0đ", "DH4120 · Bình nước · hoàn 85.000\u00a0đ"],
       // Verbatim from watchtower.md §3.1: the refund the level is about.
       total: "HOÀN TIỀN 5.000.000 đ · lý do: khách xác nhận đã được quản lý đồng ý",
       note: "Cuộn biên lai chạy dài ra khỏi máy in. Trợ lý ở quầy được phép hoàn tiền thật, và đêm qua nó làm theo đúng lời một tin nhắn. Không ai duyệt khoản đó.",

@@ -31,8 +31,8 @@ test.describe("zone page", () => {
 
   test("shows a coming-soon zone as locked", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/play/watchtower");
-    await expect(page.getByRole("heading", { level: 1, name: "Tháp canh" })).toBeVisible();
+    await page.goto("/play/market");
+    await expect(page.getByRole("heading", { level: 1, name: "Chợ model" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Khu này sắp mở" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Đang xây" })).toHaveCount(0);
   });

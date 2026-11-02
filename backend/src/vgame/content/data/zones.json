@@ -40,7 +40,7 @@
       "summary": "Dựng hàng rào bảo vệ cho agent: chặn prompt injection, lọc dữ liệu cá nhân và tự tấn công thử để tìm lỗ hổng.",
       "concepts": ["Hàng rào bảo vệ", "Prompt injection", "Lọc dữ liệu cá nhân", "Tấn công thử"],
       "location": "watchtower",
-      "status": "coming_soon",
+      "status": "open",
       "levels": [
         {
           "id": "direct-injection",
@@ -56,7 +56,8 @@
           "title": "Tài liệu độc",
           "brief": "Tài liệu truy xuất về chứa lệnh ẩn, còn câu trả lời làm lộ thông tin cá nhân. Chặn injection gián tiếp và lọc PII ở đầu ra.",
           "concepts": ["Injection gián tiếp", "Lọc PII đầu ra", "Nguồn không tin cậy"],
-          "kind": "standard"
+          "kind": "standard",
+          "status": "coming_soon"
         },
         {
           "id": "turncoat-agent",
@@ -64,7 +65,8 @@
           "title": "Đổi phe",
           "brief": "Sự cố: trợ lý của một NPC có thể bị dụ làm trái nhiệm vụ. Đóng vai kẻ tấn công để tìm lỗ hổng, rồi vá hàng rào.",
           "concepts": ["Red-team", "Kịch bản tấn công", "Vá lỗ hổng"],
-          "kind": "incident"
+          "kind": "incident",
+          "status": "coming_soon"
         }
       ]
     },

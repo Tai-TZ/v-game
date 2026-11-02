@@ -159,9 +159,8 @@ REGISTRY: Final[Mapping[BlockType, BlockSpec]] = {
 # ponytail: the Watchtower blocks stay off GET /api/blocks until the workbench draws them. The
 # client parses block types as a closed list, so one unknown type would break every level; the
 # backend can deploy before the frontend. Remove a block from here when its toy ships.
-UNRELEASED: Final[frozenset[BlockType]] = frozenset(
-    {"pattern_guard", "injection_classifier", "tool_refund", "human_approval", "action_llm"}
-)
+# Watchtower W1's five blocks shipped with its toys (2026-11-02, watchtower.md §6.4 step 3).
+UNRELEASED: Final[frozenset[BlockType]] = frozenset()
 
 
 def _ports(ports: Mapping[str, PortSpec]) -> dict[str, JsonValue]:

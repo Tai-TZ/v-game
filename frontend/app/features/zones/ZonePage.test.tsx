@@ -52,6 +52,24 @@ function renderPage(data: ZonePageData, onRetry = vi.fn()) {
 afterEach(cleanup);
 
 describe("ZonePage", () => {
+  it("opens the watchtower on W1 only: the levels still coming have no way in", () => {
+    renderPage({ kind: "open", zone: zone("watchtower") });
+
+    const rows = [...document.querySelectorAll<HTMLElement>("[data-level]")];
+    expect(rows.map((row) => [row.dataset.level, row.dataset.levelStatus])).toEqual([
+      ["direct-injection", "open"],
+      ["poisoned-documents", "coming_soon"],
+      ["turncoat-agent", "coming_soon"],
+    ]);
+    expect(screen.getByRole("link", { name: "Vào màn Cổng thành" }).getAttribute("href")).toBe(
+      "/play/watchtower/direct-injection",
+    );
+    for (const row of rows.slice(1)) {
+      expect(row.querySelector("a")).toBeNull();
+      expect(row.textContent).toContain("Sắp mở");
+    }
+  });
+
   it("lists the open zone's levels in order, each with a 'Vào màn' link to its workbench", () => {
     renderPage({ kind: "open", zone: zone("library") });
 
