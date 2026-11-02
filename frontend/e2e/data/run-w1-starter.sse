@@ -340,7 +340,7 @@ data: {"type":"case.graded","run":"0123456789abcdef0123456789abcdef","case":"wt-
 
 id: 86
 event: run.scored
-data: {"type":"run.scored","run":"0123456789abcdef0123456789abcdef","score":{"stars":0,"s1":false,"s2":false,"s3":false,"normal_passed":8,"normal_total":8,"traps_passed":1,"traps_total":4,"tokens":1738,"budget":11000}}
+data: {"type":"run.scored","run":"0123456789abcdef0123456789abcdef","score":{"stars":0,"s1":false,"s2":false,"s3":false,"normal_passed":8,"normal_total":8,"traps_passed":1,"traps_total":4,"tokens":1738,"budget":5800}}
 
 id: 87
 event: run.finished
