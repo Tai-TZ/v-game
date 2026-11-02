@@ -102,9 +102,68 @@ def test_the_file_stays_under_its_cap(level_id: str) -> None:
     assert size <= BYTE_CAP, f"{level_id}: {size} bytes over the {BYTE_CAP} cap"
 
 
+# One step of the 4-decimal rounding. A score is a float32 dot product, and BLAS builds differ
+# by a few ulps (macOS Accelerate vs the CI runners' OpenBLAS): a value sitting on a rounding
+# boundary (0.80794990 rounds to 0.8079 on one, 0.808 on the other) must not fail the gate.
+SCORE_STEP = 1e-4
+
+
+def _score_rows(data: dict[str, Any]) -> dict[str, dict[str, list[list[Any]]]]:
+    ranks: dict[str, dict[str, list[list[Any]]]] = data["ranks"]
+    return ranks
+
+
+def _without_ranks(data: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in data.items() if k != "ranks"}
+
+
+def _same_up_to_scores(written: dict[str, Any], committed: dict[str, Any]) -> list[str]:
+    """Where the two differ, other than a score within one rounding step. Ranks, chunk ids
+    and spans must match exactly: only the last field of a rank row is a score."""
+    issues: list[str] = []
+    if _without_ranks(written) != _without_ranks(committed):
+        issues.append("a field other than the ranks differs")
+    a, b = _score_rows(written), _score_rows(committed)
+    if a.keys() != b.keys():
+        return [*issues, "the variants differ"]
+    for variant, cases in a.items():
+        if cases.keys() != b[variant].keys():
+            issues.append(f"{variant}: the cases differ")
+            continue
+        for case_id, rows in cases.items():
+            theirs = b[variant][case_id]
+            if [r[:-1] for r in rows] != [r[:-1] for r in theirs]:
+                issues.append(f"{variant}/{case_id}: ranked chunks differ")
+            elif any(
+                abs(r[-1] - t[-1]) > SCORE_STEP + 1e-12 for r, t in zip(rows, theirs, strict=True)
+            ):
+                issues.append(f"{variant}/{case_id}: a score moved by more than {SCORE_STEP}")
+    return issues
+
+
 @pytest.mark.parametrize("level_id", LEVEL_IDS)
 def test_committed_files_are_what_the_export_writes_today(level_id: str) -> None:
-    assert viz_level(level_id, _shipped(), CONTENT_DIR) == _committed(level_id)
+    written = viz_level(level_id, _shipped(), CONTENT_DIR)
+    assert _same_up_to_scores(written, _committed(level_id)) == []
+
+
+def test_the_comparison_still_catches_a_moved_rank_or_score() -> None:
+    committed = _committed(LEVEL_IDS[0])
+    variant, cases = next(iter(_score_rows(committed).items()))
+    case_id, rows = next((k, v) for k, v in cases.items() if len(v) >= 2)
+
+    def edited(rows_now: list[list[Any]]) -> dict[str, Any]:
+        copy: dict[str, Any] = json.loads(json.dumps(committed))
+        copy["ranks"][variant][case_id] = rows_now
+        return copy
+
+    # The chunks trade places, the scores stay where they were: only the rank check sees it.
+    swapped = [[*rows[1][:-1], rows[0][-1]], [*rows[0][:-1], rows[1][-1]], *rows[2:]]
+    assert _same_up_to_scores(edited(swapped), committed) != []
+    off = [[*rows[0][:-1], rows[0][-1] + 3 * SCORE_STEP], *rows[1:]]
+    assert _same_up_to_scores(edited(off), committed) != []
+    one_step = [[*rows[0][:-1], round(rows[0][-1] + SCORE_STEP, 4)], *rows[1:]]
+    assert _same_up_to_scores(edited(one_step), committed) == []
 
 
 def test_main_writes_one_file_per_level(tmp_path: Path) -> None:
