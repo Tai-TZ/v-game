@@ -3,7 +3,8 @@ import type { BlockType, Blocks, Graph, GraphNode, JsonValue, PublicLevel } from
 /**
  * The bench: one fixed slot per block type (workbench-v0.1 §3). Players attach, detach and tune
  * toys; a pure function turns the slots into the graph JSON the server runs, and another reads a
- * graph back into slots. No graph editor: a Library graph has at most ten nodes of fixed shape.
+ * graph back into slots. No graph editor: a Library graph has at most ten nodes of fixed shape,
+ * a Watchtower desk at most seven (watchtower.md §3.2).
  */
 
 /** Slot order = topological order = Tab order (§3.1). */
@@ -17,10 +18,23 @@ export const SLOT_ORDER: readonly BlockType[] = [
   "rerank",
   "context_packer",
   "llm",
+  "pattern_guard",
+  "injection_classifier",
+  "tool_refund",
+  "human_approval",
+  "action_llm",
   "output",
 ];
 /** Slots the player can attach and detach. */
-export const OPTIONAL_SLOTS = ["vector_search", "bm25_search", "fusion", "rerank"] as const;
+export const OPTIONAL_SLOTS = [
+  "vector_search",
+  "bm25_search",
+  "fusion",
+  "rerank",
+  "pattern_guard",
+  "injection_classifier",
+  "human_approval",
+] as const;
 export type SlotType = (typeof OPTIONAL_SLOTS)[number];
 export const isOptional = (type: BlockType): type is SlotType =>
   (OPTIONAL_SLOTS as readonly BlockType[]).includes(type);
@@ -35,6 +49,11 @@ const DEFAULT_ID: Readonly<Record<BlockType, string>> = {
   rerank: "rr",
   context_packer: "pk",
   llm: "llm",
+  pattern_guard: "net",
+  injection_classifier: "dog",
+  tool_refund: "refund",
+  human_approval: "bell",
+  action_llm: "desk",
   output: "out",
 };
 
@@ -47,6 +66,8 @@ export interface Bench {
   params: Readonly<Record<string, Params>>;
   /** Prompt card keys in the three Lăng kính slots (§3.3). */
   cards: Cards;
+  /** Watchtower: the phrases picked from the level's tray for the net, in tray order. */
+  phrases: readonly string[];
 }
 
 export type Domain =
@@ -70,12 +91,19 @@ export function nodeIds(level: PublicLevel): Readonly<Record<BlockType, string>>
 
 export const isAllowed = (level: PublicLevel, type: BlockType) =>
   level.allowed_blocks.includes(type);
+/** The block whose Lăng kính the player fills: the library's reader or the desk's slip writer. */
+export const promptType = (env: Env): "llm" | "action_llm" =>
+  isAllowed(env.level, "action_llm") ? "action_llm" : "llm";
 export const isLocked = (level: PublicLevel, type: BlockType) =>
   level.locked_nodes.includes(nodeIds(level)[type]);
 
-/** Params the bench tunes with a control; `system_prompt` is the Lăng kính (cards). */
+/**
+ * Params the bench tunes with a control. `system_prompt` is the Lăng kính (cards), `phrases` the
+ * net's tray; a guard's `refusal` is the level's, never the player's (watchtower.md §3.2).
+ */
+const NOT_A_CONTROL = new Set(["system_prompt", "phrases", "refusal"]);
 export const paramNames = (blocks: Blocks, type: BlockType) =>
-  Object.keys(blocks[type].params.properties).filter((name) => name !== "system_prompt");
+  Object.keys(blocks[type].params.properties).filter((name) => !NOT_A_CONTROL.has(name));
 
 const decimals = (step: number) => (String(step).split(".")[1] ?? "").length;
 /** 0.15, not 0.15000000000000002 (§3.2). */
@@ -223,11 +251,40 @@ export function graphFromBench(env: Env, bench: Bench): Graph {
     }
     if (SPECIAL.has(type)) return { id, type, params: {} };
     const params = { ...(bench.params[id] ?? {}) };
-    if (type === "llm") params.system_prompt = systemPrompt(level, bench.cards);
+    if (type === "llm" || type === "action_llm") {
+      params.system_prompt = systemPrompt(level, bench.cards);
+    }
+    if (type === "pattern_guard") params.phrases = [...bench.phrases];
     return { id, type, params };
   };
   const on = (type: SlotType) => isAllowed(level, type) && bench.attached[type];
   const q = ids.input;
+  if (isAllowed(level, "action_llm")) {
+    // The Watchtower desk: guards in a chain before the desk, the refund tool behind its gate.
+    const nodes: GraphNode[] = [node("input")];
+    const edges: [string, string][] = [];
+    let head = q;
+    for (const type of ["pattern_guard", "injection_classifier"] as const) {
+      if (!on(type)) continue;
+      nodes.push(node(type));
+      edges.push([`${head}.query`, `${ids[type]}.query`]);
+      head = ids[type];
+    }
+    edges.push([`${head}.query`, `${ids.action_llm}.query`]);
+    nodes.push(node("tool_refund"));
+    let tool = ids.tool_refund;
+    if (on("human_approval")) {
+      nodes.push(node("human_approval"));
+      edges.push([`${tool}.tool`, `${ids.human_approval}.tool`]);
+      tool = ids.human_approval;
+    }
+    nodes.push(node("action_llm"), node("output"));
+    edges.push(
+      [`${tool}.tool`, `${ids.action_llm}.tools`],
+      [`${ids.action_llm}.answer`, `${ids.output}.answer`],
+    );
+    return { schema: 1, nodes, edges };
+  }
   const nodes: GraphNode[] = [node("input"), node("corpus"), node("chunker")];
   const edges: [string, string][] = [];
   const lists: string[] = [];
@@ -277,11 +334,23 @@ export function benchFromGraph(env: Env, graph: Graph): Bench | null {
   const filled = fillDefaults(blocks, graph);
   const params: Record<string, Params> = {};
   let cards: Cards = [null, null, null];
+  let phrases: string[] = [];
   for (const type of SLOT_ORDER) {
     if (!isAllowed(level, type) || SPECIAL.has(type) || isLocked(level, type)) continue;
     const found = filled.nodes.find((node) => node.type === type);
     const own = found ? { ...found.params } : initialParams(env, type);
-    if (type === "llm") {
+    if (type === "pattern_guard") {
+      // Only tray phrases, each once: the net's toy can show nothing else. A phrase off the tray
+      // or a repeat leaves the count short; an order other than the tray's fails the final
+      // round-trip check, since the bench always writes them in tray order.
+      const picked = Array.isArray(own.phrases) ? own.phrases : [];
+      phrases = level.phrase_tray.filter((p) => picked.includes(p));
+      if (phrases.length !== picked.length) return null;
+      delete own.phrases;
+      delete own.refusal;
+    }
+    if (type === "injection_classifier") delete own.refusal;
+    if (type === "llm" || type === "action_llm") {
       const parsed = cardsFromPrompt(
         level,
         typeof own.system_prompt === "string" ? own.system_prompt : "",
@@ -302,9 +371,13 @@ export function benchFromGraph(env: Env, graph: Graph): Bench | null {
       bm25_search: byType.has("bm25_search"),
       fusion: byType.has("fusion"),
       rerank: byType.has("rerank"),
+      pattern_guard: byType.has("pattern_guard"),
+      injection_classifier: byType.has("injection_classifier"),
+      human_approval: byType.has("human_approval"),
     },
     params,
     cards,
+    phrases,
   };
   return sameJson(fillDefaults(blocks, graphFromBench(env, bench)), filled) ? bench : null;
 }
@@ -328,6 +401,14 @@ export const setAttached = (bench: Bench, type: SlotType, on: boolean): Bench =>
   ...bench,
   attached: { ...bench.attached, [type]: on },
 });
+
+/** Picks or drops a tray phrase of the net; the bench keeps them in tray order. */
+export function setPhrase(level: PublicLevel, bench: Bench, phrase: string, on: boolean): Bench {
+  const picked = new Set(bench.phrases);
+  if (on) picked.add(phrase);
+  else picked.delete(phrase);
+  return { ...bench, phrases: level.phrase_tray.filter((p) => picked.has(p)) };
+}
 
 export function setCard(bench: Bench, slot: 0 | 1 | 2, key: string | null): Bench {
   const cards: [string | null, string | null, string | null] = [...bench.cards];

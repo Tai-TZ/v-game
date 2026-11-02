@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { describePostError, newKey, postRun, previewRetrieval } from "./api";
+import { describePostError, loadLevelPage, newKey, postRun, previewRetrieval } from "./api";
+import { blocksJson, publicLevelJson } from "./test-fixtures";
 
 const headers = (entries: Record<string, string> = {}) => new Headers(entries);
 const NOW = Date.parse("2026-10-08T12:00:00Z");
@@ -233,5 +234,38 @@ describe("postRun carries the run's scope (N2)", () => {
     const urls = stubPost();
     await postRun("grounded-citation", body, newKey(), { variant: "lib-l1-r04" });
     expect(urls[0]).toContain("scope=bien_the&case=lib-l1-r04");
+  });
+});
+
+describe("loadLevelPage against the server's block list", () => {
+  /** The blocks the server lists, minus the unreleased ones it hides (registry.UNRELEASED). */
+  function stubServer(hidden: readonly string[]) {
+    const { blocks } = blocksJson() as { blocks: { type: string }[] };
+    vi.stubGlobal("fetch", (url: string) => {
+      const body = url.endsWith("/api/blocks")
+        ? { blocks: blocks.filter((b) => !hidden.includes(b.type)) }
+        : publicLevelJson(url.split("/").at(-1) ?? "");
+      return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+    });
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("opens a library level while the Watchtower's blocks are still hidden", async () => {
+    stubServer([
+      "pattern_guard",
+      "injection_classifier",
+      "tool_refund",
+      "human_approval",
+      "action_llm",
+    ]);
+    const page = await loadLevelPage("library", "grounded-citation");
+    expect(page.kind).toBe("ready");
+  });
+
+  it("refuses a level one of whose own blocks the server does not list", async () => {
+    stubServer(["context_packer"]);
+    const page = await loadLevelPage("library", "grounded-citation");
+    expect(page.kind).toBe("error");
   });
 });

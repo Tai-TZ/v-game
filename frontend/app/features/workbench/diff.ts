@@ -17,6 +17,7 @@ import {
   sameJson,
   SLOT_ORDER,
   type Env,
+  promptType,
 } from "./bench";
 import { TOY } from "./copy";
 import type { BlockType, Graph, JsonValue } from "./schema";
@@ -67,7 +68,7 @@ export function diffGraphs(env: Env, before: Graph, after: Graph): Change[] {
 
   // The cards, slot by slot. An unreadable prompt (hand-edited JSON, an older level) is left
   // alone rather than reported as three changes.
-  const llm = ids.llm;
+  const llm = ids[promptType(env)];
   // Narrowed, not coerced: a non-string here is a graph nobody drew, and String() would turn
   // it into "[object Object]" and then report three card changes.
   const prompt = (graph: Graph) => {
@@ -156,15 +157,16 @@ export function nextPickOptions(env: Env, graph: Graph): NextOption[] {
   }
 
   // The three Lăng kính slots, from the llm node's joined prompt.
-  const llm = node(ids.llm);
+  const brain = promptType(env);
+  const llm = node(ids[brain]);
   const prompt = typeof llm?.params.system_prompt === "string" ? llm.params.system_prompt : "";
   const cards = cardsFromPrompt(env.level, prompt);
-  if (cards !== null && !isLocked(env.level, "llm") && isAllowed(env.level, "llm")) {
+  if (cards !== null && !isLocked(env.level, brain) && isAllowed(env.level, brain)) {
     for (const slot of [0, 1, 2] as const) {
       const filled = cards[slot] !== null;
       options.push({
         label: filled ? `Bỏ Lăng kính (khe ${slot + 1})` : `Thêm Lăng kính (khe ${slot + 1})`,
-        pick: { type: "llm", param: "system_prompt", slot, direction: filled ? "remove" : "add" },
+        pick: { type: brain, param: "system_prompt", slot, direction: filled ? "remove" : "add" },
       });
     }
   }

@@ -33,6 +33,7 @@ import {
   roundToStep,
   setAttached,
   setParam,
+  setPhrase,
   slotParams,
   type Bench,
   type Domain,
@@ -43,7 +44,10 @@ import {
   CRITERIA_VI,
   fmt,
   fmtValue,
+  DESK_VI,
+  GUARD_VI,
   LABEL_VI,
+  LEDGER_BOOK_VI,
   LEVEL_COPY,
   outcomeText,
   shownLabels,
@@ -89,7 +93,7 @@ export function slotTargets(env: Env, type: BlockType, param?: string): string[]
 /** Slots that can be focused from a diagnosis: shown, unlocked and with a control. */
 export function hasControls(env: Env, type: BlockType): boolean {
   if (!isAllowed(env.level, type) || isLocked(env.level, type)) return false;
-  if (isOptional(type) || type === "llm") return true;
+  if (isOptional(type) || type === "llm" || type === "action_llm") return true;
   return paramNames(env.blocks, type).some((name) => domain(env, type, name)?.kind !== "fixed");
 }
 
@@ -156,16 +160,25 @@ const FLOW: readonly BlockType[] = [
   "rerank",
   "context_packer",
   "llm",
+  "pattern_guard",
+  "injection_classifier",
+  "action_llm",
+  "human_approval",
+  "tool_refund",
   "output",
 ];
+
+/** A Watchtower desk: the action slip's model instead of the library's reader. */
+export const isDesk = (env: Env) => isAllowed(env.level, "action_llm");
 
 export function BenchSection(props: BenchProps) {
   const { env, locked, view, saved, discarded } = props;
   const { level, blocks } = env;
   const allowed = (type: BlockType) => isAllowed(level, type);
   const flow = (type: BlockType) => Object.values(blocks[type].outputs)[0]?.type_vi ?? "";
+  const desk = isDesk(env);
   const notOpened = (["vector_search", "bm25_search", "fusion", "rerank"] as const)
-    .filter((type) => !allowed(type))
+    .filter((type) => !desk && !allowed(type))
     .map((type) => TOY[type].name);
   // One toy open at a time: the machine is the overview, the open slot its knobs and evidence.
   // A level opens on the first toy it lets the player turn.
@@ -246,43 +259,79 @@ export function BenchSection(props: BenchProps) {
 
       <fieldset disabled={locked} className="mt-5 min-w-0">
         <legend className="sr-only">Các món trên bàn thợ</legend>
-        {slot("input")}
-        <Connector label={flow("input")} />
-        <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
-          {slot("corpus")}
-          {slot("chunker")}
-        </div>
-        <Connector label={flow("chunker")} />
-        {(allowed("vector_search") || allowed("bm25_search")) && (
+        {desk ? (
           <>
-            <div
-              className={`grid gap-3 ${allowed("vector_search") && allowed("bm25_search") ? "sm:grid-cols-2" : ""}`}
-            >
-              {allowed("vector_search") && slot("vector_search")}
-              {allowed("bm25_search") && slot("bm25_search")}
+            {slot("input")}
+            <Connector label={flow("input")} />
+            {slot("pattern_guard")}
+            <Connector label={flow("pattern_guard")} />
+            {slot("injection_classifier")}
+            <Connector label={flow("injection_classifier")} />
+            {slot("action_llm")}
+            {/* The tool branch: what the slip asks for goes past the bell to the refund desk. */}
+            <Connector label={DESK_VI.branch} />
+            <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
+              {slot("human_approval")}
+              {slot("tool_refund")}
             </div>
-            <Connector label={flow("vector_search")} />
+            <Connector label={flow("action_llm")} />
+            {slot("output")}
           </>
+        ) : (
+          <LibraryFlow slot={slot} allowed={allowed} flow={flow} />
         )}
-        {allowed("fusion") && (
-          <>
-            {slot("fusion")}
-            <Connector label={flow("fusion")} />
-          </>
-        )}
-        {allowed("rerank") && (
-          <>
-            {slot("rerank")}
-            <Connector label={flow("rerank")} />
-          </>
-        )}
-        {slot("context_packer")}
-        <Connector label={flow("context_packer")} />
-        {slot("llm")}
-        <Connector label={flow("llm")} />
-        {slot("output")}
       </fieldset>
     </section>
+  );
+}
+
+function LibraryFlow({
+  slot,
+  allowed,
+  flow,
+}: {
+  slot: (type: BlockType) => ReactNode;
+  allowed: (type: BlockType) => boolean;
+  flow: (type: BlockType) => string;
+}) {
+  return (
+    <>
+      {slot("input")}
+      <Connector label={flow("input")} />
+      <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
+        {slot("corpus")}
+        {slot("chunker")}
+      </div>
+      <Connector label={flow("chunker")} />
+      {(allowed("vector_search") || allowed("bm25_search")) && (
+        <>
+          <div
+            className={`grid gap-3 ${allowed("vector_search") && allowed("bm25_search") ? "sm:grid-cols-2" : ""}`}
+          >
+            {allowed("vector_search") && slot("vector_search")}
+            {allowed("bm25_search") && slot("bm25_search")}
+          </div>
+          <Connector label={flow("vector_search")} />
+        </>
+      )}
+      {allowed("fusion") && (
+        <>
+          {slot("fusion")}
+          <Connector label={flow("fusion")} />
+        </>
+      )}
+      {allowed("rerank") && (
+        <>
+          {slot("rerank")}
+          <Connector label={flow("rerank")} />
+        </>
+      )}
+      {slot("context_packer")}
+      <Connector label={flow("context_packer")} />
+      {slot("llm")}
+      <Connector label={flow("llm")} />
+      {slot("output")}
+    </>
   );
 }
 
@@ -516,7 +565,15 @@ function Slot(props: BenchProps & { type: BlockType; open: boolean; onPick: () =
               onValue={(value) => onChange(setParam(env, bench, type, name, value))}
             />
           ))}
-        {type === "llm" && !locked && <Prism env={env} bench={bench} onChange={onChange} />}
+        {(type === "llm" || type === "action_llm") && !locked && (
+          <Prism env={env} bench={bench} onChange={onChange} />
+        )}
+        {type === "pattern_guard" && <PhraseTray env={env} bench={bench} onChange={onChange} />}
+        {type === "injection_classifier" && (
+          <p data-precomputed="" className="max-w-prose text-xs text-fg-muted">
+            {DESK_VI.precomputed}
+          </p>
+        )}
         {/* What the level holds still is worth one line, not one line per knob: the turning
             knobs are the game, the fixed ones are there for whoever wants to check. */}
         {fixed.length > 0 && (
@@ -676,6 +733,49 @@ function SlotIssues({ env, graph, issues }: { env: Env; graph: Graph; issues: re
 }
 
 // --- Controls -------------------------------------------------------------------------------
+
+/**
+ * Lưới cụm từ: the level's tray of phrases, each a chip the player presses into the net (no
+ * typing, no regex: watchtower.md §3.2). A pressed chip is in the net; the count says how full.
+ */
+function PhraseTray({
+  env,
+  bench,
+  onChange,
+}: {
+  env: Env;
+  bench: Bench;
+  onChange: (next: Bench) => void;
+}) {
+  const id = useId();
+  const tray = env.level.phrase_tray;
+  return (
+    <div data-phrase-tray="">
+      <p id={id} className="text-sm font-medium">
+        {DESK_VI.tray(bench.phrases.length, tray.length)}
+      </p>
+      <ul aria-labelledby={id} className="mt-2 flex flex-wrap gap-1">
+        {tray.map((phrase) => {
+          const on = bench.phrases.includes(phrase);
+          return (
+            <li key={phrase}>
+              <button
+                type="button"
+                aria-pressed={on}
+                data-phrase={phrase}
+                onClick={() => onChange(setPhrase(env.level, bench, phrase, !on))}
+                className="inline-flex min-h-11 items-center rounded-sm border border-fg-muted bg-surface px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60 aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-on-brand"
+              >
+                {phrase}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-1 max-w-prose text-xs text-fg-muted">{DESK_VI.match}</p>
+    </div>
+  );
+}
 
 /** "Móc kéo · Số đoạn lấy về · top_k": the knob's own toy (never the slot's again), title, code. */
 function ParamLabel({ env, type, param }: { env: Env; type: BlockType; param: string }) {
@@ -889,7 +989,7 @@ function Ingestion({ run, node, gold }: { run: RunView; node: string; gold: Slot
 /** What the provider charged for this case's prompt; the packer's own step has no usage. */
 function promptTokens(view: BenchRunView | null): number | null {
   for (const step of Object.values(view?.followed.steps ?? {})) {
-    if (step.block === "llm") return step.tokens?.in ?? null;
+    if (step.block === "llm" || step.block === "action_llm") return step.tokens?.in ?? null;
   }
   return null;
 }
@@ -1046,6 +1146,40 @@ function FactView({ fact, step, gold }: { fact: Fact; step: StepView; gold: Slot
           Vào thùng: {fact.included.length} đoạn. Bị cắt: {fact.dropped.length} đoạn.
         </p>
       </div>
+    );
+  }
+  if (fact.kind === "guard") {
+    const blocked = fact.decision === "block";
+    return (
+      <p data-guard={fact.decision} className={blocked ? "font-semibold text-danger" : undefined}>
+        {fact.by === "pattern" ? TOY.pattern_guard.name : TOY.injection_classifier.name}:{" "}
+        {blocked ? "chặn" : "cho qua"}
+        {fact.matched !== undefined && <> · khớp «{fact.matched}»</>}
+        {fact.score !== undefined && (
+          <>
+            {" "}
+            · điểm {fmt(fact.score)} <span className="text-fg-muted">({GUARD_VI.precomputed})</span>
+          </>
+        )}
+      </p>
+    );
+  }
+  if (fact.kind === "ledger") {
+    if (fact.entries.length === 0) return <p className="text-fg-muted">{LEDGER_BOOK_VI.empty}</p>;
+    return (
+      <ul aria-label={LEDGER_BOOK_VI.label} className="space-y-1">
+        {fact.entries.map((entry, index) => (
+          <li
+            key={index}
+            data-ledger={entry.executed ? "executed" : "held"}
+            className={`rounded-sm border px-2 py-1 font-mono text-xs ${
+              entry.executed ? "border-line-strong" : "border-dashed border-line"
+            }`}
+          >
+            {LEDGER_BOOK_VI.line(entry)}
+          </li>
+        ))}
+      </ul>
     );
   }
   return (

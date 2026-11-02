@@ -17,6 +17,7 @@ import {
   DIAGNOSIS_VI,
   HISTORY_VI,
   LEVEL_COPY,
+  npcOf,
   lowerFirst,
   RECORDED_VI,
   stepStatusText,
@@ -220,7 +221,7 @@ export function Results({
 
       {copy && score.stars >= 1 && (
         <figure className="mt-5 max-w-prose rounded-md border border-line bg-surface p-4">
-          <figcaption className="text-sm font-bold">Cô Lan</figcaption>
+          <figcaption className="text-sm font-bold">{npcOf(copy).name}</figcaption>
           <blockquote className="mt-1">{score.s3 ? copy.win3 : copy.win1}</blockquote>
         </figure>
       )}
@@ -234,7 +235,7 @@ export function Results({
       {slip && <SlipResult slip={slip} run={run} />}
 
       <h3 id="wb-diagnosis-title" tabIndex={-1} className="mt-8 text-lg font-bold">
-        Cô Lan chẩn đoán
+        {copy ? npcOf(copy).name : "Cô Lan"} chẩn đoán
       </h3>
       {ask && (
         <WhyMenu

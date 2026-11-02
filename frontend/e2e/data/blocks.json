@@ -396,6 +396,213 @@
       "llm_calls": 1,
       "runtime": true,
       "concepts": ["N1.token_economy", "N1.system_prompt"]
+    },
+    {
+      "type": "pattern_guard",
+      "name_vi": "Lọc mẫu injection",
+      "inputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        }
+      },
+      "outputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "phrases": {
+            "items": {
+              "maxLength": 50,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Cụm từ chặn",
+            "type": "array"
+          },
+          "refusal": {
+            "default": "Xin lỗi, quầy không xử lý được yêu cầu này. Bạn liên hệ nhân viên giúp mình nhé.",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Câu từ chối",
+            "type": "string"
+          }
+        },
+        "title": "PatternGuardParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": ["N11.input_guardrail"]
+    },
+    {
+      "type": "injection_classifier",
+      "name_vi": "Phân loại injection",
+      "inputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        }
+      },
+      "outputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "threshold": {
+            "default": 0.8,
+            "maximum": 0.95,
+            "minimum": 0.5,
+            "multipleOf": 0.05,
+            "title": "Ngưỡng chặn",
+            "type": "number"
+          },
+          "refusal": {
+            "default": "Xin lỗi, quầy không xử lý được yêu cầu này. Bạn liên hệ nhân viên giúp mình nhé.",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Câu từ chối",
+            "type": "string"
+          }
+        },
+        "title": "InjectionClassifierParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": true,
+      "concepts": ["N11.classifier", "N11.defense_in_depth"]
+    },
+    {
+      "type": "tool_refund",
+      "name_vi": "Hoàn tiền",
+      "inputs": {},
+      "outputs": {
+        "tool": {
+          "type": "Tool",
+          "type_vi": "Công cụ",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "description": "No params: the refund tool of the level's shop. Compiled to a ToolHandle, never run.",
+        "properties": {},
+        "title": "ToolRefundParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": false,
+      "concepts": ["N11.lethal_trifecta"]
+    },
+    {
+      "type": "human_approval",
+      "name_vi": "Cổng duyệt",
+      "inputs": {
+        "tool": {
+          "type": "Tool",
+          "type_vi": "Công cụ",
+          "many": false,
+          "required": true
+        }
+      },
+      "outputs": {
+        "tool": {
+          "type": "Tool",
+          "type_vi": "Công cụ",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "default": "hoi_neu_vuot",
+            "enum": ["luon_hoi", "hoi_neu_vuot"],
+            "title": "Khi nào hỏi",
+            "type": "string"
+          },
+          "amount_threshold": {
+            "default": 500000,
+            "maximum": 10000000,
+            "minimum": 0,
+            "multipleOf": 10000,
+            "title": "Ngưỡng tiền (đồng)",
+            "type": "integer"
+          }
+        },
+        "title": "HumanApprovalParams",
+        "type": "object"
+      },
+      "llm_calls": 0,
+      "runtime": false,
+      "concepts": ["N4.hitl", "N11.hitl"]
+    },
+    {
+      "type": "action_llm",
+      "name_vi": "Gọi LLM (phiếu hành động)",
+      "inputs": {
+        "query": {
+          "type": "Query",
+          "type_vi": "Câu hỏi",
+          "many": false,
+          "required": true
+        },
+        "tools": {
+          "type": "Tool",
+          "type_vi": "Công cụ",
+          "many": true,
+          "required": false
+        }
+      },
+      "outputs": {
+        "answer": {
+          "type": "Answer",
+          "type_vi": "Câu trả lời",
+          "many": false,
+          "required": true
+        }
+      },
+      "params": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "default": "can_bang",
+            "enum": ["nhe", "can_bang", "sau"],
+            "title": "Mức suy nghĩ",
+            "type": "string"
+          },
+          "system_prompt": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Dặn dò (system prompt)",
+            "type": "string"
+          }
+        },
+        "title": "ActionLLMParams",
+        "type": "object"
+      },
+      "llm_calls": 1,
+      "runtime": true,
+      "concepts": ["N1.system_prompt", "N4.structured_output", "N11.hitl"]
     }
   ]
 }

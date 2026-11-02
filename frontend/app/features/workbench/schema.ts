@@ -17,6 +17,12 @@ export const BLOCK_TYPES = [
   "rerank",
   "context_packer",
   "llm",
+  // Watchtower W1 (docs/content/scenarios/watchtower.md §3.2).
+  "pattern_guard",
+  "injection_classifier",
+  "tool_refund",
+  "human_approval",
+  "action_llm",
 ] as const;
 export const BlockTypeSchema = v.picklist(BLOCK_TYPES);
 export type BlockType = v.InferOutput<typeof BlockTypeSchema>;
@@ -73,7 +79,21 @@ export const BlockSpecSchema = v.looseObject({
     properties: v.optional(v.record(v.string(), ParamSchemaSchema), {}),
   }),
 });
-export const BlocksResponseSchema = v.object({ blocks: v.array(BlockSpecSchema) });
+/**
+ * Blocks of a type this client does not know are dropped, not fatal: the server can ship a new
+ * block before the workbench draws it, and one unknown type must not break every level.
+ */
+export const BlocksResponseSchema = v.object({
+  blocks: v.pipe(
+    v.array(v.unknown()),
+    v.transform((items) =>
+      items.flatMap((item) => {
+        const parsed = v.safeParse(BlockSpecSchema, item);
+        return parsed.success ? [parsed.output] : [];
+      }),
+    ),
+  ),
+});
 export type BlockSpec = v.InferOutput<typeof BlockSpecSchema>;
 export type Blocks = Readonly<Record<BlockType, BlockSpec>>;
 
@@ -110,6 +130,8 @@ export const PublicLevelSchema = v.looseObject({
   visible_cases: v.array(v.looseObject({ id: v.string(), vai: v.string(), question: v.string() })),
   // `info`: cases that run (one AI call each) but earn no star.
   case_counts: v.looseObject({ normal: Int, trap: Int, info: v.optional(Int, 0) }),
+  // Watchtower: the phrases the net offers to pick from (picked, never typed).
+  phrase_tray: v.optional(v.array(v.string()), []),
 });
 export type PublicLevel = v.InferOutput<typeof PublicLevelSchema>;
 
@@ -158,6 +180,26 @@ export const FactSchema = v.variant("kind", [
     model: v.string(),
     system_tokens: Int,
     answer: v.optional(v.string()),
+  }),
+  // Watchtower: a guard's verdict, and the write actions the desk ran (watchtower.md §3).
+  v.looseObject({
+    kind: v.literal("guard"),
+    by: v.picklist(["pattern", "classifier"]),
+    decision: v.picklist(["block", "pass"]),
+    matched: v.optional(v.string()),
+    score: v.optional(v.number()),
+  }),
+  v.looseObject({
+    kind: v.literal("ledger"),
+    entries: v.array(
+      v.looseObject({
+        tool: v.string(),
+        ma_don: v.string(),
+        so_tien: Int,
+        approval: v.picklist(["none", "auto", "approved", "denied", "no_tool"]),
+        executed: v.boolean(),
+      }),
+    ),
   }),
 ]);
 export type Fact = v.InferOutput<typeof FactSchema>;
