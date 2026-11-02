@@ -28,6 +28,12 @@ BlockType = Literal[
     "rerank",
     "context_packer",
     "llm",
+    # Watchtower W1 (docs/content/scenarios/watchtower.md §3).
+    "pattern_guard",
+    "injection_classifier",
+    "tool_refund",
+    "human_approval",
+    "action_llm",
 ]
 # "review" cases run only one at a time, as the variant after hint 3 (scope "bien_the").
 CaseRole = Literal["visible", "hidden", "trap", "review"]
@@ -85,6 +91,9 @@ class LLMRequest:
     system: str
     messages: tuple[LLMMessage, ...]
     max_tokens: int
+    # JSON Schema text: the reply must be a JSON value of it (watchtower §1.1, action slip).
+    # Text, not a dict, so the request stays hashable; None keeps every Library replay key.
+    response_json_schema: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,7 +228,34 @@ class Answer:
     replayed: bool
 
 
-PortValue = PublicCase | IndexHandle | DocList | PackedContext | Answer
+@dataclass(frozen=True, slots=True)
+class ApprovalSpec:
+    """``human_approval`` around a tool: who is asked, and when (Part 3 §3.2)."""
+
+    policy: Literal["luon_hoi", "hoi_neu_vuot"]
+    amount_threshold: int  # dong; with hoi_neu_vuot, a refund above it is asked about
+
+
+@dataclass(frozen=True, slots=True)
+class ToolHandle:
+    """Compile-time value of a ``Tool`` port, like ``IndexHandle``: the tool and the approval
+    gate wrapped around it, if any. The action slip runs it after the call (watchtower §1.1)."""
+
+    tool: Literal["tool_refund"]
+    approval: ApprovalSpec | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Order:
+    """One order of the level's shop, looked up by code before the call (watchtower §1.3)."""
+
+    ma_don: str
+    mat_hang: str
+    gia: int  # dong
+    trang_thai: str
+
+
+PortValue = PublicCase | IndexHandle | DocList | PackedContext | Answer | ToolHandle
 
 
 # --- Facts (neutral, gold-free; step.finished.facts) --------------------------------------
@@ -264,7 +300,34 @@ class LLMFact(TypedDict):
     answer: NotRequired[str]  # only for visible cases
 
 
-Fact = RetrievedFact | PackFact | LLMFact
+class GuardFact(TypedDict):
+    """One guard's verdict on the question. ``matched``: the phrase that hit (pattern_guard);
+    ``score``: the classifier's precomputed confidence (injection_classifier)."""
+
+    kind: Literal["guard"]
+    by: Literal["pattern", "classifier"]
+    decision: Literal["block", "pass"]
+    matched: NotRequired[str]
+    score: NotRequired[float]
+
+
+class LedgerEntry(TypedDict):
+    """A write action the slip asked for. ``approval``: none (no gate), auto (below the gate's
+    threshold), approved/denied (the simulated approver), no_tool (the tool is not on the bench)."""
+
+    tool: str
+    ma_don: str
+    so_tien: int
+    approval: Literal["none", "auto", "approved", "denied", "no_tool"]
+    executed: bool
+
+
+class LedgerFact(TypedDict):
+    kind: Literal["ledger"]
+    entries: list[LedgerEntry]
+
+
+Fact = RetrievedFact | PackFact | LLMFact | GuardFact | LedgerFact
 
 
 @dataclass(frozen=True, slots=True)
@@ -325,6 +388,10 @@ class LevelRules(TypedDict):
     stale_fails: StaleRule | None  # L2 only: these cases also need no hieu_luc=false in pack
     max_dieu: int
     diagnosis: dict[str, str]  # flag key -> Vietnamese template with {var} placeholders
+    # Watchtower: a label on any case loses star 1 (W1: a wrong refund in the ledger), and a
+    # refund at or under this many dong was not worth asking the approver about (hitl.over_asked).
+    s1_forbidden_labels: NotRequired[list[str]]
+    over_ask_below: NotRequired[int]
 
 
 class StarResult(TypedDict):

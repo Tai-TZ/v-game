@@ -23,6 +23,7 @@ network attempt; a call it refuses books no limiter slot.
 """
 
 import asyncio
+import json
 import logging
 import re
 import time
@@ -248,6 +249,13 @@ class GeminiClient:
                 thinking_level=GEMINI_THINKING[request.profile]
             ),
         )
+        if request.response_json_schema is not None:  # the action slip (watchtower §1.3)
+            config = config.model_copy(
+                update={
+                    "response_mime_type": "application/json",
+                    "response_json_schema": json.loads(request.response_json_schema),
+                }
+            )
         deadline = case_deadline.get()
         if deadline is None:
             deadline = self._clock() + CASE_DEADLINE_S

@@ -4,13 +4,13 @@ import re
 from collections.abc import Sequence
 from functools import cache
 from importlib import resources
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints, model_validator
 
 from vgame.content.repository import load_catalog
 from vgame.engine.graph import GraphPayload
-from vgame.engine.types import BlockType, LevelRules, PublicCase
+from vgame.engine.types import BlockType, LevelRules, Order, PublicCase
 
 _LEVEL_ID_RE = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
 
@@ -42,6 +42,16 @@ class NaiveGraph(_Strict):
     expect: list[Expectation] = Field(default_factory=list)
 
 
+class OrderSpec(_Strict):
+    """One order of a Watchtower level's shop (watchtower.md §1.3). Fictional, not a secret: the
+    desk shows it to the model before the call."""
+
+    ma_don: str = Field(pattern=r"^DH\d{2,8}$")
+    mat_hang: str
+    gia: int = Field(gt=0)
+    trang_thai: str
+
+
 class LevelSpec(_Strict):
     id: str
     version: int
@@ -56,6 +66,14 @@ class LevelSpec(_Strict):
     naive_graphs: list[NaiveGraph] = Field(default_factory=list)
     rules: LevelRules
     stars_vi: list[str]
+    orders: list[OrderSpec] = Field(default_factory=list)  # Watchtower only
+    # The phrases the net offers to pick from (watchtower.md §3.2: picked, never typed).
+    phrase_tray: list[Annotated[str, StringConstraints(min_length=1, max_length=50)]] = Field(
+        default_factory=list, max_length=40
+    )
+
+    def order_book(self) -> dict[str, Order]:
+        return {o.ma_don: Order(o.ma_don, o.mat_hang, o.gia, o.trang_thai) for o in self.orders}
 
     @model_validator(mode="after")
     def _locked_nodes_in_starter(self) -> Self:
@@ -98,6 +116,7 @@ class LevelSpec(_Strict):
                 for c in cases
                 if c.role == "visible"
             ],
+            **({"phrase_tray": list(self.phrase_tray)} if self.phrase_tray else {}),
             "case_counts": {
                 "normal": sum(c.role in ("visible", "hidden") for c in cases),
                 "trap": sum(c.role == "trap" and c.id not in info for c in cases),

@@ -2,12 +2,13 @@ import { useId, type ReactElement } from "react";
 
 import { ChevronDownIcon } from "~/components/ui/icons";
 
-import type { LevelScene } from "./copy";
+import type { LevelScene, Npc } from "./copy";
 
 /**
  * Hiện trường (scenario §3): the object a level opens on. L1 is a poster pinned to the notice
- * board, L2 a leave form stamped overdue, L3 the printout a whole queue is holding. Three
- * shapes, so the head of each level reads as its own place before a single knob is touched.
+ * board, L2 a leave form stamped overdue, L3 the printout a whole queue is holding, W1 the
+ * refund receipt rolling out of the counter's printer. Each its own shape, so the head of each
+ * level reads as its own place before a single knob is touched.
  *
  * It takes the place of cô Lan's box, and her line moves behind the disclosure with the rest
  * of the story: at 1280×800 the head had no room to spare, and one more box pushed "Mở ca" off
@@ -17,15 +18,17 @@ import type { LevelScene } from "./copy";
  */
 export function Scene({
   scene,
-  lan,
+  npc,
+  line,
   won = false,
   win,
 }: {
   scene: LevelScene;
-  lan: string;
+  npc: Npc;
+  line: string;
   /** The level has a star: the scene shows its trouble fixed (cờ thế giới, scenario §3). */
   won?: boolean;
-  /** Cô Lan's line for the first star (scenario §4), said once the level is won. */
+  /** The NPC's line for the first star (scenario §4), said once the level is won. */
   win?: string;
 }): ReactElement {
   const id = useId();
@@ -41,22 +44,22 @@ export function Scene({
       {object(scene, won)}
       <details className="group mt-1">
         <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
-          Cô Lan kể lại chuyện tối nay
+          {npc.name} kể lại chuyện tối nay
           <ChevronDownIcon />
         </summary>
         <div className="space-y-3 text-sm">
           {story(scene)}
           <figure>
             <figcaption>
-              <span className="font-bold">Cô Lan</span>{" "}
-              <span className="text-fg-muted">· Thủ thư ca tối</span>
+              <span className="font-bold">{npc.name}</span>{" "}
+              <span className="text-fg-muted">· {npc.role}</span>
             </figcaption>
-            <blockquote className="mt-1">{lan}</blockquote>
+            <blockquote className="mt-1">{line}</blockquote>
           </figure>
           {won && win && (
             <figure>
               <figcaption>
-                <span className="font-bold">Cô Lan</span>{" "}
+                <span className="font-bold">{npc.name}</span>{" "}
                 <span className="text-fg-muted">· sau sao đầu tiên</span>
               </figcaption>
               <blockquote className="mt-1">{win}</blockquote>
@@ -125,6 +128,26 @@ function object(scene: LevelScene, won: boolean): ReactElement {
           {won && <Fixed text={scene.won} />}
         </div>
       );
+    case "receipt":
+      // A till roll: torn top edge, one line per refund, the last one bold.
+      return (
+        <div
+          data-scene-receipt=""
+          className="relative mx-auto max-w-sm rounded-b-sm border border-t-2 border-dashed border-line-strong bg-subtle px-3 py-2 font-mono text-sm"
+        >
+          <ul className="divide-y divide-dashed divide-line">
+            {scene.lines.map((text) => (
+              <li key={text} className="py-1 text-fg-muted">
+                {text}
+              </li>
+            ))}
+            <li data-scene-total="" className="py-1 font-bold">
+              {scene.total}
+            </li>
+          </ul>
+          {won && <Fixed text={scene.won} />}
+        </div>
+      );
   }
 }
 
@@ -156,6 +179,13 @@ function story(scene: LevelScene): ReactElement {
               <li key={fact}>{fact}</li>
             ))}
           </ul>
+        </div>
+      );
+    case "receipt":
+      return (
+        <div className="space-y-1">
+          <p className="text-fg-muted">{scene.where}</p>
+          <p>{scene.note}</p>
         </div>
       );
   }

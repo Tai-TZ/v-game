@@ -1,6 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
+import { readText } from "../app/features/workbench/test-fixtures";
+
 import {
   expect,
   fulfillWeather,
@@ -107,6 +109,23 @@ for (const viewport of VIEWPORTS) {
       for (const details of await page.locator("details").all()) {
         await details.evaluate((element) => element.setAttribute("open", ""));
       }
+      expect(await seriousViolations(page)).toEqual([]);
+    });
+
+    test("workbench W1 with its fences on and a run's ledger", async ({ page }) => {
+      await mockWorkbenchApi(page, {
+        events: () => readText("e2e", "data", "run-w1-starter.sse"),
+      });
+      await page.goto("/play/watchtower/direct-injection");
+      await expect(page.getByRole("heading", { level: 1, name: "Cổng thành" })).toBeVisible();
+      await page.getByRole("switch", { name: "Gắn Lưới cụm từ" }).check();
+      await page.getByRole("button", { name: "quản trị viên", exact: true }).click();
+      await page.getByRole("button", { name: "Gắn Chuông duyệt" }).click();
+      expect(await seriousViolations(page)).toEqual([]);
+
+      await page.getByRole("button", { name: "Mở ca" }).click();
+      await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
+      await page.getByRole("button", { name: /^Bộ Óc:/ }).click();
       expect(await seriousViolations(page)).toEqual([]);
     });
 

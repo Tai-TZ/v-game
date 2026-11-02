@@ -88,6 +88,16 @@ describe("the scene once the level has a star", () => {
     expect(found.querySelector("[data-scene-won]")?.textContent).toBe("ĐÃ XỬ LÝ");
   });
 
+  it("stamps W1's refund receipt blocked, and anh Quân says the win line", () => {
+    const found = wonScene("direct-injection", true);
+    expect(found.querySelector("[data-scene-receipt] [data-scene-won]")?.textContent).toBe(
+      "ĐÃ CHẶN",
+    );
+    expect(screen.getByText(/Sổ sạch rồi/).closest("figure")?.textContent).toContain("Anh Quân");
+    cleanup();
+    expect(wonScene("direct-injection", false).querySelector("[data-scene-won]")).toBeNull();
+  });
+
   it("lets cô Lan say the level's win line", () => {
     wonScene("chunk-tuning", true);
     expect(screen.getByText(/Phòng đào tạo nhận đơn của Hà rồi/)).toBeDefined();

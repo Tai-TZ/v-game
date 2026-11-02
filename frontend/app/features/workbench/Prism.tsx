@@ -64,12 +64,15 @@ export function Prism({
                   type="button"
                   data-lens-slot={at}
                   data-card={key}
-                  aria-label={`Khe ${at + 1}: thẻ ${key}. Bấm để gỡ ra`}
                   onClick={() => onChange(setCard(bench, at, null))}
                   className="flex h-24 w-full min-w-0 flex-col items-start gap-1 rounded-md border-2 border-brand bg-brand-tint p-2 text-left disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <span className="font-mono text-sm font-bold">{key}</span>
+                  {/* Named by its own words plus hidden ones, never an aria-label over them:
+                      a voice user says what they see on the card (WCAG 2.5.3). */}
+                  <span className="sr-only">{`Khe ${at + 1}: thẻ `}</span>
+                  <span className="font-mono text-sm font-bold">{key}</span>{" "}
                   <span className="line-clamp-3 text-xs">{env.level.prompt_cards[key]}</span>
+                  <span className="sr-only">. Bấm để gỡ ra</span>
                 </button>
               ) : (
                 <div

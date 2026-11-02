@@ -1,7 +1,7 @@
 import { ChevronDownIcon } from "~/components/ui/icons";
 import { IncidentBadge } from "~/features/zones/ui";
 
-import { LEVEL_COPY, vaiVi } from "./copy";
+import { LEVEL_COPY, npcOf, vaiVi } from "./copy";
 import { Scene } from "./Scene";
 import type { PublicLevel } from "./schema";
 
@@ -24,7 +24,9 @@ export function Brief({ level, won = false }: { level: PublicLevel; won?: boolea
         </div>
         <p className="mt-3 text-lg text-fg-muted">{level.brief}</p>
 
-        {copy && <Scene scene={copy.scene} lan={copy.intro} won={won} win={copy.win1} />}
+        {copy && (
+          <Scene scene={copy.scene} npc={npcOf(copy)} line={copy.intro} won={won} win={copy.win1} />
+        )}
       </div>
 
       <div className="max-w-prose">

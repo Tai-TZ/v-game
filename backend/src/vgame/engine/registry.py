@@ -10,7 +10,7 @@ from pydantic import JsonValue
 from vgame.engine import blocks as b
 from vgame.engine.types import BlockType
 
-PortType = Literal["Query", "Index", "Docs", "Context", "Answer"]
+PortType = Literal["Query", "Index", "Docs", "Context", "Answer", "Tool"]
 
 PORT_TYPE_VI: Final[Mapping[PortType, str]] = {
     "Query": "Câu hỏi",
@@ -18,6 +18,7 @@ PORT_TYPE_VI: Final[Mapping[PortType, str]] = {
     "Docs": "Tài liệu",
     "Context": "Context",
     "Answer": "Câu trả lời",
+    "Tool": "Công cụ",
 }
 
 
@@ -36,13 +37,14 @@ class BlockSpec:
     inputs: Mapping[str, PortSpec] = field(default_factory=dict)
     outputs: Mapping[str, PortSpec] = field(default_factory=dict)
     llm_calls: int = 0
-    runtime: bool = True  # False: ingestion lane (corpus, chunker), resolved at compile time
+    runtime: bool = True  # False: resolved at compile time (corpus, chunker; tools and gates)
     concepts: tuple[str, ...] = ()
 
 
 _Q = PortSpec("Query")
 _IX = PortSpec("Index")
 _DOCS = PortSpec("Docs")
+_TOOL = PortSpec("Tool")
 
 REGISTRY: Final[Mapping[BlockType, BlockSpec]] = {
     s.type: s
@@ -107,8 +109,59 @@ REGISTRY: Final[Mapping[BlockType, BlockSpec]] = {
             llm_calls=1,
             concepts=("N1.token_economy", "N1.system_prompt"),
         ),
+        # Watchtower W1 (docs/content/scenarios/watchtower.md §3.2).
+        BlockSpec(
+            "pattern_guard",
+            "Lọc mẫu injection",
+            b.PatternGuardParams,
+            inputs={"query": _Q},
+            outputs={"query": _Q},
+            concepts=("N11.input_guardrail",),
+        ),
+        BlockSpec(
+            "injection_classifier",
+            "Phân loại injection",
+            b.InjectionClassifierParams,
+            inputs={"query": _Q},
+            outputs={"query": _Q},
+            concepts=("N11.classifier", "N11.defense_in_depth"),
+        ),
+        BlockSpec(
+            "tool_refund",
+            "Hoàn tiền",
+            b.ToolRefundParams,
+            outputs={"tool": _TOOL},
+            runtime=False,
+            concepts=("N11.lethal_trifecta",),
+        ),
+        BlockSpec(
+            "human_approval",
+            "Cổng duyệt",
+            b.HumanApprovalParams,
+            inputs={"tool": _TOOL},
+            outputs={"tool": _TOOL},
+            runtime=False,
+            concepts=("N4.hitl", "N11.hitl"),
+        ),
+        BlockSpec(
+            "action_llm",
+            "Gọi LLM (phiếu hành động)",
+            b.ActionLLMParams,
+            inputs={"query": _Q, "tools": PortSpec("Tool", many=True, required=False)},
+            outputs={"answer": PortSpec("Answer")},
+            llm_calls=1,
+            concepts=("N1.system_prompt", "N4.structured_output", "N11.hitl"),
+        ),
     )
 }
+
+
+# ponytail: the Watchtower blocks stay off GET /api/blocks until the workbench draws them. The
+# client parses block types as a closed list, so one unknown type would break every level; the
+# backend can deploy before the frontend. Remove a block from here when its toy ships.
+UNRELEASED: Final[frozenset[BlockType]] = frozenset(
+    {"pattern_guard", "injection_classifier", "tool_refund", "human_approval", "action_llm"}
+)
 
 
 def _ports(ports: Mapping[str, PortSpec]) -> dict[str, JsonValue]:
@@ -123,8 +176,9 @@ def _ports(ports: Mapping[str, PortSpec]) -> dict[str, JsonValue]:
     }
 
 
-def registry_json() -> dict[str, JsonValue]:
-    """Payload of ``GET /api/blocks``: JSON Schema (Vietnamese titles) + port matrix per block."""
+def registry_json(*, include_unreleased: bool = False) -> dict[str, JsonValue]:
+    """Payload of ``GET /api/blocks``: JSON Schema (Vietnamese titles) + port matrix per block.
+    ``include_unreleased``: every block, for the frontend's test fixtures, never the route."""
     return {
         "blocks": [
             {
@@ -138,5 +192,6 @@ def registry_json() -> dict[str, JsonValue]:
                 "concepts": list(s.concepts),
             }
             for s in REGISTRY.values()
+            if include_unreleased or s.type not in UNRELEASED
         ]
     }

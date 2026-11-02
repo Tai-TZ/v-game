@@ -27,7 +27,19 @@ export const readText = (...parts: string[]) =>
   readFileSync(path.resolve(FRONTEND, ...parts), "utf8");
 
 export const LEVEL_IDS = ["grounded-citation", "chunk-tuning", "article-number-lookup"] as const;
-export type LevelId = (typeof LEVEL_IDS)[number];
+/** Watchtower levels: the desk, not the index (watchtower.md §3); kept apart from LEVEL_IDS,
+ * whose tests are about retrieval. */
+export const WATCHTOWER_IDS = ["direct-injection"] as const;
+export type LevelId = (typeof LEVEL_IDS)[number] | (typeof WATCHTOWER_IDS)[number];
+
+/** The naive graphs of a backend level file (each must lose stars the way it declares). */
+export function naiveGraphs(id: LevelId): { id: string; graph: Graph }[] {
+  const raw = readJson("..", "backend", "src", "vgame", "engine", "levels", `${id}.json`);
+  return v.parse(
+    v.looseObject({ naive_graphs: v.array(v.looseObject({ id: v.string(), graph: GraphSchema })) }),
+    raw,
+  ).naive_graphs;
+}
 
 export const publicLevelJson = (id: string) => readJson("e2e", "data", "levels", `${id}.json`);
 export const blocksJson = () => readJson("e2e", "data", "blocks.json");

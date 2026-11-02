@@ -123,7 +123,7 @@ def test_output_runs_once_on_uneven_branches() -> None:
     async def run_case(case: PublicCase) -> None:
         ctx = CaseContext("run", events.append, deadline=float("inf"))
         final = await c.graph.ainvoke(
-            {"case": case, "ports": {}, "answer": None},
+            {"case": case, "ports": {}, "answer": None, "halt": None},
             {"configurable": {"case_ctx": ctx}, "recursion_limit": RECURSION_LIMIT},
         )
         assert final["answer"] is not None

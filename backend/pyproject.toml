@@ -24,6 +24,9 @@ vgame-build-index = "vgame.engine.index:main"
 # Record the starter run of every Library level from the replay seed (no Gemini call) into
 # frontend/public/runs/<level>.json, redacted for hidden and trap cases (engine/recorded.py).
 vgame-export-recorded-runs = "vgame.engine.recorded:main"
+# Score a Watchtower level's cases for the watchdog (injection_classifier), one Gemini call each,
+# into src/vgame/engine/data/guard_scores/<level>.json (watchtower.md §1.2). Needs GEMINI_API_KEY.
+vgame-score-guards = "vgame.engine.guard_scores:main"
 vgame-export-static-viz = "vgame.engine.static_viz:main"
 
 [dependency-groups]

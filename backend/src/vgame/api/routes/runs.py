@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Requ
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from vgame.api.engine import EngineServices, get_engine
-from vgame.api.routes.levels import LEVEL_NOT_FOUND
+from vgame.api.routes.levels import LEVEL_NOT_FOUND, load_open_level
 from vgame.content.models import SLUG_PATTERN
 from vgame.engine.blocks import EngineDeps
 from vgame.engine.budget import RunBudget
@@ -22,7 +22,6 @@ from vgame.engine.constants import MAX_PAYLOAD_BYTES, RUN_DEADLINE_S
 from vgame.engine.grading import LevelEvaluator, public_cases
 from vgame.engine.graph import graph_hash
 from vgame.engine.index import IndexNotBuiltError, IndexStaleError
-from vgame.engine.levels import load_level
 from vgame.engine.run_store import IdempotencyConflictError, RunBusyError
 from vgame.engine.runtime import CANCELLED_VI, precheck, run_level
 from vgame.engine.types import (
@@ -106,7 +105,7 @@ async def create_run(
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
         return _error(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, JSON_ONLY)
     try:
-        spec_level = load_level(level)
+        spec_level = load_open_level(level)
     except KeyError:
         return _error(status.HTTP_404_NOT_FOUND, LEVEL_NOT_FOUND)
 

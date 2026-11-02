@@ -35,6 +35,9 @@ def replay_key(provider: str, model: str, request: LLMRequest, frame_version: in
         "messages": [[m.role, m.text] for m in request.messages],
         "frame_version": frame_version,
     }
+    # Only when set: every Library request (no schema) keeps the key it had before.
+    if request.response_json_schema is not None:
+        material["response_json_schema"] = request.response_json_schema
     blob = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
