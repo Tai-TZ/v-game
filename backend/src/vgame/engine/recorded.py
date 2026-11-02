@@ -29,7 +29,7 @@ from vgame.engine.compiler import compile_graph
 from vgame.engine.corpus import load_documents
 from vgame.engine.grading import LevelEvaluator, load_grading_spec, public_cases
 from vgame.engine.index import IndexStore, golden_questions, rerank_questions
-from vgame.engine.levels import load_level
+from vgame.engine.levels import library_level_ids, load_level
 from vgame.engine.llm import ReplayingLLM
 from vgame.engine.replay import SEED_PATH, ReplayStore
 from vgame.engine.runtime import run_level
@@ -47,7 +47,7 @@ from vgame.engine.types import (
 )
 from vgame.engine.validator import validate
 
-LEVEL_IDS: Final = ("grounded-citation", "chunk-tuning", "article-number-lookup")
+LEVEL_IDS: Final = library_level_ids()
 # backend/src/vgame/engine/recorded.py -> parents[4] is the repo root.
 OUT_DIR: Final = Path(__file__).resolve().parents[4] / "frontend" / "public" / "runs"
 RUN_ID: Final = "recorded"
