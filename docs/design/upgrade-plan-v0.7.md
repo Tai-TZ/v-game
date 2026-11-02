@@ -114,6 +114,8 @@ Mọi sự kiện có chung một vỏ `{pid, arm, buoi, t_min, level, type}`:
 
 ## 6. Quyết định của chủ dự án
 
+> **2026-11-02:** chủ dự án: "làm theo đề xuất". Đã chốt theo đề xuất của tài liệu này: **Q2** (hiện sẵn, vẫn bỏ qua được), **Q4** (cả hai mốc), **Q5** (nhánh A/B). **Q1** và **Q3** chưa có đề xuất cụ thể nên vẫn mở: Q1 cần tạo tài khoản dịch vụ, Q3 là sáu câu của W2.
+
 1. **Q1 · Lưu bền.** Postgres miễn phí ngoài Render (Neon hoặc Supabase), hay giữ RAM và chấp nhận mất dữ liệu khi khởi động lại? Ảnh hưởng 1.2 và 4.4.
 2. **Q2 · Đoán và "Vì sao" thành bước mặc định?** X4 đã chốt là "không bắt buộc, cho bỏ qua". Đề xuất: hiện sẵn nhưng vẫn có nút bỏ qua.
 3. **Q3 · Sáu câu của W2:**
