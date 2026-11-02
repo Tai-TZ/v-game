@@ -101,7 +101,7 @@ Mục tiêu là nhận được "dấu hiệu", không phải kết luận chắ
 1. **Chia ngẫu nhiên.** Nhóm A chơi bản có phiếu đoán, nhóm B chơi bản không có. Nếu đủ người, thêm nhóm C học như cũ để biết game có thêm giá trị so với lớp bình thường không. Không để học viên tự chọn nhóm.
 2. **Tiền kiểm và hậu kiểm bằng câu tương đương**, không dùng lại cùng một bộ câu. Báo điểm thô và gain chuẩn hoá (Hake 1998).
 3. **Bài chuyển giao ngoài game**: một tình huống chưa gặp (ví dụ một test set hoặc một kiểu tấn công mới), làm không có AI và không có game.
-4. **Kiểm tra lặp lại sau 1–2 tuần** để đo giữ lại kiến thức và để hạn chế ảnh hưởng của sự mới lạ.
+4. **Kiểm tra lặp lại sau 1–2 tuần, và một lần nữa sau ≥ 4 tuần** để đo giữ lại kiến thức và để hạn chế ảnh hưởng của sự mới lạ. Sửa 2026-11-02: Rodrigues và cộng sự 2022 (DOI 10.1186/s41239-021-00314-6; đã đọc abstract, chưa đọc toàn văn) thấy hiệu ứng gamification giảm sau khoảng 4 tuần, nên một mốc 1–2 tuần chưa loại được hiệu ứng mới lạ ([kế hoạch v0.7](../design/upgrade-plan-v0.7.md) §3, Q4).
 5. **Khảo sát hài lòng chỉ là chỉ số phụ** (Deslauriers 2019).
 6. **Viết trước bảng "năng lực nào, bằng chứng nào"** cho từng màn, trước khi viết bài kiểm tra, theo tinh thần evidence-centered design (Mislevy 2003; chưa xác minh nội dung). Log trong game là bằng chứng bổ sung, phải đối chiếu với bài ngoài game.
 7. **Đăng ký trước kế hoạch phân tích**: giả thuyết, chỉ số chính, cách xử lý người bỏ cuộc.

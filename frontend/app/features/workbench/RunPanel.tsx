@@ -369,10 +369,14 @@ function Editing({
         </div>
       )}
 
-      {/* Collapsed so the aside's resting height keeps Mở ca on the first screen at 1280x800
-          (§2.1). Locked while the graph is out: the slip leaves with this run. */}
-      {/* On the projector the room guesses by show of hands instead (R4): HandRaise. */}
-      <details className="min-w-0 chieu:hidden">
+      {/* Open by default (plan v0.7 Q2): predicting before a run is the step the evidence backs
+          (Mayer & Johnson 2010; Crouch 2004), still optional and one tap to fold away. It was
+          collapsed to keep Mở ca on the first screen at 1280x800 (§2.1), which the full-width
+          machine already gave up (level-identity §2.7); once the aside sticks, Mở ca is still in
+          view at 1280x800 with the slip open, W1's included. Locked while the graph is out:
+          the slip leaves with this run. On the projector the room guesses by show of hands
+          instead (R4): HandRaise. */}
+      <details open className="min-w-0 chieu:hidden">
         <summary className="min-h-11 cursor-pointer list-none text-sm font-semibold underline underline-offset-4">
           Đoán trước khi mở ca
         </summary>
@@ -395,6 +399,7 @@ function Editing({
       <QuotaLines quota={quota} />
 
       <button
+        id="wb-open-button"
         type="button"
         onClick={quota.mode === "recorded" ? onRecorded : onOpen}
         disabled={sending}
