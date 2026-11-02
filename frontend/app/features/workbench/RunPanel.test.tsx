@@ -173,6 +173,16 @@ describe("the two steps of one Mở ca are named on screen (N2)", () => {
     render(<Panel request={{ state: "idle" }} run={running()} />);
     expect(screen.queryByText(/Thử 3 câu mẫu/)).toBeNull();
   });
+
+  it("fills the star-2 budget as the star run streams its tokens (G4)", () => {
+    render(<Panel request={{ state: "idle" }} run={running()} />);
+    expect(document.querySelector("[data-budget-meter]")).not.toBeNull();
+  });
+
+  it("draws no budget on a sample run, which earns no star", () => {
+    render(<Panel request={{ state: "idle" }} run={running("mau")} />);
+    expect(document.querySelector("[data-budget-meter]")).toBeNull();
+  });
 });
 
 describe("the recorded run is free and on offer (N4)", () => {

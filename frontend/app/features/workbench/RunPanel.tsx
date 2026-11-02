@@ -32,6 +32,7 @@ import {
 } from "./copy";
 import type { Slip } from "./guess";
 import { Scrub } from "./Scrub";
+import { BudgetMeter, runTokens } from "./BudgetMeter";
 import { GuessSlip } from "./GuessSlip";
 import { isActive, runningNodes, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, Issue } from "./schema";
@@ -540,6 +541,7 @@ function Editing({
 }
 
 function Running({
+  env,
   run,
   samplesOnly,
   stop,
@@ -575,6 +577,10 @@ function Running({
       <p className="text-sm font-semibold tabular-nums">
         {graded}/{run.cases.length} câu đã chấm
       </p>
+      {/* Only a star run is judged on tokens: samples and a variant earn no star (G4). */}
+      {run.scope === undefined && (
+        <BudgetMeter used={runTokens(run)} budget={env.level.token_budget} />
+      )}
       <p role="status" className="text-sm empty:hidden">
         {run.stream === "connecting" && (
           <span className="block text-fg-muted">Đang nối tới lượt chạy…</span>
