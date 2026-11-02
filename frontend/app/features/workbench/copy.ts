@@ -358,6 +358,8 @@ export const COMPARE_VI = {
 export function changeName(change: Change): string {
   if (change.kind === "slot") return toyName(change.type);
   if (change.kind === "param") return TOY[change.type].params?.[change.param] ?? change.param;
+  if (change.kind === "phrase")
+    return `${change.on ? "Thêm" : "Rút"} cụm «${change.phrase}» ở ${TOY.pattern_guard.name}`;
   return `${TOY.llm.params?.system_prompt ?? "Lăng kính"} (khe ${change.slot + 1})`;
 }
 

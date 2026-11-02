@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setCard, setParam, starterBench, type Bench } from "./bench";
+import { changeName } from "./copy";
 import { diffGraphs, nextPickOptions } from "./diff";
 import { testEnv } from "./test-fixtures";
 
@@ -136,5 +137,82 @@ describe("nextPickOptions", () => {
     const options = nextPickOptions(l3, graph(setAttached(start(), "vector_search", true)));
     const labels = options.map((o) => o.label);
     expect(new Set(labels).size).toBe(labels.length);
+  });
+});
+
+describe("the W1 net's phrases", () => {
+  const w1 = testEnv("direct-injection");
+  const netted = (...phrases: string[]) => {
+    const bench = starterBench(w1);
+    if (!bench) throw new Error("the W1 starter is not drawable");
+    const withNet = setAttached(bench, "pattern_guard", true);
+    return { ...withNet, phrases: w1.level.phrase_tray.filter((p) => phrases.includes(p)) };
+  };
+  const g = (bench: Bench) => graphFromBench(w1, bench);
+
+  it("counts one phrase added as exactly one change, naming the phrase", () => {
+    const changes = diffGraphs(
+      w1,
+      g(netted("quản trị viên")),
+      g(netted("quản trị viên", "bỏ qua")),
+    );
+    expect(changes).toEqual([{ kind: "phrase", phrase: "bỏ qua", on: true }]);
+  });
+
+  it("counts two phrases added as two changes, so the label cannot name one cause", () => {
+    const changes = diffGraphs(w1, g(netted()), g(netted("bỏ qua", "quản trị viên")));
+    expect(changes).toHaveLength(2);
+    expect(changes.every((c) => c.kind === "phrase" && c.on)).toBe(true);
+  });
+
+  it("counts a phrase swapped for another as two: one out, one in", () => {
+    const changes = diffGraphs(w1, g(netted("bỏ qua")), g(netted("bỏ qua hướng dẫn")));
+    expect(changes).toEqual([
+      { kind: "phrase", phrase: "bỏ qua", on: false },
+      { kind: "phrase", phrase: "bỏ qua hướng dẫn", on: true },
+    ]);
+  });
+
+  it("finds nothing between the same net written in another order", () => {
+    const before = g(netted("bỏ qua", "quản trị viên"));
+    const after = structuredClone(before);
+    const net = after.nodes.find((n) => n.type === "pattern_guard");
+    if (!net || !Array.isArray(net.params.phrases)) throw new Error("no net");
+    net.params.phrases = [...net.params.phrases].reverse();
+    expect(diffGraphs(w1, before, after)).toEqual([]);
+  });
+
+  it("counts attaching a net with phrases as one change, the net itself", () => {
+    const bench = starterBench(w1);
+    if (!bench) throw new Error("the W1 starter is not drawable");
+    expect(diffGraphs(w1, g(bench), g(netted("bỏ qua", "quản trị viên")))).toEqual([
+      { kind: "slot", type: "pattern_guard" },
+    ]);
+  });
+
+  it("offers adding one phrase and removing one phrase as next picks, each one change", () => {
+    const labels = (bench: Bench) =>
+      nextPickOptions(w1, g(bench))
+        .filter((o) => o.pick.type === "pattern_guard" && o.pick.param === "phrases")
+        .map((o) => [o.label, o.pick.direction]);
+    expect(labels(netted("bỏ qua"))).toEqual([
+      ["Thêm một cụm vào Lưới cụm từ", "add"],
+      ["Rút một cụm khỏi Lưới cụm từ", "remove"],
+    ]);
+    // An empty net has nothing to pull out.
+    expect(labels(netted())).toEqual([["Thêm một cụm vào Lưới cụm từ", "add"]]);
+    // A full net has nothing left to add.
+    expect(labels(netted(...w1.level.phrase_tray))).toEqual([
+      ["Rút một cụm khỏi Lưới cụm từ", "remove"],
+    ]);
+  });
+
+  it("names the phrase and the way it went, for the comparison card", () => {
+    expect(changeName({ kind: "phrase", phrase: "bỏ qua", on: true })).toBe(
+      "Thêm cụm «bỏ qua» ở Lưới cụm từ",
+    );
+    expect(changeName({ kind: "phrase", phrase: "admin", on: false })).toBe(
+      "Rút cụm «admin» ở Lưới cụm từ",
+    );
   });
 });

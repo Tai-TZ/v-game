@@ -28,10 +28,20 @@ export type Change =
   /** One knob of one block moved. */
   | { kind: "param"; type: BlockType; param: string; from: JsonValue; to: JsonValue }
   /** One Lăng kính slot took a different card. */
-  | { kind: "card"; slot: 0 | 1 | 2; from: string | null; to: string | null };
+  | { kind: "card"; slot: 0 | 1 | 2; from: string | null; to: string | null }
+  /** One phrase went into the net (`on`) or came out of it. */
+  | { kind: "phrase"; phrase: string; on: boolean };
 
 /** The joined prompt is three card slots; comparing it as one param would hide a swap. */
 const CARDS = "system_prompt";
+/**
+ * The net's phrases are a set, each one pressed in from the tray on its own: comparing the list
+ * as one param would read two phrases added as one change, and order would read as a change.
+ */
+const PHRASES = "phrases";
+
+const phraseList = (value: JsonValue | undefined): string[] =>
+  Array.isArray(value) ? value.filter((p): p is string => typeof p === "string") : [];
 
 export function diffGraphs(env: Env, before: Graph, after: Graph): Change[] {
   // Normalised first: a param written out in one graph and defaulted in the other is the same
@@ -52,8 +62,17 @@ export function diffGraphs(env: Env, before: Graph, after: Graph): Change[] {
     if (was === undefined || now === undefined) continue;
     for (const param of Object.keys(env.blocks[type].params.properties)) {
       if (param === CARDS) continue;
-      // Every param is a scalar today, so this is `!==`; it stays structural because the day
-      // one becomes an array, `!==` would report a phantom change on every rerun.
+      if (param === PHRASES) {
+        const before = new Set(phraseList(was.params[param]));
+        const after = new Set(phraseList(now.params[param]));
+        for (const phrase of before)
+          if (!after.has(phrase)) changes.push({ kind: "phrase", phrase, on: false });
+        for (const phrase of after)
+          if (!before.has(phrase)) changes.push({ kind: "phrase", phrase, on: true });
+        continue;
+      }
+      // Every other param is a scalar today; the compare stays structural so a future array
+      // param does not report a phantom change on every rerun.
       if (!sameJson(was.params[param], now.params[param])) {
         changes.push({
           kind: "param",
@@ -92,7 +111,8 @@ export type NextDirection = "on" | "off" | "up" | "down" | "add" | "remove";
 export interface NextPick {
   type: BlockType;
   param?: string;
-  /** Only when `param` is "system_prompt": which Lăng kính slot. */
+  /** Only when `param` is "system_prompt": which Lăng kính slot. (For "phrases", add/remove
+   * name one phrase in or out, not which one.) */
   slot?: 0 | 1 | 2;
   direction: NextDirection;
 }
@@ -136,6 +156,23 @@ export function nextPickOptions(env: Env, graph: Graph): NextOption[] {
     }
   };
 
+  /** The net: one phrase in or one out is one change; which phrase is the player's to pick. */
+  const phraseOptions = (type: BlockType, params: Readonly<Record<string, JsonValue>>) => {
+    if (!(PHRASES in env.blocks[type].params.properties)) return;
+    const picked = phraseList(params[PHRASES]).length;
+    const name = TOY[type].name;
+    if (picked < env.level.phrase_tray.length)
+      options.push({
+        label: `Thêm một cụm vào ${name}`,
+        pick: { type, param: PHRASES, direction: "add" },
+      });
+    if (picked > 0)
+      options.push({
+        label: `Rút một cụm khỏi ${name}`,
+        pick: { type, param: PHRASES, direction: "remove" },
+      });
+  };
+
   for (const type of SLOT_ORDER) {
     const id = ids[type];
     if (isLocked(env.level, type) || !isAllowed(env.level, type)) continue;
@@ -146,6 +183,7 @@ export function nextPickOptions(env: Env, graph: Graph): NextOption[] {
       } else {
         options.push({ label: `Rút ${TOY[type].name}`, pick: { type, direction: "off" } });
         knobOptions(type, n.params);
+        phraseOptions(type, n.params);
       }
       continue;
     }
