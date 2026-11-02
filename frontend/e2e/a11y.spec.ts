@@ -129,6 +129,21 @@ for (const viewport of VIEWPORTS) {
       expect(await seriousViolations(page)).toEqual([]);
     });
 
+    test("the tool-risk micro lesson, before and after the check", async ({ page }) => {
+      await mockApi(page);
+      await page.goto("/play/watchtower/vi-mo/thang-rui-ro-tool");
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Thang rủi ro tool" }),
+      ).toBeVisible();
+      expect(await seriousViolations(page)).toEqual([]);
+      for (const card of await page.locator("[data-card]").all()) {
+        await card.getByRole("radio").first().check({ force: true });
+      }
+      await page.getByRole("button", { name: "Kiểm tra" }).click();
+      await expect(page.locator("[data-grade]")).toBeVisible();
+      expect(await seriousViolations(page)).toEqual([]);
+    });
+
     test("library zone page", async ({ page }) => {
       await mockApi(page);
       await page.goto("/play/library");

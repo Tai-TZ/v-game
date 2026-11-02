@@ -10,6 +10,38 @@ const W1 = "/play/watchtower/direct-injection";
 const stream = (name: "starter" | "reference") => readText("e2e", "data", `run-w1-${name}.sse`);
 
 test.describe("watchtower W1", () => {
+  test("warms up on the tool-risk ladder from the brief, then goes back to the level", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await mockWorkbenchApi(page, { events: () => stream("starter") });
+    await page.goto(W1);
+    await page.getByRole("link", { name: "Khởi động 2 phút: Thang rủi ro tool" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Thang rủi ro tool" })).toBeVisible();
+    // Every job set to "Tự chạy": the read-only ones are right, the rest let something through.
+    for (const card of await page.locator("[data-card]").all()) {
+      await card.getByText("Tự chạy", { exact: true }).click();
+    }
+    await page.getByRole("button", { name: "Kiểm tra" }).click();
+    const grade = page.locator("[data-grade]");
+    await expect(grade).toBeFocused();
+    await expect(grade).toHaveAttribute("data-right", "3");
+    await expect(grade).toContainText("5 việc để lọt · 0 việc hỏi thừa");
+    const scroll = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(scroll).toBe(0);
+    await grade.getByRole("link", { name: "Vào màn Cổng thành" }).click();
+    await expect(page).toHaveURL(W1);
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("answers an unknown micro lesson as not found", async ({ page }) => {
+    await mockWorkbenchApi(page, { events: () => stream("starter") });
+    await page.goto("/play/watchtower/vi-mo/khong-co");
+    await expect(page.getByRole("heading", { level: 1, name: "Thang rủi ro tool" })).toHaveCount(0);
+  });
+
   test("is reached from the zone page, where the levels still coming have no way in", async ({
     page,
     consoleErrors,

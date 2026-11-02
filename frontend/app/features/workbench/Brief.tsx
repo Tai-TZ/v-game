@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import { ChevronDownIcon } from "~/components/ui/icons";
 import { IncidentBadge } from "~/features/zones/ui";
 
@@ -60,6 +62,15 @@ export function Brief({ level, won = false }: { level: PublicLevel; won?: boolea
               ))}
             </ol>
           </details>
+        )}
+        {copy?.warmup && (
+          <Link
+            to={copy.warmup.href}
+            data-warmup=""
+            className="mt-2 flex min-h-11 items-center font-semibold text-brand underline underline-offset-4"
+          >
+            {copy.warmup.label}
+          </Link>
         )}
       </div>
     </div>
