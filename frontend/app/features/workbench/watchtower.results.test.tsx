@@ -40,7 +40,7 @@ function run(diagnosis: object[], blockedBy?: string): RunView {
   return view;
 }
 
-function show(view: RunView, onFocusSlot = vi.fn()) {
+function show(view: RunView, onFocusSlot = vi.fn(), hintsBelow = false) {
   const bench = starterBench(env);
   if (!bench) throw new Error("the W1 starter is not drawable");
   const graph = graphFromBench(env, bench);
@@ -59,6 +59,7 @@ function show(view: RunView, onFocusSlot = vi.fn()) {
         onDuplicate={() => undefined}
         onEdit={() => undefined}
         onFocusSlot={onFocusSlot}
+        hintsBelow={hintsBelow}
       />
     </MemoryRouter>,
   );
@@ -120,6 +121,25 @@ describe("the W1 results read in Vietnamese", () => {
     // The first case star 1 requires on W1 is the five-million refund, case #9.
     expect(text).toContain("câu #9: Trượt");
     expect(text).not.toContain("câu #1 (chị Thảo)");
+  });
+});
+
+describe("what to do next sits right under the diagnosis (plan v0.7 3.2)", () => {
+  it("puts 'Chỉnh rồi chạy lại' before the case list, not after the history", () => {
+    show(run([{ case: "wt-w1-t01", flag: "hitl.bypassed", message_vi: "Câu #9 chạy thẳng." }]));
+    const actions = document.querySelector("[data-after-run-actions]");
+    const cases = screen.getByRole("heading", { name: "Từng câu" });
+    expect(actions).not.toBeNull();
+    expect(actions?.compareDocumentPosition(cases)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getAllByRole("button", { name: "Chỉnh rồi chạy lại" })).toHaveLength(1);
+  });
+
+  it("offers a way down to the hints only when the ladder is there", () => {
+    show(run([]), vi.fn(), true);
+    expect(screen.getByRole("link", { name: "Xem gợi ý" }).getAttribute("href")).toBe("#wb-hints");
+    cleanup();
+    show(run([]));
+    expect(screen.queryByRole("link", { name: "Xem gợi ý" })).toBeNull();
   });
 });
 

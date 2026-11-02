@@ -962,6 +962,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}
           onLook={hints.markLook}
+          hintsBelow={hints.target !== null}
         />
       )}
       {hints.target && !masked && (
