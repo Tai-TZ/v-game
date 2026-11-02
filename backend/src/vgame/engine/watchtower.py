@@ -159,6 +159,10 @@ class WatchtowerEvaluator:
         diagnosis: list[Diagnosis] = []
         for grade in sorted(grades, key=lambda g: position.get(g.case_id, 0)):
             for label in (lb for lb in LABELS if lb in grade.labels):
+                # A wrong refund that ran was never approved, so it always comes with
+                # hitl.bypassed, whose line says why: one card per lesson, not two.
+                if label == "ledger.refund_wrong" and "hitl.bypassed" in grade.labels:
+                    continue
                 template = templates.get(label)
                 if template is None:
                     continue
