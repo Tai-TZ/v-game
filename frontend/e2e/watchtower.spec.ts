@@ -51,6 +51,29 @@ test.describe("watchtower W1", () => {
     expect(progress).toBeNull();
   });
 
+  test("keeps the machine's steps on one row and its view toggles in the caption, at 375 px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await mockWorkbenchApi(page, { events: () => stream("starter") });
+    await page.goto(W1);
+    const steps = page.getByRole("list", { name: "Cho câu hỏi chạy qua máy" });
+    await expect(steps).toBeVisible();
+    const items = await steps
+      .getByRole("button")
+      .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+    expect(new Set(items).size).toBe(1); // one row, scrolled sideways rather than wrapped
+    const caption = page.locator("[data-machine-figure] figcaption");
+    const toggle = page.getByRole("button", { name: "Nhìn xuyên" });
+    const [cap, tog] = [await caption.boundingBox(), await toggle.boundingBox()];
+    expect(Math.abs((cap?.y ?? 0) - (tog?.y ?? 999))).toBeLessThan(44);
+    expect(tog?.height ?? 0).toBeGreaterThanOrEqual(44);
+    const scroll = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(scroll).toBe(0);
+  });
+
   test("answers an unknown micro lesson as not found", async ({ page }) => {
     await mockWorkbenchApi(page, { events: () => stream("starter") });
     await page.goto("/play/watchtower/vi-mo/khong-co");

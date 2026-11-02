@@ -414,8 +414,12 @@ const TONE: Readonly<Record<BlockState, string>> = {
 /** Zoom steps, in percent of the frame's width: 100 is the whole machine in view. */
 const ZOOMS = [100, 150, 200] as const;
 
-const PILL =
-  "min-h-11 rounded-full border-2 border-fg px-4 text-sm font-semibold aria-pressed:bg-fg aria-pressed:text-surface disabled:cursor-not-allowed disabled:opacity-60";
+/** A step of the walk-through: numbered, with the site's corners (no other control is round). */
+const STEP_CHIP =
+  "flex min-h-11 shrink-0 items-center gap-2 rounded-sm border-2 border-fg px-3 text-sm font-semibold whitespace-nowrap aria-pressed:bg-fg aria-pressed:text-surface disabled:cursor-not-allowed disabled:opacity-60";
+/** A view toggle: smaller and quieter than a step, grouped in the caption row. */
+const TOGGLE =
+  "min-h-11 border border-line-strong px-3 text-sm first:rounded-l-sm last:rounded-r-sm aria-pressed:bg-fg aria-pressed:text-surface";
 
 export function MachineMap({
   env,
@@ -526,35 +530,22 @@ export function MachineMap({
     el.scrollLeft = (bubbleLeft / 100) * el.scrollWidth - el.clientWidth / 2;
   }, [bubbleLeft, zoom]);
 
+  const stepLabel = (b: string) => (b === "input" && isDesk(env) ? "Khách gõ cửa" : BEAT_VI[b]);
+
   return (
     <figure data-machine-figure="">
-      <figcaption className="mb-3 font-mono text-sm font-bold">
-        Hình · Cỗ máy trợ lý — {env.level.title}
-      </figcaption>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <ol aria-label="Cho câu hỏi chạy qua máy" className="flex flex-wrap gap-2">
-          {steps.map((b, index) => (
-            <li key={b}>
-              <button
-                type="button"
-                aria-pressed={beat === b}
-                aria-describedby={beat === b ? readoutId : undefined}
-                data-beat={b}
-                onClick={() => setBeat(beat === b ? null : b)}
-                className={PILL}
-              >
-                <span className="sr-only">Bước {index + 1}: </span>
-                {b === "input" && isDesk(env) ? "Khách gõ cửa" : BEAT_VI[b]}
-              </button>
-            </li>
-          ))}
-        </ol>
-        <div className="flex gap-2">
+      {/* The caption row carries the view toggles; the steps get a row of their own, which
+          scrolls sideways on a phone instead of wrapping into 4-5 rows above the machine. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <figcaption className="font-mono text-sm font-bold">
+          Hình · Cỗ máy trợ lý — {env.level.title}
+        </figcaption>
+        <div data-view-toggles="" className="flex">
           <button
             type="button"
             aria-pressed={seeThrough}
             onClick={() => setSeeThrough(!seeThrough)}
-            className={PILL}
+            className={TOGGLE}
           >
             Nhìn xuyên
           </button>
@@ -562,12 +553,36 @@ export function MachineMap({
             type="button"
             aria-pressed={labels}
             onClick={() => setLabels(!labels)}
-            className={PILL}
+            className={TOGGLE}
           >
             Nhãn
           </button>
         </div>
       </div>
+      <ol
+        aria-label="Cho câu hỏi chạy qua máy"
+        // relative: each step's sr-only label is absolutely placed, and would otherwise take a
+        // containing block outside this scroller and widen the page at 375 px.
+        className="relative flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible"
+      >
+        {steps.map((b, index) => (
+          <li key={b} className="shrink-0">
+            <button
+              type="button"
+              aria-pressed={beat === b}
+              aria-describedby={beat === b ? readoutId : undefined}
+              data-beat={b}
+              onClick={() => setBeat(beat === b ? null : b)}
+              className={STEP_CHIP}
+            >
+              {/* The visible text is the name, "1 Khách gõ cửa", inside the list "Cho câu hỏi
+                  chạy qua máy": an sr-only "Bước n: " lost its space in some name computations
+                  and escaped the scroller, and an aria-label unlike the text fails WCAG 2.5.3. */}
+              <span className="tabular-nums opacity-70">{index + 1}</span> {stepLabel(b)}
+            </button>
+          </li>
+        ))}
+      </ol>
 
       {/* Scrolls on a phone rather than shrink the toys past reading: focusable, as it scrolls. */}
       <div

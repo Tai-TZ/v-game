@@ -108,7 +108,8 @@ describe("the W1 machine", () => {
       "tool_refund",
       "output",
     ]);
-    expect(document.querySelector('[data-beat="input"]')?.textContent).toBe("Bước 1: Khách gõ cửa");
+    // The visible text is the name, in the list that says these are the steps.
+    expect(screen.getByRole("button", { name: "1 Khách gõ cửa" }).dataset.beat).toBe("input");
   });
 
   it("draws the branch red with no bell on it, and gated once the bell is attached", () => {
