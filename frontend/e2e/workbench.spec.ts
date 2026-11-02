@@ -1131,3 +1131,25 @@ test.describe("the blade's own strip (B6 N22)", () => {
     await expect(page.getByRole("figure").filter({ hasText: "Dải đoạn" })).toHaveCount(0);
   });
 });
+
+test.describe("a way to Mở ca on a phone (plan v0.7 3.1)", () => {
+  test("jumps from the top of the bench to Mở ca, then gets out of the way", async ({
+    page,
+  }, testInfo) => {
+    await mockWorkbenchApi(page);
+    await page.goto(L1);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const jump = page.getByRole("link", { name: "Tới Mở ca" });
+    if (testInfo.project.name === "desktop") {
+      // From lg up the aside is a sticky column beside the bench: no jump needed.
+      await expect(jump).toBeHidden();
+      return;
+    }
+    await expect(jump).toBeVisible();
+    await jump.click();
+    const open = page.getByRole("button", { name: "Mở ca", exact: true });
+    await expect(open).toBeFocused();
+    await expect(open).toBeInViewport();
+    await expect(jump).toBeHidden();
+  });
+});

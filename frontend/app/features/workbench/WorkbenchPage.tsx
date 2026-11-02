@@ -871,6 +871,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           discarded={initial.discarded && !saved}
         />
         <aside
+          id="wb-aside"
           aria-label="Mở ca và lượt chạy"
           // p-1 inside the scroll box keeps focus outlines (2 px + 2 px offset) unclipped; -m-1
           // keeps the content on the column edges.
@@ -937,6 +938,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             onFollow={follow}
           />
         </aside>
+        {!projector && !active && <JumpToOpen />}
       </div>
       {awaitingReveal && <RevealGate onReveal={() => setRevealed(awaitingReveal)} />}
       {sample && !masked && <SampleResult run={sample} samplesOnly={samplesOnly} />}
@@ -979,5 +981,39 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
         {live}
       </p>
     </>
+  );
+}
+
+/**
+ * Plan v0.7 3.1, phones: below lg the aside comes after the whole bench, and Mở ca sat about
+ * 3.000 px down. A link pinned to the foot of the screen takes the hand there and gets out of
+ * the way once the aside is in view. It moves focus to the button; it never runs a shift
+ * itself, so the quota's own label and checks stay the only way in.
+ */
+function JumpToOpen() {
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const aside = document.getElementById("wb-aside");
+    if (!aside || typeof IntersectionObserver === "undefined") return;
+    const watch = new IntersectionObserver(([entry]) => setInView(entry?.isIntersecting ?? false));
+    watch.observe(aside);
+    return () => watch.disconnect();
+  }, []);
+  if (inView) return null;
+  return (
+    <a
+      href="#wb-open-title"
+      data-jump-open=""
+      onClick={(event) => {
+        const button = document.getElementById("wb-open-button");
+        if (!button) return;
+        event.preventDefault();
+        button.scrollIntoView({ block: "center" });
+        button.focus({ preventScroll: true });
+      }}
+      className={buttonClass("primary", "fixed right-4 bottom-4 z-20 lg:hidden")}
+    >
+      Tới Mở ca
+    </a>
   );
 }
