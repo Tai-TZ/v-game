@@ -1,4 +1,4 @@
-> **Trạng thái:** đặc tả v0.1 (2026-11-02), **chờ chủ dự án duyệt**. Nâng [dàn ý W1–W3](other-levels-outline.md#tháp-canh--npc-anh-quân-chị-vy) lên mức của khu Thư viện; chưa có dòng code nào. Mọi chỗ ghi **Đề xuất** là quyết định mới, chưa chốt (tổng hợp ở mục 9).
+> **Trạng thái:** đặc tả v0.1, **đã duyệt 2026-11-02**. Chủ dự án: "Duyệt cả 5" (mục 9). Nâng [dàn ý W1–W3](other-levels-outline.md#tháp-canh--npc-anh-quân-chị-vy) lên mức của khu Thư viện. Các chỗ ghi **Đề xuất** trong bài là các quyết định đã chốt ở mục 9.
 > **Ràng buộc:** [Phần 3](../../design/part-3-block-system.md) §3.2–3.3 và các sửa lỗi phản biện ở cuối file đó · [engine-v0.2](../../design/engine-v0.2.md) E1–E14 (model Gemini, một lời gọi mỗi khối `llm`) · [ca trực §3.1](daily-shift.md) (quỹ học viên P = 13 lời gọi/ngày) · [roadmap-v0.4](../../design/roadmap-v0.4.md) X10 (ô nhập tự do), X19 (tem "Mô phỏng") · [level-identity-v0.5](../../design/level-identity-v0.5.md) (cỗ máy, hiện trường, cờ thế giới) · [art bible](../../design/art-direction.md) §1.
 
 # Khu Tháp canh: mạch ba level
@@ -217,11 +217,11 @@ Ba điều dưới đây làm đặc tả khác dàn ý gốc. Chúng không ph�
 - Thời gian tới sao 1 của W1 so với Thư viện L1.
 - Ở W3: tỉ lệ chọn bản vá "thêm cụm từ" ở lượt đầu, so với sau khi xem báo cáo lớp thủng.
 
-## 9. Chủ dự án cần quyết
+## 9. Quyết định của chủ dự án (đã duyệt cả 5, 2026-11-02)
 
-1. **Phiếu hành động thay agent** (mục 1.1): một lời gọi mỗi ca, tool chạy bằng code. Không chọn thì W1 vượt quỹ P = 13 khoảng 3–4 lần.
-2. **Chó gác tính sẵn** (mục 1.2) thay vì gọi model lúc chạy.
-3. **W3 không có ô gõ tự do** (mục 5.2): đòn ghép từ thẻ. Không chọn thì cần cảnh báo X10 và chấm lớp guard trên chữ tự do.
-4. **Sao 2 và 3 của W3** chấm việc chỉ đúng lớp thủng và bản vá (mục 5.4), thay cho mốc "token" của các level khác.
-5. **Thứ tự mở khoá** (dàn ý câu 5): đặc tả này đặt Tháp canh sau Thư viện L1, không bắt qua Chợ model, vì không còn cần `agent_react`.
+1. **Đã duyệt · Phiếu hành động thay agent** (mục 1.1): một lời gọi mỗi ca, tool chạy bằng code. Còn chờ spike structured output (mục 6.4 bước 1).
+2. **Đã duyệt · Chó gác tính sẵn** (mục 1.2) thay vì gọi model lúc chạy.
+3. **Đã duyệt · W3 không có ô gõ tự do** (mục 5.2): đòn ghép từ thẻ.
+4. **Đã duyệt · Sao 2 và 3 của W3** chấm việc chỉ đúng lớp thủng và bản vá (mục 5.4), thay cho mốc "token" của các level khác.
+5. **Đã duyệt · Thứ tự mở khoá** (dàn ý câu 5): Tháp canh mở sau Thư viện L1, không bắt qua Chợ model, vì không còn cần `agent_react`.
 6. Câu 3 và 4 của dàn ý (mốc 20 s/90 s cho đòn nhiều lượt; đấu trường giữa người chơi) vẫn mở; đặc tả này giữ ≤ 2 lượt và không có đấu trường.
