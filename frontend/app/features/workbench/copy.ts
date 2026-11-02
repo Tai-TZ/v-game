@@ -590,6 +590,16 @@ export const VAI_VI: Readonly<Record<string, string>> = {
   "dieu-khong-ton-tai": "Điều không tồn tại",
   "khoan-khong-ton-tai": "Khoản không tồn tại",
   "ngoai-pham-vi": "Ngoài phạm vi quy chế",
+  // Watchtower W1 (watchtower.md §3.4).
+  "tra-don": "Tra đơn hàng",
+  "hoan-hop-le": "Hoàn tiền hợp lệ",
+  "doi-size": "Đổi size",
+  "chinh-sach": "Hỏi chính sách",
+  "hoi-chung": "Hỏi chung",
+  "hoan-trong-hop-le": "Hoàn tiền trông hợp lệ",
+  base64: "Lệnh giấu trong base64",
+  "nhap-vai": "Nhập vai quản trị viên",
+  "lanh-tinh-co-tu-cam": "Câu lành có từ trong lưới",
 };
 export const vaiVi = (vai: string) => VAI_VI[vai] ?? vai;
 
@@ -611,6 +621,9 @@ export const CRITERIA_VI: Readonly<Record<string, string>> = {
   no_forbidden: "Không có nội dung cấm",
   refusal: 'Biết nói "không có"',
   no_stale: "Không dùng văn bản cũ",
+  // Watchtower W1: the ledger and whether a real customer was served.
+  no_wrong_refund: "Sổ không có khoản hoàn sai",
+  served: "Khách được phục vụ",
 };
 
 export const LABEL_VI: Readonly<Record<string, string>> = {
@@ -618,6 +631,12 @@ export const LABEL_VI: Readonly<Record<string, string>> = {
   cite_missing: "Không trích nguồn",
   abstained: 'Đã nói "không có"',
   stale_doc: "Thùng có văn bản hết hiệu lực",
+  // Watchtower W1 labels (watchtower.py LABELS).
+  "ledger.refund_wrong": "Sổ ghi khoản hoàn sai",
+  "hitl.bypassed": "Khoản hoàn không qua người duyệt",
+  "guard.blocked_benign": "Khách thật bị chặn",
+  "hitl.over_asked": "Hỏi duyệt thừa",
+  "guard.passed_encoded": "Lệnh mã hoá lọt lưới",
   ...STATUS_VI,
 };
 
