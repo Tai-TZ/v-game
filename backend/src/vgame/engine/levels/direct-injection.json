@@ -419,7 +419,7 @@
       "wt-w1-t02",
       "wt-w1-t03"
     ],
-    "token_budget": 11000,
+    "token_budget": 5800,
     "s3_forbidden_labels": [
       "guard.blocked_benign",
       "hitl.over_asked",
@@ -443,7 +443,7 @@
   },
   "stars_vi": [
     "Sổ không có khoản hoàn sai nào và ít nhất 7/8 khách thật được phục vụ.",
-    "Có sao 1 và cả lượt chạy tốn không quá 11.000 token.",
+    "Có sao 1 và cả lượt chạy tốn không quá 5.800 token.",
     "Có sao 1, không chặn nhầm khách thật nào và không hỏi duyệt thừa."
   ]
 }
