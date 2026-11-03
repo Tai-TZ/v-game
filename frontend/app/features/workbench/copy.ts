@@ -1,6 +1,7 @@
 import { domain, isAllowed, nodeIds, type Env } from "./bench";
 import type { Change } from "./diff";
 import type { Confidence, Why } from "./guess";
+import type { Principle } from "./hints";
 import { unfinished, type BlockState, type CaseView, type RunView } from "./run";
 import type { BlockType, Graph, JsonValue, RunReport } from "./schema";
 
@@ -188,7 +189,32 @@ export const HINTS_VI = {
     `Gợi ý 3 là lời giải mẫu. Nó mở khi bạn đã nhìn thêm một chỗ sau gợi ý 2, và đã trượt 3 lượt chấm ở sao này trên các cấu hình khác nhau (hiện là ${failed}), hoặc khi quỹ hôm nay không đủ cho thêm một lượt.`,
   seeCase: (n: number) => `Xem câu #${n}`,
   seeSlot: (toy: string) => `Xem ở ${toy}`,
+  // Plan v0.7 2.2: the principle question under each rung, and hint 3's faded last step.
+  principleAsk: "Gợi ý này dựa trên nguyên lý nào?",
+  principleWrong: "Chưa khớp với gợi ý này. Đọc lại gợi ý rồi chọn lại.",
+  principleNamed: "Nguyên lý",
+  lastLabel: "Bước cuối",
+  lastHidden:
+    "Bước cuối để bạn tự nghĩ. Thử trên bàn thợ trước: đổi một món, theo dõi một câu, hoặc mở vết chạy của một câu trượt. Sau đó bước cuối mới hiện.",
+  showLast: "Hiện bước cuối",
 } as const;
+
+/** Plan v0.7 2.2: the principles a hint can rest on, as the player picks them. */
+export const PRINCIPLE_VI: Readonly<Record<Principle, string>> = {
+  tim_dung: "Bộ Óc chỉ biết những gì có trong thùng",
+  nguon: "Câu trả lời phải mang mã nguồn mới kiểm được",
+  dan_do: "Lời dặn quyết định Bộ Óc làm gì khi thiếu tin",
+  ngan_sach: "Mỗi đoạn vào thùng đều tốn token",
+  cat_doan: "Đoạn bị cắt ngang thì mất ý",
+  loc_truoc: "Lọc trước khi tìm, đừng để Bộ Óc tự chọn",
+  diem_mu: "Mỗi cách tìm có điểm mù, ghép hai cách để bù",
+  hoi_quy: "Sửa chỗ mới có thể làm hỏng chỗ đã đạt",
+  nhieu_lop: "Lớp chặn nào cũng có lúc thủng, nên cần lớp sau đỡ",
+  nguoi_duyet: "Việc tiêu tiền thật phải có người duyệt",
+  chan_nham: "Lớp chặn càng rộng càng chặn nhầm khách thật",
+  hoi_vua_du: "Chỉ hỏi duyệt khi rủi ro đáng hỏi",
+  chan_som: "Chặn ở cổng thì Bộ Óc khỏi tốn token",
+};
 
 /** N17: one line the first time a toy is touched; never an overlay, never a help button. */
 export const FIRST_TOUCH_VI: Partial<Record<BlockType, string>> = {

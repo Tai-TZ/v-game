@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  answer,
   canOpen,
   configKey,
   firstTouches,
@@ -11,11 +12,14 @@ import {
   loadHints,
   look,
   open,
+  principleOptions,
   recordFail,
   saveHints,
+  settled,
   type HintBook,
   type Target,
 } from "./hints";
+import { PRINCIPLE_VI } from "./copy";
 import type { CaseView, RunView } from "./run";
 import type { Graph } from "./schema";
 
@@ -193,7 +197,7 @@ describe("the ladder", () => {
     saveHints(L1, open(book(), "s1", 1, 1000));
     expect(loadHints(L1).targets.s1?.opened).toBe(1);
     window.localStorage.setItem(`vg.hints.v1.${L1}`, "{nope");
-    expect(loadHints(L1)).toEqual({ targets: {}, log: [], fails: {} });
+    expect(loadHints(L1)).toEqual({ targets: {}, log: [], fails: {}, picks: [] });
   });
 });
 
@@ -377,5 +381,124 @@ describe("configKey", () => {
   it("is stable for the same body and differs for another", () => {
     expect(configKey('{"a":1}')).toBe(configKey('{"a":1}'));
     expect(configKey('{"a":1}')).not.toBe(configKey('{"a":2}'));
+  });
+});
+
+// Plan v0.7 2.2 (Atkinson et al. 2003): every rung asks which principle it rests on, from a closed
+// list, and the worked example leaves its last step for the player.
+const LADDERS = {
+  [L1]: ["s1", "s1_source", "s2", "s3"],
+  "chunk-tuning": ["s1", "s2", "s3"],
+  [L3]: ["s1", "s2", "s3", "s3_t02", "s3_t03"],
+  "direct-injection": ["s1", "s2", "s3", "s3_blocked", "s3_asked"],
+} as const;
+
+describe("the principle under each rung (plan v0.7 2.2)", () => {
+  it("names one principle per rung, offered among four of the level's own", () => {
+    for (const [level, keys] of Object.entries(LADDERS)) {
+      for (const key of keys) {
+        for (const n of [1, 2, 3] as const) {
+          const hint = hintFor(level, { key, star: 1, n: 2 }, n);
+          if (!hint) throw new Error(`${level} ${key} ${n}: no hint`);
+          const options = principleOptions(level, hint.principle);
+          expect(options).toHaveLength(4);
+          expect(options).toContain(hint.principle);
+          expect(new Set(options).size).toBe(4);
+          for (const option of options) expect(PRINCIPLE_VI[option].length).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("asks about more than one principle on a level, so the answer is not always the same", () => {
+    for (const [level, keys] of Object.entries(LADDERS)) {
+      const named = new Set(
+        keys.flatMap((key) =>
+          ([1, 2, 3] as const).map((n) => hintFor(level, { key, star: 1, n: 1 }, n)?.principle),
+        ),
+      );
+      expect(named.size).toBeGreaterThan(2);
+    }
+  });
+
+  it("keeps each pick, right or not, for the pilot", () => {
+    const target: Target = { key: "s1", star: 1, n: 1 };
+    const right = hintFor(L1, target, 1)?.principle;
+    if (!right) throw new Error("no hint");
+    const wrong = principleOptions(L1, right).find((p) => p !== right);
+    if (!wrong) throw new Error("no distractor");
+    const after = answer(
+      answer(loadHints(L1), L1, target, 1, wrong, 1000),
+      L1,
+      target,
+      1,
+      right,
+      2000,
+    );
+    expect(after.picks).toEqual([
+      { at: 1000, target: "s1", n: 1, pick: wrong, right: false },
+      { at: 2000, target: "s1", n: 1, pick: right, right: true },
+    ]);
+    saveHints(L1, after);
+    expect(loadHints(L1).picks).toHaveLength(2);
+  });
+
+  it("counts a principle settled for a ladder once picked right, and only that principle", () => {
+    const target: Target = { key: "s3", star: 3, n: null };
+    const first = hintFor(L1, target, 1)?.principle;
+    const second = hintFor(L1, target, 2)?.principle;
+    if (!first || !second) throw new Error("no hint");
+    expect(first).not.toBe(second); // L1 star 3: the cards, then what the bin held
+    const book = answer(loadHints(L1), L1, target, 1, first, 1000);
+    expect(settled(book, "s3", first)).toBe(true);
+    expect(settled(book, "s3", second)).toBe(false);
+    expect(settled(book, "s1", first)).toBe(false);
+    const wrongOnly = principleOptions(L1, first).find((p) => p !== first);
+    if (!wrongOnly) throw new Error("no distractor");
+    expect(settled(answer(loadHints(L1), L1, target, 1, wrongOnly, 1), "s3", wrongOnly)).toBe(
+      false,
+    );
+  });
+
+  it("keeps the picks to the most recent 50", () => {
+    const target: Target = { key: "s1", star: 1, n: 1 };
+    let b = loadHints(L1);
+    for (let i = 0; i < 60; i += 1) b = answer(b, L1, target, 1, "ngan_sach", i);
+    expect(b.picks).toHaveLength(50);
+    expect(b.picks[0]?.at).toBe(10);
+  });
+
+  it("reads a book saved before picks were kept", () => {
+    window.localStorage.setItem(
+      `vg.hints.v1.${L1}`,
+      JSON.stringify({ targets: { s1: { opened: 1, looked: true } }, log: [], fails: {} }),
+    );
+    expect(loadHints(L1).picks).toEqual([]);
+    expect(loadHints(L1).targets.s1?.opened).toBe(1);
+  });
+});
+
+describe("the worked example leaves its last step (plan v0.7 2.2, backward fading)", () => {
+  it("holds a last step apart from the rest, on every ladder", () => {
+    for (const [level, keys] of Object.entries(LADDERS)) {
+      for (const key of keys) {
+        const hint = hintFor(level, { key, star: 1, n: 1 }, 3);
+        expect(hint?.last?.length, `${level} ${key}`).toBeGreaterThan(0);
+        expect(hint?.text).not.toContain(hint?.last ?? "");
+      }
+    }
+    // Hints 1 and 2 are not worked examples, so they have no step to leave.
+    expect(hintFor(L1, { key: "s1", star: 1, n: 1 }, 1)?.last).toBeUndefined();
+  });
+
+  it("shows the last step after a look since hint 3, like every rung before it", () => {
+    let b = loadHints(L1);
+    for (const at of [1, 2]) b = look(open(b, "s1", 1, at));
+    b = open(b, "s1", 1, 3);
+    expect(canOpen(b, "s1", true)).toBeNull();
+    expect(canOpen(look(b), "s1", true)).toBe(4);
+    const shown = open(look(b), "s1", 1, 4);
+    expect(shown.log.at(-1)).toEqual({ at: 4, target: "s1", star: 1, n: 4 });
+    expect(canOpen(look(shown), "s1", true)).toBeNull();
   });
 });

@@ -74,6 +74,15 @@ describe("useHints", () => {
     expect(loadHints(L1).log.map((e) => e.n)).toEqual([1, 2, 3]);
   });
 
+  it("keeps the principle the player names under a hint, and stores it", () => {
+    const { result } = hook(failedSample("r1"), "cfg-a");
+    act(() => result.current.openNext());
+    act(() => result.current.pick(1, "tim_dung"));
+    expect(loadHints(L1).picks).toMatchObject([
+      { target: "s1", n: 1, pick: "tim_dung", right: true },
+    ]);
+  });
+
   it("keeps hint 3 shut while the pool still pays for another attempt", () => {
     // 5 calls cover another sample run (3), which is what a failed sample run is priced at;
     // priced as a star run (10), the pool would wrongly read as spent.
