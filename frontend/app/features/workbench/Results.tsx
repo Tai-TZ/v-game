@@ -29,6 +29,7 @@ import {
   WHY_MENU,
 } from "./copy";
 import { SlipResult, WhyMenu } from "./GuessSlip";
+import { Calibration } from "./calibration";
 import { ScaleBill } from "./ScaleBill";
 import { Compare } from "./Compare";
 import { Debrief } from "./Debrief";
@@ -384,6 +385,7 @@ export function Results({
           {/* history[0] is the run just finished (recordRun prepends), history[1] the one
               before it -- from the second run of a level on, there is a prior to compare. */}
           {history[0] && history[1] && <Compare env={env} prev={history[1]} now={history[0]} />}
+          <Calibration runs={history} />
         </div>
       )}
 

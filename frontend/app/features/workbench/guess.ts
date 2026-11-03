@@ -107,8 +107,11 @@ export interface SlipGrade {
   unfinished: number;
 }
 
-export function gradeSlip(slip: Slip, run: RunView, levelId?: string): SlipGrade | null {
-  if (run.phase !== "finished") return null;
+/**
+ * The slip's calls on each graded case, with no wait for run.finished: the history entry is
+ * written at run.scored, when every verdict is already in, and is written only once.
+ */
+export function predictionsOf(slip: Slip, run: RunView): Prediction[] {
   const skipped = new Set(unfinished(run).map((c) => c.id));
   const predictions: Prediction[] = [];
   for (const c of run.cases) {
@@ -125,6 +128,13 @@ export function gradeSlip(slip: Slip, run: RunView, levelId?: string): SlipGrade
       ...(bet && { confidence: bet.confidence }),
     });
   }
+  return predictions;
+}
+
+export function gradeSlip(slip: Slip, run: RunView, levelId?: string): SlipGrade | null {
+  if (run.phase !== "finished") return null;
+  const skipped = new Set(unfinished(run).map((c) => c.id));
+  const predictions = predictionsOf(slip, run);
   // The count is scored over the cases the stars read: those that ran, minus the info cases.
   // A case the daily cap or an outage left unanswered cannot have passed, so keeping it in the
   // denominator would charge the player for the server's trouble (daily-shift §3.3 exempts
