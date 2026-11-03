@@ -111,7 +111,9 @@ describe("traceOptions", () => {
 describe("TraceBook", () => {
   const rows = traceRows(env, starter, {}, graph);
   // Row i of the book, by its label: t01-t03 are cases #9-#11, not #1-#3.
-  const label = (i: number) => new RegExp(`^Câu #${rows[i - 1]?.c.n ?? 0} `);
+  // A function, not a RegExp built from a string: semgrep blocks detect-non-literal-regexp.
+  const label = (i: number) => (content: string) =>
+    content.startsWith(`Câu #${rows[i - 1]?.c.n ?? 0} `);
   const pick = (i: number, value: string) =>
     fireEvent.change(screen.getByLabelText(label(i)), { target: { value } });
   const check = () => fireEvent.click(screen.getByRole("button", { name: "Kiểm tra sổ" }));
