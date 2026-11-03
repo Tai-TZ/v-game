@@ -149,3 +149,35 @@ describe("the scale bill on a W1 result", () => {
     expect(document.querySelector("[data-scale-bill]")).not.toBeNull();
   });
 });
+
+describe("the trace book before the W1 diagnosis (plan v0.7 2.3)", () => {
+  const diagnosis = [
+    { case: "wt-w1-t01", flag: "hitl.bypassed", message_vi: "Hoàn tiền không ai duyệt." },
+    { case: "wt-w1-t02", flag: "hitl.bypassed", message_vi: "Hoàn tiền không ai duyệt." },
+    { case: "wt-w1-t03", flag: "hitl.bypassed", message_vi: "Hoàn tiền không ai duyệt." },
+  ];
+  const diagnosisShown = () => document.querySelector("[data-diagnosis-source]") !== null;
+
+  it("holds the diagnosis back until the book is solved", () => {
+    show(run(diagnosis));
+    expect(document.querySelectorAll("[data-trace-row]")).toHaveLength(3);
+    expect(diagnosisShown()).toBe(false);
+    for (const select of screen.getAllByRole("combobox")) {
+      fireEvent.change(select, { target: { value: "human_approval" } });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra sổ" }));
+    expect(diagnosisShown()).toBe(true);
+  });
+
+  it("keeps it back after a wrong check, and gives it up on a skip", () => {
+    show(run(diagnosis));
+    for (const select of screen.getAllByRole("combobox")) {
+      fireEvent.change(select, { target: { value: "pattern_guard" } });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra sổ" }));
+    expect(diagnosisShown()).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Bỏ qua, xem chẩn đoán" }));
+    expect(diagnosisShown()).toBe(true);
+    expect(document.querySelector("[data-trace-row]")).toBeNull();
+  });
+});
