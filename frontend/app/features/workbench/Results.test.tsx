@@ -506,6 +506,36 @@ describe("the comparison card from the second run on", () => {
   });
 });
 
+describe("the calibration rows under the past runs", () => {
+  const mark = (bets: RunMark["bets"]): RunMark => ({
+    body: JSON.stringify(dense),
+    at: 1,
+    stars: 1,
+    tokens: 10,
+    budget: 20,
+    cases: [{ n: 1, role: "visible", passed: true }],
+    ...(bets && { bets }),
+  });
+
+  it("adds up the remembered bets by how sure the player was", () => {
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, [
+      mark([{ confidence: "high", right: false }]),
+      mark([
+        { confidence: "high", right: true },
+        { confidence: "low", right: true },
+      ]),
+    ]);
+    const high = document.querySelector('[data-confidence="high"]');
+    expect(high?.getAttribute("data-right")).toBe("1");
+    expect(high?.getAttribute("data-total")).toBe("2");
+  });
+
+  it("shows nothing when no run kept a bet", () => {
+    show(finishedRun({ "lib-l1-v01": trap }), dense, l1, dense, [mark(undefined)]);
+    expect(document.querySelector("[data-confidence]")).toBeNull();
+  });
+});
+
 describe("Debrief's picks reach the page through onDebrief", () => {
   it("calls onDebrief with exactly the option the player picked", () => {
     const picks: unknown[] = [];

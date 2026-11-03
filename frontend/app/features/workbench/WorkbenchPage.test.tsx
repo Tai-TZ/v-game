@@ -246,6 +246,27 @@ describe("useRecordHistory", () => {
     ]);
   });
 
+  it("keeps the slip's bets with the run: how sure, and whether the call was right", () => {
+    const run = replay(short.slice(0, scored + 1));
+    if (!run) throw new Error("no run");
+    const [first, second] = run.cases;
+    if (!first || !second) throw new Error("the short run has two cases");
+    const slip = {
+      passed: null,
+      failing: [],
+      bets: {
+        // Both cases passed: a "pass" bet is right, a "fail" bet is wrong.
+        [first.id]: { pass: true, confidence: "high" as const },
+        [second.id]: { pass: false, confidence: "low" as const },
+      },
+    };
+    renderHook(() => useRecordHistory(l1.level.id, run, BODY, undefined, slip));
+    expect(loadHistory(l1.level.id)[0]?.bets).toEqual([
+      { confidence: "high", right: true },
+      { confidence: "low", right: false },
+    ]);
+  });
+
   it("remembers which case failed, which is the whole point of the strip", () => {
     // The committed short run passes both cases, so a fixture that cannot fail would let
     // `passed: true` for everything through.

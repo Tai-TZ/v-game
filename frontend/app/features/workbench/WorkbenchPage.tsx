@@ -20,7 +20,7 @@ import { benchFromGraph, graphFromBench, type Bench, type Env } from "./bench";
 import { BenchSection, slotTargets } from "./BenchView";
 import { Brief } from "./Brief";
 import { BACK_TO_LEVELS, FIRST_TOUCH_VI, liveMessage, PROJECTOR_VI } from "./copy";
-import { EMPTY_SLIP, isEmptySlip, type Slip } from "./guess";
+import { EMPTY_SLIP, isEmptySlip, predictionsOf, type Slip } from "./guess";
 import { previewableCase, shouldPreview } from "./preview";
 import { parseRecorded, recordedUrl, replayRecorded } from "./recorded";
 import { parseViz, vizUrl, type VizData } from "./vizData";
@@ -274,11 +274,21 @@ export function useRecordStars(level: PublicLevel, run: RunView | null) {
  * when to write, so a caller that hands over a changing body still gets one entry per run
  * instead of one per knob turn.
  */
+/** The slip's confident calls, graded against this run, as the history keeps them. */
+function betsOf(slip: Slip | null, run: RunView): { bets?: RunMark["bets"] } {
+  const bets = (slip ? predictionsOf(slip, run) : []).flatMap((p) =>
+    p.confidence ? [{ confidence: p.confidence, right: p.right }] : [],
+  );
+  return bets.length > 0 ? { bets } : {};
+}
+
 export function useRecordHistory(
   levelId: string,
   run: RunView | null,
   ranBody: string | null,
   onWritten?: (runs: RunMark[]) => void,
+  /** The slip this run was guessed with, if any: its bets are kept for the calibration view. */
+  slip: Slip | null = null,
 ) {
   // Same rule as the stars, and for the strip there is a second reason: a truncated run has
   // fewer rows than the others, so it would not be comparable with them.
@@ -304,12 +314,13 @@ export function useRecordHistory(
       cases: run.cases.flatMap((c) =>
         c.graded ? [{ n: c.n, role: c.role, passed: c.graded.passed }] : [],
       ),
+      ...betsOf(slip, run),
     });
     // The store is write-only otherwise: the strip needs the list it just joined.
     onWritten?.(loadHistory(levelId));
     // `onWritten` is in the deps, which is honest: a fresh closure re-runs the effect, and the
     // guard above -- not a trimmed dep list -- is what keeps it to one entry per run.
-  }, [scoredRun, run, ranBody, levelId, onWritten]);
+  }, [scoredRun, run, ranBody, levelId, onWritten, slip]);
 }
 
 /**
@@ -567,7 +578,13 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [machineHost, setMachineHost] = useState<HTMLDivElement | null>(null);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
   const passing = lastPassing(history);
-  useRecordHistory(level.id, run, lastBody, setHistory);
+  useRecordHistory(
+    level.id,
+    run,
+    lastBody,
+    setHistory,
+    run && ranSlip?.runId === run.runId ? ranSlip.slip : null,
+  );
   // Set by Mở ca from the pool (§5.1): when it only covers the samples, they run alone. State,
   // not a ref, because the hook below reads it during render.
   const [samplesOnly, setSamplesOnly] = useState(false);

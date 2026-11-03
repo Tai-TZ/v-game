@@ -122,6 +122,11 @@ const MarkSchema = v.object({
    */
   why: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
   next: v.optional(NextPickSchema),
+  /**
+   * The slip's bets on this run (plan v0.7 2.4): how sure the player was, and whether the call
+   * was right. Optional, so a mark from before bets were kept still reads.
+   */
+  bets: v.optional(v.array(v.object({ confidence: v.picklist(CONFIDENCE), right: v.boolean() }))),
 });
 const HistorySchema = v.object({ runs: v.array(MarkSchema) });
 
