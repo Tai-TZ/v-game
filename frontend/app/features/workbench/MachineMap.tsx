@@ -411,7 +411,13 @@ const TONE: Readonly<Record<BlockState, string>> = {
   error: "stroke-danger",
 };
 
-/** Zoom steps, in percent of the frame's width: 100 is the whole machine in view. */
+/** How far a socket and its callout reach either side of its centre, in drawing units. */
+const SOCKET_REACH = 56;
+
+/**
+ * Zoom steps, in percent of the frame's width: 100 is the whole machine in view where the frame
+ * is wide enough to draw it at one unit a pixel, and a scroll from the empty sockets where not.
+ */
 const ZOOMS = [100, 150, 200] as const;
 
 /** A step of the walk-through: numbered, with the site's corners (no other control is round). */
@@ -530,6 +536,41 @@ export function MachineMap({
     el.scrollLeft = (bubbleLeft / 100) * el.scrollWidth - el.clientWidth / 2;
   }, [bubbleLeft, zoom]);
 
+  // Plan v0.7 3.3: on a narrow screen the frame opens on the empty sockets, where the lesson is:
+  // all of them if they fit, else the first. Where they are when the level opens, not after
+  // each edit -- a frame that jumps while the player works on it loses their place.
+  const holes = [
+    ...cols.flatMap((col, index) =>
+      col.some((type) => isOptional(type) && !attached(type))
+        ? [along(centre(index), 0, 0, 0)[0]]
+        : [],
+    ),
+    ...fork.flatMap((type, k) =>
+      isOptional(type) && !attached(type) ? [along(forkCentre(k), 0, 0, 0)[0]] : [],
+    ),
+  ];
+  const openFrom = holes.length === 0 ? null : (Math.min(...holes) - SOCKET_REACH - box.x) / box.w;
+  const openTo = holes.length === 0 ? null : (Math.max(...holes) + SOCKET_REACH - box.x) / box.w;
+  const level = env.level.id;
+  useEffect(() => {
+    const el = frame.current;
+    if (!el || openFrom === null || openTo === null || el.scrollWidth <= el.clientWidth) return;
+    const from = openFrom * el.scrollWidth;
+    const to = openTo * el.scrollWidth;
+    el.scrollLeft = to - from <= el.clientWidth ? (from + to - el.clientWidth) / 2 : from;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per level: following the sockets as they fill would move the frame under the player's hand
+  }, [level]);
+  // Whether the frame scrolls, said under it: on a phone part of the machine is off to the side.
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const el = frame.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => setScrolls(el.scrollWidth > el.clientWidth + 1));
+    watch.observe(el);
+    if (el.firstElementChild) watch.observe(el.firstElementChild);
+    return () => watch.disconnect();
+  }, []);
+
   const stepLabel = (b: string) => (b === "input" && isDesk(env) ? "Khách gõ cửa" : BEAT_VI[b]);
 
   return (
@@ -593,10 +634,12 @@ export function MachineMap({
         className="mt-3 overflow-x-auto focus-visible:outline-2 focus-visible:outline-brand"
       >
         {/* pt-10: a band above the machine for the beat's bubble, clear of the callouts. */}
+        {/* One scale for every level (plan v0.7 3.3, 3.4): never narrower than one drawing
+            unit a pixel, so a label is 10 px on any level and any screen, and a phone scrolls. */}
         <div
           data-zoom={zoom}
-          style={{ width: `${zoom}%` }}
-          className="relative min-w-[38rem] pt-10"
+          style={{ width: `${zoom}%`, minWidth: `${Math.round((box.w * zoom) / 100)}px` }}
+          className="relative pt-10"
         >
           <svg
             role="group"
@@ -853,22 +896,27 @@ export function MachineMap({
       </div>
 
       <div className="mt-2 flex items-center justify-end gap-1 text-sm">
+        {scrolls && (
+          <p data-machine-scroll="" className="mr-auto min-w-0 text-xs text-fg-muted">
+            Máy dài hơn khung: vuốt ngang để xem hết.
+          </p>
+        )}
         <button
           type="button"
           aria-label="Thu nhỏ"
           disabled={zoom === ZOOMS[0]}
           onClick={() => setZoom(ZOOMS[Math.max(ZOOMS.indexOf(zoom) - 1, 0)] ?? 100)}
-          className="size-11 rounded-full border-2 border-fg font-bold disabled:cursor-not-allowed disabled:opacity-40"
+          className="size-11 shrink-0 rounded-full border-2 border-fg font-bold disabled:cursor-not-allowed disabled:opacity-40"
         >
           −
         </button>
-        <span className="w-14 text-center font-mono font-bold tabular-nums">{zoom}%</span>
+        <span className="w-14 shrink-0 text-center font-mono font-bold tabular-nums">{zoom}%</span>
         <button
           type="button"
           aria-label="Phóng to"
           disabled={zoom === ZOOMS[ZOOMS.length - 1]}
           onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.indexOf(zoom) + 1, ZOOMS.length - 1)] ?? 100)}
-          className="size-11 rounded-full border-2 border-fg font-bold disabled:cursor-not-allowed disabled:opacity-40"
+          className="size-11 shrink-0 rounded-full border-2 border-fg font-bold disabled:cursor-not-allowed disabled:opacity-40"
         >
           +
         </button>

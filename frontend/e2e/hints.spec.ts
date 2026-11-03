@@ -236,3 +236,32 @@ test("runs the variant after the worked example, and keeps the ladder (N16)", as
   );
   expect(JSON.parse(seen ?? "{}")).toEqual({ "lib-l1-r01": 1 });
 });
+
+// Plan v0.7 2.2: "nguyên lý nào?" under each hint, kept for the pilot.
+test("asks which principle a hint rests on, and keeps the first answer", async ({ page }) => {
+  await mockWorkbenchApi(page, { events: () => sse.sample(false) });
+  await page.goto(L1);
+  await page.getByRole("button", { name: "Mở ca" }).click();
+  const hints = page.getByRole("region", { name: "Gợi ý" });
+  await hints.getByRole("button", { name: "Xem gợi ý 1" }).click();
+  const ask = hints.locator('[data-hint="1"] [data-principle="ask"]');
+  await expect(ask.getByRole("button")).toHaveCount(4);
+  await ask.getByRole("button", { name: "Mỗi đoạn vào thùng đều tốn token" }).click();
+  await expect(hints.getByText("Chưa khớp với gợi ý này.", { exact: false })).toBeVisible();
+  await ask.getByRole("button", { name: "Bộ Óc chỉ biết những gì có trong thùng" }).click();
+  await expect(hints.locator('[data-hint="1"] [data-principle="named"]')).toContainText(
+    "Bộ Óc chỉ biết những gì có trong thùng",
+  );
+  const picks = await page.evaluate(
+    () =>
+      (
+        JSON.parse(window.localStorage.getItem("vg.hints.v1.grounded-citation") ?? "{}") as {
+          picks: { pick: string; right: boolean }[];
+        }
+      ).picks,
+  );
+  expect(picks.map((p) => [p.pick, p.right])).toEqual([
+    ["ngan_sach", false],
+    ["tim_dung", true],
+  ]);
+});
