@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { buttonClass } from "~/components/ui/button";
 import { levelStars, readProgress } from "~/features/progress/progress";
 
-import { HINTS_VI, TOY } from "./copy";
+import { HINTS_VI, PRINCIPLE_VI, TOY } from "./copy";
 import {
+  answer,
   canOpen,
   configKey,
   hint3Gate,
@@ -13,11 +14,14 @@ import {
   loadHints,
   look,
   open,
+  principleOptions,
   recordFail,
   saveHints,
+  settled,
   type GateContext,
   type HintBook,
   type Pointer,
+  type Principle,
   type Target,
 } from "./hints";
 import type { RunView } from "./run";
@@ -64,8 +68,14 @@ export function useHints({
     setBook(open(book, target.key, target.star, Date.now()));
   }, [target, book, gate]);
   const markLook = useCallback(() => setBook(look(book)), [book]);
+  const pick = useCallback(
+    (n: 1 | 2 | 3, principle: Principle) => {
+      if (target) setBook(answer(book, levelId, target, n, principle, Date.now()));
+    },
+    [target, book, levelId],
+  );
 
-  return { book, target, gate3, openNext, markLook };
+  return { book, target, gate3, openNext, markLook, pick };
 }
 
 const pointerLabel = (pointer: Pointer) =>
@@ -91,6 +101,7 @@ export function HintLadder({
   onOpen,
   onPointer,
   onVariant,
+  onPick,
 }: {
   levelId: string;
   target: Target;
@@ -104,6 +115,8 @@ export function HintLadder({
   onOpen: () => void;
   onPointer: (pointer: Pointer) => void;
   onVariant: () => void;
+  /** The player named the principle under hint n (plan v0.7 2.2). */
+  onPick: (n: 1 | 2 | 3, principle: Principle) => void;
 }): ReactElement | null {
   const opened = book.targets[target.key]?.opened ?? 0;
   const next = canOpen(book, target.key, gate3);
@@ -134,6 +147,17 @@ export function HintLadder({
                   </span>
                   {hint.text}
                 </p>
+                {hint.last !== undefined &&
+                  (opened >= 4 ? (
+                    <p data-hint-last="shown" className="mt-1">
+                      <span className="font-semibold">{HINTS_VI.lastLabel}: </span>
+                      {hint.last}
+                    </p>
+                  ) : (
+                    <p data-hint-last="hidden" className="mt-1 text-sm text-fg-muted">
+                      {HINTS_VI.lastHidden}
+                    </p>
+                  ))}
                 <button
                   type="button"
                   onClick={() => onPointer(hint.pointer)}
@@ -141,38 +165,96 @@ export function HintLadder({
                 >
                   {pointerLabel(hint.pointer)}
                 </button>
+                <PrincipleCheck
+                  levelId={levelId}
+                  target={target}
+                  n={n}
+                  principle={hint.principle}
+                  book={book}
+                  onPick={onPick}
+                />
               </li>
             ) : null,
           )}
         </ol>
       )}
-      {next !== null ? (
+      {next !== null && (
         <button type="button" onClick={onOpen} className={buttonClass("secondary", "mt-3")}>
-          {HINTS_VI.open(next)}
+          {next === 4 ? HINTS_VI.showLast : HINTS_VI.open(next)}
         </button>
-      ) : (
-        <>
-          {opened === 1 && <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitLook}</p>}
-          {/* Said in full, numbers included: a gate the player cannot see reads as arbitrary. */}
-          {opened >= 3 && variant !== null && (
-            <div className="mt-4 border-t border-line pt-4">
-              <h3 className="font-bold">{HINTS_VI.variantHeading}</h3>
-              <p className="mt-1 text-sm text-fg-muted">{HINTS_VI.variantLead}</p>
-              <button
-                type="button"
-                onClick={onVariant}
-                disabled={busy}
-                className={buttonClass("secondary", "mt-3")}
-              >
-                {HINTS_VI.variantRun}
-              </button>
-            </div>
-          )}
-          {opened === 2 && (
-            <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitGate(failures)}</p>
-          )}
-        </>
+      )}
+      {next === null && opened === 1 && (
+        <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitLook}</p>
+      )}
+      {/* Said in full, numbers included: a gate the player cannot see reads as arbitrary. */}
+      {next === null && opened === 2 && (
+        <p className="mt-3 text-sm text-fg-muted">{HINTS_VI.waitGate(failures)}</p>
+      )}
+      {/* The variant does not wait for the last step: fixing for it is the player's own try. */}
+      {opened >= 3 && variant !== null && (
+        <div className="mt-4 border-t border-line pt-4">
+          <h3 className="font-bold">{HINTS_VI.variantHeading}</h3>
+          <p className="mt-1 text-sm text-fg-muted">{HINTS_VI.variantLead}</p>
+          <button
+            type="button"
+            onClick={onVariant}
+            disabled={busy}
+            className={buttonClass("secondary", "mt-3")}
+          >
+            {HINTS_VI.variantRun}
+          </button>
+        </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Plan v0.7 2.2: "nguyên lý nào?" under a rung, from four of the level's principles. Once the
+ * ladder has the principle right, a rung resting on it names it instead of asking again. It
+ * opens nothing and holds nothing back: naming the principle is the point, not a gate.
+ */
+function PrincipleCheck({
+  levelId,
+  target,
+  n,
+  principle,
+  book,
+  onPick,
+}: {
+  levelId: string;
+  target: Target;
+  n: 1 | 2 | 3;
+  principle: Principle;
+  book: HintBook;
+  onPick: (n: 1 | 2 | 3, principle: Principle) => void;
+}): ReactElement {
+  if (settled(book, target.key, principle)) {
+    return (
+      <p data-principle="named" className="mt-2 text-sm">
+        <span className="font-semibold">{HINTS_VI.principleNamed}: </span>
+        {PRINCIPLE_VI[principle]}
+      </p>
+    );
+  }
+  const latest = book.picks.filter((p) => p.target === target.key && p.n === n).at(-1);
+  return (
+    <fieldset data-principle="ask" className="mt-2">
+      <legend className="text-sm font-semibold">{HINTS_VI.principleAsk}</legend>
+      <div className="mt-1 flex flex-wrap gap-2">
+        {principleOptions(levelId, principle).map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={latest?.pick === option}
+            onClick={() => onPick(n, option)}
+            className="min-h-11 rounded-md border border-line-strong bg-surface px-3 py-1 text-left text-sm aria-pressed:border-brand aria-pressed:bg-brand-tint"
+          >
+            {PRINCIPLE_VI[option]}
+          </button>
+        ))}
+      </div>
+      {latest && !latest.right && <p className="mt-1 text-sm">{HINTS_VI.principleWrong}</p>}
+    </fieldset>
   );
 }

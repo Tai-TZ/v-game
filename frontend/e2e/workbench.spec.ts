@@ -1153,3 +1153,67 @@ test.describe("a way to Mở ca on a phone (plan v0.7 3.1)", () => {
     await expect(jump).toBeHidden();
   });
 });
+
+// Plan v0.7 3.3: on a phone the machine scrolls rather than shrink past reading, so the frame
+// opens on its empty sockets (the lesson), says it scrolls, and draws every level at one scale.
+test.describe("the machine on a 375 px screen", () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  const inFrame = (page: Page, selector: string) =>
+    page.evaluate((sel) => {
+      const frame = document.querySelector('[role="region"][aria-label="Cỗ máy trợ lý"]');
+      const view = frame?.getBoundingClientRect();
+      return [...document.querySelectorAll(sel)].map((el) => {
+        const r = el.getBoundingClientRect();
+        return view !== undefined && r.left >= view.left - 1 && r.right <= view.right + 1;
+      });
+    }, selector);
+
+  for (const [name, url, holes] of [
+    ["L1", L1, 1],
+    ["W1", "/play/watchtower/direct-injection", 3],
+  ] as const) {
+    test(`opens ${name} on its empty sockets, every one of them in view`, async ({ page }) => {
+      await mockWorkbenchApi(page);
+      await page.goto(url);
+      await expect(page.locator('[data-tile="empty"]').first()).toBeAttached();
+      await expect
+        .poll(() => inFrame(page, '[data-tile="empty"]'))
+        .toEqual(Array<boolean>(holes).fill(true));
+      await expect(page.locator("[data-machine-scroll]")).toBeVisible();
+      // The note shares the zoom row: the buttons keep their 44 px.
+      for (const name of ["Thu nhỏ", "Phóng to"]) {
+        const box = await page.getByRole("button", { name }).boundingBox();
+        expect(box?.width ?? 0, name).toBeGreaterThanOrEqual(44);
+      }
+    });
+  }
+
+  test("draws every level at the same scale, labels at 10 px or more", async ({ page }) => {
+    await mockWorkbenchApi(page);
+    for (const url of [L1, L3, "/play/watchtower/direct-injection"]) {
+      await page.goto(url);
+      const scale = await page
+        .locator("[data-machine-figure] svg[viewBox]")
+        .first()
+        .evaluate((svg) => {
+          const w = Number(svg.getAttribute("viewBox")?.split(" ")[2]);
+          return svg.getBoundingClientRect().width / w;
+        });
+      expect(scale, url).toBeGreaterThanOrEqual(0.99);
+      expect(scale, url).toBeLessThan(1.01);
+    }
+    const sideways = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(sideways).toBe(0);
+  });
+});
+
+test("says nothing about scrolling where the whole machine fits", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await mockWorkbenchApi(page);
+  await page.goto(L1);
+  await expect(page.locator('[data-tile="empty"]').first()).toBeAttached();
+  await expect(page.locator("[data-machine-scroll]")).toHaveCount(0);
+});

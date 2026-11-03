@@ -993,6 +993,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           onOpen={hints.openNext}
           onPointer={point}
           onVariant={runVariant}
+          onPick={hints.pick}
         />
       )}
       <p aria-live="polite" className="sr-only">

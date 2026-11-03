@@ -60,6 +60,27 @@ describe("sessionRows", () => {
     expect(rows[1]).toMatchObject({ hint_target: "s1", hint_n: 1, star: 1 });
   });
 
+  it("has one row per principle pick under a hint, right or not (plan v0.7 2.2)", () => {
+    window.localStorage.setItem(
+      "vg.hints.v1.direct-injection",
+      JSON.stringify({
+        targets: {},
+        log: [],
+        fails: {},
+        picks: [
+          { at: 300, target: "s1", n: 1, pick: "chan_som", right: false },
+          { at: 400, target: "s1", n: 1, pick: "nguoi_duyet", right: true },
+        ],
+      }),
+    );
+    const rows = sessionRows("ABCDEF");
+    expect(rows.map((r) => [r.kind, r.at, r.principle, r.right])).toEqual([
+      ["principle", 300, "chan_som", 0],
+      ["principle", 400, "nguoi_duyet", 1],
+    ]);
+    expect(rows[0]).toMatchObject({ level: "direct-injection", hint_target: "s1", hint_n: 1 });
+  });
+
   it("never carries the graph, a question or any free text", () => {
     window.localStorage.setItem(
       "vg.history.v1.direct-injection",

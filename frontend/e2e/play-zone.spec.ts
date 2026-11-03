@@ -106,7 +106,7 @@ test("downloads this browser's session data as a CSV named by its code", async (
   const { readFileSync } = await import("node:fs");
   const csv = readFileSync(path, "utf8");
   expect(csv.split("\n")[0]).toBe(
-    "code,level,kind,at,stars,tokens,budget,passed,cases,why,next,hint_target,star,hint_n",
+    "code,level,kind,at,stars,tokens,budget,passed,cases,why,next,hint_target,star,hint_n,principle,right",
   );
   expect(csv).toContain(`${code},grounded-citation,run,1,1,900,15000,1,1`);
   await expect(page.getByText(code ?? "", { exact: true })).toBeVisible();

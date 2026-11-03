@@ -45,12 +45,14 @@ export const CSV_COLUMNS = [
   "hint_target",
   "star",
   "hint_n",
+  "principle",
+  "right",
 ] as const;
 
 export type SessionRow = Partial<Record<(typeof CSV_COLUMNS)[number], string | number>> & {
   code: string;
   level: string;
-  kind: "run" | "hint";
+  kind: "run" | "hint" | "principle";
   at: number;
 };
 
@@ -69,7 +71,7 @@ function levelsWithData(): string[] {
   return [...levels].sort();
 }
 
-/** One row per scored run and per opened hint, every level, oldest first. */
+/** One row per scored run, per opened hint and per principle pick, every level, oldest first. */
 export function sessionRows(code: string): SessionRow[] {
   const rows: SessionRow[] = [];
   for (const level of levelsWithData()) {
@@ -97,6 +99,19 @@ export function sessionRows(code: string): SessionRow[] {
         hint_target: hint.target,
         star: hint.star,
         hint_n: hint.n,
+      });
+    }
+    // Plan v0.7 2.2: every "nguyên lý nào?" answer, as a key from a closed list; 1 is right.
+    for (const pick of loadHints(level).picks) {
+      rows.push({
+        code,
+        level,
+        kind: "principle",
+        at: pick.at,
+        hint_target: pick.target,
+        hint_n: pick.n,
+        principle: pick.pick,
+        right: pick.right ? 1 : 0,
       });
     }
   }
