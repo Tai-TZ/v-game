@@ -40,6 +40,7 @@ import type { RunMark } from "./storage";
 import { RankJourney } from "./RankJourney";
 import { whyCase, type Slip } from "./guess";
 import { caseTitle } from "./RunPanel";
+import { TraceBook, traceRows } from "./TraceBook";
 import {
   caseModel,
   fallbackAnswers,
@@ -125,6 +126,10 @@ export function Results({
   const asked = whyCase(run);
   const menu = asked && WHY_MENU[level.id]?.[asked.why];
   const ask = asked && menu && why !== "skipped" ? { c: asked.c, menu } : null;
+  // One step before the diagnosis, never two: the trace book stands in only where the level has
+  // no reason menu for this run (plan v0.7 2.3).
+  const trace = asked && menu ? [] : traceRows(env, run, revealed, runGraph);
+  const tracing = trace.length > 0 && why !== "skipped";
   const copy = LEVEL_COPY[level.id];
   const first = run.cases.find((c) => c.id === level.s1_required[0]);
   const skipped = unfinished(run).length;
@@ -267,7 +272,15 @@ export function Results({
           onSkip={() => setWhy("skipped")}
         />
       )}
-      {ask && why === "ask" ? null : run.phase === "failed" ? (
+      {tracing && (
+        <TraceBook
+          env={env}
+          rows={trace}
+          onSolved={() => setWhy("answered")}
+          onSkip={() => setWhy("skipped")}
+        />
+      )}
+      {(ask !== null || tracing) && why === "ask" ? null : run.phase === "failed" ? (
         // The stars came, then the run failed before its gold reveal (§8.6).
         <p className="mt-2 max-w-prose text-sm">
           Máy chủ đã chấm sao nhưng phần chẩn đoán chưa tới được. Chạy lại cùng cấu hình để xem: các
