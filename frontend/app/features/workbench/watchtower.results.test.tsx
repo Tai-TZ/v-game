@@ -330,6 +330,56 @@ describe("every case a tile that opens (plan v0.7 3.2)", () => {
     expect([mark(3), mark(9)]).not.toContain(mark(2));
   });
 
+  it("names a tile by its title, a pause, then its verdict, the visible words in order", () => {
+    show(run([]));
+    for (const [n, verdict] of [
+      [1, "Đạt"],
+      [9, "Trượt"],
+    ] as const) {
+      const { article, button } = tile(n);
+      const title = document.getElementById(`cau-${n}-title`)?.textContent ?? "";
+      expect(title, `#${n}`).not.toBe("");
+      // The name the button reads out, as testing-library computes it.
+      expect(within(article).getByRole("button", { name: `${title}, ${verdict}` })).toBe(button);
+      // The tile itself is named by the title alone, no pause trailing it.
+      expect(screen.getByRole("article", { name: title })).toBe(article);
+      // WCAG 2.5.3: the visible words, punctuation aside, are the name's own in the same order.
+      const shown = button.cloneNode(true) as HTMLElement;
+      shown.querySelectorAll(".sr-only, [data-name-pause]").forEach((hidden) => hidden.remove());
+      const words = (text: string | null) =>
+        (text ?? "")
+          .replace(/[,.…·:]/g, " ")
+          .split(/\s+/)
+          .filter(Boolean);
+      expect(words(shown.textContent)).toEqual(words(`${title}, ${verdict}`));
+    }
+  });
+
+  it("closes a body until found, and opens its tile when find-in-page reaches it", () => {
+    show(run([]));
+    const nine = tile(9);
+    // The browser's find-in-page still searches an until-found body; plain hidden it skips.
+    expect(nine.body.getAttribute("hidden")).toBe("until-found");
+    // jsdom has no find-in-page: the event a matching browser fires before it shows the body.
+    act(() => {
+      nine.body.dispatchEvent(new Event("beforematch"));
+    });
+    expect(nine.button.getAttribute("aria-expanded")).toBe("true");
+    expect(nine.body.hasAttribute("hidden")).toBe(false);
+    expect(opened()).toEqual(["cau-9"]);
+    expect(criteria(9)).not.toBeNull();
+    // A second match on an open tile leaves it open; closed again, it is findable again.
+    act(() => {
+      nine.body.dispatchEvent(new Event("beforematch"));
+    });
+    expect(opened()).toEqual(["cau-9"]);
+    fireEvent.click(nine.button);
+    expect(nine.button.getAttribute("aria-expanded")).toBe("false");
+    expect(nine.body.getAttribute("hidden")).toBe("until-found");
+    // The others never heard it.
+    expect(tile(10).button.getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("counts a failed case's trace as a look, not the press that opens its tile (L1 §11)", () => {
     const looks: number[] = [];
     show(run([]), vi.fn(), false, { onLook: () => looks.push(1) });

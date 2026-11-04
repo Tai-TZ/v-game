@@ -189,6 +189,55 @@ test.describe("the W1 cases as tiles (plan v0.7 3.2)", () => {
     });
   }
 
+  test("reads a tile out as its title, a pause, then its verdict", async ({ page }) => {
+    await results(page);
+    const title = (await page.locator("#cau-9-title").textContent()) ?? "";
+    // Chromium's own name for it, not a library's: the accessibility tree over CDP.
+    const cdp = await page.context().newCDPSession(page);
+    const { root } = await cdp.send("DOM.getDocument");
+    const { nodeId } = await cdp.send("DOM.querySelector", {
+      nodeId: root.nodeId,
+      selector: "#cau-9 h4 button",
+    });
+    const { nodes } = await cdp.send("Accessibility.getPartialAXTree", {
+      nodeId,
+      fetchRelatives: false,
+    });
+    expect(String(nodes[0]?.name?.value)).toBe(`${title}, Trượt`);
+  });
+
+  test("lets find-in-page reach a closed case, and opens its tile on the match", async ({
+    page,
+  }) => {
+    await results(page);
+    const nine = page.locator("#cau-9");
+    const body = page.locator("#cau-9-body");
+    await expect(body).toHaveAttribute("hidden", "until-found");
+    await expect(body).toBeHidden();
+    // Chromium's own until-found: a text fragment is found the way find-in-page finds it, and
+    // fires beforematch on the closed body before it shows it.
+    const question = (await body.locator("p").first().textContent()) ?? "";
+    expect(question.length).toBeGreaterThan(8);
+    const fired = body.evaluate(
+      (el) =>
+        new Promise<boolean>((done) => {
+          el.addEventListener("beforematch", () => done(true));
+          setTimeout(() => done(false), 5000);
+        }),
+    );
+    await page.evaluate(
+      (text) => {
+        window.location.hash = `:~:text=${encodeURIComponent(text)}`;
+      },
+      question.slice(0, 40),
+    );
+    expect(await fired).toBe(true);
+    await expect(nine).toHaveAttribute("data-case-open", "");
+    await expect(nine.locator("h4 button")).toHaveAttribute("aria-expanded", "true");
+    await expect(body).toBeVisible();
+    await expect(body).not.toHaveAttribute("hidden");
+  });
+
   test("opens case #9 from the trace book, and again from the diagnosis", async ({ page }) => {
     await results(page);
     const nine = page.locator("#cau-9");
