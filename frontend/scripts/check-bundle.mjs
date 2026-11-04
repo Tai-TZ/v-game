@@ -5,7 +5,8 @@
 //   - no chunk the landing page loads contains three.js;
 //   - the workbench route (/play/:zoneId/:levelId) adds at most 120 kB of gzipped JS on top of
 //     the app shell and none of its chunks contains three.js (workbench-v0.1 §10);
-//   - each micro lesson's page is a lazy chunk the micro route alone loads (plan v0.7 4.5).
+//   - each micro lesson's page is a lazy chunk the micro route alone loads (plan v0.7 4.5), and
+//     none of its chunks is the workbench's.
 // Writes build/bundle-report.json (read by the e2e suite) and removes the manifest from the
 // deployable output.
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -111,6 +112,16 @@ const microRoute = closure(
   keysWhere((key) => key.startsWith("app/routes/play-micro.tsx")),
   { dynamic: true },
 );
+// A lesson is a page's worth of JS: one import of the bench (a chip's class names, once) pulled
+// ~43 kB gzip of workbench chunks into two of them. vite.config.ts writes each chunk's modules.
+const chunkModules = JSON.parse(
+  await readFile(path.join(clientDir, ".vite", "chunk-modules.json"), "utf8"),
+);
+const benchModules = (file) =>
+  (chunkModules[file] ?? []).filter((id) => id.startsWith("app/features/workbench/"));
+if (![...workbench].some((file) => benchModules(file).length > 0)) {
+  problems.push("No workbench module found in the chunk module map; update check-bundle.mjs.");
+}
 if (lessonKeys.length === 0) problems.push("No micro lesson page chunk found in the manifest.");
 for (const key of lessonKeys) {
   const file = manifest[key].file;
@@ -120,6 +131,12 @@ for (const key of lessonKeys) {
   for (const other of closure([key])) {
     if (other !== file && lessonFiles.has(other)) {
       problems.push(`Micro lesson chunk ${file} loads another lesson's, ${other}.`);
+    }
+  }
+  for (const other of closure([key])) {
+    const bench = benchModules(other);
+    if (bench.length > 0) {
+      problems.push(`Micro lesson chunk ${file} loads workbench code in ${other}: ${bench[0]}.`);
     }
   }
 }
