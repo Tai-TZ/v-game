@@ -321,17 +321,32 @@ test("keeps star 2's budget meter off a live W1 star run until the reveal (R4)",
   await expect(page.getByText(/ngân sách sao 2/)).toHaveCount(0);
 });
 
-test("raises W1's world flag only once the teacher opens the results (R4)", async ({ page }) => {
+test("raises W1's world flag only once the teacher opens the results (R4, R8)", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1280, height: 720 });
+  // The teacher rehearsed on this laptop: its three stars are not the room's to see.
+  await page.addInitScript(() =>
+    window.localStorage.setItem(
+      "vg-progress-v1",
+      JSON.stringify({ watchtower: { "direct-injection": 3 } }),
+    ),
+  );
   await mockWorkbenchApi(page, { events: () => w1Stream("reference") });
   await page.goto(`${W1}?chieu=1`);
+  await expect(page.locator("[data-scene-receipt]")).toBeVisible();
+  await expect(page.locator("[data-scene-won]")).toHaveCount(0);
   await page.getByRole("button", { name: "Mở ca" }).click();
-  // Three stars, scored and finished, and the receipt is still unstamped for the room.
+  // Three stars, scored and finished, and the receipt is still unstamped for the room. Nor does
+  // the way back to a starred run turn up, which would say the same thing (R3 hides it anyway).
+  const back = page.getByRole("button", { name: "Quay về bản đạt gần nhất" });
   await expect(page.getByRole("button", { name: "Mở kết quả" })).toBeFocused();
   await expect(page.locator("[data-scene-won]")).toHaveCount(0);
+  await expect(back).toHaveCount(0);
   await page.keyboard.press("Enter");
   await expect(page.getByText("3/3 sao", { exact: true })).toBeVisible();
   await expect(page.locator("[data-scene-won]")).toHaveText("ĐÃ CHẶN");
+  await expect(back).toHaveCount(0);
 });
 
 test("leaves a pair's slip and cô Lan's hints off a projector run (R3, R8)", async ({ page }) => {
@@ -368,6 +383,9 @@ test("works on the watchtower zone page, and the warm-up lesson still reads (R1)
   await expect(page.locator("html")).toHaveClass(/\bchieu\b/);
   await expect(page.getByRole("button", { name: "Thoát chế độ chiếu" })).toBeVisible();
   expect(await px(page, "[data-warmup-row] p")).toBeGreaterThanOrEqual(24);
+  // One browser's history and its paper-test code are not the room's (R3, R8): there, not shown.
+  await expect(page.locator("[data-session-export]")).toHaveCount(1);
+  await expect(page.locator("[data-session-export]")).toBeHidden();
   expect(await seriousViolations(page)).toEqual([]);
   expect(await sideways(page)).toBeLessThanOrEqual(0);
 

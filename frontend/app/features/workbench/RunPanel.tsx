@@ -72,7 +72,10 @@ interface RunPanelProps {
   onOpen: () => void;
   onRetry: () => void;
   onRestore: () => void;
-  /** Puts the newest starred run's configuration back; null when no run has earned a star (N3). */
+  /**
+   * Puts the newest starred run's configuration back; null when no run has earned a star (N3),
+   * and on the projector, where the history it reads is hidden (R3).
+   */
   backToPassing: (() => void) | null;
   onFocusSlot: (type: BlockType, param?: string) => void;
   onStop: () => void;

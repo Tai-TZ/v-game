@@ -229,12 +229,16 @@ function useFocusLater() {
  * The level's world flag (cờ thế giới, scenario §3): up once this browser holds a star for the
  * level, or the moment a scored run on screen earns one. A recorded or sample run never raises
  * it -- the same rule as `useRecordStars`, for the same reason.
+ *
+ * `remembered` false (projector mode): only the run on screen counts. A star this browser kept
+ * from before -- the teacher's rehearsal, or a pair's laptop put up -- would stamp the scene
+ * fixed before the room has guessed anything (R4), and it is that browser's progress (R8).
  */
-export function useLevelWon(level: PublicLevel, run: RunView | null): boolean {
+export function useLevelWon(level: PublicLevel, run: RunView | null, remembered = true): boolean {
   // Read once: the workbench renders on the client only, and a star earned now comes in below.
   const [saved] = useState(() => levelStars(readProgress(), level.zone, level.id));
   const earned = run?.score && run.scope === undefined && !cappedRun(run) ? run.score.stars : 0;
-  return saved >= 1 || earned >= 1;
+  return (remembered && saved >= 1) || earned >= 1;
 }
 
 /**
@@ -573,8 +577,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [tips, setTips] = useState<Partial<Record<BlockType, string>>>({});
   const sample = useLastSample(ours);
   useRecordStars(level, run);
-  // R4: a star the room has not been shown yet must not stamp the scene before "Mở kết quả".
-  const won = useLevelWon(level, masked ? null : run);
+  // R4: a star the room has not been shown yet must not stamp the scene before "Mở kết quả",
+  // nor one this browser saved before the lesson.
+  const won = useLevelWon(level, masked ? null : run, !projector);
   // A state, not a ref: the bench re-renders into the host once it exists.
   const [machineHost, setMachineHost] = useState<HTMLDivElement | null>(null);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
@@ -923,7 +928,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
               if (request.state === "failed") void send(request.body, request.key);
             }}
             onRestore={() => edit(starter)}
-            backToPassing={passing === null ? null : () => benchFrom(passing)}
+            // Not on the projector: the way back reads the history, which is the pairs' (R3),
+            // and it appears the moment a covered run earns a star, before "Mở kết quả" (R4).
+            backToPassing={passing === null || projector ? null : () => benchFrom(passing)}
             onFocusSlot={focusSlot}
             onStop={() => {
               if (!run) return;
