@@ -180,9 +180,13 @@ test.describe("workbench", () => {
     });
     expect(afterDuplicate).toBe(1);
 
-    // A figure inside a collapsed <details> ("Xem vết chạy") is in the DOM but not visible, and
-    // the gate is about what every figure carries, not about which disclosure happens to be
-    // open. Open them all first, as the a11y suite does.
+    // A figure inside a closed case tile (plan v0.7 3.2) or a collapsed <details> ("Xem vết
+    // chạy") is in the DOM but not visible, and the gate is about what every figure carries, not
+    // about which disclosure happens to be open. Open them all first, as the a11y suite does.
+    await page
+      .locator("article[id^='cau-'] h4 button[aria-expanded='false']")
+      .evaluateAll((buttons) => buttons.forEach((button) => (button as HTMLElement).click()));
+    await expect(page.locator("article[data-case-open]")).toHaveCount(cases);
     for (const details of await page.locator("details").all()) {
       await details.evaluate((element) => element.setAttribute("open", ""));
     }
@@ -752,7 +756,10 @@ test.describe("workbench", () => {
 
     await page.getByRole("button", { name: "Mở ca" }).click();
     await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeFocused();
-    // Open every <details> (JSON again, numbers, traces); the closed set shrinks as we go.
+    // Open every case tile (plan v0.7 3.2), then every <details> (JSON again, numbers, traces);
+    // each closed set shrinks as we go.
+    const tiles = page.locator("article[id^='cau-'] h4 button[aria-expanded='false']");
+    while ((await tiles.count()) > 0) await tiles.first().click();
     const closed = page.locator("details:not([open]) > summary");
     while ((await closed.count()) > 0) await closed.first().click();
     expect(await overflow()).toBeLessThanOrEqual(0);
@@ -1216,4 +1223,97 @@ test("says nothing about scrolling where the whole machine fits", async ({ page 
   await page.goto(L1);
   await expect(page.locator('[data-tile="empty"]').first()).toBeAttached();
   await expect(page.locator("[data-machine-scroll]")).toHaveCount(0);
+});
+
+// Plan v0.7 3.4: the frame is cut to the highest tag, about the margin of the other edges, and
+// holds still while the player works: no toggle, step or socket moves or resizes the machine,
+// and the beat's bubble keeps to its band, whole and clear of every tag.
+test.describe("the machine's frame (plan v0.7 3.4)", () => {
+  /**
+   * The machine as drawn. In drawing units: its viewBox, the room over the drawing and the tags
+   * the frame cuts. In px: where the drawing starts in its frame and how tall that is, and the
+   * beat's bubble, with the tags it covers and whether it sits whole in the frame.
+   */
+  const look = (page: Page) =>
+    page.evaluate(() => {
+      const frame = document.querySelector('[role="region"][aria-label="Cỗ máy trợ lý"]');
+      const svg = frame?.querySelector("svg[viewBox]");
+      const stage = frame?.querySelector("[data-zoom]");
+      if (!frame || !svg || !stage) throw new Error("no machine on the page");
+      const viewBox = svg.getAttribute("viewBox") ?? "";
+      const [x = 0, y = 0, w = 0, h = 0] = viewBox.split(" ").map(Number);
+      const tags = [...svg.querySelectorAll<SVGGElement>("[data-callout]")];
+      const cut = tags.flatMap((tag) => {
+        const b = tag.getBBox();
+        const out = b.x < x || b.y < y || b.x + b.width > x + w || b.y + b.height > y + h;
+        return out ? [tag.dataset.callout ?? "?"] : [];
+      });
+      // The slip's own transform is not in its box; it rides the belt, never above the tags.
+      const drawn = [...svg.children].filter(
+        (el): el is SVGGElement => el instanceof SVGGElement && !el.hasAttribute("data-slip"),
+      );
+      const room = Math.min(...drawn.map((g) => g.getBBox().y)) - y;
+      const [f, s] = [frame.getBoundingClientRect(), svg.getBoundingClientRect()];
+      const layout = { top: Math.round(s.top - f.top), height: Math.round(f.height) };
+      const at = stage.querySelector("[data-beat-bubble]")?.getBoundingClientRect();
+      const box = stage.getBoundingClientRect();
+      const bubble = at && {
+        covered: tags.flatMap((tag) => {
+          const r = tag.getBoundingClientRect();
+          const over =
+            r.left < at.right && r.right > at.left && r.top < at.bottom && r.bottom > at.top;
+          return over ? [tag.dataset.callout ?? "?"] : [];
+        }),
+        whole: at.left >= box.left && at.right <= box.right && at.top >= box.top,
+      };
+      return { viewBox, room, cut, layout, bubble: bubble ?? null };
+    });
+
+  for (const url of [L1, "/play/library/chunk-tuning", L3, "/play/watchtower/direct-injection"]) {
+    test(`frames ${url} close over its tags, and holds the frame still`, async ({ page }) => {
+      await mockWorkbenchApi(page);
+      await page.goto(url);
+      await expect(page.locator("[data-callout]").first()).toBeAttached();
+      const opened = await look(page);
+      expect(opened.room).toBeGreaterThanOrEqual(10);
+      expect(opened.room).toBeLessThanOrEqual(18);
+      expect(opened.cut).toEqual([]);
+      const holds = async (what: string, bubble: boolean) => {
+        const now = await look(page);
+        expect(now.viewBox, what).toBe(opened.viewBox);
+        expect(now.cut, what).toEqual([]);
+        expect(now.layout, what).toEqual(opened.layout);
+        expect(now.bubble, what).toEqual(bubble ? { covered: [], whole: true } : null);
+      };
+
+      for (const name of ["Nhãn", "Nhìn xuyên"]) {
+        const toggle = page.getByRole("button", { name, exact: true });
+        await toggle.click();
+        await holds(`${name} pressed`, false);
+        await toggle.click();
+        await holds(`${name} pressed again`, false);
+      }
+
+      const empty = page.locator('[data-tile="empty"]');
+      const seeThrough = page.getByRole("button", { name: "Nhìn xuyên", exact: true });
+      for (const sockets of ["as opened", "all filled"]) {
+        if (sockets === "all filled") {
+          for (let left = await empty.count(); left > 0; left--) await empty.first().press("Enter");
+          await expect(empty).toHaveCount(0);
+          await holds("sockets filled", false);
+        }
+        for (const view of ["plain", "seen through"]) {
+          if (view === "seen through") await seeThrough.click();
+          const steps = await page.locator("[data-beat]").all();
+          for (const step of steps) {
+            await step.click();
+            await holds(`${sockets}, ${view}, ${await step.getAttribute("data-beat")}`, true);
+          }
+          await steps.at(-1)?.click();
+          await holds(`${sockets}, ${view}, no step pressed`, false);
+          if (view === "seen through") await seeThrough.click();
+        }
+      }
+    });
+  }
 });

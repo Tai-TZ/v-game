@@ -472,6 +472,52 @@ describe("going back to a remembered configuration", () => {
     page();
     expect(screen.queryByRole("button", { name: /Quay về bản đạt/ })).toBeNull();
   });
+
+  // The way back reads the history, which the projector hides (R3). It also turned up the moment
+  // a covered run earned a star, so the room saw the result before "Mở kết quả" (R4).
+  it("offers no way back on the projector", () => {
+    seed('{"schema":1,"nodes":[],"edges":[]}');
+    page();
+    expect(screen.getByRole("button", { name: "Quay về bản đạt gần nhất" })).toBeDefined();
+    cleanup();
+    const starter = starterBench(l1);
+    if (!starter) throw new Error("L1 starter is not drawable");
+    render(
+      <MemoryRouter initialEntries={["/play/library/grounded-citation?chieu=1"]}>
+        <WorkbenchPage env={l1} starter={starter} back="/play/library" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("region", { name: "Cả lớp đoán" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: /Quay về bản đạt/ })).toBeNull();
+  });
+});
+
+describe("the world flag on the projector (lesson plan R4, R8)", () => {
+  const w1 = testEnv("direct-injection");
+  const page = (url: string) => {
+    const starter = starterBench(w1);
+    if (!starter) throw new Error("W1 starter is not drawable");
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <WorkbenchPage env={w1} starter={starter} back="/play/watchtower" />
+      </MemoryRouter>,
+    );
+  };
+
+  it("leaves the receipt unstamped by a star this browser saved before the lesson", () => {
+    window.localStorage.setItem(
+      PROGRESS_KEY,
+      JSON.stringify({ [w1.level.zone]: { [w1.level.id]: 3 } }),
+    );
+    page("/play/watchtower/direct-injection");
+    expect(document.querySelector("[data-scene-receipt] [data-scene-won]")).not.toBeNull();
+    cleanup();
+    // A rehearsal on this laptop, or a pair's own put up: the room has guessed nothing yet.
+    page("/play/watchtower/direct-injection?chieu=1");
+    expect(screen.getByRole("region", { name: "Cả lớp đoán" })).toBeDefined();
+    expect(document.querySelector("[data-scene-receipt]")).not.toBeNull();
+    expect(document.querySelector("[data-scene-won]")).toBeNull();
+  });
 });
 
 describe("useStarRunAfterSample (N2)", () => {

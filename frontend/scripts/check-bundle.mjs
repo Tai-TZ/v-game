@@ -4,7 +4,8 @@
 //     (three + react-three-fiber + scene code included);
 //   - no chunk the landing page loads contains three.js;
 //   - the workbench route (/play/:zoneId/:levelId) adds at most 120 kB of gzipped JS on top of
-//     the app shell and none of its chunks contains three.js (workbench-v0.1 §10).
+//     the app shell and none of its chunks contains three.js (workbench-v0.1 §10);
+//   - each micro lesson's page is a lazy chunk the micro route alone loads (plan v0.7 4.5).
 // Writes build/bundle-report.json (read by the e2e suite) and removes the manifest from the
 // deployable output.
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -93,6 +94,34 @@ if (workbenchGzip > WORKBENCH_BUDGET_BYTES) {
   problems.push(
     `Workbench adds ${workbenchGzip} B gzip, over the ${WORKBENCH_BUDGET_BYTES} B budget.`,
   );
+}
+
+// Micro lessons (plan v0.7 4.5): each lesson's page and content is a lazy chunk of the micro
+// route alone. The zone page and the brief read the registry's metadata, so neither reaches a
+// lesson chunk, not even lazily, and no lesson's page loads another lesson's.
+const lessonKeys = keysWhere(
+  (key) => key.startsWith("app/features/micro/") && manifest[key].isDynamicEntry,
+);
+const lessonFiles = new Set(lessonKeys.map((key) => manifest[key].file));
+const zonePage = closure(
+  keysWhere((key) => key.startsWith("app/routes/play-zone.tsx")),
+  { dynamic: true },
+);
+const microRoute = closure(
+  keysWhere((key) => key.startsWith("app/routes/play-micro.tsx")),
+  { dynamic: true },
+);
+if (lessonKeys.length === 0) problems.push("No micro lesson page chunk found in the manifest.");
+for (const key of lessonKeys) {
+  const file = manifest[key].file;
+  if (zonePage.has(file)) problems.push(`Zone page reaches micro lesson chunk ${file}.`);
+  if (workbench.has(file)) problems.push(`Workbench route reaches micro lesson chunk ${file}.`);
+  if (!microRoute.has(file)) problems.push(`Micro lesson route does not load ${file}.`);
+  for (const other of closure([key])) {
+    if (other !== file && lessonFiles.has(other)) {
+      problems.push(`Micro lesson chunk ${file} loads another lesson's, ${other}.`);
+    }
+  }
 }
 
 const sceneChunks = [...closure(keysWhere((key) => manifest[key].isDynamicEntry))].filter(

@@ -47,6 +47,14 @@ describe("the world flag of a level", () => {
     expect(renderHook(() => useLevelWon(level, finished(0))).result.current).toBe(false);
   });
 
+  // Projector mode (R4, R8): a rehearsal's star must not stamp the scene before the room guesses.
+  it("leaves a star this browser saved out of it when told to, and still takes the run's", () => {
+    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify({ library: { [level.id]: 3 } }));
+    expect(renderHook(() => useLevelWon(level, null, false)).result.current).toBe(false);
+    expect(renderHook(() => useLevelWon(level, finished(0), false)).result.current).toBe(false);
+    expect(renderHook(() => useLevelWon(level, finished(1), false)).result.current).toBe(true);
+  });
+
   // A recorded run carries the stars of whoever recorded it, and a sample run earns none:
   // neither is the player's result, so neither may take the poster down.
   it("ignores the stars of a recorded run or a sample run", () => {

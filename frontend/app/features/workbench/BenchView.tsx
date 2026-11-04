@@ -692,7 +692,14 @@ function AttachSwitch({ toy, on, onToggle }: { toy: string; on: boolean; onToggl
 }
 
 /** Outcome badge, criteria chips and labels of a graded case (§7, §8.6). */
-export function Grade({ c }: { c: CaseView }) {
+export function Grade({
+  c,
+  outcome = true,
+}: {
+  c: CaseView;
+  /** False where a heading already says the outcome: a results tile (plan v0.7 3.2). */
+  outcome?: boolean;
+}) {
   const graded = c.graded;
   const tone = !graded?.counted
     ? "bg-subtle"
@@ -701,9 +708,11 @@ export function Grade({ c }: { c: CaseView }) {
       : "bg-danger-tint";
   return (
     <>
-      <p className={`mt-2 inline-block rounded-sm px-2 py-0.5 text-sm font-semibold ${tone}`}>
-        {outcomeText(c)}
-      </p>
+      {outcome && (
+        <p className={`mt-2 inline-block rounded-sm px-2 py-0.5 text-sm font-semibold ${tone}`}>
+          {outcomeText(c)}
+        </p>
+      )}
       {graded && (
         <ul className="mt-2 flex flex-wrap gap-1" aria-label="Tiêu chí">
           {Object.entries(graded.criteria).map(([name, ok]) => (

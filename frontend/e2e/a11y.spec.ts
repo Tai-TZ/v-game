@@ -106,6 +106,14 @@ for (const viewport of VIEWPORTS) {
       await page.getByRole("switch", { name: "Gắn Tủ ngăn kéo" }).check();
       await page.getByRole("button", { name: "Mở ca" }).click();
       await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
+      // Every case open, every trace in it too: a closed tile (plan v0.7 3.2) hides its case
+      // from the scan. The W1 test below scans the tiles closed.
+      const tiles = page.locator("article[id^='cau-']");
+      await expect(tiles.first()).toBeVisible();
+      await page
+        .locator("article[id^='cau-'] h4 button[aria-expanded='false']")
+        .evaluateAll((buttons) => buttons.forEach((button) => (button as HTMLElement).click()));
+      await expect(page.locator("article[data-case-open]")).toHaveCount(await tiles.count());
       for (const details of await page.locator("details").all()) {
         await details.evaluate((element) => element.setAttribute("open", ""));
       }
@@ -139,6 +147,40 @@ for (const viewport of VIEWPORTS) {
       for (const card of await page.locator("[data-card]").all()) {
         await card.getByRole("radio").first().check({ force: true });
       }
+      await page.getByRole("button", { name: "Kiểm tra" }).click();
+      await expect(page.locator("[data-grade]")).toBeVisible();
+      expect(await seriousViolations(page)).toEqual([]);
+    });
+
+    test("the three-kinds micro lesson, before and after the check", async ({ page }) => {
+      await mockApi(page);
+      await page.goto("/play/library/vi-mo/ba-loai-du-lieu");
+      await expect(page.getByRole("heading", { level: 1, name: "Ba loại dữ liệu" })).toBeVisible();
+      expect(await seriousViolations(page)).toEqual([]);
+      // One card wrong into each other place, so every kind of verdict and lesson is drawn.
+      const cards = await page.locator("[data-card]").all();
+      for (const [index, card] of cards.entries()) {
+        await card
+          .getByRole("radio")
+          .nth(index % 3)
+          .check({ force: true });
+      }
+      await page.getByRole("button", { name: "Kiểm tra" }).click();
+      await expect(page.locator("[data-grade]")).toBeVisible();
+      expect(await seriousViolations(page)).toEqual([]);
+    });
+
+    test("the RRF micro lesson, before and after the check", async ({ page }) => {
+      await mockApi(page);
+      await page.goto("/play/library/vi-mo/tu-tay-tron-rrf");
+      await expect(page.getByRole("heading", { level: 1, name: "Tự tay trộn RRF" })).toBeVisible();
+      expect(await seriousViolations(page)).toEqual([]);
+      for (const chip of await page.locator("[data-chip]").all()) await chip.click();
+      // Placed in the Phễu's listing order: some right, some wrong.
+      for (const row of await page.locator("[data-fused]").all()) {
+        await row.getByRole("button").click();
+      }
+      expect(await seriousViolations(page)).toEqual([]);
       await page.getByRole("button", { name: "Kiểm tra" }).click();
       await expect(page.locator("[data-grade]")).toBeVisible();
       expect(await seriousViolations(page)).toEqual([]);

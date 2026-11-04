@@ -352,6 +352,45 @@ const HEIGHT: Readonly<Record<BlockType, number>> = {
 /** Distance between two toys of the tool branch, per axis, across the belt. */
 const FORK = 2.1;
 
+/** A tag's height, in drawing units. */
+const TAG = 16;
+/** The frame's margin over the highest tag: about what the slab leaves at the other edges. */
+const EDGE = 14;
+
+/**
+ * Where a toy's tag goes: risen over its lid on one of two rows (an empty socket's from its
+ * floor, lower); hung under the front corner of a pair's front toy; level at the side of a toy
+ * of the tool branch. One rule for the tags and for the frame cut to the highest of them (plan
+ * v0.7 3.4).
+ */
+function tagAt(
+  type: BlockType,
+  [x, y]: P,
+  {
+    on,
+    row = 0,
+    front = false,
+    side = false,
+  }: { on: boolean; row?: number; front?: boolean; side?: boolean },
+): { from: P; top: number } {
+  const h = HEIGHT[type];
+  if (side) {
+    const from = iso(x, y + FOOT, on ? h / 2 : 0);
+    return { from, top: from[1] - TAG / 2 };
+  }
+  if (front) {
+    const from = iso(x + FOOT, y + FOOT, 0);
+    return { from, top: from[1] + 18 };
+  }
+  const from = iso(x + FOOT / 2, y + FOOT / 2, on ? h + 0.9 : 0.2);
+  return { from, top: from[1] - (34 + row * 22) };
+}
+
+/** The row of the tag of a column's toy: neighbours on the belt alternate. */
+const rowOf = (index: number, at: number) => (index + at) % 2;
+/** The front toy of a pair, whose tag hangs below. */
+const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
+
 /** Three faces of a box: the top in its own token, the two sides darker by a fixed rule. */
 function Box({
   x,
@@ -487,17 +526,35 @@ export function MachineMap({
   const desk = centre(Math.max(deskIndex, 0));
   const forkCentre = (k: number): P => [desk[0] + (k + 1) * FORK, desk[1] + (k + 1) * FORK];
   const forkEnd = fork.length > 0 ? forkCentre(fork.length - 1) : null;
+  const forkCorner = (k: number): P => {
+    const [cx, cy] = forkCentre(k);
+    return [cx - FOOT / 2, cy - FOOT / 2];
+  };
+  // The slab's lower corners, the branch's too: the frame's left, right and bottom edges.
   const ends = [
     along(first, -1.4, half, -0.3),
-    along(first, -1.4, -half, 2.2),
     along(last, 1.4, half, -0.3),
-    along(last, 1.4, -half, 2.2),
     ...(forkEnd ? [along(forkEnd, 1.2, 1.3, -0.3), along(forkEnd, -1.2, 1.3, -0.3)] : []),
   ];
   const minX = Math.min(...ends.map((p) => p[0])) - 16;
   const maxX = Math.max(...ends.map((p) => p[0])) + 28;
-  // Room above the toys for the callouts, two rows of them.
-  const minY = Math.min(...ends.map((p) => p[1])) - 58;
+  // Above, the highest tag any toy raises, each toy as it stands attached (an empty socket's tag
+  // sits lower). Read off the layout, never off what is drawn, so the frame holds still as a
+  // socket fills, the labels go off or a beat plays (plan v0.7 3.4).
+  const roof = Math.min(
+    ...cols.flatMap((col, index) =>
+      col.map(
+        (type, at) =>
+          tagAt(type, origin(index, at, col.length), {
+            on: true,
+            row: rowOf(index, at),
+            front: frontOf(col, at),
+          }).top,
+      ),
+    ),
+    ...fork.map((type, k) => tagAt(type, forkCorner(k), { on: true, side: true }).top),
+  );
+  const minY = roof - EDGE;
   // And below, for the hanging callout of a pair's front toy.
   const maxY = Math.max(...ends.map((p) => p[1])) + (pair ? 44 : 22);
   const box = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
@@ -515,15 +572,19 @@ export function MachineMap({
       : beatIndex === -1
         ? null
         : along(centre(beatIndex), beatIndex === 0 ? -1.0 : -STEP / U / 2, 0, 0);
-  // The bubble sits in the band above the machine, over the beat's toy, kept off the edges.
+  // The bubble sits in the band above the machine, over the beat's toy, and stops short of
+  // either end, where the frame would cut it (W1's first beat on a phone). Its line is
+  // monospace: half of it is half its letters in ch, plus its px-3 and border-2, and 0.25rem
+  // of air.
   const beatX =
     forkIndex !== -1
       ? along(forkCentre(forkIndex), 0, 0, 0)[0]
       : beatIndex === -1
         ? null
         : along(centre(beatIndex), 0, 0, 0)[0];
-  const bubbleAt =
-    beatX === null ? null : { left: Math.min(88, Math.max(12, ((beatX - box.x) / box.w) * 100)) };
+  const narration = beat === null ? "" : (NARRATE_VI[beat] ?? "");
+  const halfBubble = `calc(${narration.length / 2}ch + 1rem + 2px)`;
+  const bubbleAt = beatX === null ? null : { left: ((beatX - box.x) / box.w) * 100 };
   const ink = `ink${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   // On a narrow screen the machine scrolls: bring the beat's toy to the middle of the frame.
   const frame = useRef<HTMLDivElement>(null);
@@ -633,13 +694,15 @@ export function MachineMap({
         aria-label="Cỗ máy trợ lý"
         className="mt-3 overflow-x-auto focus-visible:outline-2 focus-visible:outline-brand"
       >
-        {/* pt-10: a band above the machine for the beat's bubble, clear of the callouts. */}
+        {/* pt-8: a band above the machine for the beat's bubble, there with no beat pressed
+            too, so a press moves nothing. The bubble fills it (top-1, 28 px tall); the frame's
+            own margin over the highest tag keeps it off the tags (plan v0.7 3.4). */}
         {/* One scale for every level (plan v0.7 3.3, 3.4): never narrower than one drawing
             unit a pixel, so a label is 10 px on any level and any screen, and a phone scrolls. */}
         <div
           data-zoom={zoom}
           style={{ width: `${zoom}%`, minWidth: `${Math.round((box.w * zoom) / 100)}px` }}
-          className="relative pt-10"
+          className="relative pt-8"
         >
           <svg
             role="group"
@@ -796,8 +859,8 @@ export function MachineMap({
                           type={type}
                           x={x}
                           y={y}
-                          row={(index + at) % 2}
-                          front={col.length > 1 && at === 1}
+                          row={rowOf(index, at)}
+                          front={frontOf(col, at)}
                           on={attached(type)}
                           disabled={disabled}
                           state={states[type] ?? "idle"}
@@ -821,15 +884,15 @@ export function MachineMap({
                 );
               })}
               {fork.map((type, k) => {
-                const [cx, cy] = forkCentre(k);
+                const [x, y] = forkCorner(k);
                 return (
                   <g key={type} data-column={type} data-branch="">
                     <Toy
                       env={env}
                       bench={bench}
                       type={type}
-                      x={cx - FOOT / 2}
-                      y={cy - FOOT / 2}
+                      x={x}
+                      y={y}
                       row={0}
                       front={false}
                       side
@@ -886,10 +949,12 @@ export function MachineMap({
             <p
               aria-hidden="true"
               data-beat-bubble=""
-              style={{ left: `${bubbleAt.left.toFixed(1)}%` }}
+              style={{
+                left: `clamp(${halfBubble}, ${bubbleAt.left.toFixed(1)}%, 100% - ${halfBubble})`,
+              }}
               className="absolute top-1 -translate-x-1/2 rounded-md border-2 border-fg bg-warning-tint px-3 py-1 font-mono text-xs font-bold whitespace-nowrap"
             >
-              {NARRATE_VI[beat]}
+              {narration}
             </p>
           )}
         </div>
@@ -1009,18 +1074,13 @@ function Toy({
   const h = HEIGHT[type];
   // Callouts, Colorfigures-style: a capitalised tag over the toy on a leader line. Seen
   // through, the tag gives the block's real type (library §2: the metaphor fades).
+  const tag = tagAt(type, [x, y], { on, row, front, side });
   const label = labels && (
     <Callout
       type={type}
       text={seeThrough ? type : (on ? toy : `Gắn ${toy}`).toLocaleUpperCase("vi")}
-      from={
-        side
-          ? iso(x, y + FOOT, on ? h / 2 : 0)
-          : front
-            ? iso(x + FOOT, y + FOOT, 0)
-            : iso(x + FOOT / 2, y + FOOT / 2, on ? h + 0.9 : 0.2)
-      }
-      rise={34 + row * 22}
+      from={tag.from}
+      top={tag.top}
       below={front}
       left={side}
     />
@@ -1103,12 +1163,14 @@ function Callout({
   type,
   text,
   from: [fx, fy],
-  rise,
+  top,
 }: {
   type: BlockType;
   text: string;
+  /** Where the leader leaves the toy. */
   from: P;
-  rise: number;
+  /** The tag's top edge, from tagAt. */
+  top: number;
   /** Hang the tag under the toy: the front one of a pair, whose tag would cover the back one. */
   below?: boolean;
   /** Stand the tag to the left of the toy, on a level leader: a toy of the tool branch. */
@@ -1122,16 +1184,16 @@ function Callout({
         <line x1={fx} y1={fy} x2={end} y2={fy} className="stroke-fg" strokeWidth="1" />
         <rect
           x={end - w}
-          y={fy - 8}
+          y={top}
           width={w}
-          height="16"
+          height={TAG}
           rx="4"
           className="fill-surface stroke-fg"
           strokeWidth="1.2"
         />
         <text
           x={end - w / 2}
-          y={fy + 3.5}
+          y={top + 11.5}
           textAnchor="middle"
           className="fill-fg font-mono text-[10px] font-bold"
         >
@@ -1140,14 +1202,13 @@ function Callout({
       </g>
     );
   }
-  const top = below ? fy + 18 : fy - rise;
   return (
     <g aria-hidden="true" data-callout={type}>
       <line
         x1={fx}
         y1={fy}
         x2={fx}
-        y2={below ? top : top + 16}
+        y2={below ? top : top + TAG}
         className="stroke-fg"
         strokeWidth="1"
       />
@@ -1155,7 +1216,7 @@ function Callout({
         x={fx - w / 2}
         y={top}
         width={w}
-        height="16"
+        height={TAG}
         rx="4"
         className="fill-surface stroke-fg"
         strokeWidth="1.2"

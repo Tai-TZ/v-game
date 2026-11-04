@@ -1,11 +1,8 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { Link } from "react-router";
+import { useId, useState } from "react";
 
-import { PageFrame } from "~/components/PageFrame";
-import { buttonClass } from "~/components/ui/button";
-import { CheckIcon, CrossIcon } from "~/components/ui/icons";
 import { CHIP } from "~/features/workbench/BenchView";
 
+import { CheckRow, GradeBox, MicroFrame, useStartOver, VerdictLine } from "./MicroFrame";
 import {
   CARDS,
   gradeLadder,
@@ -16,8 +13,6 @@ import {
   type LaneId,
   type Verdict,
 } from "./toolRisk";
-
-const LEVEL_URL = `/play/${TOOL_RISK.zone}/${TOOL_RISK.before}`;
 
 /**
  * On top of the shared chip: a full-width cell holding number, label and marks, and the picked
@@ -44,25 +39,18 @@ export function ToolRiskPage() {
   const id = useId();
   const [picks, setPicks] = useState<Partial<Record<string, LaneId>>>({});
   const [grade, setGrade] = useState<LadderGrade | null>(null);
-  const summary = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (grade) summary.current?.focus();
-  }, [grade]);
+  const { controls, startOver } = useStartOver<HTMLOListElement>();
 
   const ready = gradeLadder(picks) !== null;
   const verdictOf = (cardId: string) => grade?.cards.find((c) => c.id === cardId)?.verdict;
 
   return (
-    <PageFrame back={LEVEL_URL} backLabel="Về màn Cổng thành">
-      <div aria-hidden="true" className="h-[5px] w-12 bg-ink" />
-      <p className="mt-4 text-sm font-semibold text-fg-muted">Khởi động 2 phút · Tháp canh</p>
-      <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{TOOL_RISK.title}</h1>
-      <p className="mt-3 max-w-prose text-lg text-fg-muted">{TOOL_RISK.lead}</p>
-      <p className="mt-2 max-w-prose text-sm text-fg-muted">
-        Bài này không tốn lượt gọi AI và không tính sao. Chọn một mức cho mỗi việc, rồi kiểm tra.
-      </p>
-
-      <ol className="mt-8 space-y-4">
+    <MicroFrame
+      lesson={TOOL_RISK}
+      lead={TOOL_RISK.lead}
+      how="Chọn một mức cho mỗi việc, rồi kiểm tra."
+    >
+      <ol ref={controls} className="mt-8 space-y-4">
         {CARDS.map((card, index) => {
           const verdict = verdictOf(card.id);
           return (
@@ -109,17 +97,10 @@ export function ToolRiskPage() {
                 </div>
               </fieldset>
               {verdict && (
-                <p className="mt-3 flex gap-2 text-sm">
-                  {verdict === "right" ? (
-                    <CheckIcon className="mt-0.5 size-4 shrink-0 text-success" />
-                  ) : (
-                    <CrossIcon className="mt-0.5 size-4 shrink-0 text-danger" />
-                  )}
-                  <span>
-                    <span className="font-semibold">{VERDICT_VI[verdict]}</span>
-                    {verdict !== "right" && ` · nên là: ${laneLabel(card.lane)}`}. {card.why}
-                  </span>
-                </p>
+                <VerdictLine right={verdict === "right"}>
+                  <span className="font-semibold">{VERDICT_VI[verdict]}</span>
+                  {verdict !== "right" && ` · nên là: ${laneLabel(card.lane)}`}. {card.why}
+                </VerdictLine>
               )}
             </li>
           );
@@ -127,12 +108,14 @@ export function ToolRiskPage() {
       </ol>
 
       {grade ? (
-        <div
-          ref={summary}
-          tabIndex={-1}
-          data-grade=""
-          data-right={grade.right}
-          className="mt-8 rounded-md border border-line p-4"
+        <GradeBox
+          lesson={TOOL_RISK}
+          right={grade.right}
+          onStartOver={() => {
+            setGrade(null);
+            setPicks({});
+            startOver();
+          }}
         >
           <p className="text-lg font-bold tabular-nums">
             Đúng {grade.right}/{grade.total} việc
@@ -155,42 +138,16 @@ export function ToolRiskPage() {
             Rủi ro nằm ở tác dụng phụ và việc làm lại được hay không, không nằm ở chữ trong câu. Hỏi
             duyệt việc chỉ đọc cũng là một lỗi: người duyệt sẽ quen bấm đồng ý.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link to={LEVEL_URL} className={buttonClass("primary")}>
-              Vào màn Cổng thành
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                setGrade(null);
-                setPicks({});
-              }}
-              className={buttonClass("secondary")}
-            >
-              Làm lại
-            </button>
-          </div>
-        </div>
+        </GradeBox>
       ) : (
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled={!ready}
-            onClick={() => setGrade(gradeLadder(picks))}
-            className={buttonClass("primary")}
-          >
-            Kiểm tra
-          </button>
-          {!ready && (
-            <span className="text-sm text-fg-muted">
-              Còn {CARDS.length - Object.keys(picks).length} việc chưa chọn mức.
-            </span>
-          )}
-          <Link to={LEVEL_URL} className={buttonClass("quiet")}>
-            Vào màn Cổng thành
-          </Link>
-        </div>
+        <CheckRow
+          lesson={TOOL_RISK}
+          left={
+            ready ? null : `Còn ${CARDS.length - Object.keys(picks).length} việc chưa chọn mức.`
+          }
+          onCheck={() => setGrade(gradeLadder(picks))}
+        />
       )}
-    </PageFrame>
+    </MicroFrame>
   );
 }
