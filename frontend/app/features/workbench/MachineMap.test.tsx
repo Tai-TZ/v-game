@@ -1,7 +1,15 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { setAttached, setParam, starterBench, type Bench, type Env } from "./bench";
+import {
+  isAllowed,
+  OPTIONAL_SLOTS,
+  setAttached,
+  setParam,
+  starterBench,
+  type Bench,
+  type Env,
+} from "./bench";
 import { beatLine, MachineMap } from "./MachineMap";
 import type { BenchRunView } from "./BenchView";
 import type { BlockState } from "./run";
@@ -354,6 +362,104 @@ describe("the machine as a figure to play with", () => {
     expect(document.querySelector("[data-beat-bubble]")).toBeNull();
     fireEvent.click(beatButton("context_packer"));
     expect(document.querySelector("[data-beat-bubble]")?.textContent).toBe("Đang đóng thùng…");
+  });
+});
+
+// Plan v0.7 3.4: the frame is cut to the highest tag, at about the margin the slab leaves at the
+// other edges, and holds still: nothing done on the bench moves or resizes the machine.
+describe("the machine's frame", () => {
+  const w1 = testEnv("direct-injection");
+  const levels = [l1, l2, l3, w1].map((env) => [env.level.id, env] as const);
+
+  /** Every socket of the level filled, or every one emptied. */
+  const sockets = (env: Env, on: boolean) =>
+    OPTIONAL_SLOTS.filter((type) => isAllowed(env.level, type)).reduce(
+      (bench, type) => setAttached(bench, type, on),
+      starter(env),
+    );
+  const viewBox = () =>
+    document.querySelector("[data-machine-figure] svg")?.getAttribute("viewBox") ?? "";
+  /** Each tag's box as drawn, in drawing units. */
+  const tags = () =>
+    [...document.querySelectorAll("[data-callout] rect")].map((rect) => {
+      const at = (name: string) => Number(rect.getAttribute(name));
+      return {
+        y: at("y"),
+        x: at("x"),
+        right: at("x") + at("width"),
+        bottom: at("y") + at("height"),
+      };
+    });
+  /** The frame's edges, from its viewBox. */
+  const edges = () => {
+    const [x = NaN, y = NaN, w = NaN, h = NaN] = viewBox().split(" ").map(Number);
+    return { x, y, right: x + w, bottom: y + h };
+  };
+  /** The followed case of the level's own committed recording, its first visible one. */
+  function recorded(env: Env): BenchRunView {
+    const file = JSON.parse(readText("public", "runs", `${env.level.id}.json`)) as {
+      events: { type: string }[];
+    };
+    const run = replay(file.events.map((e, i) => frame(i + 1, e.type as EventType, e)));
+    const followed = run?.cases.find((c) => c.role === "visible");
+    if (!run || !followed) throw new Error(`the recorded ${env.level.id} run does not replay`);
+    return { run, followed, gold: null };
+  }
+
+  it.each(levels)("opens %s with about 14 units over its highest tag", (_, env) => {
+    draw(env, starter(env));
+    const room = Math.min(...tags().map((tag) => tag.y)) - edges().y;
+    expect(room).toBeGreaterThanOrEqual(12);
+    expect(room).toBeLessThanOrEqual(16);
+  });
+
+  it.each(levels)("holds every tag of %s inside the frame, sockets filled or empty", (_, env) => {
+    for (const bench of [sockets(env, true), starter(env), sockets(env, false)]) {
+      draw(env, bench);
+      for (const seeThrough of [false, true]) {
+        if (seeThrough) fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
+        const box = edges();
+        const drawn = tags();
+        expect(drawn.length).toBeGreaterThan(0);
+        for (const tag of drawn) {
+          expect(tag.y).toBeGreaterThanOrEqual(box.y);
+          expect(tag.x).toBeGreaterThanOrEqual(box.x);
+          expect(tag.right).toBeLessThanOrEqual(box.right);
+          expect(tag.bottom).toBeLessThanOrEqual(box.bottom);
+        }
+      }
+      cleanup();
+    }
+  });
+
+  // The frame is the level's alone: were it cut to what is drawn now, the machine would jump
+  // under the player's hand as a socket fills, the labels go off or a beat plays.
+  it.each(levels)("keeps %s's frame whatever the bench shows", (_, env) => {
+    const props = {
+      env,
+      onChange: () => undefined,
+      disabled: false,
+      states: {},
+      highlight: null,
+      answer: null,
+    };
+    const { rerender } = render(<MachineMap {...props} bench={starter(env)} />);
+    const opened = viewBox();
+    expect(opened).toMatch(/^-?\d+ -?\d+ \d+ \d+$/);
+    rerender(<MachineMap {...props} bench={sockets(env, true)} />);
+    expect(viewBox()).toBe(opened);
+    rerender(<MachineMap {...props} bench={sockets(env, false)} />);
+    expect(viewBox()).toBe(opened);
+    rerender(<MachineMap {...props} bench={starter(env)} view={recorded(env)} answer="fail" />);
+    expect(viewBox()).toBe(opened);
+    for (const name of ["Nhãn", "Nhìn xuyên"]) {
+      fireEvent.click(screen.getByRole("button", { name }));
+      expect(viewBox(), name).toBe(opened);
+    }
+    for (const step of document.querySelectorAll<HTMLButtonElement>("[data-beat]")) {
+      fireEvent.click(step);
+      expect(viewBox(), step.dataset.beat).toBe(opened);
+    }
   });
 });
 
