@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { buttonClass } from "~/components/ui/button";
-import { CheckIcon, ChevronDownIcon, CrossIcon, StarIcon } from "~/components/ui/icons";
+import { CheckIcon, ChevronDownIcon, ClockIcon, CrossIcon, StarIcon } from "~/components/ui/icons";
 
 import { domain, nodeIds, sameJson, type Env } from "./bench";
 import { Bar, Grade, hasControls, rich } from "./BenchView";
@@ -20,6 +20,7 @@ import {
   LEVEL_COPY,
   npcOf,
   lowerFirst,
+  outcomeText,
   RECORDED_VI,
   stepStatusText,
   TOKENS_VI,
@@ -87,6 +88,11 @@ const LABEL_EVIDENCE: Readonly<Record<string, string>> = {
 };
 const asBlock = (block: string): BlockType | null =>
   (BLOCK_TYPES as readonly string[]).includes(block) ? (block as BlockType) : null;
+/** The case a link or the address points at: "#cau-9" is 9, anything else none. */
+const caseIn = (hash: string | null): number | null => {
+  const match = /^#cau-(\d+)$/.exec(hash ?? "");
+  return match ? Number(match[1]) : null;
+};
 
 /** Stars, the three conditions, cô Lan's diagnosis and every case (§8.6). */
 export function Results({
@@ -121,6 +127,39 @@ export function Results({
   useEffect(() => {
     if (why === "skipped") document.getElementById("wb-diagnosis-title")?.focus();
   }, [why]);
+  // Plan v0.7 3.2: every case is a closed tile until pressed, or until something points at it --
+  // "Xem câu #9" in the trace book, the diagnosis or the guess slip, or the address itself.
+  const [opened, setOpened] = useState<ReadonlySet<number>>(() => {
+    const n = caseIn(typeof window === "undefined" ? null : window.location.hash);
+    return new Set(n === null ? [] : [n]);
+  });
+  useEffect(() => {
+    const show = (n: number | null) => {
+      if (n !== null) setOpened((now) => (now.has(n) ? now : new Set(now).add(n)));
+    };
+    // The capture phase, so no link's own handler or parent can keep the click from us; and the
+    // same link pressed twice still opens, which no hashchange would say. The default is left
+    // alone: the browser still scrolls to the case, open by then.
+    const onClick = (event: MouseEvent) => {
+      const link =
+        event.target instanceof Element ? event.target.closest("a[href^='#cau-']") : null;
+      show(caseIn(link?.getAttribute("href") ?? null));
+    };
+    // Back and Forward through the case links, or an address typed in.
+    const onHash = () => show(caseIn(window.location.hash));
+    document.addEventListener("click", onClick, true);
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("hashchange", onHash);
+    };
+  }, []);
+  const toggle = (n: number) =>
+    setOpened((now) => {
+      const next = new Set(now);
+      if (!next.delete(n)) next.add(n);
+      return next;
+    });
   const score = run.score;
   if (!score) return null;
   const asked = whyCase(run);
@@ -377,7 +416,12 @@ export function Results({
       </div>
 
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>
-      <div className="mt-3 grid gap-3 lg:grid-cols-2 chieu:lg:grid-cols-1">
+      {/* Plan v0.7 3.2: twelve full cards ran 3.101 px down a phone. Tiles make three rows on a
+          desktop; the projector keeps two to a row at 1280 px, so its 24 px words still fit. */}
+      <div
+        data-case-grid=""
+        className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 chieu:grid-cols-2 chieu:2xl:grid-cols-3"
+      >
         {run.cases.map((c) => (
           <CaseCard
             key={c.id}
@@ -385,6 +429,8 @@ export function Results({
             c={c}
             gold={revealed[c.id]}
             runGraph={runGraph}
+            open={opened.has(c.n)}
+            onToggle={() => toggle(c.n)}
             onLook={onLook}
           />
         ))}
@@ -438,78 +484,132 @@ export function Results({
   );
 }
 
+/**
+ * A tile's verdict in colour, mark and words, none of the three carrying it alone (roadmap §5).
+ * The words are the full card's own, so a case that does not count still says so when closed.
+ */
+function Verdict({ c }: { c: CaseView }) {
+  const graded = c.graded;
+  const state = !graded
+    ? "waiting"
+    : !graded.counted
+      ? "uncounted"
+      : graded.passed
+        ? "pass"
+        : "fail";
+  const Icon = !graded ? ClockIcon : graded.passed ? CheckIcon : CrossIcon;
+  const tone =
+    state === "pass" ? "text-success" : state === "fail" ? "text-danger" : "text-fg-muted";
+  return (
+    <span data-case-verdict={state} className={`inline-flex items-start gap-1 ${tone}`}>
+      <Icon className="mt-0.5 size-4 shrink-0" />
+      {outcomeText(c)}
+    </span>
+  );
+}
+
 function CaseCard({
   env,
   c,
   gold,
   runGraph,
+  open,
+  onToggle,
   onLook,
 }: {
   env: Env;
   c: CaseView;
   gold: GoldReveal | undefined;
   runGraph: Graph | null;
+  /** Open, the tile takes its whole row and shows the case as the full card did (plan v0.7 3.2). */
+  open: boolean;
+  onToggle: () => void;
   onLook: (() => void) | undefined;
 }) {
   const failed = c.graded?.counted === true && !c.graded.passed;
   const titleId = `cau-${c.n}-title`;
+  const bodyId = `cau-${c.n}-body`;
   const served = caseModel(c);
   return (
     <article
       id={`cau-${c.n}`}
       aria-labelledby={titleId}
-      className="min-w-0 rounded-md border border-line bg-surface p-4"
+      data-case-open={open ? "" : undefined}
+      className={`flex min-w-0 scroll-mt-4 flex-col rounded-md border border-line bg-surface ${open ? "col-span-full" : ""}`}
     >
-      <h4 id={titleId} className="font-semibold">
-        {caseTitle(c, env.level.id)}
+      {/* The disclosure pattern: the heading holds the button, and the button fills the tile,
+          as tall as the tallest in its row, the verdicts on one line at its foot. The spaces
+          between its parts are for the name it reads out, not for the layout. */}
+      <h4 className="flex grow">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={onToggle}
+          className={`flex min-h-11 w-full flex-col items-start gap-2 p-3 text-left text-sm font-semibold hover:bg-subtle ${open ? "rounded-t-md" : "rounded-md"}`}
+        >
+          <span id={titleId} className={open ? undefined : "line-clamp-2"}>
+            {caseTitle(c, env.level.id)}
+          </span>{" "}
+          <span className="mt-auto flex w-full items-start justify-between gap-2">
+            <Verdict c={c} />
+            <ChevronDownIcon
+              className={`mt-0.5 size-4 shrink-0 text-fg-muted transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+            />
+          </span>
+        </button>
       </h4>
-      {c.question && <p className="mt-1 text-sm text-fg-muted">{c.question}</p>}
-      <Grade c={c} />
-      <p data-case-tokens className="mt-2 text-sm text-fg-muted tabular-nums">
-        {fmt(c.tokens.in + c.tokens.out)} token ({TOKENS_VI.usage})
-      </p>
-      <details
-        className="group mt-1 chieu:hidden"
-        onToggle={(event) => {
-          // L1 §11: the look that counts is the trace of a case that failed.
-          if (failed && event.currentTarget.open) onLook?.();
-        }}
-      >
-        <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
-          Xem vết chạy<span className="sr-only"> câu #{c.n}</span>
-          <ChevronDownIcon />
-        </summary>
-        <ol className="space-y-1 text-sm">
-          {Object.entries(c.steps).map(([node, step]) => {
-            const block = asBlock(step.block);
-            return (
-              <li key={node}>
-                <span className="font-semibold">{block ? toyName(block) : node}</span> ·{" "}
-                {stepStatusText(step.status, step.ms)}
-                {step.summary && <span className="text-fg-muted"> · {step.summary}</span>}
-              </li>
-            );
-          })}
-        </ol>
-        {/* X7: star 2 is calibrated on the primary model, so which model answered this case is
-            part of reading the grade. Same words as the bench's llm step, so the two agree. */}
-        {served && (
-          <p className="mt-2 text-sm" data-case-model={served.model}>
-            Model <code className="font-mono text-xs">{served.model}</code>
-            {served.replayed && (
-              <span className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-xs">
-                Kết quả đã lưu
-              </span>
-            )}
-          </p>
-        )}
-        {c.answer && (
-          <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-sm whitespace-pre-line">
-            {c.answer}
-          </blockquote>
-        )}
-        {gold && <GoldTrace env={env} c={c} gold={gold} runGraph={runGraph} />}
-      </details>
+      {/* Hidden, not unmounted: a trace opened inside stays open when the tile closes and opens.
+          pt-1 keeps the button's focus ring, drawn 2 px outside it, off the first line. */}
+      <div id={bodyId} hidden={!open} className="max-w-prose px-3 pt-1 pb-3">
+        {c.question && <p className="text-sm text-fg-muted">{c.question}</p>}
+        <Grade c={c} outcome={false} />
+        <p data-case-tokens className="mt-2 text-sm text-fg-muted tabular-nums">
+          {fmt(c.tokens.in + c.tokens.out)} token ({TOKENS_VI.usage})
+        </p>
+        <details
+          className="group mt-1 chieu:hidden"
+          onToggle={(event) => {
+            // L1 §11: the look that counts is the trace of a case that failed.
+            if (failed && event.currentTarget.open) onLook?.();
+          }}
+        >
+          <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
+            Xem vết chạy<span className="sr-only"> câu #{c.n}</span>
+            <ChevronDownIcon />
+          </summary>
+          <ol className="space-y-1 text-sm">
+            {Object.entries(c.steps).map(([node, step]) => {
+              const block = asBlock(step.block);
+              return (
+                <li key={node}>
+                  <span className="font-semibold">{block ? toyName(block) : node}</span> ·{" "}
+                  {stepStatusText(step.status, step.ms)}
+                  {step.summary && <span className="text-fg-muted"> · {step.summary}</span>}
+                </li>
+              );
+            })}
+          </ol>
+          {/* X7: star 2 is calibrated on the primary model, so which model answered this case is
+              part of reading the grade. Same words as the bench's llm step, so the two agree. */}
+          {served && (
+            <p className="mt-2 text-sm" data-case-model={served.model}>
+              Model <code className="font-mono text-xs">{served.model}</code>
+              {served.replayed && (
+                <span className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-xs">
+                  Kết quả đã lưu
+                </span>
+              )}
+            </p>
+          )}
+          {c.answer && (
+            <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-sm whitespace-pre-line">
+              {c.answer}
+            </blockquote>
+          )}
+          {gold && <GoldTrace env={env} c={c} gold={gold} runGraph={runGraph} />}
+        </details>
+      </div>
     </article>
   );
 }

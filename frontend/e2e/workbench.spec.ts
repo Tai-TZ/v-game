@@ -180,9 +180,13 @@ test.describe("workbench", () => {
     });
     expect(afterDuplicate).toBe(1);
 
-    // A figure inside a collapsed <details> ("Xem vết chạy") is in the DOM but not visible, and
-    // the gate is about what every figure carries, not about which disclosure happens to be
-    // open. Open them all first, as the a11y suite does.
+    // A figure inside a closed case tile (plan v0.7 3.2) or a collapsed <details> ("Xem vết
+    // chạy") is in the DOM but not visible, and the gate is about what every figure carries, not
+    // about which disclosure happens to be open. Open them all first, as the a11y suite does.
+    await page
+      .locator("article[id^='cau-'] h4 button[aria-expanded='false']")
+      .evaluateAll((buttons) => buttons.forEach((button) => (button as HTMLElement).click()));
+    await expect(page.locator("article[data-case-open]")).toHaveCount(cases);
     for (const details of await page.locator("details").all()) {
       await details.evaluate((element) => element.setAttribute("open", ""));
     }
@@ -752,7 +756,10 @@ test.describe("workbench", () => {
 
     await page.getByRole("button", { name: "Mở ca" }).click();
     await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeFocused();
-    // Open every <details> (JSON again, numbers, traces); the closed set shrinks as we go.
+    // Open every case tile (plan v0.7 3.2), then every <details> (JSON again, numbers, traces);
+    // each closed set shrinks as we go.
+    const tiles = page.locator("article[id^='cau-'] h4 button[aria-expanded='false']");
+    while ((await tiles.count()) > 0) await tiles.first().click();
     const closed = page.locator("details:not([open]) > summary");
     while ((await closed.count()) > 0) await closed.first().click();
     expect(await overflow()).toBeLessThanOrEqual(0);

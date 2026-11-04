@@ -106,6 +106,14 @@ for (const viewport of VIEWPORTS) {
       await page.getByRole("switch", { name: "Gắn Tủ ngăn kéo" }).check();
       await page.getByRole("button", { name: "Mở ca" }).click();
       await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
+      // Every case open, every trace in it too: a closed tile (plan v0.7 3.2) hides its case
+      // from the scan. The W1 test below scans the tiles closed.
+      const tiles = page.locator("article[id^='cau-']");
+      await expect(tiles.first()).toBeVisible();
+      await page
+        .locator("article[id^='cau-'] h4 button[aria-expanded='false']")
+        .evaluateAll((buttons) => buttons.forEach((button) => (button as HTMLElement).click()));
+      await expect(page.locator("article[data-case-open]")).toHaveCount(await tiles.count());
       for (const details of await page.locator("details").all()) {
         await details.evaluate((element) => element.setAttribute("open", ""));
       }

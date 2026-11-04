@@ -1,16 +1,18 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import axe from "axe-core";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { setAttached, starterBench } from "./bench";
+import { graphFromBench, setAttached, starterBench } from "./bench";
 import { Blade } from "./Blade";
 import { CitationLedger } from "./CitationLedger";
 import { ContextBin } from "./ContextBin";
 import { MachineMap } from "./MachineMap";
 import { Prism } from "./Prism";
+import { Results } from "./Results";
 import { Stamps } from "./Stamps";
 import { StarDome } from "./StarDome";
-import { testEnv } from "./test-fixtures";
+import { parseSse, readText, replay, testEnv } from "./test-fixtures";
 
 afterEach(cleanup);
 
@@ -139,5 +141,41 @@ describe("the toys answer axe's structural rules", () => {
       expect(await violations(container)).toEqual([]);
       cleanup();
     }
+  });
+});
+
+describe("the results' case grid answers them too (plan v0.7 3.2)", () => {
+  it("as closed tiles, and with a tile open", async () => {
+    const env = testEnv("direct-injection");
+    const bench = starterBench(env);
+    const run = replay(parseSse(readText("e2e", "data", "run-w1-starter.sse")));
+    if (!bench || !run) throw new Error("the W1 starter run is not drawable");
+    const graph = graphFromBench(env, bench);
+    render(
+      <MemoryRouter>
+        <Results
+          env={env}
+          run={run}
+          changed={false}
+          runGraph={graph}
+          graph={graph}
+          backTo="/play/watchtower"
+          slip={null}
+          history={[]}
+          onDebrief={() => undefined}
+          onDuplicate={() => undefined}
+          onEdit={() => undefined}
+          onFocusSlot={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+    const grid = document.querySelector("[data-case-grid]");
+    if (!grid) throw new Error("no case grid");
+    expect(await violations(grid)).toEqual([]);
+    const button = grid.querySelector("#cau-9 h4 button");
+    if (!button) throw new Error("case #9 has no tile button");
+    fireEvent.click(button);
+    expect(grid.querySelector("#cau-9[data-case-open]")).not.toBeNull();
+    expect(await violations(grid)).toEqual([]);
   });
 });

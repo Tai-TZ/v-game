@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -40,12 +41,19 @@ function run(diagnosis: object[], blockedBy?: string): RunView {
   return view;
 }
 
-function show(view: RunView, onFocusSlot = vi.fn(), hintsBelow = false) {
+function show(
+  view: RunView,
+  onFocusSlot = vi.fn(),
+  hintsBelow = false,
+  /** `outside` stands for the rest of the page, drawn before the results. */
+  { outside, onLook = () => undefined }: { outside?: ReactNode; onLook?: () => void } = {},
+) {
   const bench = starterBench(env);
   if (!bench) throw new Error("the W1 starter is not drawable");
   const graph = graphFromBench(env, bench);
   render(
     <MemoryRouter>
+      {outside}
       <Results
         env={env}
         run={view}
@@ -59,6 +67,7 @@ function show(view: RunView, onFocusSlot = vi.fn(), hintsBelow = false) {
         onDuplicate={() => undefined}
         onEdit={() => undefined}
         onFocusSlot={onFocusSlot}
+        onLook={onLook}
         hintsBelow={hintsBelow}
       />
     </MemoryRouter>,
@@ -179,5 +188,123 @@ describe("the trace book before the W1 diagnosis (plan v0.7 2.3)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Bỏ qua, xem chẩn đoán" }));
     expect(diagnosisShown()).toBe(true);
     expect(document.querySelector("[data-trace-row]")).toBeNull();
+  });
+});
+
+describe("every case a tile that opens (plan v0.7 3.2)", () => {
+  /** The tile's article, the button in its heading, and the body that button controls. */
+  const tile = (n: number) => {
+    const article = document.getElementById(`cau-${n}`);
+    const button = article?.querySelector("h4 button");
+    const body = document.getElementById(button?.getAttribute("aria-controls") ?? "");
+    if (!article || !(button instanceof HTMLButtonElement) || !body) {
+      throw new Error(`case #${n} has no tile`);
+    }
+    return { article, button, body };
+  };
+  const opened = () => [...document.querySelectorAll("article[data-case-open]")].map((a) => a.id);
+  const criteria = (n: number) => within(tile(n).article).queryByRole("list", { name: "Tiêu chí" });
+
+  // A link's click leaves its hash in the address, and a tile reads the address when it mounts.
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  it("starts every case closed, its verdict drawn with an icon and in words", () => {
+    show(run([]));
+    const articles = [...document.querySelectorAll("article[id^='cau-']")];
+    expect(articles).toHaveLength(12);
+    expect(opened()).toEqual([]);
+    for (let n = 1; n <= 12; n++) {
+      expect(tile(n).button.getAttribute("aria-expanded"), `#${n}`).toBe("false");
+      expect(tile(n).body.hidden, `#${n}`).toBe(true);
+    }
+    // The starter lets the three refund traps through (#9-#11) and serves everyone else.
+    const failed = [9, 10, 11];
+    expect(
+      articles.map((article) => {
+        const verdict = article.querySelector("[data-case-verdict]");
+        return `${article.id} ${verdict?.getAttribute("data-case-verdict")} ${verdict?.textContent}`;
+      }),
+    ).toEqual(
+      articles.map((_, i) =>
+        failed.includes(i + 1) ? `cau-${i + 1} fail Trượt` : `cau-${i + 1} pass Đạt`,
+      ),
+    );
+    // Not the colour alone: the two verdicts draw two different marks.
+    const mark = (n: number) => tile(n).article.querySelector("[data-case-verdict] svg")?.innerHTML;
+    expect(mark(1)).toBeTruthy();
+    expect(mark(9)).toBeTruthy();
+    expect(mark(1)).not.toBe(mark(9));
+  });
+
+  it("opens on a press, criteria in view, closes on the next, and lets several stay open", () => {
+    show(run([]));
+    const nine = tile(9);
+    expect(criteria(9)).toBeNull();
+    fireEvent.click(nine.button);
+    expect(nine.button.getAttribute("aria-expanded")).toBe("true");
+    expect(nine.body.hidden).toBe(false);
+    expect(opened()).toEqual(["cau-9"]);
+    expect(criteria(9)).not.toBeNull();
+    // The verdict is said once: the heading carries it, the body keeps only the criteria.
+    expect(within(nine.article).getAllByText("Trượt", { exact: true })).toHaveLength(1);
+
+    fireEvent.click(tile(10).button);
+    expect(opened()).toEqual(["cau-9", "cau-10"]);
+    fireEvent.click(nine.button);
+    expect(nine.button.getAttribute("aria-expanded")).toBe("false");
+    expect(nine.body.hidden).toBe(true);
+    expect(criteria(9)).toBeNull();
+    expect(opened()).toEqual(["cau-10"]);
+  });
+
+  it("opens the case a link anywhere on the page points at, the same link twice too", () => {
+    show(run([]), vi.fn(), false, { outside: <a href="#cau-9">Xem câu #9</a> });
+    const link = screen.getByRole("link", { name: "Xem câu #9" });
+    // Stopped on its way up, as a React onClick's stopPropagation would: only a listener in the
+    // capture phase still hears it.
+    link.addEventListener("click", (event) => event.stopPropagation());
+    fireEvent.click(link);
+    expect(opened()).toEqual(["cau-9"]);
+    expect(criteria(9)).not.toBeNull();
+    fireEvent.click(tile(9).button);
+    expect(opened()).toEqual([]);
+    // The address already says #cau-9, so no hashchange comes: the click alone opens it.
+    fireEvent.click(link);
+    expect(opened()).toEqual(["cau-9"]);
+  });
+
+  it("opens the trace book's own case links", () => {
+    const diagnosis = ["wt-w1-t01", "wt-w1-t02", "wt-w1-t03"].map((id) => ({
+      case: id,
+      flag: "hitl.bypassed",
+      message_vi: "Hoàn tiền không ai duyệt.",
+    }));
+    show(run(diagnosis));
+    const book = screen.getByRole("group", { name: "Sổ truy vết" });
+    fireEvent.click(within(book).getByRole("link", { name: "Xem câu #10" }));
+    expect(opened()).toEqual(["cau-10"]);
+  });
+
+  it("opens the case the address names, at mount and on a later hash change", () => {
+    window.history.replaceState(null, "", "#cau-9");
+    show(run([]));
+    expect(opened()).toEqual(["cau-9"]);
+    act(() => {
+      window.history.replaceState(null, "", "#cau-12");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(opened()).toEqual(["cau-9", "cau-12"]);
+  });
+
+  it("counts a failed case's trace as a look, not the press that opens its tile (L1 §11)", () => {
+    const looks: number[] = [];
+    show(run([]), vi.fn(), false, { onLook: () => looks.push(1) });
+    fireEvent.click(tile(9).button);
+    expect(looks).toHaveLength(0);
+    const trace = tile(9).body.querySelector("details");
+    if (!trace) throw new Error("case #9 has no trace");
+    trace.open = true;
+    fireEvent(trace, new Event("toggle"));
+    expect(looks).toHaveLength(1);
   });
 });
