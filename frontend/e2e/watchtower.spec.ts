@@ -1,3 +1,5 @@
+import type { Page } from "@playwright/test";
+
 import { readText } from "../app/features/workbench/test-fixtures";
 import { expect, mockWorkbenchApi, test } from "./fixtures";
 
@@ -147,5 +149,114 @@ test.describe("watchtower W1", () => {
     await expect(page.getByText("3/3 sao", { exact: true })).toBeVisible();
     await expect(page.getByText(/Không chặn nhầm ai, không hỏi thừa ai/)).toBeVisible();
     expect(consoleErrors).toEqual([]);
+  });
+});
+
+// Plan v0.7 3.2: the cases fold into tiles that open on a press. On the starter run the twelve
+// full cards spanned 1.365 px at 1280×800 and 3.101 px at 375×812 (screenshot audit); the closed
+// tiles span 286 and 624 px. The bounds leave room for a font or a theme, not for a card.
+test.describe("the W1 cases as tiles (plan v0.7 3.2)", () => {
+  const results = async (page: Page) => {
+    await mockWorkbenchApi(page, { events: () => stream("starter") });
+    await page.goto(W1);
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeFocused();
+  };
+
+  for (const [width, height, most] of [
+    [1280, 800, 400],
+    [375, 812, 850],
+  ] as const) {
+    test(`folds the twelve cases into closed tiles at ${width} px`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== "desktop", "Both widths are set here.");
+      await page.setViewportSize({ width, height });
+      await results(page);
+      const tiles = page.locator("article[id^='cau-']");
+      await expect(tiles).toHaveCount(12);
+      await expect(page.locator("[data-case-open]")).toHaveCount(0);
+      const grid = await page.locator("[data-case-grid]").boundingBox();
+      expect(grid?.height ?? Infinity).toBeLessThan(most);
+      const heights = await tiles.evaluateAll((els) =>
+        els.map((el) => el.getBoundingClientRect().height),
+      );
+      expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth))
+        .toBe(0);
+    });
+  }
+
+  test("opens case #9 from the trace book, and again from the diagnosis", async ({ page }) => {
+    await results(page);
+    const nine = page.locator("#cau-9");
+    const criteria = nine.getByRole("list", { name: "Tiêu chí" });
+    await expect(criteria).toBeHidden();
+
+    const book = page.getByRole("group", { name: "Sổ truy vết" });
+    await book.getByRole("link", { name: "Xem câu #9" }).click();
+    await expect(page).toHaveURL(/#cau-9$/);
+    await expect(nine).toHaveAttribute("data-case-open", "");
+    await expect(criteria).toBeVisible();
+    await expect(criteria).toBeInViewport();
+    // Open, the case takes the grid's whole row.
+    const width = async (selector: string) =>
+      Math.round((await page.locator(selector).boundingBox())?.width ?? 0);
+    expect(await width("#cau-9")).toBe(await width("[data-case-grid]"));
+
+    // Closed by its own button, then opened by the diagnosis's link to the same address: no
+    // hashchange comes, so the click alone has to open it.
+    const toggle = nine.locator("h4 button");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await toggle.click();
+    await expect(criteria).toBeHidden();
+    await book.getByRole("button", { name: "Bỏ qua, xem chẩn đoán" }).click();
+    const diagnosis = page.getByRole("list", { name: "Anh Quân chẩn đoán" });
+    await diagnosis.getByRole("link", { name: "Xem câu #9" }).click();
+    await expect(criteria).toBeVisible();
+    await expect(criteria).toBeInViewport();
+  });
+
+  test("lands on a tile that moves to a row of its own as it opens", async ({ page }) => {
+    await results(page);
+    // #10 sits in the second column: open, it takes the next row, and the page scrolls there.
+    await page
+      .getByRole("group", { name: "Sổ truy vết" })
+      .getByRole("link", { name: "Xem câu #10" })
+      .click();
+    const ten = page.locator("#cau-10");
+    await expect(ten).toHaveAttribute("data-case-open", "");
+    // Its top at the top of the screen (scroll-mt-4): opened only after the browser scrolled,
+    // it would sit a whole row of tiles lower.
+    const top = () => ten.evaluate((el) => el.getBoundingClientRect().top);
+    await expect.poll(top).toBeLessThan(40);
+    expect(await top()).toBeGreaterThanOrEqual(0);
+    await expect(ten.getByRole("list", { name: "Tiêu chí" })).toBeInViewport();
+  });
+
+  test("keeps the tiles legible on the projector, two to a row at 1280×720", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "A projector hangs off a desktop.");
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await mockWorkbenchApi(page);
+    await page.goto(`${W1}?chieu=1`);
+    await page.getByRole("button", { name: "Xem lượt đã ghi" }).click();
+    await page.getByRole("button", { name: "Mở kết quả" }).click();
+    await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
+    const grid = page.locator("[data-case-grid]");
+    const columns = await grid.evaluate(
+      (el) => getComputedStyle(el).gridTemplateColumns.split(" ").length,
+    );
+    expect(columns).toBe(2);
+    // R2: the tile's words at body size, 24 px or more.
+    const size = await page
+      .locator("#cau-1 h4 button")
+      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(size).toBeGreaterThanOrEqual(24);
+    // At rest: the "Bảng câu" rows turn over as the results open (N18), and a row mid-turn
+    // reaches past the edge for a moment.
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth))
+      .toBe(0);
   });
 });
