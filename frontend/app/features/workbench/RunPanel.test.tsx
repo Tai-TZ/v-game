@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type Env, graphFromBench, starterBench } from "./bench";
 import { PROJECTOR_VI, RECORDED_VI, SCRUB_VI } from "./copy";
-import { EMPTY_SLIP } from "./guess";
+import { ASKS, EMPTY_SLIP } from "./guess";
 import type { RunView } from "./run";
 import { RunPanel, type RequestState } from "./RunPanel";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
@@ -335,6 +335,47 @@ describe("projector mode (lesson plan R4-R6)", () => {
   it("shows no hand-raise card off the projector", () => {
     render(<Panel request={idle} />);
     expect(screen.queryByRole("region", { name: PROJECTOR_VI.guessHeading })).toBeNull();
+  });
+
+  it("asks the room W1's own slip questions, lettered, not the library's three answers", () => {
+    const w1 = testEnv("direct-injection");
+    const asks = ASKS["direct-injection"] ?? [];
+    expect(asks.length).toBeGreaterThan(0);
+    render(<Panel request={idle} env={w1} projector />);
+    const card = screen.getByRole("region", { name: PROJECTOR_VI.guessHeading });
+    // "Trả lời đúng quy chế" means nothing at a refund desk (plan v0.7 1.5, R4).
+    for (const [, text] of PROJECTOR_VI.options) expect(card.textContent).not.toContain(text);
+    const drawn = [...card.querySelectorAll<HTMLElement>("[data-hand-ask]")];
+    expect(drawn.map((el) => el.dataset.handAsk)).toEqual(asks.map((ask) => ask.id));
+    asks.forEach((ask, index) => {
+      const block = drawn[index];
+      expect(block?.textContent).toContain(ask.legend);
+      const letters = [...(block?.querySelectorAll<HTMLElement>("[data-hand-letter]") ?? [])];
+      expect(letters.map((el) => el.textContent)).toEqual(
+        ask.options.map((_, at) => String.fromCharCode(65 + at)),
+      );
+      for (const option of ask.options) expect(block?.textContent).toContain(option);
+    });
+  });
+
+  it("keeps star 2's budget meter off a covered star run, which would call star 2 early", () => {
+    const w1 = testEnv("direct-injection");
+    const frames = parseSse(readText("e2e", "data", "run-w1-starter.sse"));
+    // Every case graded, nothing scored or finished yet: the star run is still on.
+    const live = replay(
+      frames.slice(
+        0,
+        frames.findIndex((f) => f.event === "run.scored"),
+      ),
+    );
+    if (!live) throw new Error("no run");
+    render(<Panel request={idle} env={w1} projector masked run={live} />);
+    expect(screen.getByRole("heading", { name: "Đang chạy ca" })).toBeTruthy();
+    expect(document.querySelector("[data-budget-meter]")).toBeNull();
+    cleanup();
+    // The same run once revealed, or off the projector, has its meter: the guard is the cover.
+    render(<Panel request={idle} env={w1} projector run={live} />);
+    expect(document.querySelector("[data-budget-meter]")).not.toBeNull();
   });
 
   it("covers every graded case as 'Đã chấm' until the reveal", () => {

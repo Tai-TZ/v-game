@@ -30,7 +30,7 @@ import {
   VARIANT_VI,
   vaiVi,
 } from "./copy";
-import type { Slip } from "./guess";
+import { ASKS, type Slip } from "./guess";
 import { Scrub } from "./Scrub";
 import { BudgetMeter, runTokens } from "./BudgetMeter";
 import { GuessSlip } from "./GuessSlip";
@@ -97,43 +97,72 @@ interface RunPanelProps {
 }
 
 /**
- * The pool beside Mở ca (roadmap-v0.4 §5.1): what is left and when it refills, then what this
- * shift costs or why the button now offers less. "ước tính" stays until T1, since every server
- * counter lives in RAM and a Render restart zeroes it.
- */
-/**
  * R4: the room guesses by show of hands. Nothing to type or click -- the letters are big enough
- * to read from the back row, and the teacher counts. Only a sample question is ever shown (R8).
+ * to read from the back row, and the teacher counts. Only a sample question, or a question of
+ * the level's own slip, is ever shown (R8). A level whose slip has its own questions (W1,
+ * watchtower.md §3.6) asks the room those: the library's three answers mean nothing at a desk.
  */
 function HandRaise({ env }: { env: Env }) {
   const question = env.level.visible_cases[0]?.question;
+  const asks = ASKS[env.level.id];
   return (
     <section aria-labelledby="wb-hands" className="rounded-md border border-line bg-subtle p-4">
       <h3 id="wb-hands" className="text-lg font-bold">
         {PROJECTOR_VI.guessHeading}
       </h3>
-      {question && <p className="mt-2">{question}</p>}
-      <p className="mt-2 text-sm text-fg-muted">{PROJECTOR_VI.guessLead}</p>
-      <ol className="mt-3 space-y-2">
-        {PROJECTOR_VI.options.map(([letter, text]) => (
-          <li key={letter} className="flex items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="flex size-12 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-2xl font-bold"
-            >
-              {letter}
-            </span>
-            <span>
-              <span className="sr-only">{letter}. </span>
-              {text}
-            </span>
-          </li>
-        ))}
-      </ol>
+      {asks ? (
+        <>
+          <p className="mt-2 text-sm text-fg-muted">{PROJECTOR_VI.asksLead}</p>
+          {asks.map((ask) => (
+            <div key={ask.id} data-hand-ask={ask.id} className="mt-4">
+              <p>{ask.legend}</p>
+              <Hands
+                options={ask.options.map(
+                  (text, at) => [String.fromCharCode(65 + at), text] as const,
+                )}
+              />
+            </div>
+          ))}
+        </>
+      ) : (
+        <>
+          {question && <p className="mt-2">{question}</p>}
+          <p className="mt-2 text-sm text-fg-muted">{PROJECTOR_VI.guessLead}</p>
+          <Hands options={PROJECTOR_VI.options} />
+        </>
+      )}
     </section>
   );
 }
 
+/** One answer per line under its big letter, as the room raises its hands. */
+function Hands({ options }: { options: readonly (readonly [string, string])[] }) {
+  return (
+    <ol className="mt-3 space-y-2">
+      {options.map(([letter, text]) => (
+        <li key={letter} className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            data-hand-letter={letter}
+            className="flex size-12 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-2xl font-bold"
+          >
+            {letter}
+          </span>
+          <span>
+            <span className="sr-only">{letter}. </span>
+            {text}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * The pool beside Mở ca (roadmap-v0.4 §5.1): what is left and when it refills, then what this
+ * shift costs or why the button now offers less. "ước tính" stays until T1, since every server
+ * counter lives in RAM and a Render restart zeroes it.
+ */
 function QuotaLines({ quota }: { quota: QuotaView }) {
   const { left, refill, cost, mode, note } = quota;
   return (
@@ -549,6 +578,7 @@ function Running({
   env,
   run,
   samplesOnly,
+  masked,
   stop,
   onStop,
   onReconnect,
@@ -582,8 +612,9 @@ function Running({
       <p className="text-sm font-semibold tabular-nums">
         {graded}/{run.cases.length} câu đã chấm
       </p>
-      {/* Only a star run is judged on tokens: samples and a variant earn no star (G4). */}
-      {run.scope === undefined && (
+      {/* Only a star run is judged on tokens: samples and a variant earn no star (G4). Not on
+          the projector before "Mở kết quả" either: the meter calls star 2 as it fills (R4). */}
+      {run.scope === undefined && !masked && (
         <BudgetMeter used={runTokens(run)} budget={env.level.token_budget} />
       )}
       <p role="status" className="text-sm empty:hidden">

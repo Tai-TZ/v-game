@@ -573,7 +573,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   const [tips, setTips] = useState<Partial<Record<BlockType, string>>>({});
   const sample = useLastSample(ours);
   useRecordStars(level, run);
-  const won = useLevelWon(level, run);
+  // R4: a star the room has not been shown yet must not stamp the scene before "Mở kết quả".
+  const won = useLevelWon(level, masked ? null : run);
   // A state, not a ref: the bench re-renders into the host once it exists.
   const [machineHost, setMachineHost] = useState<HTMLDivElement | null>(null);
   const [history, setHistory] = useState<RunMark[]>(() => loadHistory(level.id));
@@ -777,9 +778,11 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
       return;
     }
     setNotes(result.issues.filter((issue) => issue.severity === "info"));
-    // The slip goes with this run; the next run starts from a blank one.
-    setRanSlip(isEmptySlip(slip) ? null : { runId: result.runId, slip });
-    editSlip(EMPTY_SLIP);
+    // The slip goes with this run; the next run starts from a blank one. Not on the projector
+    // (R3, R8): the room guessed by hand, and a draft left on this machine -- a pair's own, when
+    // theirs is the one put up -- neither rides the class's run nor leaves with it.
+    setRanSlip(projector || isEmptySlip(slip) ? null : { runId: result.runId, slip });
+    if (!projector) editSlip(EMPTY_SLIP);
     setLastBody(sendBody);
     setVariantId(typeof scope === "object" ? result.runId : null);
     setFollowed(null);
@@ -979,7 +982,8 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
           onEdit={() => focusLater("#wb-bench-title")}
           onFocusSlot={focusSlot}
           onLook={hints.markLook}
-          hintsBelow={hints.target !== null}
+          // The ladder is the pairs' and hidden on the projector (R3): no way down to it there.
+          hintsBelow={hints.target !== null && !projector}
         />
       )}
       {hints.target && !masked && (
