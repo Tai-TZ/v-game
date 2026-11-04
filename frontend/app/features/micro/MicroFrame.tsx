@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router";
 
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, CrossIcon } from "~/components/ui/icons";
+import { ProjectorLink } from "~/features/projector/ProjectorLink";
 import { ZONE_BAR } from "~/features/zones/ui";
 
 import { levelHref, type MicroLesson } from "./registry";
@@ -63,9 +63,9 @@ export function CheckRow({
         Kiểm tra
       </button>
       {left !== null && <span className="text-sm text-fg-muted">{left}</span>}
-      <Link to={levelHref(lesson)} className={buttonClass("quiet")}>
+      <ProjectorLink to={levelHref(lesson)} className={buttonClass("quiet")}>
         Vào màn {lesson.levelTitle}
-      </Link>
+      </ProjectorLink>
     </div>
   );
 }
@@ -99,9 +99,9 @@ export function GradeBox({
     >
       {children}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link to={levelHref(lesson)} className={buttonClass("primary")}>
+        <ProjectorLink to={levelHref(lesson)} className={buttonClass("primary")}>
           Vào màn {lesson.levelTitle}
-        </Link>
+        </ProjectorLink>
         <button type="button" onClick={onStartOver} className={buttonClass("secondary")}>
           Làm lại
         </button>

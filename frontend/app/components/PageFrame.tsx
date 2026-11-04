@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigation, useRevalidator } from "react-router";
+import { useLocation, useNavigation, useRevalidator } from "react-router";
 
 import { buttonClass } from "~/components/ui/button";
 import { ChevronLeftIcon } from "~/components/ui/icons";
 import { useProjector, useProjectorClass } from "~/features/projector/projector";
+import { ProjectorLink } from "~/features/projector/ProjectorLink";
 import { ThemeToggle } from "~/features/theme/ThemeToggle";
 import { AUTHOR } from "~/lib/site";
 
@@ -60,12 +61,17 @@ export function PageFrame({
 
   return (
     <>
-      <header className="h-16 border-b border-line bg-surface">
-        <div className={`${box} flex h-full items-center justify-between gap-4`}>
-          <Link to={back} className={buttonClass("inline")}>
+      {/* Projector mode at 375 px (R10): at 175 % the way back, the way out and the theme button
+          no longer fit one 16-unit row, which pushed the page 45 px sideways and the way back to
+          one word a line. There the row wraps instead; elsewhere it is the same single row. */}
+      <header className="h-16 border-b border-line bg-surface chieu:h-auto">
+        <div
+          className={`${box} flex h-full items-center justify-between gap-4 chieu:min-h-16 chieu:flex-wrap chieu:gap-y-2 chieu:py-2`}
+        >
+          <ProjectorLink to={back} className={buttonClass("inline")}>
             <ChevronLeftIcon />
             {backLabel}
-          </Link>
+          </ProjectorLink>
           <div className="flex items-center gap-2">
             {projector.on && (
               <button type="button" onClick={projector.exit} className={buttonClass("secondary")}>

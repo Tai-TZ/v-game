@@ -1,7 +1,6 @@
-import { Link } from "react-router";
-
 import { ChevronDownIcon } from "~/components/ui/icons";
 import { microHref, warmupsBefore } from "~/features/micro/registry";
+import { ProjectorLink } from "~/features/projector/ProjectorLink";
 import { IncidentBadge } from "~/features/zones/ui";
 
 import { LEVEL_COPY, npcOf, vaiVi } from "./copy";
@@ -66,14 +65,14 @@ export function Brief({ level, won = false }: { level: PublicLevel; won?: boolea
         )}
         {/* An optional micro lesson before the level (roadmap X18): never in the way. */}
         {warmupsBefore(level.zone, level.id).map((lesson) => (
-          <Link
+          <ProjectorLink
             key={lesson.id}
             to={microHref(lesson)}
             data-warmup=""
             className="mt-2 flex min-h-11 items-center font-semibold text-brand underline underline-offset-4"
           >
             Khởi động 2 phút: {lesson.title}
-          </Link>
+          </ProjectorLink>
         ))}
       </div>
     </div>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 
 import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, ChevronDownIcon, ClockIcon, CrossIcon, StarIcon } from "~/components/ui/icons";
+import { ProjectorLink } from "~/features/projector/ProjectorLink";
 
 import { domain, nodeIds, sameJson, type Env } from "./bench";
 import { Bar, Grade, hasControls, rich } from "./BenchView";
@@ -410,9 +410,9 @@ export function Results({
             Xem gợi ý
           </a>
         )}
-        <Link to={backTo} className={buttonClass("quiet")}>
+        <ProjectorLink to={backTo} className={buttonClass("quiet")}>
           {BACK_TO_LEVELS}
-        </Link>
+        </ProjectorLink>
       </div>
 
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>

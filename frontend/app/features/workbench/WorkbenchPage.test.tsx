@@ -10,6 +10,7 @@ import { runReducer, type RunView } from "./run";
 import { parseSse, readText, replay, testEnv } from "./test-fixtures";
 import { loadHistory, type RunMark } from "./storage";
 import {
+  revealable,
   useRecordHistory,
   usePreview,
   useLastSample,
@@ -517,6 +518,33 @@ describe("the world flag on the projector (lesson plan R4, R8)", () => {
     expect(screen.getByRole("region", { name: "Cả lớp đoán" })).toBeDefined();
     expect(document.querySelector("[data-scene-receipt]")).not.toBeNull();
     expect(document.querySelector("[data-scene-won]")).toBeNull();
+  });
+});
+
+describe("revealable: the runs the teacher can open on the projector (R4)", () => {
+  const frames = parseSse(readText("e2e", "data", "run-w1-reference.sse"));
+  const upTo = (event: string) => {
+    const run = replay(frames.slice(0, frames.findIndex((f) => f.event === event) + 1));
+    if (!run) throw new Error("no run");
+    return run;
+  };
+  const failed = (run: RunView): RunView => ({
+    ...run,
+    phase: "failed",
+    stream: "closed",
+    failure: { code: "internal", message_vi: "Lỗi." },
+  });
+
+  it("opens a finished run, and one that failed after its stars or a graded case", () => {
+    expect(revealable(upTo("run.finished"))).toBe(true);
+    expect(revealable(failed(upTo("run.scored")))).toBe(true);
+    expect(revealable(failed(upTo("case.graded")))).toBe(true);
+  });
+
+  it("has nothing to open while the run is on, or after a failure before any grade", () => {
+    expect(revealable(upTo("run.scored"))).toBe(false);
+    expect(revealable(upTo("case.graded"))).toBe(false);
+    expect(revealable(failed(upTo("run.started")))).toBe(false);
   });
 });
 
