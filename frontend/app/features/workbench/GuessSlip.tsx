@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { buttonClass } from "~/components/ui/button";
+import { CHIP } from "~/components/ui/chip";
 import { AlertIcon, CheckIcon, CrossIcon } from "~/components/ui/icons";
 
 import type { Env } from "./bench";
-import { CHIP } from "./BenchView";
 import { CONFIDENCE_VI, evidenceText, type WhyMenu as Menu } from "./copy";
 import {
   ASKS,
