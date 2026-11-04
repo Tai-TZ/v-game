@@ -224,10 +224,12 @@ export function RrfPage() {
                 </div>
                 {graded && (
                   <VerdictLine right={graded.verdict === "right"}>
+                    {/* The badge is aria-hidden and the order button is gone once graded: the
+                        pick is said here, so a screen reader hears it too. */}
                     <span className="font-semibold">
                       {graded.verdict === "right"
-                        ? "Đúng chỗ"
-                        : `Sai chỗ · nên ở hạng ${graded.belongs}`}
+                        ? `Đúng chỗ · xếp hạng ${at + 1}`
+                        : `Sai chỗ · xếp hạng ${at + 1}, nên ở hạng ${graded.belongs}`}
                     </span>
                     . {whyLine(p.id)}
                   </VerdictLine>

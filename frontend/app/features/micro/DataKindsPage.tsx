@@ -124,7 +124,7 @@ export function DataKindsPage() {
                 <VerdictLine right={graded.verdict === "right"}>
                   <span className="font-semibold">{VERDICT_VI[graded.verdict]}</span>
                   {graded.verdict !== "right" && ` · nên là: ${placeFull(card.place)}`}.{" "}
-                  {graded.picked === card.lure && "Mồi nhử: chữ trong thẻ chỉ sai chỗ. "}
+                  {graded.picked === card.lure && "Mồi nhử: chữ trong thẻ dẫn sang nơi sai. "}
                   {card.why}
                 </VerdictLine>
               )}

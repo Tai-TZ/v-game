@@ -162,7 +162,7 @@ Tính bằng code từ hai danh sách (`fuseRrf` trong `rrf.ts`), không gõ tay
 
 - Thứ tự đúng tính từ hai danh sách; test so nó với công thức, và kiểm các tính chất bài dựa vào: đoạn đúng thắng mà không đứng đầu bên nào, mọi đoạn có hai chip đứng trên mọi đoạn có một chip, cộng điểm thô thì thứ tự là của Tủ ngăn kéo.
 - Thứ tự chỉ xếp được khi đã thả đủ mười chip. Chỉ chấm khi đủ chip và đủ sáu đoạn.
-- Chấm từng vị trí: đúng chỗ, hay sai chỗ kèm hạng nên ở. Mỗi đoạn có một dòng lý do: hạng và điểm thô ở từng danh sách (hoặc "không thấy"), các chip, tổng.
+- Chấm từng vị trí: đúng chỗ, hay sai chỗ kèm hạng nên ở. Dòng chấm nhắc lại hạng người chơi đã xếp, vì ô số bên trái chỉ để nhìn. Mỗi đoạn có một dòng lý do: hạng và điểm thô ở từng danh sách (hoặc "không thấy"), các chip, tổng.
 - Hộp kết quả đặt thứ tự sau khi trộn cạnh thứ tự nếu cộng điểm thô, rồi nói vì sao điểm thô không quan trọng: Tủ ngăn kéo chấm tới 14,3 còn Vòm Sao dưới 1, cộng thẳng thì Tủ ngăn kéo quyết hết và Điều 47 khoản 1 đứng đầu.
 
 ### Còn mở

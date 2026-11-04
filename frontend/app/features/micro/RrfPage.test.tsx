@@ -138,6 +138,23 @@ describe("the RRF-by-hand micro lesson", () => {
     expect(funnel(right[2] ?? "").dataset.verdict).toBe("right");
   });
 
+  it("says in words where the player put each passage, since the badge is hidden from AT", () => {
+    show();
+    dropAll();
+    const order = [right[1] ?? "", right[0] ?? "", ...right.slice(2)];
+    placeAll(order);
+    fireEvent.click(check());
+    order.forEach((passage, index) => {
+      const row = funnel(passage);
+      // What a screen reader reads of the row: everything outside aria-hidden.
+      const spoken = [...row.querySelectorAll<HTMLElement>("*")]
+        .filter((el) => el.children.length === 0 && el.closest("[aria-hidden]") === null)
+        .map((el) => el.textContent)
+        .join(" ");
+      expect(spoken, passage).toContain(`xếp hạng ${index + 1}`);
+    });
+  });
+
   it("says which list missed a passage found by only one", () => {
     show();
     dropAll();
