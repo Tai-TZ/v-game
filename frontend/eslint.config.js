@@ -46,6 +46,26 @@ export default defineConfig(
     },
   },
   {
+    // A micro lesson is a page's worth of JS: one import from the workbench (a chip's class
+    // names) once pulled ~43 kB gzip of its chunks into each lesson. scripts/check-bundle.mjs
+    // fails the build on it; this says so at the import.
+    files: ["app/features/micro/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["~/features/workbench/*", "../workbench/*"],
+              message: "Lessons stay out of the workbench chunks: share it from app/components.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Plain Node scripts and config: no tsconfig covers them, so type-aware rules only see `any`.
     files: ["**/*.js", "**/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],

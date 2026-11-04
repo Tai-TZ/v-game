@@ -1,8 +1,8 @@
 import { useId, useState } from "react";
 
+import { CHIP } from "~/components/ui/chip";
 import { ChevronDownIcon } from "~/components/ui/icons";
 
-import { CHIP } from "./BenchView";
 import { fmt } from "./copy";
 import type { RunView } from "./run";
 

@@ -428,3 +428,130 @@ for (const theme of THEMES) {
     expect(await sideways(page)).toBeLessThanOrEqual(0);
   });
 }
+
+test("keeps the mode from the zone page to a warm-up, the level and back, until the teacher leaves it (R1)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await mockWorkbenchApi(page);
+  const on = () => expect(page.locator("html")).toHaveClass(/\bchieu\b/);
+  await page.goto("/play/watchtower?chieu=1");
+  await on();
+  // The hub draws the campus, not a page frame: nothing there could show the mode or leave it.
+  await expect(page.getByRole("main").getByRole("link", { name: "Về khuôn viên" })).toHaveAttribute(
+    "href",
+    "/play?at=watchtower",
+  );
+
+  await page.getByRole("link", { name: "Làm bài khởi động Thang rủi ro tool" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Thang rủi ro tool" })).toBeVisible();
+  await expect(page).toHaveURL(/\/play\/watchtower\/vi-mo\/thang-rui-ro-tool\?chieu=1$/);
+  await on();
+
+  await page.getByRole("link", { name: "Về màn Cổng thành" }).click();
+  await expect(page).toHaveURL(new URL(`${W1}?chieu=1`, page.url()).href);
+  await on();
+  await expect(page.getByRole("region", { name: "Cả lớp đoán" })).toBeVisible();
+
+  await page.locator("header").getByRole("link", { name: "Về danh sách màn" }).click();
+  await expect(page).toHaveURL(/\/play\/watchtower\?chieu=1$/);
+  await on();
+  await page.getByRole("link", { name: "Vào màn Cổng thành" }).click();
+  await expect(page).toHaveURL(/\/direct-injection\?chieu=1$/);
+  await on();
+
+  // The way out still drops it, and the links drop it with the mode.
+  await page.getByRole("button", { name: "Thoát chế độ chiếu" }).click();
+  await expect(page).toHaveURL(/\/play\/watchtower\/direct-injection$/);
+  await expect(page.locator("html")).not.toHaveClass(/\bchieu\b/);
+  await expect(
+    page.locator("header").getByRole("link", { name: "Về danh sách màn" }),
+  ).toHaveAttribute("href", "/play/watchtower");
+});
+
+test("marks the answer to each of W1's room questions once the run is open (R4)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  // The reference net blocks one attack of three and no real customer: B, then A.
+  await mockWorkbenchApi(page, { events: () => w1Stream("reference") });
+  await page.goto(`${W1}?chieu=1`);
+  const hands = page.getByRole("region", { name: "Cả lớp đoán" });
+  await page.getByRole("button", { name: "Mở ca" }).click();
+  await expect(page.getByRole("button", { name: "Mở kết quả" })).toBeFocused();
+  await expect(hands.locator("[data-hand-answer]")).toHaveCount(0);
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
+  for (const [ask, letter] of [
+    ["net_catches", "B"],
+    ["blocks_customer", "A"],
+  ] as const) {
+    const right = hands.locator(`[data-hand-ask="${ask}"] [data-hand-answer]`);
+    await expect(right.locator("[data-hand-letter]")).toHaveText(letter);
+    await expect(right).toContainText("Đáp án");
+  }
+  expect(await px(page, "[data-hand-answer]")).toBeGreaterThanOrEqual(24);
+  expect(await seriousViolations(page)).toEqual([]);
+});
+
+test("lets the teacher open a run that was scored and then failed (R4)", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  // Stars in, then the report breaks: run.failed after run.scored keeps the stars (run.ts).
+  const frames = parseSse(w1Stream("reference"));
+  const scoredAt = frames.findIndex((f) => f.event === "run.scored");
+  const scored = frames[scoredAt];
+  if (!scored) throw new Error("no run.scored in the W1 stream");
+  const { run } = JSON.parse(scored.data) as { run: string };
+  const failed = sseText([
+    ...frames.slice(0, scoredAt + 1),
+    {
+      id: scored.id + 1,
+      event: "run.failed",
+      data: JSON.stringify({
+        type: "run.failed",
+        run,
+        code: "internal",
+        message_vi: "Máy chủ gặp lỗi khi viết báo cáo.",
+      }),
+    },
+  ]);
+  await mockWorkbenchApi(page, { events: () => failed });
+  await page.goto(`${W1}?chieu=1`);
+  await page.getByRole("button", { name: "Mở ca" }).click();
+
+  const table = page.getByRole("region", { name: "Bảng câu" });
+  await expect(page.getByText("Máy chủ gặp lỗi khi viết báo cáo.")).toBeVisible();
+  await expect(table.getByText("Đã chấm")).toHaveCount(12);
+  await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeHidden();
+
+  const reveal = page.getByRole("button", { name: "Mở kết quả" });
+  await expect(reveal).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
+  await expect(table.getByText("Đã chấm")).toHaveCount(0);
+});
+
+test.describe("the projector at 375 px (R10)", () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  for (const path of ["/play/watchtower", W1]) {
+    test(`scrolls no sideways and keeps the header whole on ${path}`, async ({ page }) => {
+      await mockWorkbenchApi(page);
+      await page.goto(`${path}?chieu=1`);
+      await expect(page.locator("html")).toHaveClass(/\bchieu\b/);
+      const header = page.locator("header").first();
+      await expect(header.getByRole("button", { name: "Thoát chế độ chiếu" })).toBeVisible();
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      // Every control of the header inside the screen, the theme button included.
+      for (const control of await header.locator("a, button").all()) {
+        const box = await control.boundingBox();
+        expect(box).not.toBeNull();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= 375).toBe(true);
+      }
+      // The way back on one line: one 44-unit control, 77 px at the projector's 175 %.
+      const back = header.getByRole("link").first();
+      expect((await back.boundingBox())?.height ?? 0).toBeLessThanOrEqual(78);
+    });
+  }
+});

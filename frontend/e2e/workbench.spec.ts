@@ -1232,7 +1232,8 @@ test.describe("the machine's frame (plan v0.7 3.4)", () => {
   /**
    * The machine as drawn. In drawing units: its viewBox, the room over the drawing and the tags
    * the frame cuts. In px: where the drawing starts in its frame and how tall that is, and the
-   * beat's bubble, with the tags it covers and whether it sits whole in the frame.
+   * beat's bubble, with the tags it covers and whether it sits whole in the frame. And the tags
+   * something else is painted over: each letter in view is hit-tested at its centre.
    */
   const look = (page: Page) =>
     page.evaluate(() => {
@@ -1266,15 +1267,44 @@ test.describe("the machine's frame (plan v0.7 3.4)", () => {
         }),
         whole: at.left >= box.left && at.right <= box.right && at.top >= box.top,
       };
-      return { viewBox, room, cut, layout, bubble: bubble ?? null };
+      // A letter is under something when the topmost element at its centre is not its own tag.
+      const seen = frame.getBoundingClientRect();
+      let letters = 0;
+      const under = tags.flatMap((tag) => {
+        const text = tag.querySelector("text");
+        const toScreen = text?.getScreenCTM();
+        if (!text || !toScreen) return [];
+        const hidden = [...Array(text.getNumberOfChars()).keys()].filter((i) => {
+          const box = text.getExtentOfChar(i);
+          const p = new DOMPoint(box.x + box.width / 2, box.y + box.height / 2).matrixTransform(
+            toScreen,
+          );
+          const inView =
+            p.x > Math.max(seen.left, 0) &&
+            p.x < Math.min(seen.right, window.innerWidth) &&
+            p.y > Math.max(seen.top, 0) &&
+            p.y < Math.min(seen.bottom, window.innerHeight);
+          if (!inView) return false;
+          letters++;
+          return document.elementFromPoint(p.x, p.y)?.closest("[data-callout]") !== tag;
+        });
+        return hidden.length > 0 ? [`${tag.dataset.callout ?? "?"} ${text.textContent}`] : [];
+      });
+      return { viewBox, room, cut, layout, bubble: bubble ?? null, letters, under };
     });
 
   for (const url of [L1, "/play/library/chunk-tuning", L3, "/play/watchtower/direct-injection"]) {
     test(`frames ${url} close over its tags, and holds the frame still`, async ({ page }) => {
+      // Every toggle, socket state and step, each hit-testing every letter in view: W1's run
+      // took past 60 s on CI's runners.
+      test.slow();
       await mockWorkbenchApi(page);
       await page.goto(url);
       await expect(page.locator("[data-callout]").first()).toBeAttached();
+      await page.locator("[data-machine-figure]").scrollIntoViewIfNeeded();
       const opened = await look(page);
+      expect(opened.letters).toBeGreaterThan(0);
+      expect(opened.under).toEqual([]);
       expect(opened.room).toBeGreaterThanOrEqual(10);
       expect(opened.room).toBeLessThanOrEqual(18);
       expect(opened.cut).toEqual([]);
@@ -1283,6 +1313,7 @@ test.describe("the machine's frame (plan v0.7 3.4)", () => {
         expect(now.viewBox, what).toBe(opened.viewBox);
         expect(now.cut, what).toEqual([]);
         expect(now.layout, what).toEqual(opened.layout);
+        expect(now.under, what).toEqual([]);
         expect(now.bubble, what).toEqual(bubble ? { covered: [], whole: true } : null);
       };
 

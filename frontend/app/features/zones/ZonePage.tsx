@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router";
 
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
 import { microHref, warmupsBefore } from "~/features/micro/registry";
+import { ProjectorLink } from "~/features/projector/ProjectorLink";
 import { SessionExport } from "~/features/session/SessionExport";
 
 import type { ZonePageData } from "./api";
@@ -60,13 +60,13 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
                     <span className="font-semibold">Khởi động 2 phút</span>
                     <span className="text-fg-muted"> · {lesson.title} · không tính sao</span>
                   </p>
-                  <Link
+                  <ProjectorLink
                     to={microHref(lesson)}
                     aria-label={`Làm bài khởi động ${lesson.title}`}
                     className={buttonClass("quiet")}
                   >
                     Làm bài khởi động
-                  </Link>
+                  </ProjectorLink>
                 </li>
               )),
               <li
@@ -95,7 +95,7 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
                   {level.status !== "open" ? (
                     <ZoneStatusText status={level.status} className="text-sm" />
                   ) : (
-                    <Link
+                    <ProjectorLink
                       to={`/play/${data.zone.id}/${level.id}`}
                       aria-label={`Vào màn ${level.title}`}
                       // No progress is stored yet, so the first level is the one to start with.
@@ -105,16 +105,16 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
                       )}
                     >
                       Vào màn
-                    </Link>
+                    </ProjectorLink>
                   )}
                 </div>
               </li>,
             ])}
           </ol>
           <SessionExport />
-          <Link to={hubAt(data.zone)} className={buttonClass("secondary", "mt-10")}>
+          <ProjectorLink to={hubAt(data.zone)} className={buttonClass("secondary", "mt-10")}>
             {BACK_LABEL}
-          </Link>
+          </ProjectorLink>
         </Frame>
       );
 
@@ -129,9 +129,9 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
                 <li key={level.id}>{level.title}</li>
               ))}
             </ol>
-            <Link to={hubAt(data.zone)} className={buttonClass("primary", "mt-5")}>
+            <ProjectorLink to={hubAt(data.zone)} className={buttonClass("primary", "mt-5")}>
               {BACK_LABEL}
-            </Link>
+            </ProjectorLink>
           </section>
         </Frame>
       );
@@ -141,9 +141,9 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
         <Frame back={hubAt(null)}>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Không tìm thấy khu này</h1>
           <p className="mt-3 text-fg-muted">Đường dẫn không khớp khu nào trong khuôn viên.</p>
-          <Link to={hubAt(null)} className={buttonClass("primary", "mt-8")}>
+          <ProjectorLink to={hubAt(null)} className={buttonClass("primary", "mt-8")}>
             {BACK_LABEL}
-          </Link>
+          </ProjectorLink>
         </Frame>
       );
 
@@ -157,9 +157,9 @@ export function ZonePage({ data, onRetry }: { data: ZonePageData; onRetry: () =>
               <button type="button" onClick={onRetry} className={buttonClass("secondary")}>
                 Thử lại
               </button>
-              <Link to={hubAt(null)} className={buttonClass("quiet")}>
+              <ProjectorLink to={hubAt(null)} className={buttonClass("quiet")}>
                 {BACK_LABEL}
-              </Link>
+              </ProjectorLink>
             </div>
           </div>
         </Frame>

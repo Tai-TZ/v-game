@@ -29,6 +29,25 @@ export function useProjector(): { on: boolean; exit: () => void } {
   return { on, exit };
 }
 
+/**
+ * `to` with the mode carried along, for a link from a page in projector mode to another page that
+ * honours it: a zone page, a level, a warm-up lesson (all under `/play/<zone>`). The hub at
+ * `/play` draws the campus, not a page frame, so it gets no parameter: nothing there could show
+ * the mode or leave it. Off, `to` comes back as it was -- a fresh visit never inherits it (R1).
+ */
+export function withProjector(to: string, on: boolean): string {
+  if (!on || !to.startsWith("/play/")) return to;
+  const url = new URL(to, "http://v-game.invalid");
+  url.searchParams.set(PROJECTOR_PARAM, "1");
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** `withProjector` for the page on screen: read from its URL, like the mode itself. */
+export function useProjectorHref(): (to: string) => string {
+  const { on } = useProjector();
+  return useCallback((to: string) => withProjector(to, on), [on]);
+}
+
 /** Puts the class on `<html>` while the mode is on; leaving the page or the mode takes it off. */
 export function useProjectorClass(on: boolean) {
   useEffect(() => {

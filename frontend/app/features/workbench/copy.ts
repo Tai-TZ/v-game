@@ -241,6 +241,8 @@ export const PROJECTOR_VI = {
     ["C", "Nói là không biết"],
   ],
   graded: "Đã chấm",
+  // Beside the true option of each room question, once the run is open (R4).
+  answer: "Đáp án",
   reveal: "Mở kết quả",
   revealNote: "Kết quả đang được che để cả lớp đoán trước. Bấm nút, hoặc nhấn Space hay Enter.",
   waking: "Đang đánh thức máy chủ",

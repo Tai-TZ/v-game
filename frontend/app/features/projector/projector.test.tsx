@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PROJECTOR_CLASS, useProjector, useProjectorClass } from "./projector";
+import { PROJECTOR_CLASS, useProjector, useProjectorClass, withProjector } from "./projector";
 
 afterEach(() => {
   cleanup();
@@ -53,5 +53,26 @@ describe("useProjectorClass", () => {
   it("never touches <html> when off", () => {
     renderHook(() => useProjectorClass(false));
     expect(document.documentElement.classList.contains(PROJECTOR_CLASS)).toBe(false);
+  });
+});
+
+describe("withProjector", () => {
+  it("carries the mode to a zone page, a level and a warm-up, keeping their own query and hash", () => {
+    expect(withProjector("/play/watchtower", true)).toBe("/play/watchtower?chieu=1");
+    expect(withProjector("/play/watchtower/direct-injection", true)).toBe(
+      "/play/watchtower/direct-injection?chieu=1",
+    );
+    expect(withProjector("/play/library/vi-mo/x?a=1#cau-2", true)).toBe(
+      "/play/library/vi-mo/x?a=1&chieu=1#cau-2",
+    );
+    // Already there: once, not twice.
+    expect(withProjector("/play/library?chieu=1", true)).toBe("/play/library?chieu=1");
+  });
+
+  it("leaves every link alone off the projector, and the hub, which cannot show the mode", () => {
+    expect(withProjector("/play/watchtower", false)).toBe("/play/watchtower");
+    expect(withProjector("/play?at=library", true)).toBe("/play?at=library");
+    expect(withProjector("/play", true)).toBe("/play");
+    expect(withProjector("/", true)).toBe("/");
   });
 });

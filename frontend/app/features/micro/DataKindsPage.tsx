@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 
-import { CHIP } from "~/features/workbench/BenchView";
+import { CHIP } from "~/components/ui/chip";
 
 import {
   CARDS,

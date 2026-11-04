@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Link } from "react-router";
 
 import { buttonClass } from "~/components/ui/button";
 import {
@@ -10,6 +9,7 @@ import {
   ClockIcon,
   PlayIcon,
 } from "~/components/ui/icons";
+import { ProjectorLink } from "~/features/projector/ProjectorLink";
 
 import type { PostError } from "./api";
 import type { Env } from "./bench";
@@ -30,7 +30,7 @@ import {
   VARIANT_VI,
   vaiVi,
 } from "./copy";
-import { ASKS, type Slip } from "./guess";
+import { askGrade, ASKS, type Slip } from "./guess";
 import { Scrub } from "./Scrub";
 import { BudgetMeter, runTokens } from "./BudgetMeter";
 import { GuessSlip } from "./GuessSlip";
@@ -97,6 +97,8 @@ interface RunPanelProps {
   projector: boolean;
   /** Projector mode before "Mở kết quả": graded cases show as graded, not passed or failed (R4). */
   masked: boolean;
+  /** Projector mode after "Mở kết quả", the bench unchanged: the run the room's questions mark. */
+  answered: RunView | null;
 }
 
 /**
@@ -105,7 +107,7 @@ interface RunPanelProps {
  * the level's own slip, is ever shown (R8). A level whose slip has its own questions (W1,
  * watchtower.md §3.6) asks the room those: the library's three answers mean nothing at a desk.
  */
-function HandRaise({ env }: { env: Env }) {
+function HandRaise({ env, answered }: { env: Env; answered: RunView | null }) {
   const question = env.level.visible_cases[0]?.question;
   const asks = ASKS[env.level.id];
   return (
@@ -123,6 +125,7 @@ function HandRaise({ env }: { env: Env }) {
                 options={ask.options.map(
                   (text, at) => [String.fromCharCode(65 + at), text] as const,
                 )}
+                answer={answered ? askGrade(env.level.id, ask.id, answered) : null}
               />
             </div>
           ))}
@@ -138,25 +141,50 @@ function HandRaise({ env }: { env: Env }) {
   );
 }
 
-/** One answer per line under its big letter, as the room raises its hands. */
-function Hands({ options }: { options: readonly (readonly [string, string])[] }) {
+/**
+ * One answer per line under its big letter, as the room raises its hands. Once the teacher opens
+ * the run, `answer` (an index into `options`) is the true one: its letter takes a heavy frame and
+ * the line says "Đáp án" in words, with a tick, so it reads without colour from the back row.
+ */
+function Hands({
+  options,
+  answer = null,
+}: {
+  options: readonly (readonly [string, string])[];
+  answer?: number | null;
+}) {
   return (
     <ol className="mt-3 space-y-2">
-      {options.map(([letter, text]) => (
-        <li key={letter} className="flex items-center gap-3">
-          <span
-            aria-hidden="true"
-            data-hand-letter={letter}
-            className="flex size-12 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-2xl font-bold"
+      {options.map(([letter, text], at) => {
+        const right = at === answer;
+        return (
+          <li
+            key={letter}
+            data-hand-answer={right ? "" : undefined}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1"
           >
-            {letter}
-          </span>
-          <span>
-            <span className="sr-only">{letter}. </span>
-            {text}
-          </span>
-        </li>
-      ))}
+            <span
+              aria-hidden="true"
+              data-hand-letter={letter}
+              className={`flex size-12 shrink-0 items-center justify-center rounded-md bg-surface text-2xl font-bold ${
+                right ? "border-4 border-fg" : "border border-line"
+              }`}
+            >
+              {letter}
+            </span>
+            <span>
+              <span className="sr-only">{letter}. </span>
+              {text}
+            </span>
+            {right && (
+              <span className="inline-flex items-center gap-1 rounded-sm border border-line-strong bg-surface px-2 text-sm font-semibold">
+                <CheckIcon />
+                {PROJECTOR_VI.answer}
+              </span>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -266,6 +294,7 @@ function Editing({
   recordedFailed,
   quota,
   projector,
+  answered,
 }: RunPanelProps) {
   const {
     open: restoring,
@@ -392,9 +421,9 @@ function Editing({
                 </button>
               )}
               {request.error.backLink && (
-                <Link to={backTo} className={buttonClass("quiet")}>
+                <ProjectorLink to={backTo} className={buttonClass("quiet")}>
                   {BACK_TO_LEVELS}
-                </Link>
+                </ProjectorLink>
               )}
             </div>
           )}
@@ -417,7 +446,7 @@ function Editing({
         </fieldset>
       </details>
 
-      {projector && <HandRaise env={env} />}
+      {projector && <HandRaise env={env} answered={answered} />}
       {projector && !quota.awake && (
         <div
           id="wb-waking"

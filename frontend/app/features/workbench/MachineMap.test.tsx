@@ -362,6 +362,10 @@ describe("the machine as a figure to play with", () => {
     expect(document.querySelector("[data-beat-bubble]")).toBeNull();
     fireEvent.click(beatButton("context_packer"));
     expect(document.querySelector("[data-beat-bubble]")?.textContent).toBe("Đang đóng thùng…");
+    // The library's guest rings; only the Watchtower desk's knocks.
+    fireEvent.click(beatButton("input"));
+    expect(beatButton("input").textContent).toBe("1 Khách rung chuông");
+    expect(document.querySelector("[data-beat-bubble]")?.textContent).toBe("Khách rung chuông…");
   });
 });
 

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useRef, useState } from "react";
 
 import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, ChevronDownIcon, ClockIcon, CrossIcon, StarIcon } from "~/components/ui/icons";
+import { ProjectorLink } from "~/features/projector/ProjectorLink";
 
 import { domain, nodeIds, sameJson, type Env } from "./bench";
 import { Bar, Grade, hasControls, rich } from "./BenchView";
@@ -154,6 +154,8 @@ export function Results({
       window.removeEventListener("hashchange", onHash);
     };
   }, []);
+  // Only ever opens: find-in-page reaching a closed case's text, as a link does.
+  const reveal = (n: number) => setOpened((now) => (now.has(n) ? now : new Set(now).add(n)));
   const toggle = (n: number) =>
     setOpened((now) => {
       const next = new Set(now);
@@ -410,9 +412,9 @@ export function Results({
             Xem gợi ý
           </a>
         )}
-        <Link to={backTo} className={buttonClass("quiet")}>
+        <ProjectorLink to={backTo} className={buttonClass("quiet")}>
           {BACK_TO_LEVELS}
-        </Link>
+        </ProjectorLink>
       </div>
 
       <h3 className="mt-8 text-lg font-bold">Từng câu</h3>
@@ -431,6 +433,7 @@ export function Results({
             runGraph={runGraph}
             open={opened.has(c.n)}
             onToggle={() => toggle(c.n)}
+            onFound={() => reveal(c.n)}
             onLook={onLook}
           />
         ))}
@@ -515,6 +518,7 @@ function CaseCard({
   runGraph,
   open,
   onToggle,
+  onFound,
   onLook,
 }: {
   env: Env;
@@ -524,8 +528,22 @@ function CaseCard({
   /** Open, the tile takes its whole row and shows the case as the full card did (plan v0.7 3.2). */
   open: boolean;
   onToggle: () => void;
+  /** The browser's find-in-page matched text in the closed body (`beforematch`). */
+  onFound: () => void;
   onLook: (() => void) | undefined;
 }) {
+  // Closed, the body is `hidden="until-found"`: find-in-page still searches it and, on a match,
+  // fires `beforematch` and shows it, so the tile opens with it and aria-expanded follows.
+  // React 19 only writes `hidden` as a boolean, so the value is set here, after React's own
+  // `hidden=""`. A browser without until-found reads any `hidden` as plain hidden: no search.
+  const body = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    if (!open) el.setAttribute("hidden", "until-found");
+    el.addEventListener("beforematch", onFound);
+    return () => el.removeEventListener("beforematch", onFound);
+  }, [open, onFound]);
   const failed = c.graded?.counted === true && !c.graded.passed;
   const titleId = `cau-${c.n}-title`;
   const bodyId = `cau-${c.n}-body`;
@@ -548,8 +566,17 @@ function CaseCard({
           onClick={onToggle}
           className={`flex min-h-11 w-full flex-col items-start gap-2 p-3 text-left text-sm font-semibold hover:bg-subtle ${open ? "rounded-t-md" : "rounded-md"}`}
         >
-          <span id={titleId} className={open ? undefined : "line-clamp-2"}>
-            {caseTitle(c, env.level.id)}
+          <span className={open ? undefined : "line-clamp-2"}>
+            <span id={titleId}>{caseTitle(c, env.level.id)}</span>
+            {/* A pause in the name between the title and the verdict ("…hợp lệ, Trượt"), where
+                the visible words alone ran on. Punctuation only, so the name still holds the
+                visible words in their order (WCAG 2.5.3). Inline and of no size, not sr-only:
+                Chromium reads an absolutely placed span as a block, and a block gets a space
+                of its own before it ("…hợp lệ , Trượt"). Outside the id, so the article's
+                name, its title, has no comma. */}
+            <span data-name-pause="" className="text-[0px] [clip-path:inset(50%)]">
+              ,
+            </span>
           </span>{" "}
           <span className="mt-auto flex w-full items-start justify-between gap-2">
             <Verdict c={c} />
@@ -560,55 +587,58 @@ function CaseCard({
         </button>
       </h4>
       {/* Hidden, not unmounted: a trace opened inside stays open when the tile closes and opens.
-          pt-1 keeps the button's focus ring, drawn 2 px outside it, off the first line. */}
-      <div id={bodyId} hidden={!open} className="max-w-prose px-3 pt-1 pb-3">
-        {c.question && <p className="text-sm text-fg-muted">{c.question}</p>}
-        <Grade c={c} outcome={false} />
-        <p data-case-tokens className="mt-2 text-sm text-fg-muted tabular-nums">
-          {fmt(c.tokens.in + c.tokens.out)} token ({TOKENS_VI.usage})
-        </p>
-        <details
-          className="group mt-1 chieu:hidden"
-          onToggle={(event) => {
-            // L1 §11: the look that counts is the trace of a case that failed.
-            if (failed && event.currentTarget.open) onLook?.();
-          }}
-        >
-          <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
-            Xem vết chạy<span className="sr-only"> câu #{c.n}</span>
-            <ChevronDownIcon />
-          </summary>
-          <ol className="space-y-1 text-sm">
-            {Object.entries(c.steps).map(([node, step]) => {
-              const block = asBlock(step.block);
-              return (
-                <li key={node}>
-                  <span className="font-semibold">{block ? toyName(block) : node}</span> ·{" "}
-                  {stepStatusText(step.status, step.ms)}
-                  {step.summary && <span className="text-fg-muted"> · {step.summary}</span>}
-                </li>
-              );
-            })}
-          </ol>
-          {/* X7: star 2 is calibrated on the primary model, so which model answered this case is
+          The padding is on an inner box: until-found hides the content, not the box's own
+          padding. pt-1 keeps the button's focus ring, drawn 2 px outside it, off the first line. */}
+      <div id={bodyId} ref={body} hidden={!open}>
+        <div className="max-w-prose px-3 pt-1 pb-3">
+          {c.question && <p className="text-sm text-fg-muted">{c.question}</p>}
+          <Grade c={c} outcome={false} />
+          <p data-case-tokens className="mt-2 text-sm text-fg-muted tabular-nums">
+            {fmt(c.tokens.in + c.tokens.out)} token ({TOKENS_VI.usage})
+          </p>
+          <details
+            className="group mt-1 chieu:hidden"
+            onToggle={(event) => {
+              // L1 §11: the look that counts is the trace of a case that failed.
+              if (failed && event.currentTarget.open) onLook?.();
+            }}
+          >
+            <summary className="flex min-h-11 cursor-pointer items-center gap-1 text-sm font-semibold text-brand">
+              Xem vết chạy<span className="sr-only"> câu #{c.n}</span>
+              <ChevronDownIcon />
+            </summary>
+            <ol className="space-y-1 text-sm">
+              {Object.entries(c.steps).map(([node, step]) => {
+                const block = asBlock(step.block);
+                return (
+                  <li key={node}>
+                    <span className="font-semibold">{block ? toyName(block) : node}</span> ·{" "}
+                    {stepStatusText(step.status, step.ms)}
+                    {step.summary && <span className="text-fg-muted"> · {step.summary}</span>}
+                  </li>
+                );
+              })}
+            </ol>
+            {/* X7: star 2 is calibrated on the primary model, so which model answered this case is
               part of reading the grade. Same words as the bench's llm step, so the two agree. */}
-          {served && (
-            <p className="mt-2 text-sm" data-case-model={served.model}>
-              Model <code className="font-mono text-xs">{served.model}</code>
-              {served.replayed && (
-                <span className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-xs">
-                  Kết quả đã lưu
-                </span>
-              )}
-            </p>
-          )}
-          {c.answer && (
-            <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-sm whitespace-pre-line">
-              {c.answer}
-            </blockquote>
-          )}
-          {gold && <GoldTrace env={env} c={c} gold={gold} runGraph={runGraph} />}
-        </details>
+            {served && (
+              <p className="mt-2 text-sm" data-case-model={served.model}>
+                Model <code className="font-mono text-xs">{served.model}</code>
+                {served.replayed && (
+                  <span className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-xs">
+                    Kết quả đã lưu
+                  </span>
+                )}
+              </p>
+            )}
+            {c.answer && (
+              <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-sm whitespace-pre-line">
+                {c.answer}
+              </blockquote>
+            )}
+            {gold && <GoldTrace env={env} c={c} gold={gold} runGraph={runGraph} />}
+          </details>
+        </div>
       </div>
     </article>
   );

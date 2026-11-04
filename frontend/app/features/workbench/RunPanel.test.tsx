@@ -33,6 +33,7 @@ function Panel({
   quota = FULL,
   projector = false,
   masked = false,
+  answered = null,
 }: {
   request: RequestState;
   env?: Env;
@@ -44,6 +45,7 @@ function Panel({
   quota?: QuotaView;
   projector?: boolean;
   masked?: boolean;
+  answered?: RunView | null;
 }) {
   const start = starterBench(env);
   if (!start) throw new Error(`${env.level.id} starter is not drawable`);
@@ -82,6 +84,7 @@ function Panel({
         samplesOnly={false}
         projector={projector}
         masked={masked}
+        answered={answered}
       />
     </MemoryRouter>
   );
@@ -408,6 +411,45 @@ describe("projector mode (lesson plan R4-R6)", () => {
     expect(screen.getByText(PROJECTOR_VI.waking)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: RECORDED_VI.open }));
     expect(onRecorded).toHaveBeenCalledOnce();
+  });
+
+  it("marks the true answer of each W1 question once the run is open, in words, not colour", () => {
+    const w1 = testEnv("direct-injection");
+    const reference = replay(parseSse(readText("e2e", "data", "run-w1-reference.sse")));
+    if (!reference) throw new Error("no run");
+    // The reference net blocks one attack of three and no customer; a copy where it also blocked
+    // a real customer turns the second answer, so neither mark can be a fixed letter.
+    const blocked: RunView = {
+      ...reference,
+      cases: reference.cases.map((c, at) =>
+        at === 0 && c.graded
+          ? { ...c, graded: { ...c.graded, labels: [...c.graded.labels, "guard.blocked_benign"] } }
+          : c,
+      ),
+    };
+    const marks = () =>
+      [...document.querySelectorAll<HTMLElement>("[data-hand-ask]")].map((ask) => {
+        const right = [...ask.querySelectorAll<HTMLElement>("[data-hand-answer]")];
+        return right.map((li) => [
+          li.querySelector("[data-hand-letter]")?.textContent,
+          li.textContent.includes(PROJECTOR_VI.answer),
+          li.querySelector("svg") !== null,
+        ]);
+      });
+
+    for (const [run, expected] of [
+      [reference, [["B"], ["A"]]],
+      [blocked, [["B"], ["B"]]],
+    ] as const) {
+      render(<Panel request={idle} env={w1} projector run={run} answered={run} />);
+      expect(marks()).toEqual(expected.map(([letter]) => [[letter, true, true]]));
+      cleanup();
+    }
+
+    // Covered, or opened over a bench since changed (answered null): no answer shows.
+    render(<Panel request={idle} env={w1} projector masked run={reference} />);
+    expect(document.querySelectorAll("[data-hand-answer]")).toHaveLength(0);
+    expect(screen.queryByText(PROJECTOR_VI.answer)).toBeNull();
   });
 
   it("names the projector's own pool", () => {

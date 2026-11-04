@@ -7,12 +7,13 @@ import {
   useState,
   type Dispatch,
 } from "react";
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 import * as v from "valibot";
 
 import { PageFrame } from "~/components/PageFrame";
 import { buttonClass } from "~/components/ui/button";
 import { useProjector } from "~/features/projector/projector";
+import { ProjectorLink } from "~/features/projector/ProjectorLink";
 import { levelStars, readProgress, recordStars, type Stars } from "~/features/progress/progress";
 
 import { cancelRun, eventsUrl, newKey, postRun, previewRetrieval, type LevelPageData } from "./api";
@@ -86,9 +87,9 @@ export function LevelPage({ data, onRetry }: { data: LevelPageData; onRetry: () 
         <PageFrame back={back} backLabel={BACK_TO_LEVELS}>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Không tìm thấy màn này</h1>
           <p className="mt-3 text-fg-muted">Đường dẫn không khớp màn nào của khu.</p>
-          <Link to={back} className={buttonClass("primary", "mt-8")}>
+          <ProjectorLink to={back} className={buttonClass("primary", "mt-8")}>
             {BACK_TO_LEVELS}
-          </Link>
+          </ProjectorLink>
         </PageFrame>
       );
     case "error":
@@ -101,9 +102,9 @@ export function LevelPage({ data, onRetry }: { data: LevelPageData; onRetry: () 
               <button type="button" onClick={onRetry} className={buttonClass("secondary")}>
                 Thử lại
               </button>
-              <Link to={back} className={buttonClass("quiet")}>
+              <ProjectorLink to={back} className={buttonClass("quiet")}>
                 {BACK_TO_LEVELS}
-              </Link>
+              </ProjectorLink>
             </div>
           </div>
         </PageFrame>
@@ -495,6 +496,17 @@ export function usePreview(
 }
 
 /**
+ * R4: a covered run the teacher can open. A finished run, and a failed one with anything graded:
+ * a run scored and then failed (a report error, a stop) keeps its stars (run.ts), and without a
+ * way in its rows said "Đã chấm" and its results stayed hidden for good. A run that failed
+ * before grading anything has nothing to open; its failure shows as it is.
+ */
+export const revealable = (run: RunView) =>
+  run.phase === "finished" ||
+  (run.phase === "failed" &&
+    (run.score !== undefined || run.cases.some((c) => c.graded !== undefined)));
+
+/**
  * Lesson plan R4: the covered outcome and the one control that uncovers it. It takes focus when
  * the run ends, so the teacher's Space or Enter opens it without reaching for the mouse.
  */
@@ -571,8 +583,12 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   // Projector mode (lesson plan R4): every run's outcome stays covered until the teacher opens
   // it, so the room guesses first. Keyed by run, so the next run is covered again.
   const projector = useProjector().on;
-  const [revealed, setRevealed] = useState<string | null>(null);
-  const masked = projector && run !== null && run.runId !== revealed;
+  // With the bench it was opened over: the room's questions show their answers until it changes.
+  const [revealed, setRevealed] = useState<{ runId: string; body: string } | null>(null);
+  const masked = projector && run !== null && run.runId !== revealed?.runId;
+  // The run whose answers the room's questions mark (R4): opened, and the bench not touched since,
+  // so the room guesses the next run afresh.
+  const answered = projector && run !== null && !masked && revealed?.body === body ? run : null;
   // N16: the ladder follows the player's own last run; N17: the first-touch lines of the page.
   const [tips, setTips] = useState<Partial<Record<BlockType, string>>>({});
   const sample = useLastSample(ours);
@@ -858,7 +874,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
   }
 
   const live = masked ? "" : liveMessage(run, followedCase?.id ?? null);
-  const awaitingReveal = masked && run.phase === "finished" ? run.runId : null;
+  const awaitingReveal = masked && revealable(run) ? run.runId : null;
   useEffect(() => {
     if (awaitingReveal) focusOn(document.getElementById("wb-reveal"));
   }, [awaitingReveal]);
@@ -924,6 +940,7 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
             samplesOnly={samplesOnly}
             projector={projector}
             masked={masked}
+            answered={answered}
             onRetry={() => {
               if (request.state === "failed") void send(request.body, request.key);
             }}
@@ -967,7 +984,9 @@ export function WorkbenchPage({ env, starter, back }: { env: Env; starter: Bench
         </aside>
         {!projector && !active && <JumpToOpen />}
       </div>
-      {awaitingReveal && <RevealGate onReveal={() => setRevealed(awaitingReveal)} />}
+      {awaitingReveal && (
+        <RevealGate onReveal={() => setRevealed({ runId: awaitingReveal, body })} />
+      )}
       {sample && !masked && <SampleResult run={sample} samplesOnly={samplesOnly} />}
       {ours && !masked && <VariantResult run={ours} />}
       {run?.score && !masked && (

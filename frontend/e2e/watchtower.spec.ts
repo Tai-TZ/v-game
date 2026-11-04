@@ -189,6 +189,42 @@ test.describe("the W1 cases as tiles (plan v0.7 3.2)", () => {
     });
   }
 
+  test("reads a tile out as its title, a pause, then its verdict", async ({ page }) => {
+    await results(page);
+    const title = (await page.locator("#cau-9-title").textContent()) ?? "";
+    // Chromium's own name for it, not a library's: the accessibility tree over CDP.
+    const cdp = await page.context().newCDPSession(page);
+    const { root } = await cdp.send("DOM.getDocument");
+    const { nodeId } = await cdp.send("DOM.querySelector", {
+      nodeId: root.nodeId,
+      selector: "#cau-9 h4 button",
+    });
+    const { nodes } = await cdp.send("Accessibility.getPartialAXTree", {
+      nodeId,
+      fetchRelatives: false,
+    });
+    expect(String(nodes[0]?.name?.value)).toBe(`${title}, Trượt`);
+  });
+
+  test("lets find-in-page reach a closed case, and opens its tile on the match", async ({
+    page,
+  }) => {
+    await results(page);
+    const nine = page.locator("#cau-9");
+    const body = page.locator("#cau-9-body");
+    await expect(body).toHaveAttribute("hidden", "until-found");
+    await expect(body).toBeHidden();
+    // The browser's own find (Ctrl+F, a text fragment) fires beforematch on the closed body
+    // before it shows it. A script cannot drive that find reliably in every headless Chromium
+    // (a text fragment set from script found it locally, never on CI), so the event is sent
+    // the way the browser sends it, on the real build.
+    await body.evaluate((el) => el.dispatchEvent(new Event("beforematch", { bubbles: true })));
+    await expect(nine).toHaveAttribute("data-case-open", "");
+    await expect(nine.locator("h4 button")).toHaveAttribute("aria-expanded", "true");
+    await expect(body).toBeVisible();
+    await expect(body).not.toHaveAttribute("hidden");
+  });
+
   test("opens case #9 from the trace book, and again from the diagnosis", async ({ page }) => {
     await results(page);
     const nine = page.locator("#cau-9");
