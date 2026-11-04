@@ -1,35 +1,11 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ThemeProvider } from "~/features/theme/context";
-import { parseThemeIndex, parseThemeManifest } from "~/features/theme/schema";
-
-import { ToolRiskPage } from "./MicroPage";
+import { renderLesson } from "./test-render";
+import { ToolRiskPage } from "./ToolRiskPage";
 import { CARDS, LANES, type LaneId } from "./toolRisk";
 
-const read = (...parts: string[]): unknown =>
-  JSON.parse(readFileSync(path.resolve(process.cwd(), ...parts), "utf8"));
-const themes = parseThemeIndex(read("public", "themes", "index.json"));
-const catalog = {
-  themes,
-  defaultId: themes[0]?.id ?? "",
-  manifests: Object.fromEntries(
-    themes.map(({ id }) => [id, parseThemeManifest(read("public", "themes", id, "manifest.json"))]),
-  ),
-};
-
-function show() {
-  const router = createMemoryRouter([{ path: "*", element: <ToolRiskPage /> }]);
-  render(
-    <ThemeProvider catalog={catalog}>
-      <RouterProvider router={router} />
-    </ThemeProvider>,
-  );
-}
+const show = () => renderLesson(<ToolRiskPage />);
 
 afterEach(cleanup);
 
@@ -92,9 +68,12 @@ describe("the tool-risk micro lesson", () => {
     show();
     pickAll();
     fireEvent.click(check());
+    expect(document.activeElement).toBe(document.querySelector("[data-grade]"));
     fireEvent.click(screen.getByRole("button", { name: "Làm lại" }));
     expect(document.querySelector("[data-grade]")).toBeNull();
     expect(row(CARDS[0]?.id ?? "").dataset.verdict).toBeUndefined();
+    // The keyboard starts over on the first job, not on <body>.
+    expect(document.activeElement).toBe(within(row(CARDS[0]?.id ?? "")).getAllByRole("radio")[0]);
     expect(screen.getByRole("link", { name: "Vào màn Cổng thành" }).getAttribute("href")).toBe(
       "/play/watchtower/direct-injection",
     );
