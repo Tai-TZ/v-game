@@ -112,6 +112,12 @@ describe("the W1 machine", () => {
     expect(screen.getByRole("button", { name: "1 Khách gõ cửa" }).dataset.beat).toBe("input");
   });
 
+  it("knocks in the first beat's bubble too, the words of its step (§3.7)", () => {
+    machine(reference());
+    fireEvent.click(screen.getByRole("button", { name: "1 Khách gõ cửa" }));
+    expect(document.querySelector("[data-beat-bubble]")?.textContent).toBe("Khách gõ cửa…");
+  });
+
   it("draws the branch red with no bell on it, and gated once the bell is attached", () => {
     machine(starter());
     const pipes = () => all("[data-pipe-branch]").map((p) => p.getAttribute("data-pipe"));
@@ -131,6 +137,60 @@ describe("the W1 machine", () => {
     expect(
       document.querySelector('[data-tile-type="tool_refund"]')?.getAttribute("data-tile"),
     ).toBe("on");
+  });
+
+  it("paints every tag over every toy, seen through and not", () => {
+    // SVG paints in document order. A toy after a tag covered it: seen through with the dog's
+    // socket empty, `injection_classifier` lost its last letter under the Bộ Óc.
+    machine(starter());
+    for (const seeThrough of [false, true]) {
+      if (seeThrough) fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
+      const tags = all("[data-callout]");
+      const toys = all("[data-tile-type]");
+      expect(tags.map((tag) => tag.getAttribute("data-callout"))).toEqual(
+        toys.map((toy) => toy.getAttribute("data-tile-type")),
+      );
+      expect(tags.find((tag) => tag.textContent === "injection_classifier") !== undefined).toBe(
+        seeThrough,
+      );
+      for (const tag of tags) {
+        for (const toy of toys) {
+          const after = toy.compareDocumentPosition(tag) & Node.DOCUMENT_POSITION_FOLLOWING;
+          expect(
+            after,
+            `${tag.getAttribute("data-callout")} after ${toy.getAttribute("data-tile-type")}`,
+          ).toBeTruthy();
+          expect(toy.contains(tag)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("takes a press on a tag as a press on its toy", () => {
+    let next: Bench | null = null;
+    const opened: string[] = [];
+    render(
+      <MachineMap
+        env={w1}
+        bench={starter()}
+        onChange={(bench) => (next = bench)}
+        onOpen={(type) => opened.push(type)}
+        disabled={false}
+        states={{}}
+        highlight={null}
+        answer={null}
+        view={null}
+      />,
+    );
+    const tag = (type: string) => {
+      const found = document.querySelector(`[data-callout="${type}"]`);
+      if (!found) throw new Error(`no tag for ${type}`);
+      return found;
+    };
+    fireEvent.click(tag("injection_classifier"));
+    expect((next as Bench | null)?.attached.injection_classifier).toBe(true);
+    fireEvent.click(tag("action_llm"));
+    expect(opened).toEqual(["action_llm"]);
   });
 
   it("attaches the bell from its socket", () => {

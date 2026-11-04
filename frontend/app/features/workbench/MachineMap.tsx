@@ -131,6 +131,9 @@ export const NARRATE_VI: Readonly<Record<string, string>> = {
   output: "Đang chấm…",
 };
 
+/** At the desk the guest knocks (watchtower §3.7); in the library the guest rings. */
+const KNOCK = "Khách gõ cửa";
+
 const beatOf = (col: Column): string => (col.every(isSearch) ? "search" : (col[0] ?? "input"));
 
 function factOf<K extends Fact["kind"]>(
@@ -582,7 +585,10 @@ export function MachineMap({
       : beatIndex === -1
         ? null
         : along(centre(beatIndex), 0, 0, 0)[0];
-  const narration = beat === null ? "" : (NARRATE_VI[beat] ?? "");
+  // The step and its bubble say the same thing: the desk's guest knocks in both.
+  const knocks = isDesk(env);
+  const narration =
+    beat === null ? "" : beat === "input" && knocks ? `${KNOCK}…` : (NARRATE_VI[beat] ?? "");
   const halfBubble = `calc(${narration.length / 2}ch + 1rem + 2px)`;
   const bubbleAt = beatX === null ? null : { left: ((beatX - box.x) / box.w) * 100 };
   const ink = `ink${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -632,7 +638,18 @@ export function MachineMap({
     return () => watch.disconnect();
   }, []);
 
-  const stepLabel = (b: string) => (b === "input" && isDesk(env) ? "Khách gõ cửa" : BEAT_VI[b]);
+  // A toy, or its tag, pressed: an empty socket takes its toy, a toy on the bench opens.
+  const attach = (type: BlockType) => {
+    if (!isOptional(type)) return;
+    onChange(setAttached(bench, type, true));
+    onPick?.(type);
+  };
+  const press = (type: BlockType) => {
+    if (attached(type)) onOpen?.(type);
+    else attach(type);
+  };
+
+  const stepLabel = (b: string) => (b === "input" && knocks ? KNOCK : BEAT_VI[b]);
 
   return (
     <figure data-machine-figure="">
@@ -859,23 +876,16 @@ export function MachineMap({
                           type={type}
                           x={x}
                           y={y}
-                          row={rowOf(index, at)}
-                          front={frontOf(col, at)}
                           on={attached(type)}
                           disabled={disabled}
                           state={states[type] ?? "idle"}
                           lit={highlight === type || active.has(type)}
                           answer={type === "output" ? answer : null}
-                          labels={labels}
                           seeThrough={seeThrough}
                           packed={packed}
                           entries={entries}
                           stopped={stopped}
-                          onAttach={() => {
-                            if (!isOptional(type)) return;
-                            onChange(setAttached(bench, type, true));
-                            onPick?.(type);
-                          }}
+                          onAttach={() => attach(type)}
                           onOpen={() => onOpen?.(type)}
                         />
                       );
@@ -893,29 +903,68 @@ export function MachineMap({
                       type={type}
                       x={x}
                       y={y}
-                      row={0}
-                      front={false}
-                      side
                       on={attached(type)}
                       disabled={disabled}
                       state={states[type] ?? "idle"}
                       lit={highlight === type || active.has(type)}
                       answer={null}
-                      labels={labels}
                       seeThrough={seeThrough}
                       packed={packed}
                       entries={entries}
                       stopped={stopped}
-                      onAttach={() => {
-                        if (!isOptional(type)) return;
-                        onChange(setAttached(bench, type, true));
-                        onPick?.(type);
-                      }}
+                      onAttach={() => attach(type)}
                       onOpen={() => onOpen?.(type)}
                     />
                   </g>
                 );
               })}
+              {/* The tags last, over every toy: a toy drawn after a neighbour's tag hid its
+                  letters (W1 seen through, the empty Chó gác's tag under the Bộ Óc). */}
+              {labels && (
+                <g data-callouts="">
+                  {cols.flatMap((col, index) =>
+                    col.map((type, at) => {
+                      const [x, y] = origin(index, at, col.length);
+                      return (
+                        <Tag
+                          key={type}
+                          env={env}
+                          bench={bench}
+                          type={type}
+                          x={x}
+                          y={y}
+                          row={rowOf(index, at)}
+                          front={frontOf(col, at)}
+                          on={attached(type)}
+                          disabled={disabled}
+                          seeThrough={seeThrough}
+                          onPress={() => press(type)}
+                        />
+                      );
+                    }),
+                  )}
+                  {fork.map((type, k) => {
+                    const [x, y] = forkCorner(k);
+                    return (
+                      <Tag
+                        key={type}
+                        env={env}
+                        bench={bench}
+                        type={type}
+                        x={x}
+                        y={y}
+                        row={0}
+                        front={false}
+                        side
+                        on={attached(type)}
+                        disabled={disabled}
+                        seeThrough={seeThrough}
+                        onPress={() => press(type)}
+                      />
+                    );
+                  })}
+                </g>
+              )}
             </g>
 
             {/* The question as a slip of paper: it slides along the belt to the beat's toy and
@@ -1010,15 +1059,11 @@ function Toy({
   type,
   x,
   y,
-  row,
-  front,
-  side = false,
   on,
   disabled,
   state,
   lit,
   answer,
-  labels,
   seeThrough,
   packed,
   entries,
@@ -1031,18 +1076,11 @@ function Toy({
   type: BlockType;
   x: number;
   y: number;
-  /** Which of the two callout rows: neighbours alternate so their labels never collide. */
-  row: number;
-  /** The front toy of a pair: its callout hangs below, clear of the one behind it. */
-  front: boolean;
-  /** A toy of the tool branch: its callout stands to its left, clear of the toy below. */
-  side?: boolean;
   on: boolean;
   disabled: boolean;
   state: BlockState;
   lit: boolean;
   answer: "pass" | "fail" | null;
-  labels: boolean;
   seeThrough: boolean;
   packed: number;
   entries: readonly LedgerEntry[];
@@ -1072,19 +1110,6 @@ function Toy({
   } as const;
 
   const h = HEIGHT[type];
-  // Callouts, Colorfigures-style: a capitalised tag over the toy on a leader line. Seen
-  // through, the tag gives the block's real type (library §2: the metaphor fades).
-  const tag = tagAt(type, [x, y], { on, row, front, side });
-  const label = labels && (
-    <Callout
-      type={type}
-      text={seeThrough ? type : (on ? toy : `Gắn ${toy}`).toLocaleUpperCase("vi")}
-      from={tag.from}
-      top={tag.top}
-      below={front}
-      left={side}
-    />
-  );
   const focusRing = (
     <polygon
       aria-hidden="true"
@@ -1109,7 +1134,6 @@ function Toy({
           strokeWidth="2"
         />
         {focusRing}
-        {label}
       </g>
     );
   }
@@ -1152,8 +1176,62 @@ function Toy({
         />
         {locked && <Lock at={iso(x, y + FOOT, h)} />}
       </g>
-      {label}
     </g>
+  );
+}
+
+/**
+ * A toy's callout, Colorfigures-style: a capitalised tag over the toy on a leader line. Seen
+ * through, the tag gives the block's real type (library §2: the metaphor fades). Drawn in a
+ * layer of its own after every toy, so no toy drawn later paints over it: W1's see-through
+ * `injection_classifier` ran under the Bộ Óc. A press on it is a press on its toy; the toy is
+ * the button the keyboard and the screen reader reach.
+ */
+function Tag({
+  env,
+  bench,
+  type,
+  x,
+  y,
+  row,
+  front,
+  side = false,
+  on,
+  disabled,
+  seeThrough,
+  onPress,
+}: {
+  env: Env;
+  bench: Bench;
+  type: BlockType;
+  x: number;
+  y: number;
+  /** Which of the two callout rows: neighbours alternate so their labels never collide. */
+  row: number;
+  /** The front toy of a pair: its callout hangs below, clear of the one behind it. */
+  front: boolean;
+  /** A toy of the tool branch: its callout stands to its left, clear of the toy below. */
+  side?: boolean;
+  on: boolean;
+  disabled: boolean;
+  seeThrough: boolean;
+  onPress: () => void;
+}) {
+  const toy = toyName(type, slotParams(env, bench, type));
+  const tag = tagAt(type, [x, y], { on, row, front, side });
+  return (
+    <Callout
+      type={type}
+      text={seeThrough ? type : (on ? toy : `Gắn ${toy}`).toLocaleUpperCase("vi")}
+      from={tag.from}
+      top={tag.top}
+      below={front}
+      left={side}
+      className={disabled ? "cursor-not-allowed" : "cursor-pointer"}
+      onPress={() => {
+        if (!disabled) onPress();
+      }}
+    />
   );
 }
 
@@ -1164,9 +1242,13 @@ function Callout({
   text,
   from: [fx, fy],
   top,
+  className,
+  onPress,
 }: {
   type: BlockType;
   text: string;
+  className: string;
+  onPress: () => void;
   /** Where the leader leaves the toy. */
   from: P;
   /** The tag's top edge, from tagAt. */
@@ -1180,7 +1262,7 @@ function Callout({
   if (left) {
     const end = fx - 14;
     return (
-      <g aria-hidden="true" data-callout={type}>
+      <g aria-hidden="true" data-callout={type} className={className} onClick={onPress}>
         <line x1={fx} y1={fy} x2={end} y2={fy} className="stroke-fg" strokeWidth="1" />
         <rect
           x={end - w}
@@ -1203,7 +1285,7 @@ function Callout({
     );
   }
   return (
-    <g aria-hidden="true" data-callout={type}>
+    <g aria-hidden="true" data-callout={type} className={className} onClick={onPress}>
       <line
         x1={fx}
         y1={fy}
