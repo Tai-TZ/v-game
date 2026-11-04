@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { graphFromBench, starterBench } from "./bench";
 import { Results } from "./Results";
-import type { RunView } from "./run";
+import type { CaseView, RunView } from "./run";
 import { frame, parseSse, readText, replay, testEnv } from "./test-fixtures";
 
 /** The diagnosis of a W1 run points at the layer that can fix it (watchtower.md §3.6). */
@@ -266,6 +266,11 @@ describe("every case a tile that opens (plan v0.7 3.2)", () => {
     fireEvent.click(link);
     expect(opened()).toEqual(["cau-9"]);
     expect(criteria(9)).not.toBeNull();
+    // A link only ever opens: followed again while its case is open ("Xem câu #9" in the book,
+    // then in the diagnosis), it must not fold the case the browser is scrolling to.
+    fireEvent.click(link);
+    expect(opened()).toEqual(["cau-9"]);
+    expect(criteria(9)).not.toBeNull();
     fireEvent.click(tile(9).button);
     expect(opened()).toEqual([]);
     // The address already says #cau-9, so no hashchange comes: the click alone opens it.
@@ -294,6 +299,35 @@ describe("every case a tile that opens (plan v0.7 3.2)", () => {
       window.dispatchEvent(new HashChangeEvent("hashchange"));
     });
     expect(opened()).toEqual(["cau-9", "cau-12"]);
+    // Back to an address whose case is open already leaves it open.
+    act(() => {
+      window.history.replaceState(null, "", "#cau-9");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(opened()).toEqual(["cau-9", "cau-12"]);
+  });
+
+  it("says a case that does not count, or has no grade, in the full card's own words", () => {
+    const base = run([]);
+    show({
+      ...base,
+      cases: base.cases.map((c): CaseView => {
+        // #1 counts for nothing (an info case); #2 never got its case.graded.
+        if (c.n === 1 && c.graded) return { ...c, graded: { ...c.graded, counted: false } };
+        if (c.n !== 2) return c;
+        const { id, n, role, vai, steps, tokens } = c;
+        return { id, n, role, vai, steps, tokens, state: "waiting" };
+      }),
+    });
+    const verdict = (n: number) => tile(n).article.querySelector("[data-case-verdict]");
+    expect(verdict(1)?.getAttribute("data-case-verdict")).toBe("uncounted");
+    expect(verdict(1)?.textContent).toBe("Không tính sao · Đạt");
+    expect(verdict(2)?.getAttribute("data-case-verdict")).toBe("waiting");
+    expect(verdict(2)?.textContent).toBe("Chờ");
+    // No grade is a mark of its own, neither the pass (#3) nor the fail (#9) one.
+    const mark = (n: number) => verdict(n)?.querySelector("svg")?.innerHTML;
+    expect(mark(2)).toBeTruthy();
+    expect([mark(3), mark(9)]).not.toContain(mark(2));
   });
 
   it("counts a failed case's trace as a look, not the press that opens its tile (L1 §11)", () => {

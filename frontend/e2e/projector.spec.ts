@@ -107,8 +107,14 @@ test("covers the recorded run until the teacher opens it from the keyboard (R4)"
 
   await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
   await expect(table.getByText("Đã chấm")).toHaveCount(0);
-  // R3: the score stays; a pair's history and cô Lan's hints do not.
-  await expect(page.getByText("Xem vết chạy").first()).toBeHidden();
+  // R3: the score stays; a pair's history and cô Lan's hints do not. A case opens on the
+  // projector too (plan v0.7 3.2), but without its trace: open one first, or the closed tile
+  // alone would hide "Xem vết chạy" and this could not fail.
+  const first = page.locator("#cau-1");
+  await first.locator("h4 button").click();
+  await expect(first.getByRole("list", { name: "Tiêu chí" })).toBeVisible();
+  await expect(first.locator("details")).toHaveCount(1);
+  await expect(first.getByText("Xem vết chạy")).toBeHidden();
 });
 
 test("leaves the mode and does not remember it (R1)", async ({ page }) => {
