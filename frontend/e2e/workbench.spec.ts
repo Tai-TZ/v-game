@@ -1295,6 +1295,9 @@ test.describe("the machine's frame (plan v0.7 3.4)", () => {
 
   for (const url of [L1, "/play/library/chunk-tuning", L3, "/play/watchtower/direct-injection"]) {
     test(`frames ${url} close over its tags, and holds the frame still`, async ({ page }) => {
+      // Every toggle, socket state and step, each hit-testing every letter in view: W1's run
+      // took past 60 s on CI's runners.
+      test.slow();
       await mockWorkbenchApi(page);
       await page.goto(url);
       await expect(page.locator("[data-callout]").first()).toBeAttached();
