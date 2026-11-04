@@ -8,8 +8,8 @@ dependencies = [
     "fastapi==0.162.0",
     "uvicorn[standard]==0.54.0",
     "pydantic==2.14.1",
-    "pydantic-settings==2.16.1",
-    "langgraph==1.2.17",
+    "pydantic-settings==2.16.2",
+    "langgraph==1.2.18",
     "google-genai==2.33.0",
     "rank-bm25==0.2.2",
     "numpy==2.5.4",
@@ -35,9 +35,9 @@ vgame-export-static-viz = "vgame.engine.static_viz:main"
 models = ["fastembed==0.9.1"]
 dev = [
     { include-group = "models" },
-    "ruff==0.17.2",
-    "mypy==2.4.0",
-    "pytest==9.1.1",
+    "ruff==0.17.3",
+    "mypy==2.4.1",
+    "pytest==9.2.0",
 ]
 
 [build-system]
