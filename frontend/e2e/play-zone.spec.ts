@@ -9,7 +9,8 @@ test.describe("zone page", () => {
     await page.goto("/play/library");
 
     await expect(page.getByRole("heading", { level: 1, name: "Thư viện" })).toBeVisible();
-    const levels = page.locator("main ol > li");
+    // The levels, without the warm-up rows that sit before L1 and L3 (plan v0.7 4.5).
+    const levels = page.locator("main ol > li[data-level]");
     await expect(levels).toHaveCount(3);
     await expect(levels.getByRole("heading", { level: 2 })).toHaveText([
       "Thôi bịa điều luật",

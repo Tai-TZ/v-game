@@ -3,13 +3,13 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Brief } from "./Brief";
-import { testEnv } from "./test-fixtures";
+import { testEnv, type LevelId } from "./test-fixtures";
 
 /** The warm-up micro lesson is a link beside the goals, optional, never a step (roadmap X18). */
 
 afterEach(cleanup);
 
-const show = (id: "direct-injection" | "grounded-citation") =>
+const show = (id: LevelId) =>
   render(
     <MemoryRouter>
       <Brief level={testEnv(id).level} />
@@ -24,8 +24,22 @@ describe("the brief's warm-up", () => {
     expect(link?.textContent).toBe("Khởi động 2 phút: Thang rủi ro tool");
   });
 
+  it("offers the library's warm-ups before L1 and L3 (plan v0.7 4.5)", () => {
+    for (const [level, lesson, title] of [
+      ["grounded-citation", "ba-loai-du-lieu", "Ba loại dữ liệu"],
+      ["article-number-lookup", "tu-tay-tron-rrf", "Tự tay trộn RRF"],
+    ] as const) {
+      show(level);
+      const links = document.querySelectorAll("[data-warmup]");
+      expect(links, level).toHaveLength(1);
+      expect(links[0]?.getAttribute("href")).toBe(`/play/library/vi-mo/${lesson}`);
+      expect(links[0]?.textContent).toBe(`Khởi động 2 phút: ${title}`);
+      cleanup();
+    }
+  });
+
   it("offers nothing on a level without one", () => {
-    show("grounded-citation");
+    show("chunk-tuning");
     expect(document.querySelector("[data-warmup]")).toBeNull();
   });
 });

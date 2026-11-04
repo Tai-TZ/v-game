@@ -91,6 +91,9 @@ test.describe("watchtower W1", () => {
   test("answers an unknown micro lesson as not found", async ({ page }) => {
     await mockWorkbenchApi(page, { events: () => stream("starter") });
     await page.goto("/play/watchtower/vi-mo/khong-co");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Không tìm thấy trang" }),
+    ).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: "Thang rủi ro tool" })).toHaveCount(0);
   });
 

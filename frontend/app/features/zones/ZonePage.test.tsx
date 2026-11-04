@@ -85,8 +85,25 @@ describe("ZonePage", () => {
     expect(document.querySelector("[data-session-export]")).toBeNull();
   });
 
-  it("lists no warm-up in a zone without one", () => {
+  it("lists the library's two warm-ups, each just before its own level (plan v0.7 4.5)", () => {
     renderPage({ kind: "open", zone: zone("library") });
+    const items = [...document.querySelectorAll<HTMLElement>("ol > li")];
+    const before = (level: string) =>
+      items[items.findIndex((li) => li.dataset.level === level) - 1];
+    expect(before("grounded-citation")?.dataset.warmupRow).toBe("");
+    expect(before("article-number-lookup")?.dataset.warmupRow).toBe("");
+    // L2 has none: the row before it is L1 itself.
+    expect(before("chunk-tuning")?.dataset.level).toBe("grounded-citation");
+    expect(
+      ["Ba loại dữ liệu", "Tự tay trộn RRF"].map((title) =>
+        screen.getByRole("link", { name: `Làm bài khởi động ${title}` }).getAttribute("href"),
+      ),
+    ).toEqual(["/play/library/vi-mo/ba-loai-du-lieu", "/play/library/vi-mo/tu-tay-tron-rrf"]);
+  });
+
+  it("lists no warm-up in a zone without one", () => {
+    renderPage({ kind: "open", zone: zone("market") });
+    expect(document.querySelectorAll("[data-level]").length).toBeGreaterThan(0);
     expect(document.querySelector("[data-warmup-row]")).toBeNull();
   });
 
