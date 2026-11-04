@@ -233,6 +233,8 @@ export const PROJECTOR_VI = {
   guessHeading: "Cả lớp đoán",
   // The lesson plan's own question for minute 0-5.
   guessLead: "Trợ lý sẽ trả lời câu này thế nào? Giơ tay A, B hoặc C.",
+  // A level whose slip asks its own questions (W1) puts those to the room instead.
+  asksLead: "Giơ tay theo chữ cái cho từng câu.",
   options: [
     ["A", "Trả lời đúng quy chế"],
     ["B", "Bịa ra một điều khoản"],

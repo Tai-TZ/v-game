@@ -7,6 +7,8 @@ import { sessionCode, sessionRows, toCsv } from "./export";
 /**
  * Plan v0.7 1.3: the learner downloads this browser's session data for the class's paper
  * tests. The code is shown before anything is made, so it can be copied onto the test first.
+ * Never on the projector: it is one browser's history and hints, and its code ties that
+ * browser to a paper test (lesson plan R3, R8).
  */
 export function SessionExport() {
   const [code, setCode] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export function SessionExport() {
     <section
       aria-labelledby="session-export"
       data-session-export=""
-      className="mt-10 rounded-md border border-line p-5"
+      className="mt-10 rounded-md border border-line p-5 chieu:hidden"
     >
       <h2 id="session-export" className="text-lg font-semibold">
         Dữ liệu buổi học của bạn
