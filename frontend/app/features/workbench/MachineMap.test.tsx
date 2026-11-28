@@ -401,7 +401,7 @@ describe("the machine as a figure to play with", () => {
         }
       }
     }
-    expect(INK).toEqual({ outline: 2.4, edge: 1, fine: 1, mark: 2.5 });
+    expect(INK).toEqual({ outline: 2.4, edge: 1, fine: 1, cue: 1.6, mark: 2.5 });
   });
 
   it("cuts the sheet inside the blade into as many pieces as it has cuts, plus one", () => {
@@ -409,6 +409,11 @@ describe("the machine as a figure to play with", () => {
     fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
     const cuts = tile("chunker")?.querySelectorAll("[data-gauge-cut]").length ?? 0;
     expect(tile("chunker")?.querySelectorAll("[data-piece]").length).toBe(cuts + 1);
+    // A cut carries the reading, so it is a cue line, not a hairline.
+    expect(cuts).toBeGreaterThan(0);
+    for (const cut of tile("chunker")?.querySelectorAll("[data-gauge-cut]") ?? []) {
+      expect(cut.getAttribute("stroke-width")).toBe(String(INK.cue));
+    }
   });
 
   it("lights as many stars inside the dome as passages it pulls", () => {
@@ -430,6 +435,7 @@ describe("the machine as a figure to play with", () => {
     fireEvent.click(beatButton("search"));
     const slip = document.querySelector("[data-slip]");
     expect(slip?.getAttribute("data-at")).toBe("search");
+    expect(slip?.querySelector("polygon")?.getAttribute("stroke-width")).toBe(String(INK.cue));
     const before = slip?.getAttribute("style");
     fireEvent.click(beatButton("llm"));
     expect(document.querySelector("[data-slip]")?.getAttribute("data-at")).toBe("llm");
@@ -576,18 +582,27 @@ describe("the machine as a figure to play with", () => {
       onChange: () => undefined,
       disabled: false,
       highlight: null,
-      states: {},
+      states: { pattern_guard: "passed" },
       view: { run, followed, gold: null },
     } as const;
+    const markOf = () => tile("pattern_guard")?.querySelector("[data-tile-mark]");
     const { rerender } = render(<MachineMap {...props} answer="pass" />);
     expect(document.querySelectorAll("[data-gauge-stop]")).toHaveLength(1);
     expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
     expect(document.querySelectorAll("[data-pipe-fault]")).toHaveLength(0);
+    // A right stop is a pass, and says so.
+    expect(markOf()?.getAttribute("data-tile-mark")).toBe("pass");
+    expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt");
 
     // The same stop on a case that should have been served: the guard is at fault.
     rerender(<MachineMap {...props} answer="fail" />);
     expect(document.querySelectorAll("[data-fault]")).toHaveLength(1);
     expect(tile("pattern_guard")?.hasAttribute("data-fault")).toBe(true);
+    // It shakes and cuts the belts, so it must not wear a tick or say "đạt": a crossed square,
+    // in the danger tone, and a label that says the stop was wrong.
+    expect(markOf()?.getAttribute("data-tile-mark")).toBe("fail");
+    expect(markOf()?.getAttribute("class")).toContain(TONE.error);
+    expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt, chặn nhầm");
     const keys = columns(w1).map((col) => col.join("+"));
     for (const belt of document.querySelectorAll("[data-pipe-after]")) {
       const index = keys.indexOf(belt.getAttribute("data-pipe-after") ?? "");
@@ -596,6 +611,8 @@ describe("the machine as a figure to play with", () => {
     // An unanswered board is no verdict.
     rerender(<MachineMap {...props} answer={null} />);
     expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
+    expect(markOf()?.getAttribute("data-tile-mark")).toBe("pass");
+    expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt");
   });
 
   it("dims nothing when the pressed beat is gone from the level", () => {

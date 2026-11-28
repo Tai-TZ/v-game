@@ -400,25 +400,37 @@ const rowOf = (index: number, at: number) => (index + at) % 2;
 const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
 
 /**
- * A toy or belt off the pressed step's path. 55% is the lowest step of 5 in 0.35-0.6 whose ink
- * outline holds 3:1 against the frame in both themes (WCAG 1.4.11; e2e "keeps a dimmed toy's
- * outline at 3:1 against the frame"): measured 3.51 town and 3.36 vinuni; 50% gave 2.94 on vinuni
- * and 45% 2.59. STEPPED is its resting twin, so the fade is a transition both ways. A dimmed toy
- * is faded over an opaque backing in the frame's own colour (`Backing`): a bare group opacity
- * would let the belt behind it show through the box.
+ * A toy or belt off the pressed step's path. 70% is the lowest 5% step at which
+ * EVERY tone of a toy's outline holds 3:1 against the frame (WCAG 1.4.11), not just the idle ink:
+ * a run leaves outlines green, red, amber and teal or blue, and those are paler once faded.
+ * Contrast of the faded outline over the frame's white, town / vinuni (e2e "keeps a dimmed toy's
+ * outline at 3:1" and "run-state outline ... after W1's recorded run", both themes):
+ *
+ *   opacity   fg          success     warning     danger      brand       lowest
+ *   55%       3.51 3.36   2.51 2.66   2.51 2.54   2.74 2.66   2.45 2.82   2.45
+ *   60%       4.06 3.86   2.77 2.95   2.77 2.80   3.04 2.93   2.70 3.15   2.70
+ *   65%       4.73 4.47   3.06 3.29   3.07 3.11   3.37 3.23   2.98 3.54   2.98
+ *   70%       5.54 5.20   3.39 3.68   3.40 3.45   3.73 3.55   3.30 3.99   3.30
+ *
+ * (66% would just clear, at 3.04; 70% is a Tailwind step and keeps a margin for rounding.)
+ * STEPPED is its resting twin, so the fade is a transition both ways. A dimmed toy is faded over
+ * an opaque backing in the frame's own colour (`backing` in `Toy`): a bare group opacity would
+ * let the belt behind it show through the box.
  */
 const STEPPED = "transition-opacity duration-150 motion-reduce:transition-none";
-const DIMMED = `opacity-55 ${STEPPED}`;
+const DIMMED = `opacity-70 ${STEPPED}`;
 /** A faulted toy knocks once; not at all with reduced motion, where the class never applies. */
 const SHAKE = "motion-safe:animate-shake";
 /** A belt cut short: no fill, a dashed red line. After an empty search socket, or a faulted toy. */
 const CUT = "fill-none stroke-danger [stroke-dasharray:4_3]";
 
 /**
- * The two ink weights of a technical drawing: a heavy outline round the whole toy, the base and
- * the belts, and thin edges between faces, on dressings and on leaders. One unit is one px.
+ * The ink weights of a technical drawing: a heavy outline round the whole toy, the base and the
+ * belts, thin edges between faces, on dressings and on leaders, and a middle weight for a line
+ * that carries information (a blade's cut, the question slip), which a hairline would lose.
+ * One unit is one px.
  */
-export const INK = { outline: 2.4, edge: 1, fine: 1, mark: 2.5 } as const;
+export const INK = { outline: 2.4, edge: 1, fine: 1, cue: 1.6, mark: 2.5 } as const;
 
 /** The six corners of a box's silhouette: its top and its two near sides, as `iso` draws them. */
 const hexagon = (x: number, y: number, z: number, w: number, d: number, t: number) => [
@@ -668,9 +680,9 @@ export function MachineMap({
   };
   // A toy is faulted when its state is error, or it holds the bar of the guard that stopped the
   // followed case wrongly (the case's verdict is a fail). A guard that rightly stops an attack is
-  // doing its job: no shake, no red belt. Every belt past a fault runs red, until the states change; the tool branch hangs
-  // off the desk, so it is past every toy up to and including the desk, and a branch toy only
-  // cuts the belts after itself.
+  // doing its job: no shake, no red belt. Every belt past a fault runs red, until the states
+  // change; the tool branch hangs off the desk, so it is past every toy up to and including the
+  // desk, and a branch toy only cuts the belts after itself.
   const faulted = (type: BlockType) =>
     attached(type) && (states[type] === "error" || (stopped === type && answer === "fail"));
   const faultCol = cols.findIndex((col) => col.some(faulted));
@@ -1104,7 +1116,7 @@ export function MachineMap({
               >
                 <polygon
                   className="fill-surface stroke-fg"
-                  strokeWidth={INK.edge}
+                  strokeWidth={INK.cue}
                   points={pts([
                     iso(-0.3, -0.3, 0.05),
                     iso(0.3, -0.3, 0.05),
@@ -1240,10 +1252,10 @@ function Toy({
 
   const h = HEIGHT[type];
   const fade = dimmed ? DIMMED : STEPPED;
-  /** What a dimmed toy is faded over: the frame's own colour, under its drawing, so nothing behind it shows. */
+  /** What a dimmed toy is faded over: the card's colour, under its drawing, so no belt shows. */
   const backing = (points: string) =>
     dimmed && (
-      <polygon aria-hidden="true" data-backing="" className="fill-canvas" points={points} />
+      <polygon aria-hidden="true" data-backing="" className="fill-surface" points={points} />
     );
   const focusRing = (
     <polygon
@@ -1276,6 +1288,9 @@ function Toy({
     );
   }
 
+  // A guard that stopped a case wrongly still holds a passed state (it ran), but it is not a pass:
+  // it shakes and cuts the belts. Its mark is the failed one, and its label says why.
+  const wrongStop = fault && state === "passed";
   return (
     <g
       {...common}
@@ -1284,7 +1299,7 @@ function Toy({
       {...(fault ? { "data-fault": "" } : {})}
       className={fault ? `${common.className} ${SHAKE}` : common.className}
       {...(locked ? { "data-locked": "" } : {})}
-      aria-label={`${toy}: ${BLOCK_STATE_VI[state]}${locked ? ", khóa ở màn này" : ""}`}
+      aria-label={`${toy}: ${BLOCK_STATE_VI[state]}${wrongStop ? ", chặn nhầm" : ""}${locked ? ", khóa ở màn này" : ""}`}
     >
       {focusRing}
       {/* The active toy lifts once and settles; nothing moves on its own. */}
@@ -1318,7 +1333,7 @@ function Toy({
             stopped={stopped}
           />
           {locked && <Lock at={iso(x, y + FOOT, h)} />}
-          <StateMark state={state} at={iso(x + FOOT, y + FOOT, h)} />
+          <StateMark state={wrongStop ? "error" : state} at={iso(x + FOOT, y + FOOT, h)} />
         </g>
       </g>
     </g>
@@ -1794,7 +1809,7 @@ function Dress({
                 x2={bx}
                 y2={by}
                 className="stroke-danger"
-                strokeWidth={INK.edge}
+                strokeWidth={INK.cue}
               />
             );
           })}

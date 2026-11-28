@@ -45,6 +45,27 @@ function referenceFacts() {
   return { score, finished, cases };
 }
 
+/**
+ * W1's recorded reference run, played on the page with the net (Lưới cụm từ) attached, and row
+ * #11 followed: a trap the net stops, so the followed case holds the red bar. Its stop is right
+ * (the case passes) unless `wrong` flips the verdict to a fail, as for a guard that blocked a
+ * case that should have been served.
+ */
+async function playW1Run(page: Page, wrong: boolean) {
+  const recorded = readText("e2e", "data", "run-w1-reference.sse");
+  const served = '"case":"wt-w1-t03","status":"ok","passed":true';
+  expect(recorded.split(served)).toHaveLength(2);
+  await mockWorkbenchApi(page, {
+    events: () => (wrong ? recorded.replace(served, served.replace("true", "false")) : recorded),
+  });
+  await page.goto("/play/watchtower/direct-injection");
+  await page.getByRole("switch", { name: "Gắn Lưới cụm từ" }).check();
+  await page.getByRole("button", { name: "Mở ca" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeFocused();
+  await page.getByRole("region", { name: "Bảng câu" }).getByRole("button").nth(10).click();
+  await expect(page.locator("[data-gauge-stop]")).toHaveCount(1);
+}
+
 const SSE_HEADERS = { "content-type": "text/event-stream", "cache-control": "no-store" };
 
 /**
@@ -974,23 +995,7 @@ test.describe("workbench", () => {
 });
 
 test.describe("a fault in the machine (graphics upgrade 4.2.2)", () => {
-  // W1's recorded reference run: row #11 is a trap the net (Lưới cụm từ) stops, so the followed
-  // case holds the red bar. Its stop is right (the case passes) unless `wrong` flips the verdict
-  // to a fail, as for a guard that blocked a case that should have been served.
-  const run = async (page: Page, wrong: boolean) => {
-    const recorded = readText("e2e", "data", "run-w1-reference.sse");
-    const served = '"case":"wt-w1-t03","status":"ok","passed":true';
-    expect(recorded.split(served)).toHaveLength(2);
-    await mockWorkbenchApi(page, {
-      events: () => (wrong ? recorded.replace(served, served.replace("true", "false")) : recorded),
-    });
-    await page.goto("/play/watchtower/direct-injection");
-    await page.getByRole("switch", { name: "Gắn Lưới cụm từ" }).check();
-    await page.getByRole("button", { name: "Mở ca" }).click();
-    await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeFocused();
-    await page.getByRole("region", { name: "Bảng câu" }).getByRole("button").nth(10).click();
-    await expect(page.locator("[data-gauge-stop]")).toHaveCount(1);
-  };
+  const run = playW1Run;
   const shake = (page: Page) =>
     page.locator("[data-fault]:has([data-gauge-stop])").evaluate((el) => {
       const css = getComputedStyle(el);
@@ -1315,6 +1320,60 @@ function contrast(a: Rgb, b: Rgb): number {
   return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
 }
 
+/**
+ * Every dimmed toy's outline over the frame, as rendered: the stroke at the product of every
+ * opacity from the outline to the root, composited over the frame's own opaque backdrop. Waits
+ * for the fade to settle first (it is a transition). One entry per dimmed toy, with its state.
+ */
+async function dimmedOutlines(page: Page) {
+  await expect(page.locator('[data-tile="on"][data-dimmed]').first()).toBeAttached();
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+  const seen = await page.evaluate(() => {
+    /** Any computed CSS colour (the theme tokens may be oklch) as 0-255 rgba, by the canvas. */
+    const rgba = (css: string) => {
+      const ctx = document.createElement("canvas").getContext("2d");
+      if (!ctx) throw new Error("no canvas");
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = css;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r = 0, g = 0, b = 0, a = 0] = ctx.getImageData(0, 0, 1, 1).data;
+      return [r, g, b, a / 255] as const;
+    };
+    const frame = document.querySelector('[role="region"][aria-label="Cỗ máy trợ lý"]');
+    if (!frame) throw new Error("no machine frame");
+    let back = rgba("rgba(0 0 0 / 0)");
+    for (let at: Element | null = frame; at; at = at.parentElement) {
+      back = rgba(getComputedStyle(at).backgroundColor);
+      if (back[3] > 0) break;
+    }
+    const toys = [...document.querySelectorAll('[data-tile="on"][data-dimmed]')].map((toy) => {
+      const outline = toy.querySelector("[data-outline]");
+      if (!outline) throw new Error("a dimmed toy has no outline");
+      let opacity = 1;
+      for (let at: Element | null = outline; at; at = at.parentElement) {
+        opacity *= Number.parseFloat(getComputedStyle(at).opacity);
+      }
+      return {
+        type: toy.getAttribute("data-tile-type") ?? "?",
+        state: toy.getAttribute("data-tile-state") ?? "?",
+        stroke: rgba(getComputedStyle(outline).stroke),
+        opacity,
+      };
+    });
+    return { back, toys };
+  });
+  expect(seen.back[3], "the frame's own backdrop is opaque").toBe(1);
+  const back: Rgb = [seen.back[0], seen.back[1], seen.back[2]];
+  return seen.toys.map((toy) => {
+    // The outline at the group's opacity, over the frame.
+    const alpha = toy.stroke[3] * toy.opacity;
+    const ink = [0, 1, 2].map(
+      (i) => (toy.stroke[i] ?? 0) * alpha + (back[i] ?? 0) * (1 - alpha),
+    ) as unknown as Rgb;
+    return { type: toy.type, state: toy.state, opacity: toy.opacity, ratio: contrast(ink, back) };
+  });
+}
+
 for (const theme of THEMES) {
   test(`keeps a dimmed toy's outline at 3:1 against the frame, theme ${theme}`, async ({
     page,
@@ -1324,54 +1383,34 @@ for (const theme of THEMES) {
     await page.goto(L1);
     await expect(page.locator("[data-dimmed]")).toHaveCount(0);
     await page.locator('[data-beat="llm"]').click();
-    const dimmed = page.locator('[data-tile="on"][data-dimmed]');
-    await expect(dimmed.first()).toBeAttached();
-    // At rest: the fade is a transition.
-    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
-
-    const seen = await page.evaluate(() => {
-      /** Any computed CSS colour (the theme tokens may be oklch) as 0-255 rgba, by the canvas. */
-      const rgba = (css: string) => {
-        const ctx = document.createElement("canvas").getContext("2d");
-        if (!ctx) throw new Error("no canvas");
-        ctx.clearRect(0, 0, 1, 1);
-        ctx.fillStyle = css;
-        ctx.fillRect(0, 0, 1, 1);
-        const [r = 0, g = 0, b = 0, a = 0] = ctx.getImageData(0, 0, 1, 1).data;
-        return [r, g, b, a / 255] as const;
-      };
-      const toy = document.querySelector('[data-tile="on"][data-dimmed]');
-      const outline = toy?.querySelector("[data-outline]");
-      const frame = document.querySelector('[role="region"][aria-label="Cỗ máy trợ lý"]');
-      if (!toy || !outline || !frame) throw new Error("no dimmed toy, outline or frame");
-      let back = rgba("rgba(0 0 0 / 0)");
-      for (let at: Element | null = frame; at; at = at.parentElement) {
-        back = rgba(getComputedStyle(at).backgroundColor);
-        if (back[3] > 0) break;
-      }
-      return {
-        stroke: rgba(getComputedStyle(outline).stroke),
-        // Wherever the fade sits in the toy: the product of every opacity from outline to root.
-        opacity: (() => {
-          let all = 1;
-          for (let at: Element | null = outline; at; at = at.parentElement) {
-            all *= Number.parseFloat(getComputedStyle(at).opacity);
-          }
-          return all;
-        })(),
-        back,
-      };
-    });
-    expect(seen.opacity).toBeLessThan(1);
-    expect(seen.back[3], "the frame's own backdrop is opaque").toBe(1);
-    // The outline at the group's opacity, over the frame.
-    const alpha = seen.stroke[3] * seen.opacity;
-    const ink = [0, 1, 2].map(
-      (i) => (seen.stroke[i] ?? 0) * alpha + (seen.back[i] ?? 0) * (1 - alpha),
-    ) as unknown as Rgb;
-    const ratio = contrast(ink, [seen.back[0], seen.back[1], seen.back[2]]);
-    expect(ratio).toBeGreaterThanOrEqual(3);
+    const toys = await dimmedOutlines(page);
+    expect(toys.length).toBeGreaterThan(1);
+    for (const toy of toys) {
+      expect(toy.opacity).toBeLessThan(1);
+      expect(toy.ratio, `${toy.type} (${toy.state})`).toBeGreaterThanOrEqual(3);
+    }
   });
+
+  // The run's own tones are paler than the idle ink once faded: success green, danger red and the
+  // brand of a running toy. W1's recorded run leaves toys passed and in error, then a beat is
+  // pressed, and every toy off its path holds 3:1 in the colour of its state.
+  for (const wrong of [false, true]) {
+    test(`keeps a dimmed toy's run-state outline at 3:1 after W1's recorded run${wrong ? " with a wrong stop" : ""}, theme ${theme}`, async ({
+      page,
+    }) => {
+      await page.addInitScript((id) => window.localStorage.setItem("vg-theme", id), theme);
+      await playW1Run(page, wrong);
+      await page.locator("[data-beat]").first().click();
+      const toys = await dimmedOutlines(page);
+      // The run left some toys passed (and, with a wrong stop, one in error): the tones at stake.
+      const states = new Set(toys.map((toy) => toy.state));
+      expect(states.has("passed")).toBe(true);
+      if (wrong) expect(states.has("error")).toBe(true);
+      for (const toy of toys) {
+        expect(toy.ratio, `${toy.type} (${toy.state})`).toBeGreaterThanOrEqual(3);
+      }
+    });
+  }
 }
 
 // A dimmed toy is faded, not made see-through: the belt that runs under it must not show in the
