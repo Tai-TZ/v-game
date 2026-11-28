@@ -10,7 +10,7 @@ import {
   type Bench,
   type Env,
 } from "./bench";
-import { beatLine, MachineMap } from "./MachineMap";
+import { beatLine, INK, MachineMap } from "./MachineMap";
 import type { BenchRunView } from "./BenchView";
 import type { BlockState } from "./run";
 import type { BlockType, EventType } from "./schema";
@@ -323,6 +323,32 @@ describe("the machine as a figure to play with", () => {
     // Six toys on the bench; the empty socket has nothing inside to show.
     expect(inside).toEqual(["input", "corpus", "chunker", "context_packer", "llm", "output"]);
     expect(document.querySelectorAll("[data-glass]").length).toBe(6);
+  });
+
+  it("draws each toy with a heavy silhouette over thin face edges", () => {
+    draw(l1, setAttached(starter(l1), "vector_search", true));
+    for (const seeThrough of [false, true]) {
+      if (seeThrough) fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
+      const toys = [...document.querySelectorAll('[data-tile="on"]')];
+      expect(toys.length).toBe(7);
+      for (const toy of toys) {
+        const outlines = toy.querySelectorAll("[data-outline]");
+        expect(outlines.length).toBe(1);
+        const outline = outlines[0];
+        expect(outline?.getAttribute("stroke-width")).toBe(String(INK.outline));
+        expect(outline?.getAttribute("fill")).toBe("none");
+        const faces = [...(outline?.parentElement?.querySelectorAll("polygon") ?? [])].filter(
+          (face) => face !== outline,
+        );
+        expect(faces.length).toBe(3);
+        for (const face of faces) {
+          expect(face.getAttribute("stroke-width")).toBe(String(INK.edge));
+          // The glass keeps its fill: the outline is a line, not a pane over the toy's insides.
+          if (seeThrough) expect(face.getAttribute("class")).toContain("[fill-opacity:0.28]");
+        }
+      }
+    }
+    expect(INK).toEqual({ outline: 2.4, edge: 1, fine: 1, mark: 2.5 });
   });
 
   it("cuts the sheet inside the blade into as many pieces as it has cuts, plus one", () => {

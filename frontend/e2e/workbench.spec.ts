@@ -1217,6 +1217,32 @@ test.describe("the machine on a 375 px screen", () => {
   });
 });
 
+// Graphics upgrade 4.1: a toy's silhouette is drawn about two and a half times heavier than the
+// edges between its faces, as rendered (the computed width, not the attribute).
+test("draws toy outlines heavier than their face edges", async ({ page }) => {
+  await mockWorkbenchApi(page);
+  for (const url of [L1, "/play/watchtower/direct-injection"]) {
+    await page.goto(url);
+    await expect(page.locator('[data-tile="on"]').first()).toBeAttached();
+    const widths = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-tile="on"]')].map((toy) => {
+        const outline = toy.querySelector("[data-outline]");
+        const face = outline?.parentElement?.querySelector("polygon:not([data-outline])");
+        if (!outline || !face) throw new Error("a toy has no outline or no face");
+        return [
+          Number.parseFloat(getComputedStyle(outline).strokeWidth),
+          Number.parseFloat(getComputedStyle(face).strokeWidth),
+        ] as const;
+      }),
+    );
+    expect(widths.length, url).toBeGreaterThan(0);
+    for (const [outline, face] of widths) {
+      expect(face, url).toBeGreaterThan(0);
+      expect(outline, url).toBeGreaterThanOrEqual(2 * face);
+    }
+  }
+});
+
 test("says nothing about scrolling where the whole machine fits", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await mockWorkbenchApi(page);

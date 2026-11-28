@@ -394,7 +394,17 @@ const rowOf = (index: number, at: number) => (index + at) % 2;
 /** The front toy of a pair, whose tag hangs below. */
 const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
 
-/** Three faces of a box: the top in its own token, the two sides darker by a fixed rule. */
+/**
+ * The two ink weights of a technical drawing: a heavy outline round the whole toy, the base and
+ * the belts, and thin edges between faces, on dressings and on leaders. One unit is one px.
+ */
+export const INK = { outline: 2.4, edge: 1, fine: 1, mark: 2.5 } as const;
+
+/**
+ * Three faces of a box: the top in its own token, the two sides darker by a fixed rule. The faces
+ * share thin edges; one heavy hexagon round the three is the toy's silhouette. A small dressing
+ * on a toy has no silhouette of its own (`outline={false}`).
+ */
 function Box({
   x,
   y,
@@ -405,6 +415,7 @@ function Box({
   top = "fill-surface",
   stroke = "stroke-fg",
   glass = false,
+  outline = true,
 }: {
   x: number;
   y: number;
@@ -416,13 +427,16 @@ function Box({
   stroke?: string;
   /** See-through: the faces turn to glass so what the toy holds shows inside it. */
   glass?: boolean;
+  /** The heavy silhouette over the faces' thin edges. */
+  outline?: boolean;
 }) {
   const t = z + h;
   const pane = glass ? "[fill-opacity:0.28]" : "";
   return (
-    <g strokeWidth="1.6" strokeLinejoin="round" {...(glass ? { "data-glass": "" } : {})}>
+    <g strokeLinejoin="round" {...(glass ? { "data-glass": "" } : {})}>
       <polygon
         className={`fill-line ${pane} ${stroke}`}
+        strokeWidth={INK.edge}
         points={pts([
           iso(x + w, y, z),
           iso(x + w, y + d, z),
@@ -432,6 +446,7 @@ function Box({
       />
       <polygon
         className={`fill-subtle ${pane} ${stroke}`}
+        strokeWidth={INK.edge}
         points={pts([
           iso(x, y + d, z),
           iso(x + w, y + d, z),
@@ -439,7 +454,28 @@ function Box({
           iso(x, y + d, t),
         ])}
       />
-      <polygon className={`${top} ${pane} ${stroke}`} points={quad(x, y, w, d, t)} />
+      <polygon
+        className={`${top} ${pane} ${stroke}`}
+        strokeWidth={INK.edge}
+        points={quad(x, y, w, d, t)}
+      />
+      {outline && (
+        <polygon
+          data-outline=""
+          fill="none"
+          className={stroke}
+          strokeWidth={INK.outline}
+          strokeLinejoin="round"
+          points={pts([
+            iso(x, y, t),
+            iso(x + w, y, t),
+            iso(x + w, y, z),
+            iso(x + w, y + d, z),
+            iso(x, y + d, z),
+            iso(x, y + d, t),
+          ])}
+        />
+      )}
     </g>
   );
 }
@@ -741,7 +777,7 @@ export function MachineMap({
               </filter>
             </defs>
 
-            <g aria-hidden="true" strokeWidth="1.6" strokeLinejoin="round">
+            <g aria-hidden="true" strokeWidth={INK.outline} strokeLinejoin="round">
               {/* A flat shadow, offset, under the slab (no blur: art bible §1.3). */}
               <polygon
                 className="fill-brand-tint"
@@ -830,7 +866,7 @@ export function MachineMap({
                     className={
                       gated ? "fill-line-strong stroke-fg" : "fill-danger-tint stroke-danger"
                     }
-                    strokeWidth="1.4"
+                    strokeWidth={INK.outline}
                     points={pts([
                       along(from, BELT, 0, 0),
                       along(from, BELT, FORK / U, 0),
@@ -857,7 +893,7 @@ export function MachineMap({
                             ? "fill-none stroke-danger [stroke-dasharray:4_3]"
                             : "fill-line-strong stroke-fg"
                         }
-                        strokeWidth="1.4"
+                        strokeWidth={INK.outline}
                         points={pts([
                           along(from, 0, BELT, 0),
                           along(from, STEP / U, BELT, 0),
@@ -981,7 +1017,7 @@ export function MachineMap({
               >
                 <polygon
                   className="fill-surface stroke-fg"
-                  strokeWidth="1.4"
+                  strokeWidth={INK.edge}
                   points={pts([
                     iso(-0.3, -0.3, 0.05),
                     iso(0.3, -0.3, 0.05),
@@ -1263,7 +1299,7 @@ function Callout({
     const end = fx - 14;
     return (
       <g aria-hidden="true" data-callout={type} className={className} onClick={onPress}>
-        <line x1={fx} y1={fy} x2={end} y2={fy} className="stroke-fg" strokeWidth="1" />
+        <line x1={fx} y1={fy} x2={end} y2={fy} className="stroke-fg" strokeWidth={INK.fine} />
         <rect
           x={end - w}
           y={top}
@@ -1271,7 +1307,7 @@ function Callout({
           height={TAG}
           rx="4"
           className="fill-surface stroke-fg"
-          strokeWidth="1.2"
+          strokeWidth={INK.edge}
         />
         <text
           x={end - w / 2}
@@ -1292,7 +1328,7 @@ function Callout({
         x2={fx}
         y2={below ? top : top + TAG}
         className="stroke-fg"
-        strokeWidth="1"
+        strokeWidth={INK.fine}
       />
       <rect
         x={fx - w / 2}
@@ -1301,7 +1337,7 @@ function Callout({
         height={TAG}
         rx="4"
         className="fill-surface stroke-fg"
-        strokeWidth="1.2"
+        strokeWidth={INK.edge}
       />
       <text
         x={fx}
@@ -1341,7 +1377,7 @@ function Inside({
     <g
       aria-hidden="true"
       data-internal={type}
-      strokeWidth="1"
+      strokeWidth={INK.fine}
       strokeLinejoin="round"
       className="stroke-fg"
     >
@@ -1516,7 +1552,7 @@ function Inside({
 
 function Lock({ at: [x, y] }: { at: P }) {
   return (
-    <g aria-hidden="true" className="fill-surface stroke-fg-muted" strokeWidth="1.2">
+    <g aria-hidden="true" className="fill-surface stroke-fg-muted" strokeWidth={INK.edge}>
       <rect x={x + 3} y={y - 4} width="8" height="7" rx="1" />
       <path d={`M${x + 5} ${y - 4}v-2a2 2 0 0 1 4 0v2`} className="fill-none" />
     </g>
@@ -1567,7 +1603,7 @@ function Dress({
   const params = slotParams(env, bench, type);
   const [tx, ty] = iso(x + FOOT / 2, y + FOOT / 2, h);
   const g = (children: ReactNode) => (
-    <g aria-hidden="true" strokeWidth="1.2" strokeLinejoin="round" className="stroke-fg">
+    <g aria-hidden="true" strokeWidth={INK.edge} strokeLinejoin="round" className="stroke-fg">
       {children}
     </g>
   );
@@ -1595,6 +1631,7 @@ function Dress({
             d={0.7}
             h={doc.includes("2019") ? 0.6 : 0.9}
             top={doc.includes("2019") ? "fill-warning-tint" : "fill-brand-tint"}
+            outline={false}
           />
         )),
       );
@@ -1617,11 +1654,20 @@ function Dress({
                 x2={bx}
                 y2={by}
                 className="stroke-danger"
-                strokeWidth="1.6"
+                strokeWidth={INK.edge}
               />
             );
           })}
-          <Box x={x + 1.5} y={y + 0.2} z={h} w={0.08} d={1.2} h={0.55} top="fill-line-strong" />
+          <Box
+            x={x + 1.5}
+            y={y + 0.2}
+            z={h}
+            w={0.08}
+            d={1.2}
+            h={0.55}
+            top="fill-line-strong"
+            outline={false}
+          />
         </>,
       );
     }
@@ -1699,7 +1745,16 @@ function Dress({
           ))}
           {params.cite_ids === true && (
             <g data-gauge-stamp="">
-              <Box x={x + 1.1} y={y - 0.1} z={h} w={0.35} d={0.35} h={0.3} top="fill-brand" />
+              <Box
+                x={x + 1.1}
+                y={y - 0.1}
+                z={h}
+                w={0.35}
+                d={0.35}
+                h={0.3}
+                top="fill-brand"
+                outline={false}
+              />
             </g>
           )}
         </>,
@@ -1856,7 +1911,7 @@ function Dress({
               data-verdict="pass"
               d={`M${mx - 7} ${my}l5 5l9 -10`}
               className="fill-none stroke-success"
-              strokeWidth="2.5"
+              strokeWidth={INK.mark}
             />
           )}
           {answer === "fail" && (
@@ -1864,7 +1919,7 @@ function Dress({
               data-verdict="fail"
               d={`M${mx - 6} ${my - 6}l12 12M${mx + 6} ${my - 6}l-12 12`}
               className="stroke-danger"
-              strokeWidth="2.5"
+              strokeWidth={INK.mark}
             />
           )}
           {answer === null && (
