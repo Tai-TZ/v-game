@@ -331,6 +331,11 @@ type P = readonly [number, number];
 const iso = (x: number, y: number, z: number): P => [(x - y) * C * S, (x + y) * 0.5 * S - z * S];
 const pts = (list: readonly P[]) =>
   list.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(" ");
+/** Lines from one point out to several, as one path. */
+const edges = (from: P, to: readonly P[]) =>
+  to
+    .map(([a, b]) => `M${from[0].toFixed(1)},${from[1].toFixed(1)}L${a.toFixed(1)},${b.toFixed(1)}`)
+    .join("");
 const quad = (x: number, y: number, w: number, d: number, z: number) =>
   pts([iso(x, y, z), iso(x + w, y, z), iso(x + w, y + d, z), iso(x, y + d, z)]);
 
@@ -448,11 +453,18 @@ function Box({
 }) {
   const t = z + h;
   const pane = glass ? "[fill-opacity:0.28]" : "";
+  // A dashed silhouette must not lie on a thin solid line (the faces' own outer edges): that reads
+  // as heavy dashes on a hairline. So the faces draw no edge, and the three that meet inside the
+  // box are drawn on their own, below.
+  const dashed = Boolean(dash) && outline;
+  const faceInk = dashed ? "" : stroke;
+  const faceEdge = dashed ? { stroke: "none" } : {};
   return (
     <g strokeLinejoin="round" {...(glass ? { "data-glass": "" } : {})}>
       <polygon
-        className={`fill-line ${pane} ${stroke}`}
+        className={`fill-line ${pane} ${faceInk}`}
         strokeWidth={INK.edge}
+        {...faceEdge}
         points={pts([
           iso(x + w, y, z),
           iso(x + w, y + d, z),
@@ -461,8 +473,9 @@ function Box({
         ])}
       />
       <polygon
-        className={`fill-subtle ${pane} ${stroke}`}
+        className={`fill-subtle ${pane} ${faceInk}`}
         strokeWidth={INK.edge}
+        {...faceEdge}
         points={pts([
           iso(x, y + d, z),
           iso(x + w, y + d, z),
@@ -471,15 +484,29 @@ function Box({
         ])}
       />
       <polygon
-        className={`${top} ${pane} ${stroke}`}
+        className={`${top} ${pane} ${faceInk}`}
         strokeWidth={INK.edge}
+        {...faceEdge}
         points={quad(x, y, w, d, t)}
       />
+      {dashed && (
+        <path
+          data-face-edges=""
+          fill="none"
+          className={stroke}
+          strokeWidth={INK.edge}
+          d={edges(iso(x + w, y + d, t), [
+            iso(x + w, y, t),
+            iso(x, y + d, t),
+            iso(x + w, y + d, z),
+          ])}
+        />
+      )}
       {outline && (
         <polygon
           data-outline=""
           fill="none"
-          className={stroke}
+          className={`${stroke}`}
           strokeWidth={INK.outline}
           strokeLinejoin="round"
           {...(dash ? { strokeDasharray: dash } : {})}

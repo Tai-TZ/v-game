@@ -193,11 +193,25 @@ describe("the machine map at the head of the bench", () => {
       const outline = toy?.querySelector("[data-outline]");
       expect(outline?.getAttribute("stroke-dasharray"), `${state} dash`).toBe(dash);
       expect(outline?.getAttribute("class")).toContain(TONE[state]);
-      // Only the silhouette is dashed: the thin face edges stay solid.
+      // Only the silhouette is dashed: nothing thin is solid under it, so a dashed state's faces
+      // draw no edge of their own and the three that meet inside are drawn apart, thin and solid.
       const faces = [...(outline?.parentElement?.querySelectorAll("polygon") ?? [])].filter(
         (face) => face !== outline,
       );
-      for (const face of faces) expect(face.hasAttribute("stroke-dasharray")).toBe(false);
+      expect(faces.length, `${state} faces`).toBe(3);
+      const inner = outline?.parentElement?.querySelectorAll("[data-face-edges]") ?? [];
+      expect(inner.length, `${state} inner edges`).toBe(dash ? 1 : 0);
+      for (const face of faces) {
+        expect(face.hasAttribute("stroke-dasharray")).toBe(false);
+        expect(face.getAttribute("stroke") === "none", `${state} face edge`).toBe(Boolean(dash));
+      }
+      if (dash) {
+        const edge = inner[0];
+        expect(edge?.getAttribute("stroke-width")).toBe(String(INK.edge));
+        expect(edge?.getAttribute("class")).toContain(TONE[state]);
+        expect(edge?.hasAttribute("stroke-dasharray")).toBe(false);
+        expect((edge?.getAttribute("d") ?? "").match(/M/g)?.length).toBe(3);
+      }
     }
   });
 
