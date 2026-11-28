@@ -403,7 +403,7 @@ const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
  * A toy or belt off the pressed step's path. 70% is the lowest 5% step at which
  * EVERY tone of a toy's outline holds 3:1 against the frame (WCAG 1.4.11), not just the idle ink:
  * a run leaves outlines green, red, amber and teal or blue, and those are paler once faded.
- * Contrast of the faded outline over the frame's white, town / vinuni (e2e "keeps a dimmed toy's
+ * Contrast of the faded outline over the frame's white, town / campus theme (e2e "keeps a dimmed toy's
  * outline at 3:1" and "run-state outline ... after W1's recorded run", both themes):
  *
  *   opacity   fg          success     warning     danger      brand       lowest
