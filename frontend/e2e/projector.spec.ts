@@ -257,6 +257,9 @@ for (const viewport of [
       await page.getByRole("button", { name: "Mở kết quả" }).click();
       await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
       expect(await px(page, "#wb-results")).toBeGreaterThanOrEqual(40);
+      // Graphics upgrade 4.3: the verdict stamps are read from the back row too.
+      await expect(page.locator("[data-stamp]").first()).toBeVisible();
+      expect(await px(page, "[data-stamp]")).toBeGreaterThanOrEqual(24);
       await expect(page.getByText("Xem vết chạy").first()).toBeHidden();
       expect(await seriousViolations(page)).toEqual([]);
       expect(await sideways(page)).toBeLessThanOrEqual(0);
@@ -571,3 +574,62 @@ test.describe("the projector at 375 px (R10)", () => {
     });
   }
 });
+
+type Rgb = readonly [number, number, number];
+/** WCAG 2.x contrast ratio of two sRGB colours (0-255 per channel). */
+function contrast(a: Rgb, b: Rgb): number {
+  const luminance = (rgb: Rgb) => {
+    const [r = 0, g = 0, bl = 0] = rgb.map((c) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
+}
+
+// Graphics upgrade 4.3: a verdict stamp's tone holds 4.5:1 over the card it is pressed on, in both
+// theme packs (ADR 0002). The reference run earns every "Đạt"; the starter's are all "Chưa đạt".
+for (const theme of THEMES) {
+  for (const [stream, tone] of [
+    ["reference", "pass"],
+    ["starter", "muted"],
+  ] as const) {
+    test(`keeps a ${tone} stamp at 4.5:1 on the projector, theme ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.addInitScript((id) => window.localStorage.setItem("vg-theme", id), theme);
+      await mockWorkbenchApi(page, { events: () => w1Stream(stream) });
+      await page.goto(`${W1}?chieu=1`);
+      await page.getByRole("button", { name: "Mở ca" }).click();
+      await page.getByRole("button", { name: "Mở kết quả" }).click();
+      await expect(page.locator(`[data-stamp="${tone}"]`).first()).toBeVisible();
+      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      const seen = await page.evaluate((wanted) => {
+        const rgba = (css: string) => {
+          const ctx = document.createElement("canvas").getContext("2d");
+          if (!ctx) throw new Error("no canvas");
+          ctx.fillStyle = css;
+          ctx.fillRect(0, 0, 1, 1);
+          const [r = 0, g = 0, b = 0, a = 0] = ctx.getImageData(0, 0, 1, 1).data;
+          return [r, g, b, a / 255] as const;
+        };
+        return [...document.querySelectorAll(`[data-stamp="${wanted}"]`)].map((el) => {
+          let back = rgba("rgba(0 0 0 / 0)");
+          for (let at: Element | null = el.parentElement; at; at = at.parentElement) {
+            back = rgba(getComputedStyle(at).backgroundColor);
+            if (back[3] > 0) break;
+          }
+          return { ink: rgba(getComputedStyle(el).color), back };
+        });
+      }, tone);
+      expect(seen.length).toBeGreaterThan(0);
+      for (const { ink, back } of seen) {
+        expect(back[3], "an opaque card behind the stamp").toBe(1);
+        expect(
+          contrast([ink[0], ink[1], ink[2]], [back[0], back[1], back[2]]),
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
+}

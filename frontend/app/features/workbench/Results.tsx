@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, ChevronDownIcon, ClockIcon, CrossIcon, StarIcon } from "~/components/ui/icons";
+import { Stamp } from "~/components/ui/Stamp";
 import { ProjectorLink } from "~/features/projector/ProjectorLink";
 
 import { domain, nodeIds, sameJson, type Env } from "./bench";
@@ -80,6 +81,13 @@ interface ResultsProps {
 }
 
 /** Sao 3 evidence per forbidden label, in the words of `stars_vi` ("{n} câu …"). */
+/** Each earned star lands a beat after the one before it (Stamp's delays, in stars). */
+const STAR_DELAY = [
+  "[animation-delay:0ms]",
+  "[animation-delay:60ms]",
+  "[animation-delay:120ms]",
+] as const;
+
 const LABEL_EVIDENCE: Readonly<Record<string, string>> = {
   stale_doc: "mang văn bản hết hiệu lực vào thùng",
   cite_unknown: "trích nguồn không có trong thùng",
@@ -231,14 +239,23 @@ export function Results({
       )}
       <div className="mt-4 flex items-center gap-3">
         <span aria-hidden="true" className="flex gap-1">
-          {[1, 2, 3].map((star) => (
-            <StarIcon
-              key={star}
-              className={`size-7 shrink-0 ${star <= score.stars ? "fill-accent stroke-accent" : "fill-none stroke-line-strong"}`}
-            />
-          ))}
+          {([0, 1, 2] as const).map((index) =>
+            index < score.stars ? (
+              <StarIcon
+                key={index}
+                data-star="earned"
+                className={`size-10 shrink-0 fill-accent stroke-accent motion-safe:animate-stamp chieu:size-14 ${STAR_DELAY[index]}`}
+              />
+            ) : (
+              <StarIcon
+                key={index}
+                data-star="empty"
+                className="size-10 shrink-0 fill-none stroke-line-strong [stroke-dasharray:3_2] chieu:size-14"
+              />
+            ),
+          )}
         </span>
-        <p className="text-xl font-bold">{score.stars}/3 sao</p>
+        <p className="text-2xl font-bold">{score.stars}/3 sao</p>
       </div>
 
       <ol className="mt-5 max-w-prose space-y-3">
@@ -246,12 +263,9 @@ export function Results({
           <li key={index} className="rounded-md border border-line bg-surface p-3">
             <p className="flex flex-wrap items-baseline justify-between gap-x-3">
               <span className="font-semibold">Sao {index + 1}</span>
-              <span
-                className={`inline-flex items-center gap-1 text-sm font-semibold ${condition.ok ? "text-success" : "text-fg-muted"}`}
-              >
-                {condition.ok ? <CheckIcon /> : <CrossIcon />}
+              <Stamp tone={condition.ok ? "pass" : "muted"} delay={Math.min(index, 2) as 0 | 1 | 2}>
                 {condition.ok ? "Đạt" : "Chưa đạt"}
-              </span>
+              </Stamp>
             </p>
             <p className="mt-1 text-sm">{level.stars_vi[index]}</p>
             <p className="mt-1 text-sm text-fg-muted tabular-nums">{condition.evidence}</p>

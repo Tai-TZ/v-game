@@ -153,6 +153,34 @@ test.describe("watchtower W1", () => {
     await expect(page.getByText(/Không chặn nhầm ai, không hỏi thừa ai/)).toBeVisible();
     expect(consoleErrors).toEqual([]);
   });
+
+  test("stamps each earned star once, and not with reduced motion (graphics upgrade 4.3)", async ({
+    page,
+  }) => {
+    await mockWorkbenchApi(page, { events: () => stream("reference") });
+    await page.goto(W1);
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await expect(page.getByText("3/3 sao", { exact: true })).toBeVisible();
+    const stars = page.locator('[data-star="earned"]');
+    await expect(stars).toHaveCount(3);
+    await expect(page.locator('[data-star="empty"]')).toHaveCount(0);
+    const stamped = () =>
+      stars.evaluateAll((all) =>
+        all.map((el) => {
+          const css = getComputedStyle(el);
+          return { name: css.animationName, opacity: css.opacity };
+        }),
+      );
+    expect((await stamped()).map((s) => s.name)).toEqual(["vg-stamp", "vg-stamp", "vg-stamp"]);
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    // Nothing plays, and every star and verdict is there at full strength all the same.
+    expect(await stamped()).toEqual(Array(3).fill({ name: "none", opacity: "1" }));
+    await expect(page.locator('[data-stamp="pass"]')).toHaveCount(3);
+    for (const stamp of await page.locator("[data-stamp]").all()) {
+      expect(await stamp.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
+    }
+  });
 });
 
 // Plan v0.7 3.2: the cases fold into tiles that open on a press. On the starter run the twelve

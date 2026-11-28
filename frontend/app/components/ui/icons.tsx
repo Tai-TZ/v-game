@@ -60,9 +60,21 @@ export function CrossIcon({ className = ICON }: { className?: string }) {
 }
 
 /** Star; colour comes from the caller's `fill-*` / `stroke-*` classes. */
-export function StarIcon({ className = ICON }: { className?: string }) {
+export function StarIcon({
+  className = ICON,
+  "data-star": star,
+}: {
+  className?: string;
+  "data-star"?: "earned" | "empty";
+}) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className={className} strokeWidth="1.5">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      className={className}
+      strokeWidth="1.5"
+      data-star={star}
+    >
       <path d="m10 2.5 2.3 4.8 5.2.7-3.8 3.6.9 5.2L10 14.3l-4.6 2.5.9-5.2-3.8-3.6 5.2-.7Z" />
     </svg>
   );

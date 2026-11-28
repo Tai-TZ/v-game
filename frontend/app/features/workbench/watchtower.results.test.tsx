@@ -152,6 +152,62 @@ describe("what to do next sits right under the diagnosis (plan v0.7 3.2)", () =>
   });
 });
 
+describe("the stars and their stamps (graphics upgrade 4.3)", () => {
+  /** The W1 starter run, scored as two stars: a fixture of the score alone, no new engine code. */
+  const twoStars = (): RunView => {
+    const view = run([]);
+    if (!view.score) throw new Error("the starter run is unscored");
+    return { ...view, score: { ...view.score, stars: 2, s1: true, s2: true, s3: false } };
+  };
+  const stars = (kind: "earned" | "empty") =>
+    [...document.querySelectorAll(`[data-star="${kind}"]`)] as SVGElement[];
+
+  it("draws earned stars solid and stamped, the rest dashed", () => {
+    show(run([]));
+    expect(stars("earned")).toHaveLength(0);
+    expect(stars("empty")).toHaveLength(3);
+    for (const star of stars("empty")) {
+      expect(star.getAttribute("class")).toContain("[stroke-dasharray:3_2]");
+      expect(star.getAttribute("class")).toContain("fill-none");
+    }
+    cleanup();
+
+    show(twoStars());
+    expect(stars("earned")).toHaveLength(2);
+    expect(stars("empty")).toHaveLength(1);
+    const [first, second] = stars("earned");
+    for (const star of stars("earned")) {
+      const classes = star.getAttribute("class") ?? "";
+      expect(classes).toContain("fill-accent");
+      expect(classes).toContain("motion-safe:animate-stamp");
+      expect(classes).not.toContain("dasharray");
+      expect(classes).toContain("size-10");
+      expect(classes).toContain("chieu:size-14");
+    }
+    // Each lands a beat after the one before it.
+    expect(first?.getAttribute("class")).toContain("[animation-delay:0ms]");
+    expect(second?.getAttribute("class")).toContain("[animation-delay:60ms]");
+    expect(screen.getByText("2/3 sao").className).toContain("text-2xl");
+  });
+
+  it("stamps every condition with its verdict, the copy unchanged", () => {
+    show(twoStars());
+    const rows = [...document.querySelectorAll("ol > li")].filter((li) =>
+      li.querySelector("[data-stamp]"),
+    );
+    expect(rows).toHaveLength(3);
+    for (const row of rows) expect(row.querySelectorAll("[data-stamp]")).toHaveLength(1);
+    expect(
+      rows.map((row) => row.querySelector("[data-stamp]")?.getAttribute("data-stamp")),
+    ).toEqual(["pass", "pass", "muted"]);
+    expect(rows.map((row) => row.querySelector("[data-stamp]")?.textContent)).toEqual([
+      "Đạt",
+      "Đạt",
+      "Chưa đạt",
+    ]);
+  });
+});
+
 describe("the scale bill on a W1 result", () => {
   it("is offered under the stars, from the run's own tokens", () => {
     show(run([]));
