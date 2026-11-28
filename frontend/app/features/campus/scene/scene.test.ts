@@ -765,6 +765,9 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     // Visual polish (art §15, 2026-10-09): the contact-darkening overlay adds one draw call
     // (15 / 16 / 18 / 19) and, with the kerbs, slab bands and mowing stripes, about 570
     // triangles: peak 34,986 (spire-hall) / 31,865 (clock-tower), hence the cap of 35,500.
+    // Graphics upgrade §4.4.1 (2026-11-28): chamfered boxes (44 triangles, not 12) on the walls,
+    // plinths and parapets of the landmark and the three zone buildings; the owner raised the
+    // cap to 40,000. The draw calls stay 15 / 16 / 18 / 19.
     it.each(LOOKS)("stays well inside 40 draw calls and 60k triangles at %s, %s", (time, bake) => {
       if (!CAST) throw new Error("cast.json does not parse");
       for (const lit of [false, true]) {
@@ -778,7 +781,7 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
         expect(sceneBudget(g, CAST).drawCalls).toBe(18);
         expect(cast.drawCalls).toBe(19);
         expect(statues.triangles).toBeLessThan(cast.triangles);
-        expect(cast.triangles).toBeLessThanOrEqual(35_500);
+        expect(cast.triangles).toBeLessThanOrEqual(40_000);
         dressing.dispose();
         unmount();
       }

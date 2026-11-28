@@ -48,6 +48,7 @@ import {
   arch,
   arcSlab,
   box,
+  chamferBox,
   circle,
   cone,
   cyl,
@@ -1040,16 +1041,16 @@ function mainBuilding(pal: Palette): Parts {
     (x, y) => ({ x, y }),
   ).filter(({ x, y }) => !(Math.abs(x) < 1.7 && y < 1.5));
   const parts: Parts = [
-    P(box(-9.9, 9.9, 0, 0.3, -9.95, -5.95), trim, ao),
-    P(box(-3.15, 3.15, 0, 0.3, -5.95, -5.15), trim, ao),
-    P(box(-1.7, 1.7, 0, 0.3, -5.15, -4.15), trim, ao),
+    P(chamferBox(-9.9, 9.9, 0, 0.3, -9.95, -5.95), trim, ao),
+    P(chamferBox(-3.15, 3.15, 0, 0.3, -5.95, -5.15), trim, ao),
+    P(chamferBox(-1.7, 1.7, 0, 0.3, -5.15, -4.15), trim, ao),
     P(box(-1.7, 1.7, 0, 0.2, -4.15, -3.85), trim),
     P(box(-1.7, 1.7, 0, 0.1, -3.85, -3.55), trim),
     // Tower base: four storeys, corner piers stepping forward.
-    P(box(-3.0, 3.0, 0.3, 2.9, -9.9, -5.3), wall, ao),
+    P(chamferBox(-3.0, 3.0, 0.3, 2.9, -9.9, -5.3), wall, ao),
     P(box(-3.06, -2.5, 0.3, 2.9, -5.3, -5.24), wall),
     P(box(2.5, 3.06, 0.3, 2.9, -5.3, -5.24), wall),
-    P(box(-3.12, 3.12, 2.9, 3.02, -10.02, -5.18), trim),
+    P(chamferBox(-3.12, 3.12, 2.9, 3.02, -10.02, -5.18), trim),
     ...baseWindows.map(({ x, y }) =>
       P(quad("+z", Math.abs(x) >= 2.5 ? -5.24 : -5.3, x, y, 0.2, 0.36), g),
     ),
@@ -1069,10 +1070,10 @@ function mainBuilding(pal: Palette): Parts {
   for (const s of SIDES) {
     const [x0, x1] = s < 0 ? [-9.7, -3.0] : [3.0, 9.7];
     parts.push(
-      P(box(x0, x1, 0.3, 2.25, -9.7, -6.2), wall, ao),
-      P(box(x0 - 0.05, x1 + 0.05, 2.25, 2.37, -9.75, -6.15), trim),
+      P(chamferBox(x0, x1, 0.3, 2.25, -9.7, -6.2), wall, ao),
+      P(chamferBox(x0 - 0.05, x1 + 0.05, 2.25, 2.37, -9.75, -6.15), trim),
       P(rect(x0 + 0.12, x1 - 0.12, -9.63, -6.27, 2.372), roof),
-      P(box(x0 - 0.05, x1 + 0.05, 2.37, 2.5, -6.27, -6.15), wall),
+      P(chamferBox(x0 - 0.05, x1 + 0.05, 2.37, 2.5, -6.27, -6.15), wall),
       // Front and back alike (D1): string courses and nine bays.
       ...[0.92, 1.57].flatMap((y) => [
         P(box(x0, x1, y, y + 0.04, -6.2, -6.16), trim),
@@ -1101,10 +1102,10 @@ function mainBuilding(pal: Palette): Parts {
   for (const c of [-9.05, -3.7, 3.7, 9.05]) {
     const floors = [0.63, 1.29, 1.95, 2.61];
     parts.push(
-      P(box(c - 0.7, c + 0.7, 0.3, 2.95, -7.4, -6.0), wall, ao),
-      P(box(c - 0.76, c + 0.76, 2.95, 3.03, -7.46, -5.94), trim),
-      P(box(c - 0.5, c + 0.5, 3.03, 3.13, -7.2, -6.2), wall),
-      P(box(c - 0.26, c + 0.26, 3.13, 3.42, -6.96, -6.44), wall),
+      P(chamferBox(c - 0.7, c + 0.7, 0.3, 2.95, -7.4, -6.0), wall, ao),
+      P(chamferBox(c - 0.76, c + 0.76, 2.95, 3.03, -7.46, -5.94), trim),
+      P(chamferBox(c - 0.5, c + 0.5, 3.03, 3.13, -7.2, -6.2), wall),
+      P(chamferBox(c - 0.26, c + 0.26, 3.13, 3.42, -6.96, -6.44), wall),
       P(box(c - 0.31, c + 0.31, 3.42, 3.48, -7.01, -6.39), trim),
       // The kiosk's window on all four sides (D6).
       ...(
@@ -1174,11 +1175,11 @@ function spireHall(pal: Palette): Parts {
       [4.6, 6.2],
       [6.5, 8.1],
     ].map(([x0 = 0, x1 = 0]) => P(rect(x0, x1, -9.35, -6.5, 2.374), pal.ground)),
-    P(box(-1.65, 1.65, 1.3, 1.46, -5.3, -4.22), trim),
+    P(chamferBox(-1.65, 1.65, 1.3, 1.46, -5.3, -4.22), trim),
     P(quad("+z", -5.3, 0, 0.75, 1.0, 0.9), g),
     // Tier 2; tiers 2 to 4 have windows on all four sides (D7).
-    P(box(-1.95, 1.95, 3.02, 3.8, -9.1, -6.1), wall),
-    P(box(-2.03, 2.03, 3.8, 3.96, -9.18, -6.02), trim),
+    P(chamferBox(-1.95, 1.95, 3.02, 3.8, -9.1, -6.1), wall),
+    P(chamferBox(-2.03, 2.03, 3.8, 3.96, -9.18, -6.02), trim),
     ...SIDES.flatMap((s) => [
       ...range(9).map((k) =>
         P(quad(s > 0 ? "+z" : "-z", s > 0 ? -6.1 : -9.1, -1.6 + 0.4 * k, 3.41, 0.2, 0.4), g),
@@ -1188,8 +1189,8 @@ function spireHall(pal: Palette): Parts {
       ),
     ]),
     // Tier 3, roof garden and corner kiosks.
-    P(box(-1.83, 1.83, 3.96, 4.9, -9.0, -6.2), wall),
-    P(box(-1.9, 1.9, 4.9, 5.0, -9.07, -6.13), trim),
+    P(chamferBox(-1.83, 1.83, 3.96, 4.9, -9.0, -6.2), wall),
+    P(chamferBox(-1.9, 1.9, 4.9, 5.0, -9.07, -6.13), trim),
     ...SIDES.flatMap((s) => [
       ...grid(range(9), [4.2, 4.62], (k, y) =>
         P(quad(s > 0 ? "+z" : "-z", s > 0 ? -6.2 : -9.0, -1.4 + 0.35 * k, y, 0.18, 0.28), g),
@@ -1205,7 +1206,7 @@ function spireHall(pal: Palette): Parts {
       P(cone(0.26, 4, 5.42, 5.6, kx, kz, true), trim),
     ]).flat(),
     // Tier 4 with tall arched openings.
-    P(box(-0.81, 0.81, 5.0, 6.2, -8.41, -6.79), wall),
+    P(chamferBox(-0.81, 0.81, 5.0, 6.2, -8.41, -6.79), wall),
     ...(
       [
         ["+z", -6.79, 0],
@@ -1217,7 +1218,7 @@ function spireHall(pal: Palette): Parts {
       P(quad(face, plane, u, 5.5, 0.34, 0.62), g),
       P(arch(face, plane, u, 5.81, 0.17), g),
     ]),
-    P(box(-0.88, 0.88, 6.2, 6.28, -8.48, -6.72), trim),
+    P(chamferBox(-0.88, 0.88, 6.2, 6.28, -8.48, -6.72), trim),
     // Lantern, cup, needle and star.
     P(cyl(0.56, 0.82, 8, 6.28, 6.55, 0, cz), wall),
     P(cyl(0.4, 0.4, 8, 6.55, 7.55, 0, cz), g),
@@ -1279,9 +1280,9 @@ function clockTower(pal: Palette): Parts {
   ] as const;
   return [
     P(hipRoof, roof),
-    P(box(-0.85, 0.85, 0.3, 4.6, -6.5, -4.8), wall, { ao: true }),
-    P(box(-0.95, 0.95, 4.6, 4.72, -6.6, -4.7), trim),
-    P(box(-0.75, 0.75, 4.72, 5.9, -6.4, -4.9), wall),
+    P(chamferBox(-0.85, 0.85, 0.3, 4.6, -6.5, -4.8), wall, { ao: true }),
+    P(chamferBox(-0.95, 0.95, 4.6, 4.72, -6.6, -4.7), trim),
+    P(chamferBox(-0.75, 0.75, 4.72, 5.9, -6.4, -4.9), wall),
     ...faces.flatMap(([face, plane, u]) => [
       P(disc(face, plane, u, v, 0.42, 16), pal.plaza, e),
       P(onFace(new RingGeometry(0.42, 0.5, 16), face, plane, u, v), accent),
@@ -1485,14 +1486,14 @@ export function buildLibrary(pal: Palette, look: SiteLook) {
   const lit = { emissive: look === "lit" };
   const tall = [-11.85, -11.15, -10.45, -9.75];
   const parts: Parts = [
-    P(box(-12.4, -8.8, 0, 0.25, -6.0, -0.6), c.trim, { ao: true }),
-    P(box(-12.2, -9.4, 0.25, 1.85, -5.8, -0.8), c.wall, { ao: true }),
+    P(chamferBox(-12.4, -8.8, 0, 0.25, -6.0, -0.6), c.trim, { ao: true }),
+    P(chamferBox(-12.2, -9.4, 0.25, 1.85, -5.8, -0.8), c.wall, { ao: true }),
     ...[-5.2, -4.4, -3.6, -2.0, -1.2].flatMap((z) => [
       P(cyl(0.075, 0.085, 8, 0.25, 1.85, -9.05, z), c.wall),
       P(cyl(0.095, 0.095, 8, 1.66, 1.76, -9.05, z), c.accent),
     ]),
-    P(box(-9.45, -8.85, 1.85, 2.02, -5.85, -0.75), c.trim),
-    P(box(-12.3, -8.85, 2.02, 2.1, -5.9, -0.7), c.trim),
+    P(chamferBox(-9.45, -8.85, 1.85, 2.02, -5.85, -0.75), c.trim),
+    P(chamferBox(-12.3, -8.85, 2.02, 2.1, -5.9, -0.7), c.trim),
     P(rect(-12.1, -9.1, -5.65, -0.95, 2.102), c.trim),
     P(rect(-11.7, -9.5, -5.2, -1.4, 2.103), c.ground),
     ...grid([-11.6, -9.6], [-5.1, -1.5], (x, z) =>
@@ -1567,17 +1568,17 @@ export function buildWatchtower(pal: Palette, look: SiteLook) {
   const ao = { ao: true };
   const slot = { emissive: look === "lit" };
   return merge([
-    P(box(8.8, 12.0, 0, 0.25, -6.0, -1.0), c.trim, ao),
-    P(box(9.0, 11.8, 0.25, 1.45, -3.8, -1.2), c.wall, ao),
-    P(box(8.95, 11.85, 1.45, 1.53, -3.85, -1.15), c.trim),
-    P(box(9.6, 11.6, 0.25, 3.45, -5.8, -3.8), c.wall, ao),
-    P(box(9.52, 11.68, 3.45, 3.57, -5.88, -3.72), c.trim),
-    P(box(9.8, 11.4, 3.57, 4.17, -5.6, -4.0), c.wall),
-    P(box(9.75, 11.45, 4.17, 4.25, -5.65, -3.95), c.trim),
-    P(box(10.05, 11.15, 4.25, 4.75, -5.35, -4.25), c.wall),
-    P(box(10.0, 11.2, 4.75, 4.82, -5.4, -4.2), c.trim),
-    P(box(10.3, 10.9, 4.82, 5.5, -5.1, -4.5), c.wall),
-    P(box(10.24, 10.96, 5.5, 5.58, -5.16, -4.44), c.trim),
+    P(chamferBox(8.8, 12.0, 0, 0.25, -6.0, -1.0), c.trim, ao),
+    P(chamferBox(9.0, 11.8, 0.25, 1.45, -3.8, -1.2), c.wall, ao),
+    P(chamferBox(8.95, 11.85, 1.45, 1.53, -3.85, -1.15), c.trim),
+    P(chamferBox(9.6, 11.6, 0.25, 3.45, -5.8, -3.8), c.wall, ao),
+    P(chamferBox(9.52, 11.68, 3.45, 3.57, -5.88, -3.72), c.trim),
+    P(chamferBox(9.8, 11.4, 3.57, 4.17, -5.6, -4.0), c.wall),
+    P(chamferBox(9.75, 11.45, 4.17, 4.25, -5.65, -3.95), c.trim),
+    P(chamferBox(10.05, 11.15, 4.25, 4.75, -5.35, -4.25), c.wall),
+    P(chamferBox(10.0, 11.2, 4.75, 4.82, -5.4, -4.2), c.trim),
+    P(chamferBox(10.3, 10.9, 4.82, 5.5, -5.1, -4.5), c.wall),
+    P(chamferBox(10.24, 10.96, 5.5, 5.58, -5.16, -4.44), c.trim),
     // The lamp slot under the cap, on all four sides (D13).
     ...(
       [
@@ -1641,11 +1642,11 @@ export function buildMarket(pal: Palette, look: SiteLook) {
   ];
   const tilt = 0.3805;
   return merge([
-    P(box(7.0, 11.0, 0, 0.2, 2.6, 5.2), c.trim, { ao: true }),
+    P(chamferBox(7.0, 11.0, 0, 0.2, 2.6, 5.2), c.trim, { ao: true }),
     ...columns.map(({ x, z }) => P(cyl(0.08, 0.09, 8, 0.2, 1.75, x, z), c.wall)),
-    P(box(6.95, 11.05, 1.75, 1.95, 2.55, 5.25), c.trim),
-    P(box(7.6, 10.4, 1.95, 2.35, 3.05, 4.75), c.wall),
-    P(box(7.55, 10.45, 2.35, 2.42, 3.0, 4.8), c.trim),
+    P(chamferBox(6.95, 11.05, 1.75, 1.95, 2.55, 5.25), c.trim),
+    P(chamferBox(7.6, 10.4, 1.95, 2.35, 3.05, 4.75), c.wall),
+    P(chamferBox(7.55, 10.45, 2.35, 2.42, 3.0, 4.8), c.trim),
     P(new PlaneGeometry(3.9, 0.646).rotateX(-PI / 2 + tilt).translate(9.0, 1.5, 5.55), c.roof),
     // North awning, the south one turned round (D15): seen from behind, the fair keeps its red.
     P(new PlaneGeometry(3.9, 0.646).rotateX(-PI / 2 - tilt).translate(9.0, 1.5, 2.25), c.roof),

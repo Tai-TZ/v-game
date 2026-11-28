@@ -35,6 +35,93 @@ export function box(x0: number, x1: number, y0: number, y1: number, z0: number, 
   );
 }
 
+/**
+ * A `box` with its four top edges and four vertical corner edges bevelled at 45°, `c` wide
+ * (graphics upgrade §4.4.1); the bottom stays square. Same outer bounds as `box`, non-indexed,
+ * 44 triangles: top 2, top bevels 8, sides 16 (four each, fanned round a centre vertex that a
+ * later bake can use), corner bevels 8, corner caps 4, octagonal bottom 6. `part()` bakes the bevels with their own 45° normals, so they catch a
+ * light between the top face and the wall: a thin highlight, no new material.
+ */
+export function chamferBox(
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+  z0: number,
+  z1: number,
+  c = 0.04,
+) {
+  const w = Math.min(c, (x1 - x0) / 2, (z1 - z0) / 2, (y1 - y0) / 2);
+  const [xa, xb, za, zb] = [x0 + w, x1 - w, z0 + w, z1 - w];
+  const yc = y1 - w;
+  const centre = new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  const positions: number[] = [];
+  // Each triangle is wound to face away from the centre, which a convex solid makes unambiguous.
+  const tri = (a: Vector3, b: Vector3, d: Vector3) => {
+    const n = b.clone().sub(a).cross(d.clone().sub(a));
+    const out = a.clone().add(b).add(d).divideScalar(3).sub(centre);
+    const [p, q] = n.dot(out) < 0 ? [d, b] : [b, d];
+    for (const v of [a, p, q]) positions.push(v.x, v.y, v.z);
+  };
+  const quad = (a: Vector3, b: Vector3, d: Vector3, e: Vector3) => {
+    tri(a, b, d);
+    tri(a, d, e);
+  };
+  const v = (x: number, y: number, z: number) => new Vector3(x, y, z);
+  /** A wall as four triangles fanned round its centre (no T-junction with the neighbours). */
+  const wall = (a: Vector3, b: Vector3, d: Vector3, e: Vector3) => {
+    const mid = a.clone().add(b).add(d).add(e).divideScalar(4);
+    for (const [p, q] of [
+      [a, b],
+      [b, d],
+      [d, e],
+      [e, a],
+    ] as const)
+      tri(mid, p, q);
+  };
+  quad(v(xa, y1, za), v(xb, y1, za), v(xb, y1, zb), v(xa, y1, zb));
+  quad(v(xb, y1, za), v(xb, y1, zb), v(x1, yc, zb), v(x1, yc, za));
+  quad(v(xa, y1, za), v(xa, y1, zb), v(x0, yc, zb), v(x0, yc, za));
+  quad(v(xa, y1, zb), v(xb, y1, zb), v(xb, yc, z1), v(xa, yc, z1));
+  quad(v(xa, y1, za), v(xb, y1, za), v(xb, yc, z0), v(xa, yc, z0));
+  wall(v(x1, yc, za), v(x1, yc, zb), v(x1, y0, zb), v(x1, y0, za));
+  wall(v(x0, yc, za), v(x0, yc, zb), v(x0, y0, zb), v(x0, y0, za));
+  wall(v(xa, yc, z1), v(xb, yc, z1), v(xb, y0, z1), v(xa, y0, z1));
+  wall(v(xa, yc, z0), v(xb, yc, z0), v(xb, y0, z0), v(xa, y0, z0));
+  for (const [sx, sz] of [
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1],
+  ] as const) {
+    const cx = sx > 0 ? x1 : x0;
+    const cz = sz > 0 ? z1 : z0;
+    const ex = sx > 0 ? xb : xa;
+    const ez = sz > 0 ? zb : za;
+    tri(v(ex, y1, ez), v(cx, yc, ez), v(ex, yc, cz));
+    quad(v(cx, yc, ez), v(ex, yc, cz), v(ex, y0, cz), v(cx, y0, ez));
+  }
+  // The bottom: an octagon (the corner bevels cut its corners), fanned from one vertex.
+  const ring = [
+    v(xa, y0, z0),
+    v(xb, y0, z0),
+    v(x1, y0, za),
+    v(x1, y0, zb),
+    v(xb, y0, z1),
+    v(xa, y0, z1),
+    v(x0, y0, zb),
+    v(x0, y0, za),
+  ];
+  const first = ring[0];
+  if (!first) throw new Error("empty ring");
+  for (let i = 1; i < ring.length - 1; i += 1) {
+    const a = ring[i];
+    const b = ring[i + 1];
+    if (a && b) tri(first, a, b);
+  }
+  return new BufferGeometry().setAttribute("position", new Float32BufferAttribute(positions, 3));
+}
+
 export function cyl(rTop: number, rBot: number, seg: number, y0: number, y1: number, x = 0, z = 0) {
   return new CylinderGeometry(rTop, rBot, y1 - y0, seg).translate(x, (y0 + y1) / 2, z);
 }
