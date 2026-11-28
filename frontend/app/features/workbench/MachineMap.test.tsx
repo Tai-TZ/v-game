@@ -404,6 +404,83 @@ describe("the machine as a figure to play with", () => {
     expect(INK).toEqual({ outline: 2.4, edge: 1, fine: 1, cue: 1.6, mark: 2.5 });
   });
 
+  it("seals the answer board like a stamp, without words", () => {
+    const board = () => {
+      const polygon = tile("output")?.querySelector('g[aria-hidden="true"] > polygon:first-child');
+      return polygon?.getAttribute("points");
+    };
+    const sealed = (answer: "pass" | "fail") => {
+      const { unmount } = render(
+        <MachineMap
+          env={l1}
+          bench={starter(l1)}
+          onChange={() => undefined}
+          disabled={false}
+          states={{}}
+          highlight={null}
+          answer={answer}
+        />,
+      );
+      const verdict = document.querySelector(`[data-verdict="${answer}"]`);
+      const seal = verdict?.querySelector("[data-board-seal]");
+      const result = {
+        board: board(),
+        rects: [...(seal?.children ?? [])].filter((c) => c.tagName === "rect"),
+        transform: seal?.getAttribute("transform"),
+        texts: seal?.querySelectorAll("text").length,
+        glyph: seal?.querySelector("path")?.getAttribute("d"),
+        tone: verdict?.querySelector("path")?.getAttribute("class"),
+      };
+      unmount();
+      return result;
+    };
+    // The board is the same parallelogram with no verdict as with one.
+    render(
+      <MachineMap
+        env={l1}
+        bench={starter(l1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{}}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    const empty = board();
+    // 31.2 wide (1.2 units at 26 px, the board's face), 30 tall: unchanged by the seal.
+    const corners = (empty ?? "").split(" ").map((p) => p.split(",").map(Number));
+    const xs = corners.map(([x]) => x ?? 0);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(31.2, 0);
+    expect(document.querySelectorAll("[data-board-seal]")).toHaveLength(0);
+    cleanup();
+    for (const [answer, tone] of [
+      ["pass", TONE.passed],
+      ["fail", TONE.error],
+    ] as const) {
+      const seal = sealed(answer);
+      expect(seal.board).toBe(empty);
+      // Two concentric frames, then the tick or the cross, in the verdict's tone; no words.
+      expect(seal.rects).toHaveLength(2);
+      expect(seal.transform).toMatch(/^rotate\(-3 /);
+      expect(seal.texts).toBe(0);
+      expect(seal.tone).toContain(tone);
+      expect(seal.glyph).toBeTruthy();
+      const [outer, inner] = seal.rects;
+      expect(outer?.getAttribute("stroke-width")).toBe(String(INK.edge));
+      expect(inner?.getAttribute("stroke-width")).toBe(String(INK.fine));
+      for (const frame of seal.rects) {
+        expect(frame.getAttribute("class")).toContain(tone);
+        expect(frame.getAttribute("fill")).toBe("none");
+      }
+      // The inner frame sits 2 units inside the outer on every side.
+      const num = (rect: Element | undefined, name: string) => Number(rect?.getAttribute(name));
+      expect(num(inner, "x") - num(outer, "x")).toBe(2);
+      expect(num(inner, "y") - num(outer, "y")).toBe(2);
+      expect(num(outer, "width") - num(inner, "width")).toBe(4);
+      expect(num(outer, "height") - num(inner, "height")).toBe(4);
+    }
+  });
+
   it("cuts the sheet inside the blade into as many pieces as it has cuts, plus one", () => {
     draw(l2, setParam(l2, starter(l2), "chunker", "chunk_size", 256));
     fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));

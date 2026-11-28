@@ -2061,21 +2061,45 @@ function Dress({
       return g(
         <>
           <polygon points={board} className={fill} />
-          {answer === "pass" && (
-            <path
-              data-verdict="pass"
-              d={`M${mx - 7} ${my}l5 5l9 -10`}
-              className="fill-none stroke-success"
-              strokeWidth={INK.mark}
-            />
-          )}
-          {answer === "fail" && (
-            <path
-              data-verdict="fail"
-              d={`M${mx - 6} ${my - 6}l12 12M${mx + 6} ${my - 6}l-12 12`}
-              className="stroke-danger"
-              strokeWidth={INK.mark}
-            />
+          {answer !== null && (
+            // The verdict sealed like the results stamp: a double frame, tilted a little, in the
+            // verdict's tone, round a tick or a cross. Drawing only, no words. The frames sit
+            // inside the board's face, which they leave as it was.
+            <g data-verdict={answer}>
+              <g data-board-seal="" transform={`rotate(-3 ${mx} ${my})`}>
+                <rect
+                  x={mx - 11}
+                  y={my - 10}
+                  width="22"
+                  height="20"
+                  fill="none"
+                  className={answer === "pass" ? "stroke-success" : "stroke-danger"}
+                  strokeWidth={INK.edge}
+                />
+                <rect
+                  x={mx - 9}
+                  y={my - 8}
+                  width="18"
+                  height="16"
+                  fill="none"
+                  className={answer === "pass" ? "stroke-success" : "stroke-danger"}
+                  strokeWidth={INK.fine}
+                />
+                {answer === "pass" ? (
+                  <path
+                    d={`M${mx - 7} ${my}l5 5l9 -10`}
+                    className="fill-none stroke-success"
+                    strokeWidth={INK.mark}
+                  />
+                ) : (
+                  <path
+                    d={`M${mx - 6} ${my - 6}l12 12M${mx + 6} ${my - 6}l-12 12`}
+                    className="stroke-danger"
+                    strokeWidth={INK.mark}
+                  />
+                )}
+              </g>
+            </g>
           )}
           {answer === null && (
             <>
