@@ -10,7 +10,7 @@ import {
   type Bench,
   type Env,
 } from "./bench";
-import { beatLine, INK, MachineMap, TONE } from "./MachineMap";
+import { beatLine, columns, INK, MachineMap, TONE } from "./MachineMap";
 import type { BenchRunView } from "./BenchView";
 import type { BlockState } from "./run";
 import type { BlockType, EventType } from "./schema";
@@ -471,6 +471,109 @@ describe("the machine as a figure to play with", () => {
       expect(belt.hasAttribute("data-dimmed")).toBe(true);
     }
     fireEvent.click(beatButton("tool_refund"));
+    expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
+  });
+
+  it("marks the faulted toy and the belt after it", () => {
+    const keys = columns(l1).map((col) => col.join("+"));
+    const at = keys.indexOf("chunker");
+    const { rerender } = render(
+      <MachineMap
+        env={l1}
+        bench={starter(l1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{ chunker: "error" }}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    const faults = [...document.querySelectorAll("[data-fault]")];
+    expect(faults).toHaveLength(1);
+    expect(faults[0]).toBe(tile("chunker"));
+    expect(faults[0]?.getAttribute("class")?.split(/\s+/)).toContain("motion-safe:animate-shake");
+    const belts = [...document.querySelectorAll("[data-pipe-after]")];
+    expect(belts).toHaveLength(keys.length - 1);
+    for (const belt of belts) {
+      const index = keys.indexOf(belt.getAttribute("data-pipe-after") ?? "");
+      expect(belt.hasAttribute("data-pipe-fault"), `belt after ${keys[index]}`).toBe(index >= at);
+    }
+    const cut = document.querySelector("[data-pipe-fault]");
+    expect(cut?.getAttribute("class")).toContain("stroke-danger");
+    expect(cut?.getAttribute("class")).toContain("stroke-dasharray");
+
+    rerender(
+      <MachineMap
+        env={l1}
+        bench={starter(l1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{ chunker: "idle" }}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-pipe-fault]")).toHaveLength(0);
+  });
+
+  it("carries a desk fault down the tool branch too, and a branch fault only past itself", () => {
+    const w1 = testEnv("direct-injection");
+    const branchBelts = () =>
+      [...document.querySelectorAll("[data-pipe-branch]")].map((b) =>
+        b.hasAttribute("data-pipe-fault"),
+      );
+    const props = {
+      env: w1,
+      bench: setAttached(starter(w1), "human_approval", true),
+      onChange: () => undefined,
+      disabled: false,
+      highlight: null,
+      answer: null,
+    } as const;
+    const { rerender } = render(<MachineMap {...props} states={{ action_llm: "error" }} />);
+    expect(branchBelts()).toEqual([true, true]);
+    rerender(<MachineMap {...props} states={{ human_approval: "error" }} />);
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(1);
+    // The first branch belt runs into the faulted bell; only the belt past it is cut.
+    expect(branchBelts()).toEqual([false, true]);
+    for (const belt of document.querySelectorAll("[data-pipe-after]")) {
+      expect(belt.hasAttribute("data-pipe-fault")).toBe(false);
+    }
+    // The last toy of the branch has nothing past it; neither has the output, off the branch.
+    rerender(<MachineMap {...props} states={{ tool_refund: "error" }} />);
+    expect(branchBelts()).toEqual([false, false]);
+    rerender(<MachineMap {...props} states={{ output: "error" }} />);
+    expect(branchBelts()).toEqual([false, false]);
+  });
+
+  it("dims nothing when the pressed beat is gone from the level", () => {
+    const w1 = testEnv("direct-injection");
+    const { rerender } = render(
+      <MachineMap
+        env={w1}
+        bench={starter(w1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{}}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    fireEvent.click(beatButton("tool_refund"));
+    expect(document.querySelectorAll("[data-dimmed]").length).toBeGreaterThan(0);
+    rerender(
+      <MachineMap
+        env={l1}
+        bench={starter(l1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{}}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    expect(document.querySelectorAll("[data-tile]").length).toBeGreaterThan(1);
     expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
   });
 

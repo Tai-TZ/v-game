@@ -402,6 +402,10 @@ const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
  */
 const STEPPED = "transition-opacity duration-150 motion-reduce:transition-none";
 const DIMMED = `opacity-55 ${STEPPED}`;
+/** A faulted toy knocks once; not at all with reduced motion, where the class never applies. */
+const SHAKE = "motion-safe:animate-shake";
+/** A belt cut short: no fill, a dashed red line. After an empty search socket, or a faulted toy. */
+const CUT = "fill-none stroke-danger [stroke-dasharray:4_3]";
 
 /**
  * The two ink weights of a technical drawing: a heavy outline round the whole toy, the base and
@@ -624,11 +628,21 @@ export function MachineMap({
   );
   // While a beat is pressed, every toy and belt off its path steps back (§4.1.3). The path is the
   // active column's toy, the belt into it (the branch belt for a branch toy), the slip, the bubble.
-  const focused = beat !== null;
+  // A beat that matches no column or fork (a stale id from another level) dims nothing.
+  const focused = beatIndex !== -1 || forkIndex !== -1;
   const beltInto = (key: string) => {
     if (!focused) return false;
     return forkIndex === -1 && cols[beatIndex - 1]?.join("+") === key;
   };
+  // A toy is faulted when its state is error or it holds the bar of the guard that stopped the
+  // followed case. Every belt past it runs red, until the states change; the tool branch hangs
+  // off the desk, so it is past every toy up to and including the desk, and a branch toy only
+  // cuts the belts after itself.
+  const faulted = (type: BlockType) =>
+    attached(type) && (states[type] === "error" || stopped === type);
+  const faultCol = cols.findIndex((col) => col.some(faulted));
+  const faultFork = fork.findIndex(faulted);
+  const pastDesk = faultCol !== -1 && faultCol <= Math.max(deskIndex, 0);
   // The question slip rides the belt and stops just before the toy of the beat; on the branch
   // it is the slip the desk wrote, riding down to the bell and the refund desk.
   const slipAt =
@@ -884,15 +898,21 @@ export function MachineMap({
                 const gated = fork.includes("human_approval") && attached("human_approval");
                 const from = k === 0 ? desk : forkCentre(k - 1);
                 const dim = focused && forkIndex !== k;
+                const cut = pastDesk || (faultFork !== -1 && k > faultFork);
                 return (
                   <polygon
                     key={type}
                     aria-hidden="true"
                     data-pipe-branch={type}
                     data-pipe={gated ? "gated" : "unguarded"}
+                    {...(cut ? { "data-pipe-fault": "" } : {})}
                     {...(dim ? { "data-dimmed": "" } : {})}
                     className={`${
-                      gated ? "fill-line-strong stroke-fg" : "fill-danger-tint stroke-danger"
+                      cut
+                        ? CUT
+                        : gated
+                          ? "fill-line-strong stroke-fg"
+                          : "fill-danger-tint stroke-danger"
                     } ${dim ? DIMMED : STEPPED}`}
                     strokeWidth={INK.outline}
                     points={pts([
@@ -909,6 +929,7 @@ export function MachineMap({
                 const broken = col.every(isSearch) && !col.some(attached);
                 const from = centre(index);
                 const dim = focused && !beltInto(key);
+                const cut = faultCol !== -1 && index >= faultCol;
                 return (
                   <g key={key} data-column={key}>
                     {/* The belt to the next toy, cut after an empty search socket. */}
@@ -917,11 +938,10 @@ export function MachineMap({
                         aria-hidden="true"
                         data-pipe-after={key}
                         data-pipe={broken ? "broken" : "flow"}
+                        {...(cut ? { "data-pipe-fault": "" } : {})}
                         {...(dim ? { "data-dimmed": "" } : {})}
                         className={`${
-                          broken
-                            ? "fill-none stroke-danger [stroke-dasharray:4_3]"
-                            : "fill-line-strong stroke-fg"
+                          broken || cut ? CUT : "fill-line-strong stroke-fg"
                         } ${dim ? DIMMED : STEPPED}`}
                         strokeWidth={INK.outline}
                         points={pts([
@@ -945,6 +965,7 @@ export function MachineMap({
                           on={attached(type)}
                           disabled={disabled}
                           state={states[type] ?? "idle"}
+                          fault={faulted(type)}
                           lit={highlight === type || active.has(type)}
                           dimmed={focused && !active.has(type)}
                           answer={type === "output" ? answer : null}
@@ -973,6 +994,7 @@ export function MachineMap({
                       on={attached(type)}
                       disabled={disabled}
                       state={states[type] ?? "idle"}
+                      fault={faulted(type)}
                       lit={highlight === type || active.has(type)}
                       dimmed={focused && !active.has(type)}
                       answer={null}
@@ -1130,6 +1152,7 @@ function Toy({
   on,
   disabled,
   state,
+  fault,
   lit,
   dimmed,
   answer,
@@ -1148,6 +1171,8 @@ function Toy({
   on: boolean;
   disabled: boolean;
   state: BlockState;
+  /** The toy is at fault: it knocks once, and its belts after it run red. */
+  fault: boolean;
   lit: boolean;
   dimmed: boolean;
   answer: "pass" | "fail" | null;
@@ -1214,6 +1239,8 @@ function Toy({
       {...common}
       data-tile="on"
       data-tile-state={state}
+      {...(fault ? { "data-fault": "" } : {})}
+      className={fault ? `${common.className} ${SHAKE}` : common.className}
       {...(locked ? { "data-locked": "" } : {})}
       aria-label={`${toy}: ${BLOCK_STATE_VI[state]}${locked ? ", khóa ở màn này" : ""}`}
     >

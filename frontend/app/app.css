@@ -38,6 +38,13 @@
   --animate-poster-bar: vg-poster-bar 1.2s linear infinite;
   /* A case row turning over as its case.graded arrives (workbench N18); motion-safe only. */
   --animate-flip: vg-flip 300ms ease-out both;
+  /* Emphasised easing: arrive fast and settle (out), leave slowly then fall away (in). */
+  --ease-emph-out: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-emph-in: cubic-bezier(0.3, 0, 0.8, 0.15);
+  /* A verdict stamped on the results (workbench Stamp); motion-safe only, and it plays once. */
+  --animate-stamp: vg-stamp 180ms var(--ease-emph-out) both;
+  /* A faulted toy on the machine knocks once and stays put; motion-safe only. */
+  --animate-shake: vg-shake 150ms var(--ease-emph-in) 1;
 
   @keyframes vg-enter {
     from {
@@ -64,6 +71,28 @@
     from {
       opacity: 0;
       transform: perspective(600px) rotateX(-90deg);
+    }
+  }
+  @keyframes vg-stamp {
+    from {
+      opacity: 0;
+      transform: scale(1.15);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes vg-shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(2px);
+    }
+    75% {
+      transform: translateX(-2px);
     }
   }
   @keyframes vg-poster-bar {

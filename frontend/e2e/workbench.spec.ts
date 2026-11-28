@@ -6,7 +6,13 @@ import type { Page } from "@playwright/test";
 
 import { fillDefaults } from "../app/features/workbench/bench";
 import type { Graph } from "../app/features/workbench/schema";
-import { levelFile, parseSse, sseText, testEnv } from "../app/features/workbench/test-fixtures";
+import {
+  levelFile,
+  parseSse,
+  readText,
+  sseText,
+  testEnv,
+} from "../app/features/workbench/test-fixtures";
 import { bundleReport, expect, mockWorkbenchApi, runId, sse, test } from "./fixtures";
 
 const L1 = "/play/library/grounded-citation";
@@ -964,6 +970,41 @@ test.describe("workbench", () => {
     await menu.getByText("Các đoạn trong thùng không mang mã, nên không có gì để trích").click();
     await expect(page.getByText("Đúng lý do.")).toBeFocused();
     await expect(lessons).toContainText("không chỉ ra lấy từ đâu");
+  });
+});
+
+test.describe("a fault in the machine (graphics upgrade 4.2.2)", () => {
+  // W1's recorded reference run: row #11 is a trap the net (Lưới cụm từ) stops, so the followed
+  // case holds the red bar, and every belt after the net runs cut.
+  const run = async (page: Page) => {
+    await mockWorkbenchApi(page, {
+      events: () => readText("e2e", "data", "run-w1-reference.sse"),
+    });
+    await page.goto("/play/watchtower/direct-injection");
+    await page.getByRole("switch", { name: "Gắn Lưới cụm từ" }).check();
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Kết quả ca tối nay" })).toBeFocused();
+    await page.getByRole("region", { name: "Bảng câu" }).getByRole("button").nth(10).click();
+    await expect(page.locator("[data-gauge-stop]")).toHaveCount(1);
+  };
+  const shake = (page: Page) =>
+    page.locator("[data-fault]").evaluate((el) => {
+      const css = getComputedStyle(el);
+      return { name: css.animationName, count: css.animationIterationCount };
+    });
+
+  test("shakes a faulted toy once, and not with reduced motion", async ({ page }) => {
+    await run(page);
+    await expect(page.locator("[data-fault]")).toHaveCount(1);
+    await expect(page.locator("[data-fault] [data-gauge-stop]")).toHaveCount(1);
+    expect(await shake(page)).toEqual({ name: "vg-shake", count: "1" });
+    await expect(page.locator("[data-pipe-fault]").first()).toBeVisible();
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect((await shake(page)).name).toBe("none");
+    // Nothing moved for the sake of the motion: the toy, its bar and the cut belts are all there.
+    await expect(page.locator("[data-fault] [data-gauge-stop]")).toBeVisible();
+    await expect(page.locator("[data-pipe-fault]").first()).toBeVisible();
   });
 });
 
