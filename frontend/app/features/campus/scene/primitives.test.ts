@@ -56,6 +56,7 @@ describe("chamferBox", () => {
       expect(t.normal.dot(t.centre.clone().sub(centre))).toBeGreaterThan(0);
     }
     const down = all.filter((t) => t.normal.y < -0.99);
+    expect(down.length).toBe(6); // the octagon fan; without it the flat check below is vacuous
     expect(down.every((t) => t.centre.y === 0)).toBe(true);
     // Watertight: every edge is shared by exactly two triangles.
     const position = geometry.getAttribute("position");

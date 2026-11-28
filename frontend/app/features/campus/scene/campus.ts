@@ -673,10 +673,10 @@ const GATES = {
 const cross = (o: Vec2, a: Vec2, b: Vec2) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
 
 /** Convex hull, counter-clockwise (Andrew's monotone chain). */
-function hull(points: readonly Vec2[]): Vec2[] {
+function hull<P extends Vec2>(points: readonly P[]): P[] {
   const sorted = [...points].sort((a, b) => a.x - b.x || a.z - b.z);
-  const half = (list: Vec2[]) => {
-    const out: Vec2[] = [];
+  const half = (list: P[]) => {
+    const out: P[] = [];
     for (const p of list) {
       while (out.length >= 2 && cross(out[out.length - 2] ?? p, out[out.length - 1] ?? p, p) <= 0) {
         out.pop();
@@ -689,8 +689,13 @@ function hull(points: readonly Vec2[]): Vec2[] {
   return [...half(sorted), ...half(sorted.reverse())];
 }
 
-/** Clips a convex polygon to the base (Sutherland-Hodgman), so no shadow hangs off the edge. */
-function clipToBase(polygon: Vec2[]): Vec2[] {
+/** A ground point with the penumbra's fade `t` (0 at the shadow's edge, 1 at the band's outer rim). */
+interface Fade extends Vec2 {
+  t: number;
+}
+
+/** Clips a convex polygon to the base (Sutherland-Hodgman), so no shadow hangs off the edge; `t` is interpolated. */
+function clipToBase(polygon: Fade[]): Fade[] {
   const edges = [
     { axis: "x", limit: BASE.minX, keep: 1 },
     { axis: "x", limit: BASE.maxX, keep: -1 },
@@ -699,14 +704,18 @@ function clipToBase(polygon: Vec2[]): Vec2[] {
   ] as const;
   let out = polygon;
   for (const { axis, limit, keep } of edges) {
-    const inside = (p: Vec2) => (p[axis] - limit) * keep >= 0;
-    const next: Vec2[] = [];
+    const inside = (p: Fade) => (p[axis] - limit) * keep >= 0;
+    const next: Fade[] = [];
     out.forEach((p, i) => {
       const q = out[(i + 1) % out.length] ?? p;
       if (inside(p)) next.push(p);
       if (inside(p) !== inside(q)) {
-        const t = (limit - p[axis]) / (q[axis] - p[axis]);
-        next.push({ x: p.x + (q.x - p.x) * t, z: p.z + (q.z - p.z) * t });
+        const u = (limit - p[axis]) / (q[axis] - p[axis]);
+        next.push({
+          x: p.x + (q.x - p.x) * u,
+          z: p.z + (q.z - p.z) * u,
+          t: p.t + (q.t - p.t) * u,
+        });
       }
     });
     out = next;
@@ -792,12 +801,22 @@ export function treesInShade(
 /** Shadow overlay height: 0.0005 over the highest ground layer (sand, lane lines, 0.0135). */
 export const SHADOW_Y = 0.014;
 
+/** Penumbra reach: 0.12 of the caster's height, at most 0.3 (graphics upgrade §4.4.2). */
+export const PENUMBRA_MAX = 0.3;
+export const penumbraWidth = (height: number) => Math.min(PENUMBRA_MAX, 0.12 * height);
+
 /**
  * Every caster's shadow (buildings, gate, tree crowns, bulky props) cast along the sun onto the ground (hull
- * of the projected points, clipped to the base), one colour: the multiply factor `pal.shadow`.
+ * of the projected points, clipped to the base), `pal.shadow` at full strength, plus a penumbra
+ * band round it that fades to white (no change under multiply) `penumbraWidth(tallest point)` out.
  * CampusScene draws it over all ground layers with multiply blending, so grass, paths, plaza and
- * lake all darken, and with a stencil test, so ground under two overlapping shadow polygons
- * darkens once. One draw call.
+ * lake all darken, and with a stencil test, so ground under two overlapping polygons darkens
+ * once. One draw call.
+ *
+ * The stencil lets the first triangle drawn at a pixel win, so ALL cores come before ALL bands:
+ * a band's light edge never blocks a core it overlaps (no light seam), and a core is never
+ * darkened again by a band over it (no dark double seam). Where two bands overlap, the first
+ * drawn wins, a small difference in a faint fringe.
  */
 export function buildShadows(
   pal: Palette,
@@ -807,22 +826,48 @@ export function buildShadows(
   const { sun } = pal.light;
   // Overcast: no sun, no shadow (the empty geometry draws nothing).
   if (!pal.sunShade) return groundTriangles([], SHADOW_Y);
-  const onGround = (p: Vector3): Vec2 => ({
+  const onGround = (p: Vector3): Fade => ({
     x: p.x - (sun.x / sun.y) * p.y,
     z: p.z - (sun.z / sun.y) * p.y,
+    t: 0,
   });
-  const vertices = [...shadowCasters(archetype, colonnades), ...crownCasters(), ...propCasters()]
-    .map((caster) => clipToBase(hull(caster.map(onGround))))
-    .filter((outline) => outline.length >= 3)
-    .flatMap((outline) => {
-      const first = outline[0] ?? { x: 0, z: 0 };
-      return outline
-        .slice(1, -1)
-        .flatMap((p, i) =>
-          [first, p, outline[i + 2] ?? p].map((q) => ({ ...q, color: pal.shadow })),
-        );
-    });
-  return groundTriangles(vertices, SHADOW_Y);
+  const shades = [...shadowCasters(archetype, colonnades), ...crownCasters(), ...propCasters()]
+    .map((caster) => {
+      const ring = hull(caster.map(onGround));
+      const w = penumbraWidth(Math.max(...caster.map((p) => p.y)));
+      const n = ring.length;
+      // The outer ring: each corner pushed out along its mitre (capped at 2w on sharp corners).
+      const outer = ring.map((p, i) => {
+        const [a, b] = [ring[(i + n - 1) % n] ?? p, ring[(i + 1) % n] ?? p];
+        const [da, db] = [Math.hypot(p.x - a.x, p.z - a.z), Math.hypot(b.x - p.x, b.z - p.z)];
+        // Outward normals of the two edges at p (counter-clockwise: (dz, -dx)).
+        const [nx, nz] = [
+          (p.z - a.z) / da + (b.z - p.z) / db,
+          -(p.x - a.x) / da - (b.x - p.x) / db,
+        ];
+        const k =
+          w /
+          Math.max(0.5, 1 + ((p.z - a.z) * (b.z - p.z) + (p.x - a.x) * (b.x - p.x)) / (da * db));
+        return { x: p.x + nx * k, z: p.z + nz * k, t: 1 };
+      });
+      return { core: clipToBase(ring), ring, outer };
+    })
+    .filter(({ core }) => core.length >= 3);
+  const fan = (outline: Fade[]) =>
+    outline.slice(1, -1).flatMap((p, i) => [outline[0] ?? p, p, outline[i + 2] ?? p]);
+  const cores = shades.flatMap(({ core }) => fan(core));
+  const bands = shades.flatMap(({ ring, outer }) =>
+    ring.flatMap((p, i) => {
+      const j = (i + 1) % ring.length;
+      // One quad per edge, clipped to the base; its two outer corners are shared with the
+      // neighbouring quads, so the band has no gap at the corners.
+      return fan(clipToBase([p, ring[j] ?? p, outer[j] ?? p, outer[i] ?? p]));
+    }),
+  );
+  return groundTriangles(
+    [...cores, ...bands].map(({ x, z, t }) => ({ x, z, color: pal.shadow.clone().lerp(WHITE, t) })),
+    SHADOW_Y,
+  );
 }
 
 /** Height of the speakers' ground discs: over every path layer, under the shadow overlay. */

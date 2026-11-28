@@ -74,6 +74,8 @@ import {
   MOW_WIDTH,
   MOW_Y,
   PAVED,
+  PENUMBRA_MAX,
+  penumbraWidth,
   SHADOW_Y,
   shadowCasters,
   SPEAKER_DISC_SEGMENTS,
@@ -144,6 +146,9 @@ const RAISED = [0.02 /* open-air stage, lowest tier */];
 const UP = new Vector3(0, 1, 0);
 const LEFT = new Vector3(0, 0, 1); // +z: the left face on screen, towards the sun
 const RIGHT = new Vector3(1, 0, 0); // +x: the right face on screen, in shade
+/** Largest per-channel difference between two colours. */
+const gap = (a: Color, b: Color) =>
+  Math.max(Math.abs(a.r - b.r), Math.abs(a.g - b.g), Math.abs(a.b - b.b));
 const luminance = (c: Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 
 /** Vertices of a baked geometry whose colour is exactly `color` (emissive parts keep it). */
@@ -829,6 +834,96 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       expect(off).toEqual([]);
       // The watchtower's shadow passes its east wall (x 11.8) by day, and the base edge at dusk.
       expect(reach).toBeGreaterThan(time === "day" ? 12 : BASE.maxX - 1e-3);
+      unmount();
+    });
+
+    it.each(TIMES)("fades every sun shadow out from its edge (%s)", (time) => {
+      // Cores are pure `pal.shadow`; a band runs from it (inner ring) to white = no change
+      // under multiply (outer ring). Clipped corners lie in between, on the same line.
+      const { result, unmount } = build(manifest, time);
+      const { shadow } = result.current.palette;
+      const g = result.current.shadow;
+      const colour = g.getAttribute("color");
+      const position = g.getAttribute("position");
+      const white = new Color(1, 1, 1);
+      const all = Array.from({ length: colour.count }, (_, i) => {
+        const c = new Color().fromBufferAttribute(colour, i);
+        const t = (c.r - shadow.r) / (1 - shadow.r);
+        return { i, t, on: gap(c, shadow.clone().lerp(white, t)) < 1e-5 };
+      });
+      expect(all.every(({ on }) => on)).toBe(true);
+      const outer = all.filter(({ t }) => t > 1 - 1e-5);
+      const inner = all.filter(({ t }) => t < 1e-5);
+      expect(outer.length).toBeGreaterThan(100);
+      expect(inner.length).toBeGreaterThan(outer.length);
+      // Width: every outer vertex sits at most a capped miter (2x) from the shadow's edge,
+      // and the tall casters reach the 0.3 cap while the small props stay narrower.
+      const reach = outer.map(({ i }) =>
+        Math.min(
+          ...inner.map(({ i: j }) =>
+            Math.hypot(position.getX(i) - position.getX(j), position.getZ(i) - position.getZ(j)),
+          ),
+        ),
+      );
+      expect(Math.max(...reach)).toBeLessThanOrEqual(2 * PENUMBRA_MAX + 1e-4);
+      expect(Math.max(...reach)).toBeGreaterThanOrEqual(PENUMBRA_MAX - 1e-4);
+      expect(reach.some((d) => d < 0.9 * PENUMBRA_MAX)).toBe(true);
+      unmount();
+    });
+
+    it("widens the penumbra with the caster's height, up to 0.3", () => {
+      expect(penumbraWidth(0.5)).toBeCloseTo(0.06, 6);
+      expect(penumbraWidth(1)).toBeCloseTo(0.12, 6);
+      expect(penumbraWidth(2)).toBeGreaterThan(penumbraWidth(1));
+      expect(penumbraWidth(2.5)).toBeCloseTo(0.3, 6);
+      expect(penumbraWidth(9)).toBe(0.3);
+    });
+
+    it.each(TIMES)("darkens where two shadows overlap once, never lighter (%s)", (time) => {
+      // The overlay is drawn with a stencil: the first triangle to cover a pixel paints it and
+      // blocks the rest. So every core (full shade) must come before every band, or a band's
+      // light edge would stencil out a core it overlaps and leave a light seam in it.
+      // Oracle: replay the stencil on a grid; wherever any core covers a point, the first
+      // triangle drawn there must be a core.
+      const { result, unmount } = build(manifest, time);
+      const { shadow } = result.current.palette;
+      const g = result.current.shadow;
+      const position = g.getAttribute("position");
+      const colour = g.getAttribute("color");
+      const tris = Array.from({ length: position.count / 3 }, (_, t) => {
+        const v = [0, 1, 2].map((k) => ({
+          x: position.getX(3 * t + k),
+          z: position.getZ(3 * t + k),
+        })) as [Vec2, Vec2, Vec2];
+        const core = [0, 1, 2].every(
+          (k) => gap(new Color().fromBufferAttribute(colour, 3 * t + k), shadow) < 1e-6,
+        );
+        const box = {
+          x0: Math.min(...v.map((q) => q.x)),
+          x1: Math.max(...v.map((q) => q.x)),
+          z0: Math.min(...v.map((q) => q.z)),
+          z1: Math.max(...v.map((q) => q.z)),
+        };
+        return { v, core, box };
+      });
+      const inside = ({ v: [a, b, c], box }: (typeof tris)[number], p: Vec2) => {
+        if (p.x < box.x0 || p.x > box.x1 || p.z < box.z0 || p.z > box.z1) return false;
+        const side = (u: Vec2, w: Vec2) => (w.x - u.x) * (p.z - u.z) - (w.z - u.z) * (p.x - u.x);
+        const s = [side(a, b), side(b, c), side(c, a)];
+        return s.every((d) => d >= 0) || s.every((d) => d <= 0);
+      };
+      let both = 0;
+      const lighter: string[] = [];
+      for (let x = BASE.minX + 0.05; x < BASE.maxX; x += 0.1) {
+        for (let z = BASE.minZ + 0.05; z < BASE.maxZ; z += 0.1) {
+          const hits = tris.filter((t) => inside(t, { x, z }));
+          if (!hits.some((t) => t.core)) continue;
+          if (hits.some((t) => !t.core)) both += 1;
+          if (!hits[0]?.core) lighter.push(`(${x.toFixed(2)}, ${z.toFixed(2)})`);
+        }
+      }
+      expect(both).toBeGreaterThan(20);
+      expect(lighter).toEqual([]);
       unmount();
     });
 
@@ -1569,6 +1664,8 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
     it.each(["overcast", "damp", "wet"] as const)("casts no sun shadow under %s", (bake) => {
       const { result, unmount } = build(manifest, "day", false, bake);
       expect(triangleCount(result.current.shadow)).toBe(0);
+      // No penumbra either: nothing, not even a faint band, draws.
+      expect(result.current.shadow.getAttribute("color").count).toBe(0);
       expect(result.current.shadedTrees.size).toBe(0);
       unmount();
     });

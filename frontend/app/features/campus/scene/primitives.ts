@@ -37,7 +37,7 @@ export function box(x0: number, x1: number, y0: number, y1: number, z0: number, 
 
 /**
  * A `box` with its four top edges and four vertical corner edges bevelled at 45°, `c` wide
- * (graphics upgrade §4.4.1); the bottom stays square. Same outer bounds as `box`, non-indexed,
+ * (graphics upgrade §4.4.1; clamped for thin slabs, never more than half of any side); the bottom stays square. Same outer bounds as `box`, non-indexed,
  * 36 triangles, closed: top 2, top bevels 8, sides 8, corner bevels 8, corner caps 4, octagonal
  * bottom 6. `part()` bakes the bevels with their own 45° normals, so they catch a
  * light between the top face and the wall: a thin highlight, no new material.
