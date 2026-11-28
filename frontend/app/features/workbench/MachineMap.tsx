@@ -416,6 +416,7 @@ function Box({
   stroke = "stroke-fg",
   glass = false,
   outline = true,
+  dash,
 }: {
   x: number;
   y: number;
@@ -429,6 +430,8 @@ function Box({
   glass?: boolean;
   /** The heavy silhouette over the faces' thin edges. */
   outline?: boolean;
+  /** A dash pattern for the silhouette: a state told by its line, not its colour alone. */
+  dash?: string | undefined;
 }) {
   const t = z + h;
   const pane = glass ? "[fill-opacity:0.28]" : "";
@@ -466,6 +469,7 @@ function Box({
           className={stroke}
           strokeWidth={INK.outline}
           strokeLinejoin="round"
+          {...(dash ? { strokeDasharray: dash } : {})}
           points={pts([
             iso(x, y, t),
             iso(x + w, y, t),
@@ -480,7 +484,7 @@ function Box({
   );
 }
 
-const TONE: Readonly<Record<BlockState, string>> = {
+export const TONE: Readonly<Record<BlockState, string>> = {
   idle: "stroke-fg",
   stale: "stroke-warning",
   queued: "stroke-fg",
@@ -488,6 +492,12 @@ const TONE: Readonly<Record<BlockState, string>> = {
   passed: "stroke-success",
   error: "stroke-danger",
 };
+
+/**
+ * The silhouette's dash by state, so error and stale read without colour: error is long-dashed,
+ * stale short-dotted. Every other state is a solid line.
+ */
+export const DASH: Partial<Record<BlockState, string>> = { error: "6 4", stale: "2 3" };
 
 /** How far a socket and its callout reach either side of its centre, in drawing units. */
 const SOCKET_REACH = 56;
@@ -1196,6 +1206,7 @@ function Toy({
           top={lit ? "fill-brand-tint" : "fill-surface"}
           stroke={TONE[state]}
           glass={seeThrough}
+          dash={DASH[state]}
         />
         {seeThrough && <Inside env={env} bench={bench} type={type} x={x} y={y} h={h} />}
         <Dress
@@ -1211,7 +1222,39 @@ function Toy({
           stopped={stopped}
         />
         {locked && <Lock at={iso(x, y + FOOT, h)} />}
+        <StateMark state={state} at={iso(x + FOOT, y + FOOT, h)} />
       </g>
+    </g>
+  );
+}
+
+/**
+ * A badge at a toy's top-front corner for the two states that end a run: a ticked circle for
+ * passed, a crossed square for error. Drawn last, so it sits over the toy and lifts with it.
+ */
+function StateMark({ state, at: [x, y] }: { state: BlockState; at: P }) {
+  if (state !== "passed" && state !== "error") return null;
+  const pass = state === "passed";
+  return (
+    <g
+      data-tile-mark={pass ? "pass" : "fail"}
+      aria-hidden="true"
+      className={`fill-surface ${TONE[state]}`}
+      strokeWidth={INK.mark}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {pass ? (
+        <>
+          <circle cx={x} cy={y} r="6" />
+          <path d={`M${x - 3} ${y}l2 2.5l4 -5`} fill="none" />
+        </>
+      ) : (
+        <>
+          <rect x={x - 5.5} y={y - 5.5} width="11" height="11" />
+          <path d={`M${x - 2.5} ${y - 2.5}l5 5m0 -5l-5 5`} fill="none" />
+        </>
+      )}
     </g>
   );
 }

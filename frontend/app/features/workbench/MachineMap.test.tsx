@@ -10,7 +10,7 @@ import {
   type Bench,
   type Env,
 } from "./bench";
-import { beatLine, INK, MachineMap } from "./MachineMap";
+import { beatLine, INK, MachineMap, TONE } from "./MachineMap";
 import type { BenchRunView } from "./BenchView";
 import type { BlockState } from "./run";
 import type { BlockType, EventType } from "./schema";
@@ -160,6 +160,45 @@ describe("the machine map at the head of the bench", () => {
     });
     expect(tile("vector_search")?.getAttribute("data-tile-state")).toBe("passed");
     expect(tile("llm")?.getAttribute("data-tile-state")).toBe("error");
+  });
+
+  it("shows each toy's state by shape, not colour alone", () => {
+    const cases: readonly {
+      type: BlockType;
+      state: BlockState;
+      mark: "pass" | "fail" | null;
+      shape: string | null;
+      dash: string | null;
+    }[] = [
+      { type: "input", state: "passed", mark: "pass", shape: "circle", dash: null },
+      { type: "llm", state: "error", mark: "fail", shape: "rect", dash: "6 4" },
+      { type: "output", state: "stale", mark: null, shape: null, dash: "2 3" },
+      { type: "chunker", state: "running", mark: null, shape: null, dash: null },
+      { type: "corpus", state: "idle", mark: null, shape: null, dash: null },
+    ];
+    draw(l1, setAttached(starter(l1), "vector_search", true), {
+      states: Object.fromEntries(cases.map((c) => [c.type, c.state])),
+    });
+    for (const { type, state, mark, shape, dash } of cases) {
+      const toy = tile(type);
+      const marks = toy?.querySelectorAll("[data-tile-mark]") ?? [];
+      expect(marks.length, `${state} mark count`).toBe(mark ? 1 : 0);
+      if (mark && shape) {
+        const badge = marks[0];
+        expect(badge?.getAttribute("data-tile-mark")).toBe(mark);
+        expect(badge?.querySelectorAll(shape).length, `${state} badge shape`).toBe(1);
+        expect(badge?.getAttribute("class")).toContain(TONE[state]);
+        expect(badge?.getAttribute("stroke-width")).toBe(String(INK.mark));
+      }
+      const outline = toy?.querySelector("[data-outline]");
+      expect(outline?.getAttribute("stroke-dasharray"), `${state} dash`).toBe(dash);
+      expect(outline?.getAttribute("class")).toContain(TONE[state]);
+      // Only the silhouette is dashed: the thin face edges stay solid.
+      const faces = [...(outline?.parentElement?.querySelectorAll("polygon") ?? [])].filter(
+        (face) => face !== outline,
+      );
+      for (const face of faces) expect(face.hasAttribute("stroke-dasharray")).toBe(false);
+    }
   });
 
   it("cannot be pressed while the bench is locked for a run", () => {
