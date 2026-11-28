@@ -1351,7 +1351,14 @@ for (const theme of THEMES) {
       }
       return {
         stroke: rgba(getComputedStyle(outline).stroke),
-        opacity: Number.parseFloat(getComputedStyle(toy).opacity),
+        // Wherever the fade sits in the toy: the product of every opacity from outline to root.
+        opacity: (() => {
+          let all = 1;
+          for (let at: Element | null = outline; at; at = at.parentElement) {
+            all *= Number.parseFloat(getComputedStyle(at).opacity);
+          }
+          return all;
+        })(),
         back,
       };
     });
@@ -1364,6 +1371,48 @@ for (const theme of THEMES) {
     ) as unknown as Rgb;
     const ratio = contrast(ink, [seen.back[0], seen.back[1], seen.back[2]]);
     expect(ratio).toBeGreaterThanOrEqual(3);
+  });
+}
+
+// A dimmed toy is faded, not made see-through: the belt that runs under it must not show in the
+// box. As rendered: the pixels down the middle of each dimmed toy are the same with every belt drawn
+// and with every belt hidden.
+for (const theme of THEMES) {
+  test(`keeps a dimmed toy opaque over the belt behind it, theme ${theme}`, async ({ page }) => {
+    await page.addInitScript((id) => window.localStorage.setItem("vg-theme", id), theme);
+    await mockWorkbenchApi(page);
+    await page.goto(L1);
+    await page.locator('[data-beat="llm"]').click();
+    const toys = page.locator('[data-tile="on"][data-dimmed]');
+    await expect(toys.first()).toBeAttached();
+    const count = await toys.count();
+    expect(count).toBeGreaterThan(1);
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+
+    const belts = page.locator("[data-pipe-after], [data-pipe-branch]");
+    const middle = async (index: number) => {
+      const toy = toys.nth(index);
+      await toy.scrollIntoViewIfNeeded();
+      const box = await toy.locator("[data-outline]").boundingBox();
+      if (!box) throw new Error("a toy has no outline box");
+      // The lower half of the box, down its middle: where the belt on the floor lies behind it.
+      const clip = {
+        x: box.x + box.width / 2 - 3,
+        y: box.y + box.height / 2,
+        width: 6,
+        height: box.height / 2 - 4,
+      };
+      return page.screenshot({ clip });
+    };
+    const drawn: Buffer[] = [];
+    for (let i = 0; i < count; i++) drawn.push(await middle(i));
+    await belts.evaluateAll((all) =>
+      all.forEach((belt) => belt.setAttribute("visibility", "hidden")),
+    );
+    for (let i = 0; i < count; i++) {
+      expect(await middle(i), `toy ${i} shows the belt behind it`).toEqual(drawn[i]);
+    }
   });
 }
 

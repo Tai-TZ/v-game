@@ -451,8 +451,11 @@ describe("the machine as a figure to play with", () => {
     expect(lit[0]?.hasAttribute("data-dimmed")).toBe(false);
     for (const other of rest) {
       expect(other.hasAttribute("data-dimmed")).toBe(true);
-      expect(other.getAttribute("class")).toContain("opacity-");
+      // Faded over an opaque backing, so the belt behind the toy cannot show through it.
+      expect(other.querySelectorAll("[data-backing]")).toHaveLength(1);
+      expect(other.querySelector("[data-backing] + [class*='opacity-']")).not.toBeNull();
     }
+    expect(lit[0]?.querySelector("[data-backing]")).toBeNull();
     // The belt into the pressed toy stays; the rest of the belts step back.
     const into = document.querySelector('[data-pipe-after="context_packer"]');
     expect(into?.hasAttribute("data-dimmed")).toBe(false);

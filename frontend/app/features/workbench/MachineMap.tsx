@@ -403,7 +403,9 @@ const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
  * A toy or belt off the pressed step's path. 55% is the lowest step of 5 in 0.35-0.6 whose ink
  * outline holds 3:1 against the frame in both themes (WCAG 1.4.11; e2e "keeps a dimmed toy's
  * outline at 3:1 against the frame"): measured 3.51 town and 3.36 vinuni; 50% gave 2.94 on vinuni
- * and 45% 2.59. STEPPED is its resting twin, so the fade is a transition both ways.
+ * and 45% 2.59. STEPPED is its resting twin, so the fade is a transition both ways. A dimmed toy
+ * is faded over an opaque backing in the frame's own colour (`Backing`): a bare group opacity
+ * would let the belt behind it show through the box.
  */
 const STEPPED = "transition-opacity duration-150 motion-reduce:transition-none";
 const DIMMED = `opacity-55 ${STEPPED}`;
@@ -417,6 +419,16 @@ const CUT = "fill-none stroke-danger [stroke-dasharray:4_3]";
  * the belts, and thin edges between faces, on dressings and on leaders. One unit is one px.
  */
 export const INK = { outline: 2.4, edge: 1, fine: 1, mark: 2.5 } as const;
+
+/** The six corners of a box's silhouette: its top and its two near sides, as `iso` draws them. */
+const hexagon = (x: number, y: number, z: number, w: number, d: number, t: number) => [
+  iso(x, y, t),
+  iso(x + w, y, t),
+  iso(x + w, y, z),
+  iso(x + w, y + d, z),
+  iso(x, y + d, z),
+  iso(x, y + d, t),
+];
 
 /**
  * Three faces of a box: the top in its own token, the two sides darker by a fixed rule. The faces
@@ -510,14 +522,7 @@ function Box({
           strokeWidth={INK.outline}
           strokeLinejoin="round"
           {...(dash ? { strokeDasharray: dash } : {})}
-          points={pts([
-            iso(x, y, t),
-            iso(x + w, y, t),
-            iso(x + w, y, z),
-            iso(x + w, y + d, z),
-            iso(x, y + d, z),
-            iso(x, y + d, t),
-          ])}
+          points={pts(hexagon(x, y, z, w, d, t))}
         />
       )}
     </g>
@@ -1230,10 +1235,16 @@ function Toy({
       event.preventDefault();
       act();
     },
-    className: `group/toy outline-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"} ${dimmed ? DIMMED : STEPPED}`,
+    className: `group/toy outline-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`,
   } as const;
 
   const h = HEIGHT[type];
+  const fade = dimmed ? DIMMED : STEPPED;
+  /** What a dimmed toy is faded over: the frame's own colour, under its drawing, so nothing behind it shows. */
+  const backing = (points: string) =>
+    dimmed && (
+      <polygon aria-hidden="true" data-backing="" className="fill-canvas" points={points} />
+    );
   const focusRing = (
     <polygon
       aria-hidden="true"
@@ -1247,16 +1258,19 @@ function Toy({
     const [cx, cy] = iso(x + FOOT / 2, y + FOOT / 2, 0);
     return (
       <g {...common} data-tile="empty" aria-label={`Gắn ${toy}`}>
-        <polygon
-          points={footprint}
-          className="fill-surface stroke-danger [stroke-dasharray:4_3]"
-          strokeWidth="1.5"
-        />
-        <path
-          d={`M${cx - 6} ${cy}h12M${cx} ${cy - 6}v12`}
-          className="stroke-danger"
-          strokeWidth="2"
-        />
+        {backing(footprint)}
+        <g className={fade}>
+          <polygon
+            points={footprint}
+            className="fill-surface stroke-danger [stroke-dasharray:4_3]"
+            strokeWidth="1.5"
+          />
+          <path
+            d={`M${cx - 6} ${cy}h12M${cx} ${cy - 6}v12`}
+            className="stroke-danger"
+            strokeWidth="2"
+          />
+        </g>
         {focusRing}
       </g>
     );
@@ -1277,32 +1291,35 @@ function Toy({
       <g
         className={`transition-transform duration-200 motion-reduce:transition-none ${lit ? "-translate-y-1.5" : ""}`}
       >
-        <Box
-          x={x}
-          y={y}
-          w={FOOT}
-          d={FOOT}
-          h={h}
-          top={lit ? "fill-brand-tint" : "fill-surface"}
-          stroke={TONE[state]}
-          glass={seeThrough}
-          dash={DASH[state]}
-        />
-        {seeThrough && <Inside env={env} bench={bench} type={type} x={x} y={y} h={h} />}
-        <Dress
-          env={env}
-          bench={bench}
-          type={type}
-          x={x}
-          y={y}
-          h={h}
-          answer={answer}
-          packed={packed}
-          entries={entries}
-          stopped={stopped}
-        />
-        {locked && <Lock at={iso(x, y + FOOT, h)} />}
-        <StateMark state={state} at={iso(x + FOOT, y + FOOT, h)} />
+        {backing(pts(hexagon(x, y, 0, FOOT, FOOT, h)))}
+        <g className={fade}>
+          <Box
+            x={x}
+            y={y}
+            w={FOOT}
+            d={FOOT}
+            h={h}
+            top={lit ? "fill-brand-tint" : "fill-surface"}
+            stroke={TONE[state]}
+            glass={seeThrough}
+            dash={DASH[state]}
+          />
+          {seeThrough && <Inside env={env} bench={bench} type={type} x={x} y={y} h={h} />}
+          <Dress
+            env={env}
+            bench={bench}
+            type={type}
+            x={x}
+            y={y}
+            h={h}
+            answer={answer}
+            packed={packed}
+            entries={entries}
+            stopped={stopped}
+          />
+          {locked && <Lock at={iso(x, y + FOOT, h)} />}
+          <StateMark state={state} at={iso(x + FOOT, y + FOOT, h)} />
+        </g>
       </g>
     </g>
   );
