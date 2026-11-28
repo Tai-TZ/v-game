@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, ChevronDownIcon, ClockIcon, CrossIcon, StarIcon } from "~/components/ui/icons";
+import { LAND_DELAY, Stamp } from "~/components/ui/Stamp";
 import { ProjectorLink } from "~/features/projector/ProjectorLink";
 
 import { domain, nodeIds, sameJson, type Env } from "./bench";
@@ -176,6 +177,9 @@ export function Results({
   const skipped = unfinished(run).length;
   const calls = llmCalls(run);
   const served = fallbackAnswers(run);
+  // X7: a fallback costs about 0,9k more output tokens on an L3 run (spec §7), so when one
+  // answered, a token figure is not a measure of the player's bench alone.
+  const tokenNote = served.fallback > 0 ? ["hiệu chỉnh trên model chính"] : [];
   const spread = outTokenSpread(run);
   const conditions = [
     {
@@ -194,11 +198,9 @@ export function Results({
     },
     {
       ok: score.s2,
-      // X7: a fallback costs about 0,9k more output tokens on an L3 run (spec §7), so when one
-      // answered, this token figure is not a measure of the player's bench alone.
       evidence: [
         `${fmt(score.tokens)}/${fmt(score.budget)} token (${TOKENS_VI.usage})`,
-        ...(served.fallback > 0 ? ["hiệu chỉnh trên model chính"] : []),
+        ...tokenNote,
       ].join(" · "),
       bar: true,
     },
@@ -229,16 +231,33 @@ export function Results({
           {runGraph && !sameJson(runGraph, graph) && ` · ${RECORDED_VI.notYours}`}
         </p>
       )}
-      <div className="mt-4 flex items-center gap-3">
-        <span aria-hidden="true" className="flex gap-1">
-          {[1, 2, 3].map((star) => (
-            <StarIcon
-              key={star}
-              className={`size-7 shrink-0 ${star <= score.stars ? "fill-accent stroke-accent" : "fill-none stroke-line-strong"}`}
-            />
-          ))}
-        </span>
-        <p className="text-xl font-bold">{score.stars}/3 sao</p>
+      <div
+        data-results-band=""
+        className="mt-4 max-w-prose rounded-md bg-subtle p-4 chieu:max-sm:p-2"
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span aria-hidden="true" className="flex gap-1">
+            {([0, 1, 2] as const).map((index) =>
+              index < score.stars ? (
+                <StarIcon
+                  key={index}
+                  data-star="earned"
+                  className={`size-10 shrink-0 fill-accent stroke-accent motion-safe:animate-stamp chieu:size-14 chieu:max-sm:size-10 ${LAND_DELAY[index]}`}
+                />
+              ) : (
+                <StarIcon
+                  key={index}
+                  data-star="empty"
+                  className="size-10 shrink-0 fill-none stroke-fg-muted [stroke-dasharray:7_3] [stroke-dashoffset:3.5] [stroke-linejoin:round] chieu:size-14 chieu:max-sm:size-10"
+                />
+              ),
+            )}
+          </span>
+          <p className="text-2xl font-bold">{score.stars}/3 sao</p>
+        </div>
+        <p className="mt-2 text-sm text-fg-muted tabular-nums">
+          {[`Tổng ${fmt(score.tokens)} token (${TOKENS_VI.usage})`, ...tokenNote].join(" · ")}
+        </p>
       </div>
 
       <ol className="mt-5 max-w-prose space-y-3">
@@ -246,12 +265,9 @@ export function Results({
           <li key={index} className="rounded-md border border-line bg-surface p-3">
             <p className="flex flex-wrap items-baseline justify-between gap-x-3">
               <span className="font-semibold">Sao {index + 1}</span>
-              <span
-                className={`inline-flex items-center gap-1 text-sm font-semibold ${condition.ok ? "text-success" : "text-fg-muted"}`}
-              >
-                {condition.ok ? <CheckIcon /> : <CrossIcon />}
+              <Stamp tone={condition.ok ? "pass" : "muted"} delay={Math.min(index, 2) as 0 | 1 | 2}>
                 {condition.ok ? "Đạt" : "Chưa đạt"}
-              </span>
+              </Stamp>
             </p>
             <p className="mt-1 text-sm">{level.stars_vi[index]}</p>
             <p className="mt-1 text-sm text-fg-muted tabular-nums">{condition.evidence}</p>
@@ -349,7 +365,10 @@ export function Results({
               const showSlot = target !== null && hasControls(env, target.slot);
               const attached = graph.nodes.some((node) => node.type === target?.slot);
               return (
-                <li key={group.flag} className="rounded-md border border-line bg-surface p-3">
+                <li
+                  key={group.flag}
+                  className="rounded-md border border-l-[3px] border-line border-l-brand bg-surface p-3"
+                >
                   <p>{rich(group.message_vi)}</p>
                   {showSlot && target.why && <p className="mt-1 text-sm">{target.why}</p>}
                   {rest.length > 0 && (

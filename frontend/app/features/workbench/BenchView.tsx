@@ -371,11 +371,11 @@ const STATE_LOOK: Readonly<
   Record<BlockState, { Icon: (props: { className?: string }) => ReactNode; tone: string }>
 > = {
   idle: { Icon: CircleDashIcon, tone: "border-line-strong text-fg-muted" },
-  stale: { Icon: RotateCwIcon, tone: "border-warning text-warning" },
+  stale: { Icon: RotateCwIcon, tone: "border-dotted border-warning text-warning" },
   queued: { Icon: ClockIcon, tone: "border-line-strong text-fg-muted" },
   running: { Icon: PlayIcon, tone: "border-brand text-brand" },
   passed: { Icon: CheckIcon, tone: "border-success text-success" },
-  error: { Icon: CrossIcon, tone: "border-danger text-danger" },
+  error: { Icon: CrossIcon, tone: "border-dashed border-danger text-danger" },
 };
 
 /** Words in the text colour; the border and the icon carry the state's colour. */

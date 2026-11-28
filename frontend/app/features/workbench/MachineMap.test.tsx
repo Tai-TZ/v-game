@@ -10,7 +10,7 @@ import {
   type Bench,
   type Env,
 } from "./bench";
-import { beatLine, columns, INK, MachineMap, TONE } from "./MachineMap";
+import { beatLine, columns, DASH, INK, MachineMap, TONE } from "./MachineMap";
 import type { BenchRunView } from "./BenchView";
 import type { BlockState } from "./run";
 import type { BlockType, EventType } from "./schema";
@@ -404,6 +404,135 @@ describe("the machine as a figure to play with", () => {
     expect(INK).toEqual({ outline: 2.4, edge: 1, fine: 1, cue: 1.6, mark: 2.5 });
   });
 
+  /** The points of a seal (rect corners, path ends) after its `translate skewY rotate` transform. */
+  const sealPoints = (seal: Element | null | undefined): [number, number][] => {
+    const m = /^translate\((-?[\d.]+) (-?[\d.]+)\) skewY\((-?[\d.]+)\) rotate\((-?[\d.]+)\)$/.exec(
+      seal?.getAttribute("transform") ?? "",
+    );
+    if (!m) return [];
+    const [tx, ty, skew, turn] = m.slice(1).map(Number) as [number, number, number, number];
+    const place = (x: number, y: number): [number, number] => {
+      const a = (turn * Math.PI) / 180;
+      const rx = x * Math.cos(a) - y * Math.sin(a);
+      const ry = x * Math.sin(a) + y * Math.cos(a);
+      return [tx + rx, ty + ry + rx * Math.tan((skew * Math.PI) / 180)];
+    };
+    const out: [number, number][] = [];
+    for (const rect of seal?.querySelectorAll("rect") ?? []) {
+      const [x, y, w, h] = ["x", "y", "width", "height"].map((n) => Number(rect.getAttribute(n)));
+      for (const [dx, dy] of [
+        [0, 0],
+        [w, 0],
+        [w, h],
+        [0, h],
+      ] as const)
+        out.push(place((x ?? 0) + (dx ?? 0), (y ?? 0) + (dy ?? 0)));
+    }
+    for (const path of seal?.querySelectorAll("path") ?? []) {
+      let at: [number, number] = [0, 0];
+      for (const [, cmd, a, b] of (path.getAttribute("d") ?? "").matchAll(
+        /([Ml])(-?[\d.]+)[ ,](-?[\d.]+)/g,
+      )) {
+        const next: [number, number] = [Number(a), Number(b)];
+        at = cmd === "M" ? next : [at[0] + next[0], at[1] + next[1]];
+        out.push(place(at[0], at[1]));
+      }
+    }
+    return out;
+  };
+  /** Inside a convex quad (corner list in drawing order), edges included. */
+  const insideBoard = (p: [number, number], quad: number[][]): boolean => {
+    const signs = quad.map(([ax = 0, ay = 0], i) => {
+      const [bx = 0, by = 0] = quad[(i + 1) % quad.length] ?? [];
+      return Math.sign((bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax));
+    });
+    return signs.every((s) => s >= 0) || signs.every((s) => s <= 0);
+  };
+
+  it("seals the answer board like a stamp, without words", () => {
+    const board = () => {
+      const polygon = tile("output")?.querySelector('g[aria-hidden="true"] > polygon:first-child');
+      return polygon?.getAttribute("points");
+    };
+    const sealed = (answer: "pass" | "fail") => {
+      const { unmount } = render(
+        <MachineMap
+          env={l1}
+          bench={starter(l1)}
+          onChange={() => undefined}
+          disabled={false}
+          states={{}}
+          highlight={null}
+          answer={answer}
+        />,
+      );
+      const verdict = document.querySelector(`[data-verdict="${answer}"]`);
+      const seal = verdict?.querySelector("[data-board-seal]");
+      const result = {
+        board: board(),
+        rects: [...(seal?.children ?? [])].filter((c) => c.tagName === "rect"),
+        transform: seal?.getAttribute("transform"),
+        points: sealPoints(seal),
+        texts: seal?.querySelectorAll("text").length,
+        glyph: seal?.querySelector("path")?.getAttribute("d"),
+        tone: verdict?.querySelector("path")?.getAttribute("class"),
+      };
+      unmount();
+      return result;
+    };
+    // The board is the same parallelogram with no verdict as with one.
+    render(
+      <MachineMap
+        env={l1}
+        bench={starter(l1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{}}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    const empty = board();
+    // 31.2 wide (1.2 units at 26 px, the board's face), 30 tall: unchanged by the seal.
+    const corners = (empty ?? "").split(" ").map((p) => p.split(",").map(Number));
+    const xs = corners.map(([x]) => x ?? 0);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(31.2, 0);
+    expect(document.querySelectorAll("[data-board-seal]")).toHaveLength(0);
+    cleanup();
+    for (const [answer, tone] of [
+      ["pass", TONE.passed],
+      ["fail", TONE.error],
+    ] as const) {
+      const seal = sealed(answer);
+      expect(seal.board).toBe(empty);
+      // Two concentric frames, then the tick or the cross, in the verdict's tone; no words.
+      expect(seal.rects).toHaveLength(2);
+      // Tilted in the board's own plane, then sheared into its face, so it leans with the board.
+      expect(seal.transform).toMatch(/^translate\(-?[\d.]+ -?[\d.]+\) skewY\(30\) rotate\(-3\)$/);
+      // Every corner of both frames and every end of the mark, as the board shows it, is inside
+      // the board's face (a drawn 1.7 px outside it before the shear).
+      expect(seal.points.length).toBeGreaterThan(10);
+      for (const point of seal.points)
+        expect(insideBoard(point, corners), String(point)).toBe(true);
+      expect(seal.texts).toBe(0);
+      expect(seal.tone).toContain(tone);
+      expect(seal.glyph).toBeTruthy();
+      const [outer, inner] = seal.rects;
+      expect(outer?.getAttribute("stroke-width")).toBe(String(INK.edge));
+      expect(inner?.getAttribute("stroke-width")).toBe(String(INK.fine));
+      for (const frame of seal.rects) {
+        expect(frame.getAttribute("class")).toContain(tone);
+        expect(frame.getAttribute("fill")).toBe("none");
+      }
+      // The inner frame sits 2 units inside the outer on every side.
+      const num = (rect: Element | undefined, name: string) => Number(rect?.getAttribute(name));
+      expect(num(inner, "x") - num(outer, "x")).toBe(2);
+      expect(num(inner, "y") - num(outer, "y")).toBe(2);
+      expect(num(outer, "width") - num(inner, "width")).toBe(4);
+      expect(num(outer, "height") - num(inner, "height")).toBe(4);
+    }
+  });
+
   it("cuts the sheet inside the blade into as many pieces as it has cuts, plus one", () => {
     draw(l2, setParam(l2, starter(l2), "chunker", "chunk_size", 256));
     fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
@@ -586,6 +715,17 @@ describe("the machine as a figure to play with", () => {
       view: { run, followed, gold: null },
     } as const;
     const markOf = () => tile("pattern_guard")?.querySelector("[data-tile-mark]");
+    // The silhouette and the faces' thin edges all carry the one tone: the three faces' own
+    // edges, or on a dashed silhouette the inner edges drawn in their place.
+    const inkOf = () => {
+      const outline = tile("pattern_guard")?.querySelector("[data-outline]");
+      const parts = [...(outline?.parentElement?.children ?? [])].filter(
+        (el) => el === outline || el.hasAttribute("data-face-edges") || el.tagName === "polygon",
+      );
+      return parts
+        .filter((el) => el.getAttribute("stroke") !== "none")
+        .map((el) => el.getAttribute("class") ?? "");
+    };
     const { rerender } = render(<MachineMap {...props} answer="pass" />);
     expect(document.querySelectorAll("[data-gauge-stop]")).toHaveLength(1);
     expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
@@ -593,6 +733,8 @@ describe("the machine as a figure to play with", () => {
     // A right stop is a pass, and says so.
     expect(markOf()?.getAttribute("data-tile-mark")).toBe("pass");
     expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt");
+    expect(inkOf()).toHaveLength(4);
+    for (const cls of inkOf()) expect(cls).toContain(TONE.passed);
 
     // The same stop on a case that should have been served: the guard is at fault.
     rerender(<MachineMap {...props} answer="fail" />);
@@ -603,6 +745,17 @@ describe("the machine as a figure to play with", () => {
     expect(markOf()?.getAttribute("data-tile-mark")).toBe("fail");
     expect(markOf()?.getAttribute("class")).toContain(TONE.error);
     expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt, chặn nhầm");
+    // The toy reads as failed everywhere: its silhouette and face edges are red, not the green of
+    // the state it ran in (which `data-tile-state` still reports), and long-dashed as an error is.
+    expect(tile("pattern_guard")?.getAttribute("data-tile-state")).toBe("passed");
+    expect(inkOf()).toHaveLength(2);
+    for (const cls of inkOf()) {
+      expect(cls).toContain(TONE.error);
+      expect(cls).not.toContain(TONE.passed);
+    }
+    expect(
+      tile("pattern_guard")?.querySelector("[data-outline]")?.getAttribute("stroke-dasharray"),
+    ).toBe(DASH.error);
     const keys = columns(w1).map((col) => col.join("+"));
     for (const belt of document.querySelectorAll("[data-pipe-after]")) {
       const index = keys.indexOf(belt.getAttribute("data-pipe-after") ?? "");

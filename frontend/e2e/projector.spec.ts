@@ -257,6 +257,10 @@ for (const viewport of [
       await page.getByRole("button", { name: "Mở kết quả" }).click();
       await expect(page.getByRole("heading", { name: "Kết quả ca tối nay" })).toBeVisible();
       expect(await px(page, "#wb-results")).toBeGreaterThanOrEqual(40);
+      // Graphics upgrade 4.3: the verdict stamps are read from the back row too.
+      await expect(page.locator("[data-stamp]").first()).toBeVisible();
+      // chieu:text-2xl: 24 x 1.75 = 42 px, the stamp bigger than the 24.5 px text beside it.
+      expect(await px(page, "[data-stamp]")).toBeGreaterThanOrEqual(40);
       await expect(page.getByText("Xem vết chạy").first()).toBeHidden();
       expect(await seriousViolations(page)).toEqual([]);
       expect(await sideways(page)).toBeLessThanOrEqual(0);
@@ -570,4 +574,153 @@ test.describe("the projector at 375 px (R10)", () => {
       expect((await back.boundingBox())?.height ?? 0).toBeLessThanOrEqual(78);
     });
   }
+
+  // Graphics upgrade 4.3: at 175 % the three stars and "3/3 sao" must not push the page sideways,
+  // and every star must sit inside the band it is drawn on (at 320 px too).
+  for (const width of [375, 320]) {
+    for (const stream of ["starter", "reference"] as const) {
+      test(`keeps the ${stream} run's stars inside the band at ${width} px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await mockWorkbenchApi(page, { events: () => w1Stream(stream) });
+        await page.goto(`${W1}?chieu=1`);
+        await page.getByRole("button", { name: "Mở ca" }).click();
+        await page.getByRole("button", { name: "Mở kết quả" }).click();
+        await expect(page.getByText(/^\d\/3 sao$/)).toBeVisible();
+        // At rest: a stamp lands from 1.15x, and its overshoot may reach past the edge for 180 ms.
+        await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+        // R10 is 375 px. At 320 the case tiles' label chips overflow on their own (not the stars'
+        // doing), so there only the band is held to the screen.
+        if (width === 375) expect(await sideways(page)).toBeLessThanOrEqual(0);
+        const band = await page.locator("[data-results-band]").boundingBox();
+        expect(band).not.toBeNull();
+        expect(band?.x ?? -1).toBeGreaterThanOrEqual(0);
+        expect((band?.x ?? 0) + (band?.width ?? 0)).toBeLessThanOrEqual(width);
+        const stars = await page.locator("[data-star]").all();
+        expect(stars).toHaveLength(3);
+        for (const star of stars) {
+          const box = await star.boundingBox();
+          expect(box).not.toBeNull();
+          expect(box?.x ?? -1).toBeGreaterThanOrEqual(band?.x ?? 0);
+          expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+            (band?.x ?? 0) + (band?.width ?? 0),
+          );
+          expect(box?.y ?? -1).toBeGreaterThanOrEqual(band?.y ?? 0);
+          expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+            (band?.y ?? 0) + (band?.height ?? 0),
+          );
+        }
+      });
+    }
+  }
 });
+
+type Rgb = readonly [number, number, number];
+/** WCAG 2.x contrast ratio of two sRGB colours (0-255 per channel). */
+function contrast(a: Rgb, b: Rgb): number {
+  const luminance = (rgb: Rgb) => {
+    const [r = 0, g = 0, bl = 0] = rgb.map((c) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
+}
+
+// Graphics upgrade 4.3: a verdict stamp's tone holds 4.5:1 over the card it is pressed on, in both
+// theme packs (ADR 0002). The reference run earns every "Đạt"; the starter's are all "Chưa đạt".
+for (const theme of THEMES) {
+  for (const [stream, tone] of [
+    ["reference", "pass"],
+    ["starter", "muted"],
+  ] as const) {
+    test(`keeps a ${tone} stamp at 4.5:1 on the projector, theme ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.addInitScript((id) => window.localStorage.setItem("vg-theme", id), theme);
+      await mockWorkbenchApi(page, { events: () => w1Stream(stream) });
+      await page.goto(`${W1}?chieu=1`);
+      await page.getByRole("button", { name: "Mở ca" }).click();
+      await page.getByRole("button", { name: "Mở kết quả" }).click();
+      await expect(page.locator(`[data-stamp="${tone}"]`).first()).toBeVisible();
+      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      const seen = await page.evaluate((wanted) => {
+        const rgba = (css: string) => {
+          const ctx = document.createElement("canvas").getContext("2d");
+          if (!ctx) throw new Error("no canvas");
+          ctx.fillStyle = css;
+          ctx.fillRect(0, 0, 1, 1);
+          const [r = 0, g = 0, b = 0, a = 0] = ctx.getImageData(0, 0, 1, 1).data;
+          return [r, g, b, a / 255] as const;
+        };
+        return [...document.querySelectorAll(`[data-stamp="${wanted}"]`)].map((el) => {
+          let back = rgba("rgba(0 0 0 / 0)");
+          for (let at: Element | null = el.parentElement; at; at = at.parentElement) {
+            back = rgba(getComputedStyle(at).backgroundColor);
+            if (back[3] > 0) break;
+          }
+          return { ink: rgba(getComputedStyle(el).color), back };
+        });
+      }, tone);
+      expect(seen.length).toBeGreaterThan(0);
+      for (const { ink, back } of seen) {
+        expect(back[3], "an opaque card behind the stamp").toBe(1);
+        expect(
+          contrast([ink[0], ink[1], ink[2]], [back[0], back[1], back[2]]),
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
+}
+
+// Graphics upgrade 4.3: a star not earned is a dashed outline that reads as a star (the dashes run
+// per edge, so the points stay solid) and holds 3:1 against the band under it (WCAG 1.4.11).
+for (const theme of THEMES) {
+  test(`draws an unearned star dashed and at 3:1 on the band, theme ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.addInitScript((id) => window.localStorage.setItem("vg-theme", id), theme);
+    await mockWorkbenchApi(page, { events: () => w1Stream("starter") });
+    await page.goto(`${W1}?chieu=1`);
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await page.getByRole("button", { name: "Mở kết quả" }).click();
+    const empty = page.locator('[data-star="empty"]');
+    await expect(empty).toHaveCount(3);
+    const seen = await empty.evaluateAll((stars) => {
+      const rgba = (css: string) => {
+        const ctx = document.createElement("canvas").getContext("2d");
+        if (!ctx) throw new Error("no canvas");
+        ctx.fillStyle = css;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r = 0, g = 0, b = 0, a = 0] = ctx.getImageData(0, 0, 1, 1).data;
+        return [r, g, b, a / 255] as const;
+      };
+      return stars.map((star) => {
+        const css = getComputedStyle(star);
+        const bandEl = star.closest("[data-results-band]");
+        if (!bandEl) throw new Error("a star outside the band");
+        const band = getComputedStyle(bandEl);
+        return {
+          dash: css.strokeDasharray,
+          offset: css.strokeDashoffset,
+          join: css.strokeLinejoin,
+          pathLength: star.querySelector("path")?.getAttribute("pathLength"),
+          ink: rgba(css.stroke),
+          back: rgba(band.backgroundColor),
+        };
+      });
+    });
+    for (const star of seen) {
+      expect(star.dash).not.toMatch(/^(none)?$/);
+      expect(star.pathLength).toBe("100");
+      expect(star.join).toBe("round");
+      expect(star.back[3], "an opaque band behind the star").toBe(1);
+      expect(star.ink[3], "an opaque outline").toBe(1);
+      expect(
+        contrast(
+          [star.ink[0], star.ink[1], star.ink[2]],
+          [star.back[0], star.back[1], star.back[2]],
+        ),
+      ).toBeGreaterThanOrEqual(3);
+    }
+  });
+}

@@ -152,6 +152,140 @@ describe("what to do next sits right under the diagnosis (plan v0.7 3.2)", () =>
   });
 });
 
+describe("the band and the rule of the results (graphics upgrade 4.2.4)", () => {
+  const two = [
+    { case: "wt-w1-t01", flag: "hitl.bypassed", message_vi: "Câu #9 chạy thẳng." },
+    { case: "wt-w1-t04", flag: "guard.blocked_benign", message_vi: "Lưới chặn nhầm." },
+  ];
+
+  it("gives the results one band and keeps the re-run where it was", () => {
+    show(run(two, "bỏ qua"));
+    const results = document.querySelector("section[aria-labelledby='wb-results']");
+    const bands = document.querySelectorAll("[data-results-band]");
+    expect(bands).toHaveLength(1);
+    const band = bands[0] as HTMLElement;
+    expect(band.className).toContain("bg-subtle");
+    expect(band.className).toContain("rounded-md");
+    expect(band.className).toContain("p-4");
+    // As wide as the rest of the results, not the section's whole width.
+    expect(band.className).toContain("max-w-prose");
+    // The stars and the total token line live in it; no button, no link.
+    expect(band.querySelectorAll("[data-star]")).toHaveLength(3);
+    expect(within(band).getByText(/Tổng .* token/)).not.toBeNull();
+    expect(within(band).queryAllByRole("button")).toHaveLength(0);
+    expect(within(band).queryAllByRole("link")).toHaveLength(0);
+    // It is the only block there with a subtle ground: a hover tint is not one, and the small
+    // rounded-sm pills of a case tile (its label chips, its outcome) are not blocks.
+    const subtle = [...(results?.querySelectorAll("*") ?? [])].filter((el) => {
+      const tokens = (el.getAttribute("class") ?? "").split(/\s+/);
+      return tokens.includes("bg-subtle") && !tokens.includes("rounded-sm");
+    });
+    expect(subtle).toEqual([band]);
+    // The re-run is still under the diagnosis, as plan v0.7 3.2 put it.
+    const diagnosis = screen.getByRole("heading", { name: /chẩn đoán/ });
+    const actions = document.querySelector("[data-after-run-actions]");
+    expect(diagnosis.compareDocumentPosition(actions as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(band.contains(actions)).toBe(false);
+  });
+
+  it("rules every diagnosis card in one tone", () => {
+    show(
+      run(
+        [
+          {
+            case: "wt-w1-t01",
+            flag: "hitl.bypassed",
+            message_vi: "Câu #9 chạy thẳng, thiếu *Chuông duyệt*.",
+          },
+          { case: "wt-w1-t04", flag: "guard.blocked_benign", message_vi: "Lưới chặn nhầm." },
+        ],
+        "bỏ qua",
+      ),
+    );
+    const cards = [...document.querySelectorAll("ul[aria-labelledby='wb-diagnosis-title'] > li")];
+    expect(cards).toHaveLength(2);
+    expect(cards[0]?.firstElementChild?.querySelector("strong")?.textContent).toBe("Chuông duyệt");
+    for (const card of cards) {
+      const classes = card.getAttribute("class") ?? "";
+      expect(classes).toContain("border-l-[3px]");
+      expect(classes).toContain("border-l-brand");
+      // The message is body weight: a card has no heading, and a bold paragraph would mute the
+      // toy names in `<strong>` (e2e "sets a toy's name bolder than the card's message").
+      expect(card.firstElementChild?.getAttribute("class") ?? "").not.toMatch(/font-(semi)?bold/);
+    }
+    // One tone for all: no card carries a danger or warning rule.
+    for (const card of cards) {
+      expect(card.getAttribute("class")).not.toMatch(/border-l-(danger|warning|success)/);
+    }
+  });
+});
+
+describe("the stars and their stamps (graphics upgrade 4.3)", () => {
+  /** The W1 starter run, scored as two stars: a fixture of the score alone, no new engine code. */
+  const twoStars = (): RunView => {
+    const view = run([]);
+    if (!view.score) throw new Error("the starter run is unscored");
+    return { ...view, score: { ...view.score, stars: 2, s1: true, s2: true, s3: false } };
+  };
+  const stars = (kind: "earned" | "empty") =>
+    [...document.querySelectorAll(`[data-star="${kind}"]`)] as SVGElement[];
+
+  it("draws earned stars solid and stamped, the rest dashed", () => {
+    show(run([]));
+    expect(stars("earned")).toHaveLength(0);
+    expect(stars("empty")).toHaveLength(3);
+    for (const star of stars("empty")) {
+      const classes = star.getAttribute("class") ?? "";
+      // Dashed per edge, not along the whole path: the path is 100 long (ten edges of about
+      // 10), `7 3` shifted by 3.5 puts each gap mid-edge, and the points stay solid.
+      expect(star.querySelector("path")?.getAttribute("pathLength")).toBe("100");
+      expect(classes).toContain("[stroke-dasharray:7_3]");
+      expect(classes).toContain("[stroke-dashoffset:3.5]");
+      expect(classes).toContain("[stroke-linejoin:round]");
+      expect(classes).toContain("fill-none");
+      expect(classes).toContain("stroke-fg-muted");
+      expect(classes).not.toContain("stroke-line-strong");
+    }
+    cleanup();
+
+    show(twoStars());
+    expect(stars("earned")).toHaveLength(2);
+    expect(stars("empty")).toHaveLength(1);
+    const [first, second] = stars("earned");
+    for (const star of stars("earned")) {
+      const classes = star.getAttribute("class") ?? "";
+      expect(classes).toContain("fill-accent");
+      expect(classes).toContain("motion-safe:animate-stamp");
+      expect(classes).not.toContain("dasharray");
+      expect(classes).toContain("size-10");
+      expect(classes).toContain("chieu:size-14");
+    }
+    // Each lands a beat after the one before it.
+    expect(first?.getAttribute("class")).toContain("[animation-delay:0ms]");
+    expect(second?.getAttribute("class")).toContain("[animation-delay:60ms]");
+    expect(screen.getByText("2/3 sao").className).toContain("text-2xl");
+  });
+
+  it("stamps every condition with its verdict, the copy unchanged", () => {
+    show(twoStars());
+    const rows = [...document.querySelectorAll("ol > li")].filter((li) =>
+      li.querySelector("[data-stamp]"),
+    );
+    expect(rows).toHaveLength(3);
+    for (const row of rows) expect(row.querySelectorAll("[data-stamp]")).toHaveLength(1);
+    expect(
+      rows.map((row) => row.querySelector("[data-stamp]")?.getAttribute("data-stamp")),
+    ).toEqual(["pass", "pass", "muted"]);
+    expect(rows.map((row) => row.querySelector("[data-stamp]")?.textContent)).toEqual([
+      "Đạt",
+      "Đạt",
+      "Chưa đạt",
+    ]);
+  });
+});
+
 describe("the scale bill on a W1 result", () => {
   it("is offered under the stars, from the run's own tokens", () => {
     show(run([]));

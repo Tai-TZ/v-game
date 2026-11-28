@@ -1427,6 +1427,8 @@ for (const theme of THEMES) {
     const count = await toys.count();
     expect(count).toBeGreaterThan(1);
     await page.mouse.move(0, 0);
+    // A font that swaps in after the first capture moves the toys and fails the comparison.
+    await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
 
     const belts = page.locator("[data-pipe-after], [data-pipe-branch]");

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { graphFromBench, setAttached, setParam, starterBench, type Bench, type Env } from "./bench";
-import { BenchSection, type BenchRunView, type SlotGold } from "./BenchView";
+import { BenchSection, StateChip, type BenchRunView, type SlotGold } from "./BenchView";
 import type { BenchRun, StepView } from "./run";
 import type { BlockType, Fact } from "./schema";
 
@@ -65,6 +65,30 @@ function Bench({
 }
 
 afterEach(cleanup);
+
+describe("StateChip", () => {
+  it("draws an error chip dashed and a stale chip dotted", () => {
+    const border = (state: Parameters<typeof StateChip>[0]["state"]) => {
+      render(<StateChip state={state} />);
+      const chip = document.querySelector(`[data-state="${state}"]`);
+      if (!chip) throw new Error(`no chip for ${state}`);
+      const out = { classes: chip.className, icon: chip.querySelectorAll("svg").length };
+      cleanup();
+      return out;
+    };
+    expect(border("error").classes).toContain("border-dashed");
+    expect(border("error").classes).not.toContain("border-dotted");
+    expect(border("stale").classes).toContain("border-dotted");
+    expect(border("stale").classes).not.toContain("border-dashed");
+    // The icon stays and the other states keep a solid border.
+    for (const state of ["idle", "queued", "running", "passed", "error", "stale"] as const) {
+      expect(border(state).icon).toBe(1);
+    }
+    for (const state of ["idle", "queued", "running", "passed"] as const) {
+      expect(border(state).classes).not.toMatch(/border-(dashed|dotted)/);
+    }
+  });
+});
 
 describe("BenchSection", () => {
   it("shows exactly the current issues of a slot, also after two identical ones", () => {
