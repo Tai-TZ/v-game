@@ -32,6 +32,7 @@ import {
   BLOB_SEGMENTS,
   RING_SEGMENTS,
   TREE_INSTANCES,
+  treeColour,
   treeMatrix,
   type TreeInstance,
 } from "./campus";
@@ -364,10 +365,11 @@ function Trees(props: {
     if (!mesh) return;
     trees.forEach((tree, i) => {
       mesh.setMatrixAt(i, treeMatrix(tree));
-      shadeColour.setScalar(tree.brightness);
       // Lambert takes no shadow: a tree in a building's shadow gets the ground's factor (QA r3).
-      if (shadedTrees.has(tree)) shadeColour.multiply(palette.shadow);
-      mesh.setColorAt(i, shadeColour);
+      mesh.setColorAt(
+        i,
+        treeColour(shadeColour, tree, shadedTrees.has(tree) ? palette.shadow : undefined),
+      );
     });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;

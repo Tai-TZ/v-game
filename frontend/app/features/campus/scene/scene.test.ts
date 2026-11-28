@@ -83,7 +83,9 @@ import {
   STATUES,
   STRATA,
   TREE_INSTANCES,
+  treeColour,
   treeMatrix,
+  treeValue,
 } from "./campus";
 import { parseCast } from "./cast";
 import { LABEL_ANCHORS } from "./labels";
@@ -372,6 +374,33 @@ const geometries = (g: CampusGeometry) => [
   g.npcs,
   g.lan,
 ];
+
+describe("tree values", () => {
+  it("varies each tree's value by at most 4% and never its hue", () => {
+    const values = TREE_INSTANCES.map((_, i) => treeValue(i));
+    for (const v of values) {
+      expect(v).toBeGreaterThanOrEqual(0.96);
+      expect(v).toBeLessThanOrEqual(1.04);
+    }
+    expect(new Set(values).size).toBeGreaterThan(1);
+    expect(treeValue(7)).toBe(treeValue(7));
+    for (const { campus } of manifests) {
+      const { shadow } = palette(campus, "dusk");
+      TREE_INSTANCES.forEach((tree) => {
+        expect(tree.value).toBe(treeValue(TREE_INSTANCES.indexOf(tree)));
+        const lit = treeColour(new Color(), tree);
+        expect(lit.r).toBeCloseTo(lit.g, 6);
+        expect(lit.b).toBeCloseTo(lit.g, 6);
+        expect(lit.g).toBeCloseTo(tree.brightness * tree.value, 6);
+        // In shade the channels keep the shadow factor's ratios (the existing tint).
+        const dark = treeColour(new Color(), tree, shadow);
+        expect(dark.r / dark.g).toBeCloseTo(shadow.r / shadow.g, 6);
+        expect(dark.b / dark.g).toBeCloseTo(shadow.b / shadow.g, 6);
+        expect(dark.g / lit.g).toBeCloseTo(shadow.g, 6);
+      });
+    }
+  });
+});
 
 describe("theme manifests", () => {
   it("parse with the schema and declare both landmark archetypes", () => {

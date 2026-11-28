@@ -121,6 +121,8 @@ export interface TreeInstance {
   scaleY: number;
   yaw: number;
   brightness: number;
+  /** `treeValue` of the tree's index: a further ±4% on the brightness. */
+  value: number;
   kind: "round" | "cypress";
 }
 
@@ -130,6 +132,15 @@ const TREE_LISTS = [
   { trees: CYPRESS_TREES, kind: "cypress", factor: 1 },
   { trees: PARK_TREES, kind: "round", factor: 0.55 },
 ] as const;
+
+/** Each tree's own value, 0.96 to 1.04, from a fixed hash of its index; never a hue shift. */
+export const treeValue = (i: number) => 0.96 + 0.08 * hash(i, 4);
+
+/** A tree's instance colour: grey from its brightness and value, times the shade factor if in shade. */
+export const treeColour = (out: Color, tree: TreeInstance, shade?: Color) => {
+  out.setScalar(tree.brightness * tree.value);
+  return shade ? out.multiply(shade) : out;
+};
 
 export const TREE_INSTANCES: readonly TreeInstance[] = TREE_LISTS.flatMap(
   ({ trees, kind, factor }) => trees.map((tree) => ({ ...tree, kind, factor })),
@@ -142,6 +153,7 @@ export const TREE_INSTANCES: readonly TreeInstance[] = TREE_LISTS.flatMap(
     scaleY: scale * (0.95 + 0.2 * hash(i, 1)),
     yaw: 2 * PI * hash(i, 2),
     brightness: 0.9 + 0.18 * hash(i, 3),
+    value: treeValue(i),
     kind,
   };
 });
