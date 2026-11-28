@@ -237,25 +237,30 @@ export function Results({
           {runGraph && !sameJson(runGraph, graph) && ` · ${RECORDED_VI.notYours}`}
         </p>
       )}
-      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span aria-hidden="true" className="flex gap-1">
-          {([0, 1, 2] as const).map((index) =>
-            index < score.stars ? (
-              <StarIcon
-                key={index}
-                data-star="earned"
-                className={`size-10 shrink-0 fill-accent stroke-accent motion-safe:animate-stamp chieu:size-14 ${STAR_DELAY[index]}`}
-              />
-            ) : (
-              <StarIcon
-                key={index}
-                data-star="empty"
-                className="size-10 shrink-0 fill-none stroke-line-strong [stroke-dasharray:3_2] chieu:size-14"
-              />
-            ),
-          )}
-        </span>
-        <p className="text-2xl font-bold">{score.stars}/3 sao</p>
+      <div data-results-band="" className="mt-4 rounded-md bg-subtle p-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span aria-hidden="true" className="flex gap-1">
+            {([0, 1, 2] as const).map((index) =>
+              index < score.stars ? (
+                <StarIcon
+                  key={index}
+                  data-star="earned"
+                  className={`size-10 shrink-0 fill-accent stroke-accent motion-safe:animate-stamp chieu:size-14 ${STAR_DELAY[index]}`}
+                />
+              ) : (
+                <StarIcon
+                  key={index}
+                  data-star="empty"
+                  className="size-10 shrink-0 fill-none stroke-line-strong [stroke-dasharray:3_2] chieu:size-14"
+                />
+              ),
+            )}
+          </span>
+          <p className="text-2xl font-bold">{score.stars}/3 sao</p>
+        </div>
+        <p className="mt-2 text-sm text-fg-muted tabular-nums">
+          Tổng {fmt(score.tokens)} token ({TOKENS_VI.usage})
+        </p>
       </div>
 
       <ol className="mt-5 max-w-prose space-y-3">
@@ -363,8 +368,11 @@ export function Results({
               const showSlot = target !== null && hasControls(env, target.slot);
               const attached = graph.nodes.some((node) => node.type === target?.slot);
               return (
-                <li key={group.flag} className="rounded-md border border-line bg-surface p-3">
-                  <p>{rich(group.message_vi)}</p>
+                <li
+                  key={group.flag}
+                  className="rounded-md border border-l-[3px] border-line border-l-brand bg-surface p-3"
+                >
+                  <p className="font-semibold">{rich(group.message_vi)}</p>
                   {showSlot && target.why && <p className="mt-1 text-sm">{target.why}</p>}
                   {rest.length > 0 && (
                     <p className="mt-1 text-sm">

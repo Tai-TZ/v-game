@@ -152,6 +152,59 @@ describe("what to do next sits right under the diagnosis (plan v0.7 3.2)", () =>
   });
 });
 
+describe("the band and the rule of the results (graphics upgrade 4.2.4)", () => {
+  const two = [
+    { case: "wt-w1-t01", flag: "hitl.bypassed", message_vi: "Câu #9 chạy thẳng." },
+    { case: "wt-w1-t04", flag: "guard.blocked_benign", message_vi: "Lưới chặn nhầm." },
+  ];
+
+  it("gives the results one band and keeps the re-run where it was", () => {
+    show(run(two, "bỏ qua"));
+    const results = document.querySelector("section[aria-labelledby='wb-results']");
+    const bands = document.querySelectorAll("[data-results-band]");
+    expect(bands).toHaveLength(1);
+    const band = bands[0] as HTMLElement;
+    expect(band.className).toContain("bg-subtle");
+    expect(band.className).toContain("rounded-md");
+    expect(band.className).toContain("p-4");
+    // The stars and the total token line live in it; no button, no link.
+    expect(band.querySelectorAll("[data-star]")).toHaveLength(3);
+    expect(within(band).getByText(/Tổng .* token/)).not.toBeNull();
+    expect(within(band).queryAllByRole("button")).toHaveLength(0);
+    expect(within(band).queryAllByRole("link")).toHaveLength(0);
+    // It is the only block there with a subtle ground: a hover tint is not one, and the small
+    // rounded-sm pills of a case tile (its label chips, its outcome) are not blocks.
+    const subtle = [...(results?.querySelectorAll("*") ?? [])].filter((el) => {
+      const tokens = (el.getAttribute("class") ?? "").split(/\s+/);
+      return tokens.includes("bg-subtle") && !tokens.includes("rounded-sm");
+    });
+    expect(subtle).toEqual([band]);
+    // The re-run is still under the diagnosis, as plan v0.7 3.2 put it.
+    const diagnosis = screen.getByRole("heading", { name: /chẩn đoán/ });
+    const actions = document.querySelector("[data-after-run-actions]");
+    expect(diagnosis.compareDocumentPosition(actions as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(band.contains(actions)).toBe(false);
+  });
+
+  it("rules every diagnosis card in one tone", () => {
+    show(run(two, "bỏ qua"));
+    const cards = [...document.querySelectorAll("ul[aria-labelledby='wb-diagnosis-title'] > li")];
+    expect(cards).toHaveLength(2);
+    for (const card of cards) {
+      const classes = card.getAttribute("class") ?? "";
+      expect(classes).toContain("border-l-[3px]");
+      expect(classes).toContain("border-l-brand");
+      expect(card.firstElementChild?.getAttribute("class") ?? "").toContain("font-semibold");
+    }
+    // One tone for all: no card carries a danger or warning rule.
+    for (const card of cards) {
+      expect(card.getAttribute("class")).not.toMatch(/border-l-(danger|warning|success)/);
+    }
+  });
+});
+
 describe("the stars and their stamps (graphics upgrade 4.3)", () => {
   /** The W1 starter run, scored as two stars: a fixture of the score alone, no new engine code. */
   const twoStars = (): RunView => {
