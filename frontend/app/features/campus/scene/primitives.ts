@@ -37,10 +37,11 @@ export function box(x0: number, x1: number, y0: number, y1: number, z0: number, 
 
 /**
  * A `box` with its four top edges and four vertical corner edges bevelled at 45°, `c` wide
- * (graphics upgrade §4.4.1; clamped for thin slabs, never more than half of any side); the bottom stays square. Same outer bounds as `box`, non-indexed,
- * 36 triangles, closed: top 2, top bevels 8, sides 8, corner bevels 8, corner caps 4, octagonal
- * bottom 6. `part()` bakes the bevels with their own 45° normals, so they catch a
- * light between the top face and the wall: a thin highlight, no new material.
+ * (graphics upgrade §4.4.1; clamped for thin slabs, never more than half of any side); the
+ * bottom stays square. Same outer bounds as `box`, non-indexed, 36 triangles, closed: top 2,
+ * top bevels 8, sides 8, corner bevels 8, corner caps 4, octagonal bottom 6. `part()` bakes the
+ * bevels with their own 45° normals, so they catch a light between the top face and the wall: a
+ * thin highlight, no new material.
  */
 export function chamferBox(
   x0: number,
@@ -252,6 +253,11 @@ export interface PartStyle {
   color?: Color | { top: Color; side: Color } | undefined;
   /** Darken the foot of vertical faces (fake ambient occlusion, art §2.4). */
   ao?: boolean;
+  /**
+   * Shade under an eave or beam (graphics upgrade §4.4.3): wall vertices from 0.25 u under this
+   * world y up to it are × 0.87. Top faces never change.
+   */
+  aoUnder?: number;
   /** Lit from inside: skip the bake (windows, lamps, clock face). */
   emissive?: boolean;
   /** Distance haze: after shading, pull this far towards the top-face light (v0.3 §5.2). */
@@ -295,6 +301,8 @@ export function part(source: BufferGeometry, style: PartStyle, light: Light | nu
       if (style.ao && Math.abs(normal.y) < 0.5 && position.getY(i) <= minY + 0.001) {
         k.multiplyScalar(0.82);
       }
+      const under = (style.aoUnder ?? -Infinity) - position.getY(i);
+      if (Math.abs(normal.y) < 0.5 && under > -0.001 && under <= 0.25) k.multiplyScalar(0.87);
     }
     base.multiply(k).lerp(hazeTo, haze);
     colors[i * 3] = base.r;

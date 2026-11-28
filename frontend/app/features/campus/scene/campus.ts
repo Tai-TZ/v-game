@@ -80,6 +80,8 @@ const hash = (i: number, k: number) => {
   return s - Math.floor(s);
 };
 
+const WHITE = new Color(1, 1, 1);
+
 type Parts = BufferGeometry[];
 /**
  * Part maker that bakes the palette's light preset; no colour keeps the vertex colours. With a
@@ -935,6 +937,29 @@ export const STRATA = [0, -0.06, -0.32, -0.6] as const;
 /** Water in the slab's cut side under the lake, this deep. */
 export const LAKE_SECTION = 0.18;
 
+/**
+ * The plinth's skirt, 0.25 out of the slab all round (art §5.1 T1), from y −0.8 to −0.6. Its
+ * lowest 0.06 is the foot band (graphics upgrade §4.4.4): the colour × 0.8, one quad a side, so
+ * the slab reads as an object set on the table. Cost: 8 triangles; the box above it ends at the
+ * band's top and the quads sit on its planes, so the outline is exact and nothing overlaps.
+ */
+function plinth(pal: Palette): Parts {
+  const P = paint(pal);
+  const { minX, maxX, minZ, maxZ } = BASE;
+  const [x0, x1, z0, z1] = [minX - 0.25, maxX + 0.25, minZ - 0.25, maxZ + 0.25];
+  const dark = pal.plaza.clone().multiplyScalar(0.8);
+  // `quad` stands 0.01 out of its plane; pull it back so the band is flush with the skirt.
+  const flush = (face: Face, plane: number) => plane - outward(face);
+  const [width, depth] = [x1 - x0, z1 - z0];
+  return [
+    P(box(x0, x1, -0.74, -0.6, z0, z1), pal.plaza),
+    P(quad("+x", flush("+x", x1), (z0 + z1) / 2, -0.77, depth, 0.06), dark),
+    P(quad("-x", flush("-x", x0), (z0 + z1) / 2, -0.77, depth, 0.06), dark),
+    P(quad("+z", flush("+z", z1), (x0 + x1) / 2, -0.77, width, 0.06), dark),
+    P(quad("-z", flush("-z", z0), (x0 + x1) / 2, -0.77, width, 0.06), dark),
+  ];
+}
+
 export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry {
   const P = paint(pal);
   const { minX, maxX, minZ, maxZ } = BASE;
@@ -956,7 +981,7 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
     P(box(minX, maxX, bottom, soil, minZ, maxZ), pal.subsoil, { ao: true }),
     P(quad("+x", maxX, LAKE.z - LAKE.rz / 2, -LAKE_SECTION / 2, LAKE.rz, LAKE_SECTION), pal.deep),
     P(quad("+z", maxZ, LAKE.x - LAKE.rx / 2, -LAKE_SECTION / 2, LAKE.rx, LAKE_SECTION), pal.deep),
-    P(box(minX - 0.25, maxX + 0.25, -0.8, -0.6, minZ - 0.25, maxZ + 0.25), pal.plaza),
+    ...plinth(pal),
     ...range(MOW_STRIPS).map((k) => {
       const z0 = minZ + MOW_WIDTH * (2 * k + 1);
       return P(rect(minX, maxX, z0, Math.min(z0 + MOW_WIDTH, maxZ), MOW_Y), pal.mow);
@@ -996,7 +1021,6 @@ export function buildTerrain(pal: Palette, colonnades: boolean): BufferGeometry 
 export const AO_Y = 0.0133;
 /** How far the soft frame round a building's footprint reaches. */
 export const AO_FRAME = 0.45;
-const WHITE = new Color(1, 1, 1);
 interface AoVertex {
   x: number;
   z: number;
@@ -1092,7 +1116,7 @@ function mainBuilding(pal: Palette): Parts {
     P(box(-1.7, 1.7, 0, 0.2, -4.15, -3.85), trim),
     P(box(-1.7, 1.7, 0, 0.1, -3.85, -3.55), trim),
     // Tower base: four storeys, corner piers stepping forward.
-    P(chamferBox(-3.0, 3.0, 0.3, 2.9, -9.9, -5.3), wall, ao),
+    P(chamferBox(-3.0, 3.0, 0.3, 2.9, -9.9, -5.3), wall, { ...ao, aoUnder: 2.9 }),
     P(box(-3.06, -2.5, 0.3, 2.9, -5.3, -5.24), wall),
     P(box(2.5, 3.06, 0.3, 2.9, -5.3, -5.24), wall),
     P(chamferBox(-3.12, 3.12, 2.9, 3.02, -10.02, -5.18), trim),
@@ -1115,7 +1139,7 @@ function mainBuilding(pal: Palette): Parts {
   for (const s of SIDES) {
     const [x0, x1] = s < 0 ? [-9.7, -3.0] : [3.0, 9.7];
     parts.push(
-      P(chamferBox(x0, x1, 0.3, 2.25, -9.7, -6.2), wall, ao),
+      P(chamferBox(x0, x1, 0.3, 2.25, -9.7, -6.2), wall, { ...ao, aoUnder: 2.25 }),
       P(chamferBox(x0 - 0.05, x1 + 0.05, 2.25, 2.37, -9.75, -6.15), trim),
       P(rect(x0 + 0.12, x1 - 0.12, -9.63, -6.27, 2.372), roof),
       P(chamferBox(x0 - 0.05, x1 + 0.05, 2.37, 2.5, -6.27, -6.15), wall),
@@ -1147,7 +1171,7 @@ function mainBuilding(pal: Palette): Parts {
   for (const c of [-9.05, -3.7, 3.7, 9.05]) {
     const floors = [0.63, 1.29, 1.95, 2.61];
     parts.push(
-      P(chamferBox(c - 0.7, c + 0.7, 0.3, 2.95, -7.4, -6.0), wall, ao),
+      P(chamferBox(c - 0.7, c + 0.7, 0.3, 2.95, -7.4, -6.0), wall, { ...ao, aoUnder: 2.95 }),
       P(chamferBox(c - 0.76, c + 0.76, 2.95, 3.03, -7.46, -5.94), trim),
       P(chamferBox(c - 0.5, c + 0.5, 3.03, 3.13, -7.2, -6.2), wall),
       P(chamferBox(c - 0.26, c + 0.26, 3.13, 3.42, -6.96, -6.44), wall),
@@ -1223,7 +1247,7 @@ function spireHall(pal: Palette): Parts {
     P(chamferBox(-1.65, 1.65, 1.3, 1.46, -5.3, -4.22), trim),
     P(quad("+z", -5.3, 0, 0.75, 1.0, 0.9), g),
     // Tier 2; tiers 2 to 4 have windows on all four sides (D7).
-    P(chamferBox(-1.95, 1.95, 3.02, 3.8, -9.1, -6.1), wall),
+    P(chamferBox(-1.95, 1.95, 3.02, 3.8, -9.1, -6.1), wall, { aoUnder: 3.8 }),
     P(chamferBox(-2.03, 2.03, 3.8, 3.96, -9.18, -6.02), trim),
     ...SIDES.flatMap((s) => [
       ...range(9).map((k) =>
@@ -1234,7 +1258,7 @@ function spireHall(pal: Palette): Parts {
       ),
     ]),
     // Tier 3, roof garden and corner kiosks.
-    P(chamferBox(-1.83, 1.83, 3.96, 4.9, -9.0, -6.2), wall),
+    P(chamferBox(-1.83, 1.83, 3.96, 4.9, -9.0, -6.2), wall, { aoUnder: 4.9 }),
     P(chamferBox(-1.9, 1.9, 4.9, 5.0, -9.07, -6.13), trim),
     ...SIDES.flatMap((s) => [
       ...grid(range(9), [4.2, 4.62], (k, y) =>
@@ -1251,7 +1275,7 @@ function spireHall(pal: Palette): Parts {
       P(cone(0.26, 4, 5.42, 5.6, kx, kz, true), trim),
     ]).flat(),
     // Tier 4 with tall arched openings.
-    P(chamferBox(-0.81, 0.81, 5.0, 6.2, -8.41, -6.79), wall),
+    P(chamferBox(-0.81, 0.81, 5.0, 6.2, -8.41, -6.79), wall, { aoUnder: 6.2 }),
     ...(
       [
         ["+z", -6.79, 0],
@@ -1325,7 +1349,7 @@ function clockTower(pal: Palette): Parts {
   ] as const;
   return [
     P(hipRoof, roof),
-    P(chamferBox(-0.85, 0.85, 0.3, 4.6, -6.5, -4.8), wall, { ao: true }),
+    P(chamferBox(-0.85, 0.85, 0.3, 4.6, -6.5, -4.8), wall, { ao: true, aoUnder: 4.6 }),
     P(chamferBox(-0.95, 0.95, 4.6, 4.72, -6.6, -4.7), trim),
     P(chamferBox(-0.75, 0.75, 4.72, 5.9, -6.4, -4.9), wall),
     ...faces.flatMap(([face, plane, u]) => [
@@ -1355,7 +1379,7 @@ function colonnade(pal: Palette): Parts {
   return [
     ...COLONNADE_COLUMNS.flatMap(({ x, z }) => [
       P(box(x - 0.13, x + 0.13, 0.04, 0.12, z - 0.13, z + 0.13), trim),
-      P(cyl(0.075, 0.088, 8, 0.12, 1.55, x, z), wall),
+      P(cyl(0.075, 0.088, 8, 0.12, 1.55, x, z), wall, { aoUnder: 1.55 }),
       P(box(x - 0.13, x + 0.13, 1.55, 1.65, z - 0.13, z + 0.13), trim),
     ]),
     ...SIDES.flatMap((s) => [
@@ -1532,7 +1556,7 @@ export function buildLibrary(pal: Palette, look: SiteLook) {
   const tall = [-11.85, -11.15, -10.45, -9.75];
   const parts: Parts = [
     P(chamferBox(-12.4, -8.8, 0, 0.25, -6.0, -0.6), c.trim, { ao: true }),
-    P(chamferBox(-12.2, -9.4, 0.25, 1.85, -5.8, -0.8), c.wall, { ao: true }),
+    P(chamferBox(-12.2, -9.4, 0.25, 1.85, -5.8, -0.8), c.wall, { ao: true, aoUnder: 1.85 }),
     ...[-5.2, -4.4, -3.6, -2.0, -1.2].flatMap((z) => [
       P(cyl(0.075, 0.085, 8, 0.25, 1.85, -9.05, z), c.wall),
       P(cyl(0.095, 0.095, 8, 1.66, 1.76, -9.05, z), c.accent),
@@ -1614,11 +1638,11 @@ export function buildWatchtower(pal: Palette, look: SiteLook) {
   const slot = { emissive: look === "lit" };
   return merge([
     P(chamferBox(8.8, 12.0, 0, 0.25, -6.0, -1.0), c.trim, ao),
-    P(chamferBox(9.0, 11.8, 0.25, 1.45, -3.8, -1.2), c.wall, ao),
+    P(chamferBox(9.0, 11.8, 0.25, 1.45, -3.8, -1.2), c.wall, { ...ao, aoUnder: 1.45 }),
     P(chamferBox(8.95, 11.85, 1.45, 1.53, -3.85, -1.15), c.trim),
-    P(chamferBox(9.6, 11.6, 0.25, 3.45, -5.8, -3.8), c.wall, ao),
+    P(chamferBox(9.6, 11.6, 0.25, 3.45, -5.8, -3.8), c.wall, { ...ao, aoUnder: 3.45 }),
     P(chamferBox(9.52, 11.68, 3.45, 3.57, -5.88, -3.72), c.trim),
-    P(chamferBox(9.8, 11.4, 3.57, 4.17, -5.6, -4.0), c.wall),
+    P(chamferBox(9.8, 11.4, 3.57, 4.17, -5.6, -4.0), c.wall, { aoUnder: 4.17 }),
     P(chamferBox(9.75, 11.45, 4.17, 4.25, -5.65, -3.95), c.trim),
     P(chamferBox(10.05, 11.15, 4.25, 4.75, -5.35, -4.25), c.wall),
     P(chamferBox(10.0, 11.2, 4.75, 4.82, -5.4, -4.2), c.trim),
@@ -1688,9 +1712,9 @@ export function buildMarket(pal: Palette, look: SiteLook) {
   const tilt = 0.3805;
   return merge([
     P(chamferBox(7.0, 11.0, 0, 0.2, 2.6, 5.2), c.trim, { ao: true }),
-    ...columns.map(({ x, z }) => P(cyl(0.08, 0.09, 8, 0.2, 1.75, x, z), c.wall)),
+    ...columns.map(({ x, z }) => P(cyl(0.08, 0.09, 8, 0.2, 1.75, x, z), c.wall, { aoUnder: 1.75 })),
     P(chamferBox(6.95, 11.05, 1.75, 1.95, 2.55, 5.25), c.trim),
-    P(chamferBox(7.6, 10.4, 1.95, 2.35, 3.05, 4.75), c.wall),
+    P(chamferBox(7.6, 10.4, 1.95, 2.35, 3.05, 4.75), c.wall, { aoUnder: 2.35 }),
     P(chamferBox(7.55, 10.45, 2.35, 2.42, 3.0, 4.8), c.trim),
     P(new PlaneGeometry(3.9, 0.646).rotateX(-PI / 2 + tilt).translate(9.0, 1.5, 5.55), c.roof),
     // North awning, the south one turned round (D15): seen from behind, the fair keeps its red.

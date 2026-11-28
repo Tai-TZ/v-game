@@ -88,7 +88,7 @@ import {
 import { parseCast } from "./cast";
 import { LABEL_ANCHORS } from "./labels";
 import { desaturate, light, palette, shade, weatherPreset, type Palette } from "./palette";
-import { triangleCount, type Face } from "./primitives";
+import { box, part, triangleCount, type Face } from "./primitives";
 import type { PropsJson } from "./props";
 import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
 import { buildDressing } from "./useDressing";
@@ -1476,6 +1476,94 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       expect(span(new Vector3(0, 0, 1), 0)).toEqual(
         [LAKE.x - LAKE.rx, LAKE.x, -LAKE_SECTION, 0].map(r5),
       );
+      unmount();
+    });
+
+    it("darkens wall just under an eave, never a top face", () => {
+      const { result, unmount } = build(manifest);
+      const { palette: pal } = result.current;
+      const bake = (y1: number, aoUnder?: number) =>
+        part(
+          box(0, 1, 0, y1, 0, 1),
+          { color: new Color(1, 1, 1), ...(aoUnder === undefined ? {} : { aoUnder }) },
+          pal.light,
+        );
+      const colourAt = (g: BufferGeometry, i: number) =>
+        new Color().fromBufferAttribute(g.getAttribute("color"), i);
+      // A 2 u box with an eave at its top: only the ring of wall vertices at y 2 is within 0.25 u.
+      const [plain, under] = [bake(2), bake(2, 2)];
+      const heights = plain.getAttribute("position");
+      let darkened = 0;
+      for (let i = 0; i < heights.count; i += 1) {
+        const [a, b] = [colourAt(plain, i), colourAt(under, i)];
+        if (sameColour(a, top(pal))) {
+          expect(sameColour(a, b), `top face vertex ${i}`).toBe(true);
+        } else if (heights.getY(i) === 2) {
+          expect(b.r / a.r).toBeCloseTo(0.87, 2);
+          darkened += 1;
+        } else {
+          expect(sameColour(a, b), `wall foot vertex ${i}`).toBe(true);
+        }
+      }
+      expect(darkened).toBeGreaterThan(0);
+      // An eave above the wall's top, or more than 0.25 u over it, leaves the wall alone.
+      for (const [y1, eave] of [
+        [2, 3],
+        [1.5, 2],
+      ] as const) {
+        const [x, y] = [bake(y1), bake(y1, eave)];
+        for (let i = 0; i < x.getAttribute("color").count; i += 1) {
+          expect(sameColour(colourAt(x, i), colourAt(y, i))).toBe(true);
+        }
+      }
+      // The landmark's wing wall, just under its eave (y 2.25; the side face ends at 2.21).
+      const landmark = result.current.landmark;
+      const position = landmark.getAttribute("position");
+      const colour = landmark.getAttribute("color");
+      const shaded = pal.lm.wall.clone().multiply(shade(new Vector3(0, 0, 1), pal.light));
+      let under225 = 0;
+      triangles(landmark).forEach((t, n) => {
+        // The +z face of the east wing wall (not its bevels, not the windows 0.01 in front).
+        if (t.normal.z < 0.99 || Math.abs(t.centre.z + 6.2) > 1e-4 || t.centre.x < 3) return;
+        if (t.centre.x > 9.7 || t.centre.y < 0.3 || t.centre.y > 2.25) return;
+        for (const i of [3 * n, 3 * n + 1, 3 * n + 2]) {
+          if (position.getY(i) !== f32(2.21)) continue;
+          const c = new Color().fromBufferAttribute(colour, i);
+          expect(sameColour(c, shaded.clone().multiplyScalar(0.87)), `wing wall vertex ${i}`).toBe(
+            true,
+          );
+          under225 += 1;
+        }
+      });
+      expect(under225).toBeGreaterThan(0);
+      unmount();
+    });
+
+    it("sets the plinth on the table", () => {
+      const { result, unmount } = build(manifest);
+      const { terrain, palette: pal } = result.current;
+      const side = pal.plaza.clone().multiply(shade(new Vector3(-1, 0, 0), pal.light));
+      const edge = BASE.minX - 0.25;
+      // The skirt's −x side, top to foot: its upper part, then the band at y −0.8 to −0.74.
+      const skirt = triangles(terrain).filter(
+        (t) => t.normal.x < -0.99 && Math.abs(t.centre.x - edge) < 1e-4 && t.centre.y < -0.6,
+      );
+      const [band, upper] = [
+        skirt.filter((t) => t.centre.y < -0.74),
+        skirt.filter((t) => t.centre.y > -0.74),
+      ];
+      expect(band).toHaveLength(2);
+      expect(upper).toHaveLength(2);
+      for (const t of band)
+        expect(sameColour(t.colour, side.clone().multiplyScalar(0.8))).toBe(true);
+      for (const t of upper) expect(sameColour(t.colour, side)).toBe(true);
+      const ys = new Set<number>();
+      const position = terrain.getAttribute("position");
+      for (let i = 0; i < position.count; i += 1) {
+        if (position.getX(i) === f32(edge) && position.getY(i) < f32(-0.7))
+          ys.add(position.getY(i));
+      }
+      expect([...ys].sort((a, b) => a - b)).toEqual([f32(-0.8), f32(-0.74)]);
       unmount();
     });
 
