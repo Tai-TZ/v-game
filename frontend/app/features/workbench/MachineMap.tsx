@@ -1173,7 +1173,7 @@ export function MachineMap({
 
       {/* Not a live region: the page keeps one (§8, Q5). The pressed beat points here by
           aria-describedby, so the line is read with the button that brought it. */}
-      <p id={readoutId} data-beat-readout="" className="mt-2 min-h-6 text-sm">
+      <p id={readoutId} data-beat-readout="" className="mt-2 min-h-6 font-mono text-sm">
         {beat === null ? (
           <span className="text-fg-muted">
             {view
