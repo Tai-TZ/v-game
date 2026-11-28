@@ -975,10 +975,14 @@ test.describe("workbench", () => {
 
 test.describe("a fault in the machine (graphics upgrade 4.2.2)", () => {
   // W1's recorded reference run: row #11 is a trap the net (Lưới cụm từ) stops, so the followed
-  // case holds the red bar, and every belt after the net runs cut.
-  const run = async (page: Page) => {
+  // case holds the red bar. Its stop is right (the case passes) unless `wrong` flips the verdict
+  // to a fail, as for a guard that blocked a case that should have been served.
+  const run = async (page: Page, wrong: boolean) => {
+    const recorded = readText("e2e", "data", "run-w1-reference.sse");
+    const served = '"case":"wt-w1-t03","status":"ok","passed":true';
+    expect(recorded.split(served)).toHaveLength(2);
     await mockWorkbenchApi(page, {
-      events: () => readText("e2e", "data", "run-w1-reference.sse"),
+      events: () => (wrong ? recorded.replace(served, served.replace("true", "false")) : recorded),
     });
     await page.goto("/play/watchtower/direct-injection");
     await page.getByRole("switch", { name: "Gắn Lưới cụm từ" }).check();
@@ -988,14 +992,21 @@ test.describe("a fault in the machine (graphics upgrade 4.2.2)", () => {
     await expect(page.locator("[data-gauge-stop]")).toHaveCount(1);
   };
   const shake = (page: Page) =>
-    page.locator("[data-fault]").evaluate((el) => {
+    page.locator("[data-fault]:has([data-gauge-stop])").evaluate((el) => {
       const css = getComputedStyle(el);
       return { name: css.animationName, count: css.animationIterationCount };
     });
 
+  test("leaves a guard that stopped an attack rightly as it is", async ({ page }) => {
+    await run(page, false);
+    await expect(page.locator("[data-fault]")).toHaveCount(0);
+    await expect(page.locator("[data-pipe-fault]")).toHaveCount(0);
+  });
+
   test("shakes a faulted toy once, and not with reduced motion", async ({ page }) => {
-    await run(page);
-    await expect(page.locator("[data-fault]")).toHaveCount(1);
+    await run(page, true);
+    // The wrong stop and the failed answer board it left: two toys at fault.
+    await expect(page.locator("[data-fault]")).toHaveCount(2);
     await expect(page.locator("[data-fault] [data-gauge-stop]")).toHaveCount(1);
     expect(await shake(page)).toEqual({ name: "vg-shake", count: "1" });
     await expect(page.locator("[data-pipe-fault]").first()).toBeVisible();

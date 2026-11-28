@@ -14,7 +14,7 @@ import { beatLine, columns, INK, MachineMap, TONE } from "./MachineMap";
 import type { BenchRunView } from "./BenchView";
 import type { BlockState } from "./run";
 import type { BlockType, EventType } from "./schema";
-import { frame, readText, replay, testEnv } from "./test-fixtures";
+import { frame, parseSse, readText, replay, testEnv } from "./test-fixtures";
 
 afterEach(cleanup);
 
@@ -545,6 +545,40 @@ describe("the machine as a figure to play with", () => {
     expect(branchBelts()).toEqual([false, false]);
     rerender(<MachineMap {...props} states={{ output: "error" }} />);
     expect(branchBelts()).toEqual([false, false]);
+  });
+
+  it("faults a guard only when its stop was wrong", () => {
+    const w1 = testEnv("direct-injection");
+    const run = replay(parseSse(readText("e2e", "data", "run-w1-reference.sse")));
+    // wt-w1-t03 is a trap the net (Lưới cụm từ) rightly stops.
+    const followed = run?.cases.find((c) => c.id === "wt-w1-t03");
+    if (!run || !followed) throw new Error("the recorded W1 run does not replay");
+    const props = {
+      env: w1,
+      bench: setAttached(starter(w1), "pattern_guard", true),
+      onChange: () => undefined,
+      disabled: false,
+      highlight: null,
+      states: {},
+      view: { run, followed, gold: null },
+    } as const;
+    const { rerender } = render(<MachineMap {...props} answer="pass" />);
+    expect(document.querySelectorAll("[data-gauge-stop]")).toHaveLength(1);
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-pipe-fault]")).toHaveLength(0);
+
+    // The same stop on a case that should have been served: the guard is at fault.
+    rerender(<MachineMap {...props} answer="fail" />);
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(1);
+    expect(tile("pattern_guard")?.hasAttribute("data-fault")).toBe(true);
+    const keys = columns(w1).map((col) => col.join("+"));
+    for (const belt of document.querySelectorAll("[data-pipe-after]")) {
+      const index = keys.indexOf(belt.getAttribute("data-pipe-after") ?? "");
+      expect(belt.hasAttribute("data-pipe-fault")).toBe(index >= keys.indexOf("pattern_guard"));
+    }
+    // An unanswered board is no verdict.
+    rerender(<MachineMap {...props} answer={null} />);
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
   });
 
   it("dims nothing when the pressed beat is gone from the level", () => {

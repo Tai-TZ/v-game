@@ -634,12 +634,13 @@ export function MachineMap({
     if (!focused) return false;
     return forkIndex === -1 && cols[beatIndex - 1]?.join("+") === key;
   };
-  // A toy is faulted when its state is error or it holds the bar of the guard that stopped the
-  // followed case. Every belt past it runs red, until the states change; the tool branch hangs
+  // A toy is faulted when its state is error, or it holds the bar of the guard that stopped the
+  // followed case wrongly (the case's verdict is a fail). A guard that rightly stops an attack is
+  // doing its job: no shake, no red belt. Every belt past a fault runs red, until the states change; the tool branch hangs
   // off the desk, so it is past every toy up to and including the desk, and a branch toy only
   // cuts the belts after itself.
   const faulted = (type: BlockType) =>
-    attached(type) && (states[type] === "error" || stopped === type);
+    attached(type) && (states[type] === "error" || (stopped === type && answer === "fail"));
   const faultCol = cols.findIndex((col) => col.some(faulted));
   const faultFork = fork.findIndex(faulted);
   const pastDesk = faultCol !== -1 && faultCol <= Math.max(deskIndex, 0);
