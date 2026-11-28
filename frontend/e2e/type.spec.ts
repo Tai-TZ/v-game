@@ -17,19 +17,35 @@ test.describe("type", () => {
     await page.goto(W1);
     await expect(page.locator("[data-beat-readout]")).toBeVisible();
 
-    // fonts.check() is true for a family nobody declared, so the faces are asked to load too:
-    // an empty list means the import is gone.
-    const loaded = await page.evaluate(async (marks) => {
-      const faces = await document.fonts.load('600 12px "IBM Plex Mono"', marks);
-      await document.fonts.ready;
-      return {
-        faces: faces.map((face) => `${face.family} ${face.weight} ${face.status}`),
-        check: document.fonts.check('600 12px "IBM Plex Mono"', marks),
-      };
-    }, MARKS);
+    // fonts.check() is true for a family nobody declared, so the faces are asked to load and
+    // their unicode-range read back: the marks' own subset (U+1EA0-1EF9) and the latin one
+    // (U+0-FF) must both be among them, at both weights.
+    const loaded = await page.evaluate(
+      async ([marks, plain]) => {
+        const out: Record<string, { faces: string[]; ranges: string[] }> = {};
+        for (const weight of [400, 600]) {
+          const faces = [
+            ...(await document.fonts.load(`${weight} 12px "IBM Plex Mono"`, marks)),
+            ...(await document.fonts.load(`${weight} 12px "IBM Plex Mono"`, plain)),
+          ];
+          out[weight] = {
+            faces: faces.map((face) => `${face.family} ${face.weight} ${face.status}`),
+            ranges: faces.map((face) => face.unicodeRange),
+          };
+        }
+        await document.fonts.ready;
+        return { out, check: document.fonts.check('600 12px "IBM Plex Mono"', marks) };
+      },
+      [MARKS, "Abc 0123 system_prompt"],
+    );
     expect(loaded.check).toBe(true);
-    expect(loaded.faces.length).toBeGreaterThan(0);
-    for (const face of loaded.faces) expect(face).toMatch(/IBM Plex Mono 600 loaded$/);
+    for (const weight of [400, 600]) {
+      const { faces, ranges } = loaded.out[weight] ?? { faces: [], ranges: [] };
+      expect(faces.length).toBeGreaterThan(0);
+      for (const face of faces) expect(face).toBe(`IBM Plex Mono ${weight} loaded`);
+      expect(ranges.some((range) => /1EA0-1EF9/i.test(range))).toBe(true);
+      expect(ranges.some((range) => /U\+0-FF\b/i.test(range))).toBe(true);
+    }
 
     const family = await page
       .locator("[data-beat-readout]")
