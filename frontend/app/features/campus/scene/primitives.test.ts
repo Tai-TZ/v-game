@@ -37,11 +37,11 @@ function triangles(geometry: BufferGeometry) {
 }
 
 describe("chamferBox", () => {
-  it("has 44 triangles and the box's outer bounds", () => {
+  it("has 36 triangles and the box's outer bounds", () => {
     const chamfer = chamferBox(-1, 2, 0.5, 3, -4, -1.5);
     const plain = box(-1, 2, 0.5, 3, -4, -1.5);
     expect(chamfer.index).toBeNull();
-    expect(triangleCount(chamfer)).toBe(44);
+    expect(triangleCount(chamfer)).toBe(36);
     chamfer.computeBoundingBox();
     plain.computeBoundingBox();
     expect(chamfer.boundingBox?.min.toArray()).toEqual(plain.boundingBox?.min.toArray());

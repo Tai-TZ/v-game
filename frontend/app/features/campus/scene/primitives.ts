@@ -38,8 +38,8 @@ export function box(x0: number, x1: number, y0: number, y1: number, z0: number, 
 /**
  * A `box` with its four top edges and four vertical corner edges bevelled at 45°, `c` wide
  * (graphics upgrade §4.4.1); the bottom stays square. Same outer bounds as `box`, non-indexed,
- * 44 triangles: top 2, top bevels 8, sides 16 (four each, fanned round a centre vertex that a
- * later bake can use), corner bevels 8, corner caps 4, octagonal bottom 6. `part()` bakes the bevels with their own 45° normals, so they catch a
+ * 36 triangles, closed: top 2, top bevels 8, sides 8, corner bevels 8, corner caps 4, octagonal
+ * bottom 6. `part()` bakes the bevels with their own 45° normals, so they catch a
  * light between the top face and the wall: a thin highlight, no new material.
  */
 export function chamferBox(
@@ -68,26 +68,15 @@ export function chamferBox(
     tri(a, d, e);
   };
   const v = (x: number, y: number, z: number) => new Vector3(x, y, z);
-  /** A wall as four triangles fanned round its centre (no T-junction with the neighbours). */
-  const wall = (a: Vector3, b: Vector3, d: Vector3, e: Vector3) => {
-    const mid = a.clone().add(b).add(d).add(e).divideScalar(4);
-    for (const [p, q] of [
-      [a, b],
-      [b, d],
-      [d, e],
-      [e, a],
-    ] as const)
-      tri(mid, p, q);
-  };
   quad(v(xa, y1, za), v(xb, y1, za), v(xb, y1, zb), v(xa, y1, zb));
   quad(v(xb, y1, za), v(xb, y1, zb), v(x1, yc, zb), v(x1, yc, za));
   quad(v(xa, y1, za), v(xa, y1, zb), v(x0, yc, zb), v(x0, yc, za));
   quad(v(xa, y1, zb), v(xb, y1, zb), v(xb, yc, z1), v(xa, yc, z1));
   quad(v(xa, y1, za), v(xb, y1, za), v(xb, yc, z0), v(xa, yc, z0));
-  wall(v(x1, yc, za), v(x1, yc, zb), v(x1, y0, zb), v(x1, y0, za));
-  wall(v(x0, yc, za), v(x0, yc, zb), v(x0, y0, zb), v(x0, y0, za));
-  wall(v(xa, yc, z1), v(xb, yc, z1), v(xb, y0, z1), v(xa, y0, z1));
-  wall(v(xa, yc, z0), v(xb, yc, z0), v(xb, y0, z0), v(xa, y0, z0));
+  quad(v(x1, yc, za), v(x1, yc, zb), v(x1, y0, zb), v(x1, y0, za));
+  quad(v(x0, yc, za), v(x0, yc, zb), v(x0, y0, zb), v(x0, y0, za));
+  quad(v(xa, yc, z1), v(xb, yc, z1), v(xb, y0, z1), v(xa, y0, z1));
+  quad(v(xa, yc, z0), v(xb, yc, z0), v(xb, y0, z0), v(xa, y0, z0));
   for (const [sx, sz] of [
     [1, 1],
     [1, -1],
