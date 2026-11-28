@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 
@@ -1242,6 +1243,77 @@ test("draws toy outlines heavier than their face edges", async ({ page }) => {
     }
   }
 });
+
+// Graphics upgrade 4.1.3: pressing a step dims the rest of the machine, and a dimmed toy's outline
+// still holds 3:1 against the frame (WCAG 1.4.11), in both theme packs (ADR 0002).
+const THEMES = (
+  JSON.parse(readFileSync("public/themes/index.json", "utf8")) as { themes: { id: string }[] }
+).themes.map((theme) => theme.id);
+type Rgb = readonly [number, number, number];
+/** WCAG 2.x contrast ratio of two sRGB colours (0-255 per channel). */
+function contrast(a: Rgb, b: Rgb): number {
+  const luminance = ([r, g, bl]: Rgb) => {
+    const [lr = 0, lg = 0, lb = 0] = [r, g, bl].map((c) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05);
+}
+
+for (const theme of THEMES) {
+  test(`keeps a dimmed toy's outline at 3:1 against the frame, theme ${theme}`, async ({
+    page,
+  }) => {
+    await page.addInitScript((id) => window.localStorage.setItem("vg-theme", id), theme);
+    await mockWorkbenchApi(page);
+    await page.goto(L1);
+    await expect(page.locator("[data-dimmed]")).toHaveCount(0);
+    await page.locator('[data-beat="llm"]').click();
+    const dimmed = page.locator('[data-tile="on"][data-dimmed]');
+    await expect(dimmed.first()).toBeAttached();
+    // At rest: the fade is a transition.
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+
+    const seen = await page.evaluate(() => {
+      /** Any computed CSS colour (the theme tokens may be oklch) as 0-255 rgba, by the canvas. */
+      const rgba = (css: string) => {
+        const ctx = document.createElement("canvas").getContext("2d");
+        if (!ctx) throw new Error("no canvas");
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = css;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r = 0, g = 0, b = 0, a = 0] = ctx.getImageData(0, 0, 1, 1).data;
+        return [r, g, b, a / 255] as const;
+      };
+      const toy = document.querySelector('[data-tile="on"][data-dimmed]');
+      const outline = toy?.querySelector("[data-outline]");
+      const frame = document.querySelector('[role="region"][aria-label="Cỗ máy trợ lý"]');
+      if (!toy || !outline || !frame) throw new Error("no dimmed toy, outline or frame");
+      let back = rgba("rgba(0 0 0 / 0)");
+      for (let at: Element | null = frame; at; at = at.parentElement) {
+        back = rgba(getComputedStyle(at).backgroundColor);
+        if (back[3] > 0) break;
+      }
+      return {
+        stroke: rgba(getComputedStyle(outline).stroke),
+        opacity: Number.parseFloat(getComputedStyle(toy).opacity),
+        back,
+      };
+    });
+    expect(seen.opacity).toBeLessThan(1);
+    expect(seen.back[3], "the frame's own backdrop is opaque").toBe(1);
+    // The outline at the group's opacity, over the frame.
+    const alpha = seen.stroke[3] * seen.opacity;
+    const ink = [0, 1, 2].map(
+      (i) => (seen.stroke[i] ?? 0) * alpha + (seen.back[i] ?? 0) * (1 - alpha),
+    ) as unknown as Rgb;
+    const ratio = contrast(ink, [seen.back[0], seen.back[1], seen.back[2]]);
+    expect(ratio).toBeGreaterThanOrEqual(3);
+  });
+}
 
 test("says nothing about scrolling where the whole machine fits", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });

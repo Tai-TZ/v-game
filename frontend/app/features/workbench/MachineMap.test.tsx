@@ -422,6 +422,58 @@ describe("the machine as a figure to play with", () => {
     expect(document.querySelector("[data-slip]")?.getAttribute("style")).not.toBe(before);
   });
 
+  it("dims everything but the pressed step's part", () => {
+    draw(l1, starter(l1));
+    expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
+
+    fireEvent.click(beatButton("llm"));
+    const tiles = [...document.querySelectorAll("[data-tile]")];
+    expect(tiles.length).toBeGreaterThan(1);
+    const [lit, rest] = [
+      tiles.filter((t) => t.getAttribute("data-tile-type") === "llm"),
+      tiles.filter((t) => t.getAttribute("data-tile-type") !== "llm"),
+    ];
+    expect(lit).toHaveLength(1);
+    expect(lit[0]?.hasAttribute("data-dimmed")).toBe(false);
+    for (const other of rest) {
+      expect(other.hasAttribute("data-dimmed")).toBe(true);
+      expect(other.getAttribute("class")).toContain("opacity-");
+    }
+    // The belt into the pressed toy stays; the rest of the belts step back.
+    const into = document.querySelector('[data-pipe-after="context_packer"]');
+    expect(into?.hasAttribute("data-dimmed")).toBe(false);
+    const belts = [...document.querySelectorAll("[data-pipe-after]")].filter((b) => b !== into);
+    expect(belts.length).toBeGreaterThan(0);
+    for (const belt of belts) expect(belt.hasAttribute("data-dimmed")).toBe(true);
+    // The slip and the bubble stay full.
+    expect(document.querySelector("[data-slip]")?.closest("[data-dimmed]")).toBeNull();
+    expect(document.querySelector("[data-beat-bubble]")?.closest("[data-dimmed]")).toBeNull();
+
+    fireEvent.click(beatButton("llm"));
+    expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
+  });
+
+  it("keeps the branch toy and its belt full when a branch step is pressed", () => {
+    const w1 = testEnv("direct-injection");
+    draw(w1, starter(w1));
+    fireEvent.click(beatButton("tool_refund"));
+    expect(tile("tool_refund")?.hasAttribute("data-dimmed")).toBe(false);
+    expect(
+      document.querySelector('[data-pipe-branch="tool_refund"]')?.hasAttribute("data-dimmed"),
+    ).toBe(false);
+    expect(
+      document.querySelector('[data-pipe-branch="human_approval"]')?.hasAttribute("data-dimmed"),
+    ).toBe(true);
+    expect(tile("human_approval")?.hasAttribute("data-dimmed")).toBe(true);
+    expect(tile("action_llm")?.hasAttribute("data-dimmed")).toBe(true);
+    expect(document.querySelector("[data-slip]")?.closest("[data-dimmed]")).toBeNull();
+    for (const belt of document.querySelectorAll("[data-pipe-after]")) {
+      expect(belt.hasAttribute("data-dimmed")).toBe(true);
+    }
+    fireEvent.click(beatButton("tool_refund"));
+    expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
+  });
+
   it("narrates the beat in a bubble over the machine", () => {
     draw(l1, starter(l1));
     expect(document.querySelector("[data-beat-bubble]")).toBeNull();

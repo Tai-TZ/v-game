@@ -395,6 +395,15 @@ const rowOf = (index: number, at: number) => (index + at) % 2;
 const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
 
 /**
+ * A toy or belt off the pressed step's path. 55% is the lowest step of 5 in 0.35-0.6 whose ink
+ * outline holds 3:1 against the frame in both themes (WCAG 1.4.11; e2e "keeps a dimmed toy's
+ * outline at 3:1 against the frame"): measured 3.51 town and 3.36 vinuni; 50% gave 2.94 on vinuni
+ * and 45% 2.59. STEPPED is its resting twin, so the fade is a transition both ways.
+ */
+const STEPPED = "transition-opacity duration-150 motion-reduce:transition-none";
+const DIMMED = `opacity-55 ${STEPPED}`;
+
+/**
  * The two ink weights of a technical drawing: a heavy outline round the whole toy, the base and
  * the belts, and thin edges between faces, on dressings and on leaders. One unit is one px.
  */
@@ -613,6 +622,13 @@ export function MachineMap({
   const active = new Set<BlockType>(
     forkIndex !== -1 ? fork.slice(forkIndex, forkIndex + 1) : (cols[beatIndex] ?? []),
   );
+  // While a beat is pressed, every toy and belt off its path steps back (§4.1.3). The path is the
+  // active column's toy, the belt into it (the branch belt for a branch toy), the slip, the bubble.
+  const focused = beat !== null;
+  const beltInto = (key: string) => {
+    if (!focused) return false;
+    return forkIndex === -1 && cols[beatIndex - 1]?.join("+") === key;
+  };
   // The question slip rides the belt and stops just before the toy of the beat; on the branch
   // it is the slip the desk wrote, riding down to the bell and the refund desk.
   const slipAt =
@@ -867,15 +883,17 @@ export function MachineMap({
               {fork.map((type, k) => {
                 const gated = fork.includes("human_approval") && attached("human_approval");
                 const from = k === 0 ? desk : forkCentre(k - 1);
+                const dim = focused && forkIndex !== k;
                 return (
                   <polygon
                     key={type}
                     aria-hidden="true"
                     data-pipe-branch={type}
                     data-pipe={gated ? "gated" : "unguarded"}
-                    className={
+                    {...(dim ? { "data-dimmed": "" } : {})}
+                    className={`${
                       gated ? "fill-line-strong stroke-fg" : "fill-danger-tint stroke-danger"
-                    }
+                    } ${dim ? DIMMED : STEPPED}`}
                     strokeWidth={INK.outline}
                     points={pts([
                       along(from, BELT, 0, 0),
@@ -890,6 +908,7 @@ export function MachineMap({
                 const key = col.join("+");
                 const broken = col.every(isSearch) && !col.some(attached);
                 const from = centre(index);
+                const dim = focused && !beltInto(key);
                 return (
                   <g key={key} data-column={key}>
                     {/* The belt to the next toy, cut after an empty search socket. */}
@@ -898,11 +917,12 @@ export function MachineMap({
                         aria-hidden="true"
                         data-pipe-after={key}
                         data-pipe={broken ? "broken" : "flow"}
-                        className={
+                        {...(dim ? { "data-dimmed": "" } : {})}
+                        className={`${
                           broken
                             ? "fill-none stroke-danger [stroke-dasharray:4_3]"
                             : "fill-line-strong stroke-fg"
-                        }
+                        } ${dim ? DIMMED : STEPPED}`}
                         strokeWidth={INK.outline}
                         points={pts([
                           along(from, 0, BELT, 0),
@@ -926,6 +946,7 @@ export function MachineMap({
                           disabled={disabled}
                           state={states[type] ?? "idle"}
                           lit={highlight === type || active.has(type)}
+                          dimmed={focused && !active.has(type)}
                           answer={type === "output" ? answer : null}
                           seeThrough={seeThrough}
                           packed={packed}
@@ -953,6 +974,7 @@ export function MachineMap({
                       disabled={disabled}
                       state={states[type] ?? "idle"}
                       lit={highlight === type || active.has(type)}
+                      dimmed={focused && !active.has(type)}
                       answer={null}
                       seeThrough={seeThrough}
                       packed={packed}
@@ -1109,6 +1131,7 @@ function Toy({
   disabled,
   state,
   lit,
+  dimmed,
   answer,
   seeThrough,
   packed,
@@ -1126,6 +1149,7 @@ function Toy({
   disabled: boolean;
   state: BlockState;
   lit: boolean;
+  dimmed: boolean;
   answer: "pass" | "fail" | null;
   seeThrough: boolean;
   packed: number;
@@ -1144,6 +1168,7 @@ function Toy({
     tabIndex: disabled ? -1 : 0,
     "aria-disabled": disabled,
     "data-tile-type": type,
+    ...(dimmed ? { "data-dimmed": "" } : {}),
     onClick: () => {
       if (!disabled) act();
     },
@@ -1152,7 +1177,7 @@ function Toy({
       event.preventDefault();
       act();
     },
-    className: `group/toy outline-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`,
+    className: `group/toy outline-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"} ${dimmed ? DIMMED : STEPPED}`,
   } as const;
 
   const h = HEIGHT[type];
