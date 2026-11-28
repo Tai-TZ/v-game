@@ -1,3 +1,5 @@
+<a href="https://taithanh.ai20k.cloud/vi/projects/v-game"><img src=".github/readme/portfolio-card.webp" width="100%" alt="V-Game: Một game web 3D nhẹ, nơi người học lắp RAG agent từ các khối, chạy thật và lần theo trace để hiểu vì sao agent đạt hay trượt. Bấm để xem case study đầy đủ trên portfolio của Nguyễn Thành Tài."></a>
+
 <p align="center">
   <img src="frontend/public/favicon.svg" width="72" height="72" alt="Biểu tượng V-Game: năm khối lập phương xếp thành chữ V, khối cam ở mũi">
 </p>
