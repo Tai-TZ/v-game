@@ -90,7 +90,16 @@ import {
 import { parseCast } from "./cast";
 import { LABEL_ANCHORS } from "./labels";
 import { desaturate, light, palette, shade, weatherPreset, type Palette } from "./palette";
-import { box, part, triangleCount, type Face } from "./primitives";
+import {
+  box,
+  CHAMFER,
+  chamferBox,
+  EAVE,
+  EAVE_BAND,
+  part,
+  triangleCount,
+  type Face,
+} from "./primitives";
 import type { PropsJson } from "./props";
 import { sceneBudget, useCampusGeometry, type CampusGeometry } from "./useCampusGeometry";
 import { buildDressing } from "./useDressing";
@@ -139,6 +148,11 @@ const LOOKS = TimeOfDaySchema.options.flatMap((phase) =>
 );
 
 const TIMES: readonly TimeOfDay[] = ["day", "dusk"];
+/**
+ * Replay grid points (0.1 u apart) only a penumbra band covers: 6,872 to 7,652 measured (both
+ * themes, day and dusk); 17 to 43 with the band turned inwards.
+ */
+const BAND_ONLY_MIN = 2_000;
 
 /**
  * Heights of raised items under 0.03 that stand over the sun-shadow overlay on purpose, like the
@@ -376,13 +390,20 @@ const geometries = (g: CampusGeometry) => [
 ];
 
 describe("tree values", () => {
-  it("varies each tree's value by at most 4% and never its hue", () => {
+  it("varies each tree's value by at most 8%, apart from its brightness, never its hue", () => {
     const values = TREE_INSTANCES.map((_, i) => treeValue(i));
     for (const v of values) {
-      expect(v).toBeGreaterThanOrEqual(0.96);
-      expect(v).toBeLessThanOrEqual(1.04);
+      expect(v).toBeGreaterThanOrEqual(0.92);
+      expect(v).toBeLessThanOrEqual(1.08);
     }
-    expect(new Set(values).size).toBeGreaterThan(1);
+    // The full ±8% is used (±4% spans at most 0.08), and it is not the brightness again.
+    expect(Math.max(...values) - Math.min(...values)).toBeGreaterThan(0.12);
+    const brightness = TREE_INSTANCES.map((tree) => tree.brightness);
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const [mv, mb] = [mean(values), mean(brightness)];
+    const cov = mean(values.map((v, i) => (v - mv) * ((brightness[i] ?? mb) - mb)));
+    const sd = (xs: number[], m: number) => Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
+    expect(Math.abs(cov / (sd(values, mv) * sd(brightness, mb)))).toBeLessThan(0.3);
     expect(treeValue(7)).toBe(treeValue(7));
     for (const { campus } of manifests) {
       const { shadow } = palette(campus, "dusk");
@@ -886,7 +907,7 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       expect(outer.length).toBeGreaterThan(100);
       expect(inner.length).toBeGreaterThan(outer.length);
       // Width: every outer vertex sits at most a capped miter (2x) from the shadow's edge,
-      // and the tall casters reach the 0.3 cap while the small props stay narrower.
+      // and the tall casters reach the 0.45 cap while the small props stay narrower.
       const reach = outer.map(({ i }) =>
         Math.min(
           ...inner.map(({ i: j }) =>
@@ -897,18 +918,66 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       expect(Math.max(...reach)).toBeLessThanOrEqual(2 * PENUMBRA_MAX + 1e-4);
       expect(Math.max(...reach)).toBeGreaterThanOrEqual(PENUMBRA_MAX - 1e-4);
       expect(reach.some((d) => d < 0.9 * PENUMBRA_MAX)).toBe(true);
+      // No sliver: a band end with no width (a sunlit foot) makes a triangle, not a flat quad.
+      const flat: number[] = [];
+      for (let i = 0; i < position.count; i += 3) {
+        const [ax, az, bx, bz, cx, cz] = [i, i + 1, i + 2].flatMap((k) => [
+          position.getX(k),
+          position.getZ(k),
+        ]) as [number, number, number, number, number, number];
+        if (Math.abs((bx - ax) * (cz - az) - (bz - az) * (cx - ax)) < 1e-9) flat.push(i / 3);
+      }
+      expect(flat).toEqual([]);
       unmount();
     });
 
-    it("widens the penumbra with the caster's height, up to 0.3", () => {
-      expect(penumbraWidth(0.5)).toBeCloseTo(0.06, 6);
-      expect(penumbraWidth(1)).toBeCloseTo(0.12, 6);
+    it("widens the penumbra with each point's height, up to 0.45", () => {
+      expect(penumbraWidth(0)).toBe(0);
+      expect(penumbraWidth(0.5)).toBeCloseTo(0.075, 6);
+      expect(penumbraWidth(1)).toBeCloseTo(0.15, 6);
       expect(penumbraWidth(2)).toBeGreaterThan(penumbraWidth(1));
-      expect(penumbraWidth(2.5)).toBeCloseTo(0.3, 6);
-      expect(penumbraWidth(9)).toBe(0.3);
+      expect(penumbraWidth(3)).toBeCloseTo(0.45, 6);
+      expect(penumbraWidth(9)).toBe(0.45);
+      expect(PENUMBRA_MAX).toBe(0.45);
     });
 
-    it.each(TIMES)("darkens where two shadows overlap once, never lighter (%s)", (time) => {
+    it("pushes the penumbra outwards, 0.15 of each point's height wide (the lobby, by day)", () => {
+      // The watchtower lobby's caster: block(9.0, 11.8, -3.8, -1.2, 1.53). By day its shadow's
+      // +x side is the cast top edge (both ends 1.53 high), joined to the sunlit foot corner
+      // (11.8, -1.2) by a slanted edge whose band tapers from penumbraWidth(1.53) to nothing.
+      const { result, unmount } = build(manifest, "day");
+      const g = result.current.shadow;
+      const { sun } = result.current.palette.light;
+      const h = 1.53;
+      const top = { x: 11.8 - (sun.x / sun.y) * h, z0: -3.8 - (sun.z / sun.y) * h };
+      const z1 = -1.2 - (sun.z / sun.y) * h;
+      expect(top.x).toBeGreaterThan(11.8); // the sun is to the west: the cast edge lies east
+      // How far out of `from` along `dir` the overlay still covers the ground.
+      const reach = (from: Vec2, dir: Vec2) => {
+        let d = 0;
+        while (inShadow(g, { x: from.x + dir.x * (d + 0.002), z: from.z + dir.z * (d + 0.002) })) {
+          d += 0.002;
+        }
+        return d;
+      };
+      const w = penumbraWidth(h);
+      expect(w).toBeCloseTo(0.2295, 6); // under the cap: the slope is what is pinned
+      // The straight cast edge, at its middle: the full width.
+      expect(reach({ x: top.x, z: (top.z0 + z1) / 2 }, { x: 1, z: 0 })).toBeCloseTo(w, 2);
+      // The slanted edge from the cast corner to the foot, at its middle: half of it.
+      const [a, b] = [
+        { x: top.x, z: z1 },
+        { x: 11.8, z: -1.2 },
+      ];
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      const out = { x: (b.z - a.z) / len, z: -(b.x - a.x) / len };
+      expect(out.x).toBeGreaterThan(0);
+      const mid = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+      expect(reach(mid, out)).toBeCloseTo(w / 2, 2);
+      unmount();
+    });
+
+    it.each(TIMES)("draws every core before any band, so cores win over bands (%s)", (time) => {
       // The overlay is drawn with a stencil: the first triangle to cover a pixel paints it and
       // blocks the rest. So every core (full shade) must come before every band, or a band's
       // light edge would stencil out a core it overlaps and leave a light seam in it.
@@ -935,6 +1004,17 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
         };
         return { v, core, box };
       });
+      // Triangles by 1 u cell, in draw order, so each point tests only its neighbours.
+      const cells = new Map<string, typeof tris>();
+      for (const t of tris) {
+        for (let cx = Math.floor(t.box.x0); cx <= Math.floor(t.box.x1); cx += 1) {
+          for (let cz = Math.floor(t.box.z0); cz <= Math.floor(t.box.z1); cz += 1) {
+            const list = cells.get(`${cx},${cz}`) ?? [];
+            list.push(t);
+            cells.set(`${cx},${cz}`, list);
+          }
+        }
+      }
       const inside = ({ v: [a, b, c], box }: (typeof tris)[number], p: Vec2) => {
         if (p.x < box.x0 || p.x > box.x1 || p.z < box.z0 || p.z > box.z1) return false;
         const side = (u: Vec2, w: Vec2) => (w.x - u.x) * (p.z - u.z) - (w.z - u.z) * (p.x - u.x);
@@ -942,16 +1022,22 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
         return s.every((d) => d >= 0) || s.every((d) => d <= 0);
       };
       let both = 0;
+      // Points only a band covers: the penumbra lies outside the shadows (an inward band would
+      // sit inside its own core and leave none).
+      let bandOnly = 0;
       const lighter: string[] = [];
       for (let x = BASE.minX + 0.05; x < BASE.maxX; x += 0.1) {
         for (let z = BASE.minZ + 0.05; z < BASE.maxZ; z += 0.1) {
-          const hits = tris.filter((t) => inside(t, { x, z }));
+          const near = cells.get(`${Math.floor(x)},${Math.floor(z)}`) ?? [];
+          const hits = near.filter((t) => inside(t, { x, z }));
+          if (hits.length > 0 && !hits.some((t) => t.core)) bandOnly += 1;
           if (!hits.some((t) => t.core)) continue;
           if (hits.some((t) => !t.core)) both += 1;
           if (!hits[0]?.core) lighter.push(`(${x.toFixed(2)}, ${z.toFixed(2)})`);
         }
       }
       expect(both).toBeGreaterThan(20);
+      expect(bandOnly).toBeGreaterThan(BAND_ONLY_MIN);
       expect(lighter).toEqual([]);
       unmount();
     });
@@ -1508,63 +1594,157 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       unmount();
     });
 
-    it("darkens wall just under an eave, never a top face", () => {
+    it("darkens a band of wall just under an eave, never the wall below it or a top face", () => {
       const { result, unmount } = build(manifest);
       const { palette: pal } = result.current;
-      const bake = (y1: number, aoUnder?: number) =>
-        part(
-          box(0, 1, 0, y1, 0, 1),
-          { color: new Color(1, 1, 1), ...(aoUnder === undefined ? {} : { aoUnder }) },
-          pal.light,
+      const white = new Color(1, 1, 1);
+      // A 2 u chamfered wall with foot AO, its eave at the top (y 2), the ring EAVE_BAND under it.
+      const ring = 2 - EAVE_BAND;
+      const yc = 2 - CHAMFER; // where the walls end and the top bevels start
+      const plain = part(chamferBox(0, 1, 0, 2, 0, 1), { color: white, ao: true }, pal.light);
+      const eaved = part(
+        chamferBox(0, 1, 0, 2, 0, 1, { split: ring }),
+        { color: white, ao: true, aoUnder: 2 },
+        pal.light,
+      );
+      // The pre-change colour of every vertex, by position and face normal.
+      const key = (t: Triangle, p: Vector3) =>
+        [p.x, p.y, p.z, t.normal.x, t.normal.y, t.normal.z].map((n) => n.toFixed(4)).join();
+      const corners = (g: BufferGeometry) => {
+        const position = g.getAttribute("position");
+        const colour = g.getAttribute("color");
+        return triangles(g).flatMap((t, n) =>
+          [0, 1, 2].map((k) => ({
+            t,
+            p: new Vector3().fromBufferAttribute(position, 3 * n + k),
+            c: new Color().fromBufferAttribute(colour, 3 * n + k),
+          })),
         );
-      const colourAt = (g: BufferGeometry, i: number) =>
-        new Color().fromBufferAttribute(g.getAttribute("color"), i);
-      // A 2 u box with an eave at its top: only the ring of wall vertices at y 2 is within 0.25 u.
-      const [plain, under] = [bake(2), bake(2, 2)];
-      const heights = plain.getAttribute("position");
-      let darkened = 0;
-      for (let i = 0; i < heights.count; i += 1) {
-        const [a, b] = [colourAt(plain, i), colourAt(under, i)];
-        if (sameColour(a, top(pal))) {
-          expect(sameColour(a, b), `top face vertex ${i}`).toBe(true);
-        } else if (heights.getY(i) === 2) {
-          expect(b.r / a.r).toBeCloseTo(0.87, 2);
-          darkened += 1;
+      };
+      const before = new Map(corners(plain).map(({ t, p, c }) => [key(t, p), c]));
+      const lerp = (t: Triangle, x: number, z: number, y: number) => {
+        // The plain wall face's colour at height y: its foot and top vertices, interpolated.
+        const [foot, head] = [0, yc].map((h) => before.get(key(t, new Vector3(x, h, z))));
+        if (!foot || !head) throw new Error(`no plain wall vertex at (${x}, ${z})`);
+        return foot.clone().lerp(head, y / yc);
+      };
+      const counts = { top: 0, below: 0, ring: 0, band: 0 };
+      for (const { t, p, c } of corners(eaved)) {
+        if (Math.abs(t.normal.y) >= 0.5) {
+          // Top face and top bevels: exactly as before.
+          expect(sameColour(c, before.get(key(t, p)) ?? white), `top vertex ${key(t, p)}`).toBe(
+            true,
+          );
+          counts.top += 1;
+        } else if (p.y < ring - 1e-4) {
+          expect(sameColour(c, lerp(t, p.x, p.z, p.y)), `foot vertex ${key(t, p)}`).toBe(true);
+          counts.below += 1;
+        } else if (Math.abs(p.y - ring) < 1e-4) {
+          // The ring keeps the foot AO's gradient, so the wall below it is unchanged.
+          expect(sameColour(c, lerp(t, p.x, p.z, p.y)), `ring vertex ${key(t, p)}`).toBe(true);
+          counts.ring += 1;
         } else {
-          expect(sameColour(a, b), `wall foot vertex ${i}`).toBe(true);
+          const want = (before.get(key(t, p)) ?? white).clone().multiplyScalar(EAVE);
+          expect(sameColour(c, want), `band vertex ${key(t, p)}`).toBe(true);
+          counts.band += 1;
         }
       }
-      expect(darkened).toBeGreaterThan(0);
-      // An eave above the wall's top, or more than 0.25 u over it, leaves the wall alone.
-      for (const [y1, eave] of [
-        [2, 3],
-        [1.5, 2],
+      expect(counts.top).toBeGreaterThan(0);
+      expect(counts.below).toBeGreaterThan(0);
+      expect(counts.ring).toBeGreaterThan(0);
+      expect(counts.band).toBeGreaterThan(0);
+      expect(EAVE).toBe(0.8);
+      expect(EAVE_BAND).toBe(0.2);
+      // The pre-change bake's ring height is interpolated, not 1 (else this check is vacuous).
+      const side = corners(plain).find(({ t }) => t.normal.z > 0.99);
+      if (!side) throw new Error("no +z wall");
+      expect(lerp(side.t, side.p.x, 1, ring).r).toBeLessThan(
+        (before.get(key(side.t, new Vector3(side.p.x, yc, 1))) ?? white).r - 1e-3,
+      );
+      // No ring (a plain box, or an eave above the wall), no change: it would tone the whole wall.
+      for (const [geometry, eave] of [
+        [() => box(0, 1, 0, 2, 0, 1), 2],
+        [() => chamferBox(0, 1, 0, 2, 0, 1, { split: ring }), 3],
       ] as const) {
-        const [x, y] = [bake(y1), bake(y1, eave)];
+        const [x, y] = [
+          part(geometry(), { color: white, ao: true }, pal.light),
+          part(geometry(), { color: white, ao: true, aoUnder: eave }, pal.light),
+        ];
         for (let i = 0; i < x.getAttribute("color").count; i += 1) {
-          expect(sameColour(colourAt(x, i), colourAt(y, i))).toBe(true);
+          const [cx, cy] = [x, y].map((g) =>
+            new Color().fromBufferAttribute(g.getAttribute("color"), i),
+          );
+          expect(sameColour(cx ?? white, cy ?? white)).toBe(true);
         }
       }
-      // The landmark's wing wall, just under its eave (y 2.25; the side face ends at 2.21).
+      // The landmark's east wing wall, +z face (eave at y 2.25, walls 0.3 to 2.25 - CHAMFER).
       const landmark = result.current.landmark;
       const position = landmark.getAttribute("position");
       const colour = landmark.getAttribute("color");
       const shaded = pal.lm.wall.clone().multiply(shade(new Vector3(0, 0, 1), pal.light));
-      let under225 = 0;
+      const [foot, head, mid] = [0.3, 2.25 - CHAMFER, 2.25 - EAVE_BAND];
+      const want = new Map([
+        [f32(foot), shaded.clone().multiplyScalar(0.82)],
+        [f32(mid), shaded.clone().multiplyScalar(0.82 + 0.18 * ((mid - foot) / (head - foot)))],
+        [f32(head), shaded.clone().multiplyScalar(EAVE)],
+      ]);
+      const seen = new Set<number>();
       triangles(landmark).forEach((t, n) => {
         // The +z face of the east wing wall (not its bevels, not the windows 0.01 in front).
         if (t.normal.z < 0.99 || Math.abs(t.centre.z + 6.2) > 1e-4 || t.centre.x < 3) return;
         if (t.centre.x > 9.7 || t.centre.y < 0.3 || t.centre.y > 2.25) return;
         for (const i of [3 * n, 3 * n + 1, 3 * n + 2]) {
-          if (position.getY(i) !== f32(2.21)) continue;
+          const y = position.getY(i);
           const c = new Color().fromBufferAttribute(colour, i);
-          expect(sameColour(c, shaded.clone().multiplyScalar(0.87)), `wing wall vertex ${i}`).toBe(
-            true,
-          );
-          under225 += 1;
+          const expected = want.get(y);
+          expect(expected, `wing wall vertex ${i} at y ${y}`).toBeDefined();
+          if (expected) expect(sameColour(c, expected), `wing wall vertex ${i}`).toBe(true);
+          seen.add(y);
         }
       });
-      expect(under225).toBeGreaterThan(0);
+      expect(seen).toEqual(new Set(want.keys()));
+      unmount();
+    });
+
+    it("leaves no bevel groove where two pieces meet at one top plane (final review)", () => {
+      const { result, unmount } = build(manifest);
+      const { landmark, watchtower } = result.current;
+      // The highest upward face over (x, z) no higher than `below`.
+      const surface = (g: BufferGeometry, x: number, z: number, below: number) => {
+        const position = g.getAttribute("position");
+        let best = -Infinity;
+        for (let i = 0; i < position.count; i += 3) {
+          const [a, b, c] = [i, i + 1, i + 2].map((k) =>
+            new Vector3().fromBufferAttribute(position, k),
+          );
+          if (!a || !b || !c) continue;
+          const n = b.clone().sub(a).cross(c.clone().sub(a));
+          if (n.y <= 1e-9) continue;
+          // Barycentric weights of (x, z) in the triangle's ground projection.
+          const d = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+          const u = ((b.z - c.z) * (x - c.x) + (c.x - b.x) * (z - c.z)) / d;
+          const v = ((c.z - a.z) * (x - c.x) + (a.x - c.x) * (z - c.z)) / d;
+          if (u < 0 || v < 0 || u + v > 1) continue;
+          const y = u * a.y + v * b.y + (1 - u - v) * c.y;
+          if (y <= below) best = Math.max(best, y);
+        }
+        return best;
+      };
+      // The forecourt tiers on the main building's base (all three 0.3 high), each join.
+      for (const [x, z] of [
+        [0, -5.95 - CHAMFER / 2],
+        [-2.5, -5.95 - CHAMFER / 4],
+        [0, -5.15 - CHAMFER / 2],
+        [0, -5.15 + CHAMFER / 2],
+      ] as const) {
+        expect(surface(landmark, x, z, 0.35), `forecourt (${x}, ${z})`).toBeCloseTo(0.3, 6);
+      }
+      // The spire hall's porch canopy against its tower base, and the watchtower lobby against
+      // its tower.
+      if (manifest.campus.landmark.archetype === "spire-hall") {
+        expect(surface(landmark, 0, -5.3 + CHAMFER / 2, 1.5)).toBeCloseTo(1.46, 6);
+      }
+      expect(surface(watchtower, 10.6, -3.8 + CHAMFER / 2, 1.452)).toBeCloseTo(1.45, 6);
       unmount();
     });
 
@@ -1573,26 +1753,26 @@ describe.each(manifests.map((m) => [m.id, m] as const))(
       const { terrain, palette: pal } = result.current;
       const side = pal.plaza.clone().multiply(shade(new Vector3(-1, 0, 0), pal.light));
       const edge = BASE.minX - 0.25;
-      // The skirt's −x side, top to foot: its upper part, then the band at y −0.8 to −0.74.
+      // The skirt's −x side, top to foot: its upper part, then the band at y −0.8 to −0.7.
       const skirt = triangles(terrain).filter(
         (t) => t.normal.x < -0.99 && Math.abs(t.centre.x - edge) < 1e-4 && t.centre.y < -0.6,
       );
       const [band, upper] = [
-        skirt.filter((t) => t.centre.y < -0.74),
-        skirt.filter((t) => t.centre.y > -0.74),
+        skirt.filter((t) => t.centre.y < -0.7),
+        skirt.filter((t) => t.centre.y > -0.7),
       ];
       expect(band).toHaveLength(2);
       expect(upper).toHaveLength(2);
       for (const t of band)
-        expect(sameColour(t.colour, side.clone().multiplyScalar(0.8))).toBe(true);
+        expect(sameColour(t.colour, side.clone().multiplyScalar(0.65))).toBe(true);
       for (const t of upper) expect(sameColour(t.colour, side)).toBe(true);
       const ys = new Set<number>();
       const position = terrain.getAttribute("position");
       for (let i = 0; i < position.count; i += 1) {
-        if (position.getX(i) === f32(edge) && position.getY(i) < f32(-0.7))
+        if (position.getX(i) === f32(edge) && position.getY(i) < f32(-0.65))
           ys.add(position.getY(i));
       }
-      expect([...ys].sort((a, b) => a - b)).toEqual([f32(-0.8), f32(-0.74)]);
+      expect([...ys].sort((a, b) => a - b)).toEqual([f32(-0.8), f32(-0.7)]);
       unmount();
     });
 

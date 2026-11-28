@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { parseThemeIndex, parseThemeManifest } from "~/features/theme/schema";
 
 import { light, shade } from "./palette";
-import { box, chamferBox, part, triangleCount } from "./primitives";
+import { box, CHAMFER, chamferBox, part, triangleCount } from "./primitives";
 
 const luminance = (c: Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 
@@ -37,6 +37,25 @@ function triangles(geometry: BufferGeometry) {
 }
 
 describe("chamferBox", () => {
+  it("chamfers 0.07 wide by default, clamped to half a thin slab", () => {
+    expect(CHAMFER).toBe(0.07);
+    const top = (g: BufferGeometry) =>
+      Math.min(
+        ...triangles(g)
+          .filter((t) => t.normal.y > 0.99)
+          .map((t) => t.centre.y),
+      );
+    const ys = (g: BufferGeometry) => {
+      const position = g.getAttribute("position");
+      return new Set(Array.from({ length: position.count }, (_, i) => position.getY(i)));
+    };
+    expect(top(chamferBox(0, 2, 0, 1, 0, 3))).toBe(1);
+    expect(ys(chamferBox(0, 2, 0, 1, 0, 3))).toEqual(new Set([0, 1, Math.fround(1 - 0.07)]));
+    expect(ys(chamferBox(0, 2, 0, 0.08, 0, 3))).toEqual(
+      new Set([0, Math.fround(0.08), Math.fround(0.04)]),
+    );
+  });
+
   it("has 36 triangles and the box's outer bounds", () => {
     const chamfer = chamferBox(-1, 2, 0.5, 3, -4, -1.5);
     const plain = box(-1, 2, 0.5, 3, -4, -1.5);
@@ -48,32 +67,49 @@ describe("chamferBox", () => {
     expect(chamfer.boundingBox?.max.toArray()).toEqual(plain.boundingBox?.max.toArray());
   });
 
-  it("is closed and faces outwards, with a flat unbevelled bottom", () => {
-    const geometry = chamferBox(0, 2, 0, 1, 0, 3);
-    const centre = new Vector3(1, 0.5, 1.5);
-    const all = triangles(geometry);
-    for (const t of all) {
-      expect(t.normal.dot(t.centre.clone().sub(centre))).toBeGreaterThan(0);
-    }
-    const down = all.filter((t) => t.normal.y < -0.99);
-    expect(down.length).toBe(6); // the octagon fan; without it the flat check below is vacuous
-    expect(down.every((t) => t.centre.y === 0)).toBe(true);
-    // Watertight: every edge is shared by exactly two triangles.
-    const position = geometry.getAttribute("position");
-    const key = (i: number) =>
-      [position.getX(i), position.getY(i), position.getZ(i)].map((n) => n.toFixed(5)).join();
-    const edges = new Map<string, number>();
-    for (let t = 0; t < position.count; t += 3) {
-      for (const [a, b] of [
-        [0, 1],
-        [1, 2],
-        [2, 0],
-      ] as const) {
-        const e = [key(t + a), key(t + b)].sort().join("|");
-        edges.set(e, (edges.get(e) ?? 0) + 1);
+  it.each([
+    ["plain", undefined, 36],
+    ["split at y 0.6", 0.6, 52],
+  ] as const)(
+    "is closed and faces outwards, with a flat unbevelled bottom (%s)",
+    (_n, split, n) => {
+      const geometry = chamferBox(0, 2, 0, 1, 0, 3, split === undefined ? {} : { split });
+      expect(triangleCount(geometry)).toBe(n);
+      const centre = new Vector3(1, 0.5, 1.5);
+      const all = triangles(geometry);
+      for (const t of all) {
+        expect(t.normal.dot(t.centre.clone().sub(centre))).toBeGreaterThan(0);
       }
+      const down = all.filter((t) => t.normal.y < -0.99);
+      expect(down.length).toBe(6); // the octagon fan; without it the flat check below is vacuous
+      expect(down.every((t) => t.centre.y === 0)).toBe(true);
+      // Watertight: every edge is shared by exactly two triangles.
+      const position = geometry.getAttribute("position");
+      const key = (i: number) =>
+        [position.getX(i), position.getY(i), position.getZ(i)].map((n) => n.toFixed(5)).join();
+      const edges = new Map<string, number>();
+      for (let t = 0; t < position.count; t += 3) {
+        for (const [a, b] of [
+          [0, 1],
+          [1, 2],
+          [2, 0],
+        ] as const) {
+          const e = [key(t + a), key(t + b)].sort().join("|");
+          edges.set(e, (edges.get(e) ?? 0) + 1);
+        }
+      }
+      expect([...edges.values()].every((count) => count === 2)).toBe(true);
+      // The split adds one ring of wall vertices at its height, and nothing else.
+      const ys = new Set(Array.from({ length: position.count }, (_, i) => position.getY(i)));
+      expect(ys.size).toBe(split === undefined ? 3 : 4);
+      if (split !== undefined) expect(ys.has(Math.fround(split))).toBe(true);
+    },
+  );
+
+  it("ignores a split outside the walls", () => {
+    for (const split of [0, -1, 1 - 0.07, 0.99, 2]) {
+      expect(triangleCount(chamferBox(0, 2, 0, 1, 0, 3, { split }))).toBe(36);
     }
-    expect([...edges.values()].every((n) => n === 2)).toBe(true);
   });
 
   it.each(manifests.map((m) => [m.id, m] as const))(

@@ -35,6 +35,9 @@ export function box(x0: number, x1: number, y0: number, y1: number, z0: number, 
   );
 }
 
+/** Chamfer width (final review ruling 2026-11-29: 0.04 read as nothing at 1280; 0.07 shows). */
+export const CHAMFER = 0.07;
+
 /**
  * A `box` with its four top edges and four vertical corner edges bevelled at 45°, `c` wide
  * (graphics upgrade §4.4.1; clamped for thin slabs, never more than half of any side); the
@@ -42,6 +45,11 @@ export function box(x0: number, x1: number, y0: number, y1: number, z0: number, 
  * top bevels 8, sides 8, corner bevels 8, corner caps 4, octagonal bottom 6. `part()` bakes the
  * bevels with their own 45° normals, so they catch a light between the top face and the wall: a
  * thin highlight, no new material.
+ *
+ * `split` (a world y strictly between the foot and the bevels) adds one ring of vertices round
+ * the walls: the four sides and four corner bevels each become two quads (+16 triangles), still
+ * closed. `part()`'s eave shade (`aoUnder`) needs it, or a wall has no vertex between its foot
+ * and its top and the shade would tone the whole wall.
  */
 export function chamferBox(
   x0: number,
@@ -50,11 +58,19 @@ export function chamferBox(
   y1: number,
   z0: number,
   z1: number,
-  c = 0.04,
+  { c = CHAMFER, split }: { c?: number; split?: number } = {},
 ) {
   const w = Math.min(c, (x1 - x0) / 2, (z1 - z0) / 2, (y1 - y0) / 2);
   const [xa, xb, za, zb] = [x0 + w, x1 - w, z0 + w, z1 - w];
   const yc = y1 - w;
+  // The walls' height bands, top down: one, or two at the split.
+  const rows =
+    split !== undefined && split > y0 && split < yc
+      ? [
+          [yc, split],
+          [split, y0],
+        ]
+      : [[yc, y0]];
   const centre = new Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
   const positions: number[] = [];
   // Each triangle is wound to face away from the centre, which a convex solid makes unambiguous.
@@ -74,10 +90,12 @@ export function chamferBox(
   quad(v(xa, y1, za), v(xa, y1, zb), v(x0, yc, zb), v(x0, yc, za));
   quad(v(xa, y1, zb), v(xb, y1, zb), v(xb, yc, z1), v(xa, yc, z1));
   quad(v(xa, y1, za), v(xb, y1, za), v(xb, yc, z0), v(xa, yc, z0));
-  quad(v(x1, yc, za), v(x1, yc, zb), v(x1, y0, zb), v(x1, y0, za));
-  quad(v(x0, yc, za), v(x0, yc, zb), v(x0, y0, zb), v(x0, y0, za));
-  quad(v(xa, yc, z1), v(xb, yc, z1), v(xb, y0, z1), v(xa, y0, z1));
-  quad(v(xa, yc, z0), v(xb, yc, z0), v(xb, y0, z0), v(xa, y0, z0));
+  for (const [hi = yc, lo = y0] of rows) {
+    quad(v(x1, hi, za), v(x1, hi, zb), v(x1, lo, zb), v(x1, lo, za));
+    quad(v(x0, hi, za), v(x0, hi, zb), v(x0, lo, zb), v(x0, lo, za));
+    quad(v(xa, hi, z1), v(xb, hi, z1), v(xb, lo, z1), v(xa, lo, z1));
+    quad(v(xa, hi, z0), v(xb, hi, z0), v(xb, lo, z0), v(xa, lo, z0));
+  }
   for (const [sx, sz] of [
     [1, 1],
     [1, -1],
@@ -89,7 +107,9 @@ export function chamferBox(
     const ex = sx > 0 ? xb : xa;
     const ez = sz > 0 ? zb : za;
     tri(v(ex, y1, ez), v(cx, yc, ez), v(ex, yc, cz));
-    quad(v(cx, yc, ez), v(ex, yc, cz), v(ex, y0, cz), v(cx, y0, ez));
+    for (const [hi = yc, lo = y0] of rows) {
+      quad(v(cx, hi, ez), v(ex, hi, cz), v(ex, lo, cz), v(cx, lo, ez));
+    }
   }
   // The bottom: an octagon (the corner bevels cut its corners), fanned from one vertex.
   const ring = [
@@ -254,8 +274,11 @@ export interface PartStyle {
   /** Darken the foot of vertical faces (fake ambient occlusion, art §2.4). */
   ao?: boolean;
   /**
-   * Shade under an eave or beam (graphics upgrade §4.4.3): wall vertices from 0.25 u under this
-   * world y up to it are × 0.87. Top faces never change.
+   * Shade under an eave or beam (graphics upgrade §4.4.3): wall vertices strictly above
+   * `aoUnder − EAVE_BAND` and at most this world y are × `EAVE`. It needs a ring of wall
+   * vertices at `aoUnder − EAVE_BAND` (`chamferBox`'s `split`): the ring keeps the foot AO's
+   * gradient, so only the band under the eave darkens. Without the ring nothing changes (a
+   * wall with no vertex between foot and top would tone all over). Top faces never change.
    */
   aoUnder?: number;
   /** Lit from inside: skip the bake (windows, lamps, clock face). */
@@ -263,6 +286,13 @@ export interface PartStyle {
   /** Distance haze: after shading, pull this far towards the top-face light (v0.3 §5.2). */
   haze?: number;
 }
+
+/** Foot AO (art §2.4): wall vertices at the part's foot × this, its top ones 1. */
+const FOOT_AO = 0.82;
+/** Eave band: × 0.8 over 0.2 u (final review ruling 2026-11-29; × 0.87 over 0.25 was faint). */
+export const EAVE = 0.8;
+export const EAVE_BAND = 0.2;
+const EPS = 0.001;
 
 const normal = new Vector3();
 const UP = new Vector3(0, 1, 0);
@@ -289,6 +319,17 @@ export function part(source: BufferGeometry, style: PartStyle, light: Light | nu
   const colors = new Float32Array(position.count * 3);
   const haze = style.haze ?? 0;
   const hazeTo = light ? shade(UP, light) : new Color(1, 1, 1);
+  const upright = (i: number) => Math.abs(normal.fromBufferAttribute(normals, i).y) < 0.5;
+  // The eave's ring, if the wall has one, and the top of the walls (the foot AO's 1.0).
+  const ring = (style.aoUnder ?? NaN) - EAVE_BAND;
+  let eave = false;
+  let wallTop = -Infinity;
+  for (let i = 0; i < position.count; i += 1) {
+    if (!upright(i)) continue;
+    const y = position.getY(i);
+    wallTop = Math.max(wallTop, y);
+    if (Math.abs(y - ring) <= EPS) eave = true;
+  }
 
   for (let i = 0; i < position.count; i += 1) {
     normal.fromBufferAttribute(normals, i);
@@ -298,11 +339,15 @@ export function part(source: BufferGeometry, style: PartStyle, light: Light | nu
     k.setRGB(1, 1, 1);
     if (light && !style.emissive) {
       shade(normal, light, k);
-      if (style.ao && Math.abs(normal.y) < 0.5 && position.getY(i) <= minY + 0.001) {
-        k.multiplyScalar(0.82);
+      const y = position.getY(i);
+      const wall = Math.abs(normal.y) < 0.5;
+      if (style.ao && wall && y <= minY + EPS) k.multiplyScalar(FOOT_AO);
+      if (eave && wall && Math.abs(y - ring) <= EPS) {
+        // The ring takes the foot AO's value at its height, so the wall below it is unchanged.
+        if (style.ao) k.multiplyScalar(FOOT_AO + (1 - FOOT_AO) * ((y - minY) / (wallTop - minY)));
+      } else if (eave && wall && y > ring && y <= (style.aoUnder ?? 0) + EPS) {
+        k.multiplyScalar(EAVE);
       }
-      const under = (style.aoUnder ?? -Infinity) - position.getY(i);
-      if (Math.abs(normal.y) < 0.5 && under > -0.001 && under <= 0.25) k.multiplyScalar(0.87);
     }
     base.multiply(k).lerp(hazeTo, haze);
     colors[i * 3] = base.r;

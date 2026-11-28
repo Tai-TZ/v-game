@@ -48,11 +48,13 @@ import {
   arch,
   arcSlab,
   box,
+  CHAMFER,
   chamferBox,
   circle,
   cone,
   cyl,
   disc,
+  EAVE_BAND,
   groundTriangles,
   ico,
   lathe,
@@ -107,6 +109,9 @@ const paint = (pal: Palette, windows?: number) => {
 };
 
 const PI = Math.PI;
+/** A chamfered wall with an eave at its top (y1): split for `part()`'s band (`aoUnder: y1`). */
+const eaveWall = (x0: number, x1: number, y0: number, y1: number, z0: number, z1: number) =>
+  chamferBox(x0, x1, y0, y1, z0, z1, { split: y1 - EAVE_BAND });
 const SIDES = [-1, 1] as const;
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 const grid = <T>(xs: readonly number[], ys: readonly number[], f: (x: number, y: number) => T) =>
@@ -121,7 +126,7 @@ export interface TreeInstance {
   scaleY: number;
   yaw: number;
   brightness: number;
-  /** `treeValue` of the tree's index: a further ±4% on the brightness. */
+  /** `treeValue` of the tree's index: a further ±8% on the brightness. */
   value: number;
   kind: "round" | "cypress";
 }
@@ -133,10 +138,14 @@ const TREE_LISTS = [
   { trees: PARK_TREES, kind: "round", factor: 0.55 },
 ] as const;
 
-/** Each tree's own value, 0.96 to 1.04, from a fixed hash of its index; never a hue shift. */
-export const treeValue = (i: number) => 0.96 + 0.08 * hash(i, 4);
+/**
+ * Each tree's own value, 0.92 to 1.08, from a fixed hash of its index with its own salt, apart
+ * from the brightness's; never a hue shift (final review ruling 2026-11-29: ±4% did not show).
+ */
+export const TREE_VALUE = 0.08;
+export const treeValue = (i: number) => 1 - TREE_VALUE + 2 * TREE_VALUE * hash(i, 5);
 
-/** A tree's instance colour: grey from its brightness and value, times the shade factor if in shade. */
+/** A tree's instance colour: grey from its brightness and value, × the shade factor in shade. */
 export const treeColour = (out: Color, tree: TreeInstance, shade?: Color) => {
   out.setScalar(tree.brightness * tree.value);
   return shade ? out.multiply(shade) : out;
@@ -703,12 +712,20 @@ function hull<P extends Vec2>(points: readonly P[]): P[] {
   return [...half(sorted), ...half(sorted.reverse())];
 }
 
-/** A ground point with the penumbra's fade `t` (0 at the shadow's edge, 1 at the band's outer rim). */
+/** A ground point with the penumbra's fade `t` (0 at the shadow's edge, 1 at its outer rim). */
 interface Fade extends Vec2 {
   t: number;
 }
 
-/** Clips a convex polygon to the base (Sutherland-Hodgman), so no shadow hangs off the edge; `t` is interpolated. */
+/** A caster's point cast onto the ground, with the height `h` it was cast from. */
+interface Cast extends Fade {
+  h: number;
+}
+
+/**
+ * Clips a convex polygon to the base (Sutherland-Hodgman), so no shadow hangs off the edge;
+ * `t` is interpolated.
+ */
 function clipToBase(polygon: Fade[]): Fade[] {
   const edges = [
     { axis: "x", limit: BASE.minX, keep: 1 },
@@ -815,14 +832,22 @@ export function treesInShade(
 /** Shadow overlay height: 0.0005 over the highest ground layer (sand, lane lines, 0.0135). */
 export const SHADOW_Y = 0.014;
 
-/** Penumbra reach: 0.12 of the caster's height, at most 0.3 (graphics upgrade §4.4.2). */
-export const PENUMBRA_MAX = 0.3;
-export const penumbraWidth = (height: number) => Math.min(PENUMBRA_MAX, 0.12 * height);
+/**
+ * Penumbra reach of one cast point: 0.15 of the height it was cast from, at most 0.45
+ * (graphics upgrade §4.4.2; final review ruling 2026-11-29: per point, sharp at the foot and
+ * soft far out, where 0.12 and 0.3 per caster read as an even halo).
+ */
+export const PENUMBRA_MAX = 0.45;
+export const PENUMBRA_SLOPE = 0.15;
+export const penumbraWidth = (height: number) =>
+  Math.min(PENUMBRA_MAX, PENUMBRA_SLOPE * Math.max(height, 0));
 
 /**
- * Every caster's shadow (buildings, gate, tree crowns, bulky props) cast along the sun onto the ground (hull
- * of the projected points, clipped to the base), `pal.shadow` at full strength, plus a penumbra
- * band round it that fades to white (no change under multiply) `penumbraWidth(tallest point)` out.
+ * Every caster's shadow (buildings, gate, tree crowns, bulky props) cast along the sun onto the
+ * ground (hull of the projected points, clipped to the base), `pal.shadow` at full strength, plus
+ * a penumbra band round it that fades to white (no change under multiply): each hull point is
+ * pushed out by `penumbraWidth` of its own height, so the band is sharp at a sunlit foot (no
+ * band where both ends of an edge are on the ground) and widest at the shadow's far end.
  * CampusScene draws it over all ground layers with multiply blending, so grass, paths, plaza and
  * lake all darken, and with a stencil test, so ground under two overlapping polygons darkens
  * once. One draw call.
@@ -840,15 +865,15 @@ export function buildShadows(
   const { sun } = pal.light;
   // Overcast: no sun, no shadow (the empty geometry draws nothing).
   if (!pal.sunShade) return groundTriangles([], SHADOW_Y);
-  const onGround = (p: Vector3): Fade => ({
+  const onGround = (p: Vector3): Cast => ({
     x: p.x - (sun.x / sun.y) * p.y,
     z: p.z - (sun.z / sun.y) * p.y,
     t: 0,
+    h: p.y,
   });
   const shades = [...shadowCasters(archetype, colonnades), ...crownCasters(), ...propCasters()]
     .map((caster) => {
       const ring = hull(caster.map(onGround));
-      const w = penumbraWidth(Math.max(...caster.map((p) => p.y)));
       const n = ring.length;
       // The outer ring: each corner pushed out along its mitre (capped at 2w on sharp corners).
       const outer = ring.map((p, i) => {
@@ -860,7 +885,7 @@ export function buildShadows(
           -(p.x - a.x) / da - (b.x - p.x) / db,
         ];
         const k =
-          w /
+          penumbraWidth(p.h) /
           Math.max(0.5, 1 + ((p.z - a.z) * (b.z - p.z) + (p.x - a.x) * (b.x - p.x)) / (da * db));
         return { x: p.x + nx * k, z: p.z + nz * k, t: 1 };
       });
@@ -870,12 +895,20 @@ export function buildShadows(
   const fan = (outline: Fade[]) =>
     outline.slice(1, -1).flatMap((p, i) => [outline[0] ?? p, p, outline[i + 2] ?? p]);
   const cores = shades.flatMap(({ core }) => fan(core));
+  const same = (a: Vec2, b: Vec2) => Math.abs(a.x - b.x) < 1e-9 && Math.abs(a.z - b.z) < 1e-9;
   const bands = shades.flatMap(({ ring, outer }) =>
     ring.flatMap((p, i) => {
       const j = (i + 1) % ring.length;
-      // One quad per edge, clipped to the base; its two outer corners are shared with the
-      // neighbouring quads, so the band has no gap at the corners.
-      return fan(clipToBase([p, ring[j] ?? p, outer[j] ?? p, outer[i] ?? p]));
+      const q = ring[j] ?? p;
+      // Both ends on the ground (a sunlit foot): no band, the shadow starts sharp there.
+      if (penumbraWidth(p.h) === 0 && penumbraWidth(q.h) === 0) return [];
+      // One quad per edge (a triangle when one end has no width), clipped to the base; its
+      // outer corners are shared with the neighbouring quads, so the band has no gap.
+      const quad = [p, q, outer[j] ?? q, outer[i] ?? p].filter(
+        (v, k, all) => k === 0 || !same(v, all[k - 1] ?? v),
+      );
+      if (same(quad[0] ?? p, quad[quad.length - 1] ?? p)) quad.pop();
+      return fan(clipToBase(quad));
     }),
   );
   return groundTriangles(
@@ -950,25 +983,33 @@ export const STRATA = [0, -0.06, -0.32, -0.6] as const;
 export const LAKE_SECTION = 0.18;
 
 /**
+ * The plinth's foot band (graphics upgrade §4.4.4): its lowest `FOOT_BAND` u, the colour ×
+ * `FOOT_DARK` (final review ruling 2026-11-29: 0.06 u × 0.8 was too faint to read at 1280).
+ */
+export const FOOT_BAND = 0.1;
+export const FOOT_DARK = 0.65;
+
+/**
  * The plinth's skirt, 0.25 out of the slab all round (art §5.1 T1), from y −0.8 to −0.6. Its
- * lowest 0.06 is the foot band (graphics upgrade §4.4.4): the colour × 0.8, one quad a side, so
- * the slab reads as an object set on the table. Cost: 8 triangles; the box above it ends at the
- * band's top and the quads sit on its planes, so the outline is exact and nothing overlaps.
+ * foot band is one quad a side, so the slab reads as an object set on the table. Cost: 8
+ * triangles; the box above it ends at the band's top and the quads sit on its planes, so the
+ * outline is exact and nothing overlaps.
  */
 function plinth(pal: Palette): Parts {
   const P = paint(pal);
   const { minX, maxX, minZ, maxZ } = BASE;
   const [x0, x1, z0, z1] = [minX - 0.25, maxX + 0.25, minZ - 0.25, maxZ + 0.25];
-  const dark = pal.plaza.clone().multiplyScalar(0.8);
+  const dark = pal.plaza.clone().multiplyScalar(FOOT_DARK);
   // `quad` stands 0.01 out of its plane; pull it back so the band is flush with the skirt.
   const flush = (face: Face, plane: number) => plane - outward(face);
   const [width, depth] = [x1 - x0, z1 - z0];
+  const [foot, mid] = [-0.8 + FOOT_BAND, -0.8 + FOOT_BAND / 2];
   return [
-    P(box(x0, x1, -0.74, -0.6, z0, z1), pal.plaza),
-    P(quad("+x", flush("+x", x1), (z0 + z1) / 2, -0.77, depth, 0.06), dark),
-    P(quad("-x", flush("-x", x0), (z0 + z1) / 2, -0.77, depth, 0.06), dark),
-    P(quad("+z", flush("+z", z1), (x0 + x1) / 2, -0.77, width, 0.06), dark),
-    P(quad("-z", flush("-z", z0), (x0 + x1) / 2, -0.77, width, 0.06), dark),
+    P(box(x0, x1, foot, -0.6, z0, z1), pal.plaza),
+    P(quad("+x", flush("+x", x1), (z0 + z1) / 2, mid, depth, FOOT_BAND), dark),
+    P(quad("-x", flush("-x", x0), (z0 + z1) / 2, mid, depth, FOOT_BAND), dark),
+    P(quad("+z", flush("+z", z1), (x0 + x1) / 2, mid, width, FOOT_BAND), dark),
+    P(quad("-z", flush("-z", z0), (x0 + x1) / 2, mid, width, FOOT_BAND), dark),
   ];
 }
 
@@ -1123,12 +1164,14 @@ function mainBuilding(pal: Palette): Parts {
   ).filter(({ x, y }) => !(Math.abs(x) < 1.7 && y < 1.5));
   const parts: Parts = [
     P(chamferBox(-9.9, 9.9, 0, 0.3, -9.95, -5.95), trim, ao),
-    P(chamferBox(-3.15, 3.15, 0, 0.3, -5.95, -5.15), trim, ao),
-    P(chamferBox(-1.7, 1.7, 0, 0.3, -5.15, -4.15), trim, ao),
+    // The two forward tiers share the base's top plane: plain boxes, the first reaching one
+    // chamfer into the base so its bevel leaves no groove at the join (final review).
+    P(box(-3.15, 3.15, 0, 0.3, -5.95 - CHAMFER, -5.15), trim, ao),
+    P(box(-1.7, 1.7, 0, 0.3, -5.15, -4.15), trim, ao),
     P(box(-1.7, 1.7, 0, 0.2, -4.15, -3.85), trim),
     P(box(-1.7, 1.7, 0, 0.1, -3.85, -3.55), trim),
     // Tower base: four storeys, corner piers stepping forward.
-    P(chamferBox(-3.0, 3.0, 0.3, 2.9, -9.9, -5.3), wall, { ...ao, aoUnder: 2.9 }),
+    P(eaveWall(-3.0, 3.0, 0.3, 2.9, -9.9, -5.3), wall, { ...ao, aoUnder: 2.9 }),
     P(box(-3.06, -2.5, 0.3, 2.9, -5.3, -5.24), wall),
     P(box(2.5, 3.06, 0.3, 2.9, -5.3, -5.24), wall),
     P(chamferBox(-3.12, 3.12, 2.9, 3.02, -10.02, -5.18), trim),
@@ -1151,7 +1194,7 @@ function mainBuilding(pal: Palette): Parts {
   for (const s of SIDES) {
     const [x0, x1] = s < 0 ? [-9.7, -3.0] : [3.0, 9.7];
     parts.push(
-      P(chamferBox(x0, x1, 0.3, 2.25, -9.7, -6.2), wall, { ...ao, aoUnder: 2.25 }),
+      P(eaveWall(x0, x1, 0.3, 2.25, -9.7, -6.2), wall, { ...ao, aoUnder: 2.25 }),
       P(chamferBox(x0 - 0.05, x1 + 0.05, 2.25, 2.37, -9.75, -6.15), trim),
       P(rect(x0 + 0.12, x1 - 0.12, -9.63, -6.27, 2.372), roof),
       P(chamferBox(x0 - 0.05, x1 + 0.05, 2.37, 2.5, -6.27, -6.15), wall),
@@ -1183,10 +1226,10 @@ function mainBuilding(pal: Palette): Parts {
   for (const c of [-9.05, -3.7, 3.7, 9.05]) {
     const floors = [0.63, 1.29, 1.95, 2.61];
     parts.push(
-      P(chamferBox(c - 0.7, c + 0.7, 0.3, 2.95, -7.4, -6.0), wall, { ...ao, aoUnder: 2.95 }),
+      P(eaveWall(c - 0.7, c + 0.7, 0.3, 2.95, -7.4, -6.0), wall, { ...ao, aoUnder: 2.95 }),
       P(chamferBox(c - 0.76, c + 0.76, 2.95, 3.03, -7.46, -5.94), trim),
       P(chamferBox(c - 0.5, c + 0.5, 3.03, 3.13, -7.2, -6.2), wall),
-      P(chamferBox(c - 0.26, c + 0.26, 3.13, 3.42, -6.96, -6.44), wall),
+      P(eaveWall(c - 0.26, c + 0.26, 3.13, 3.42, -6.96, -6.44), wall, { aoUnder: 3.42 }),
       P(box(c - 0.31, c + 0.31, 3.42, 3.48, -7.01, -6.39), trim),
       // The kiosk's window on all four sides (D6).
       ...(
@@ -1256,10 +1299,11 @@ function spireHall(pal: Palette): Parts {
       [4.6, 6.2],
       [6.5, 8.1],
     ].map(([x0 = 0, x1 = 0]) => P(rect(x0, x1, -9.35, -6.5, 2.374), pal.ground)),
-    P(chamferBox(-1.65, 1.65, 1.3, 1.46, -5.3, -4.22), trim),
+    // Plain: it abuts the tower base, where a bevel would leave a groove (final review).
+    P(box(-1.65, 1.65, 1.3, 1.46, -5.3, -4.22), trim),
     P(quad("+z", -5.3, 0, 0.75, 1.0, 0.9), g),
     // Tier 2; tiers 2 to 4 have windows on all four sides (D7).
-    P(chamferBox(-1.95, 1.95, 3.02, 3.8, -9.1, -6.1), wall, { aoUnder: 3.8 }),
+    P(eaveWall(-1.95, 1.95, 3.02, 3.8, -9.1, -6.1), wall, { aoUnder: 3.8 }),
     P(chamferBox(-2.03, 2.03, 3.8, 3.96, -9.18, -6.02), trim),
     ...SIDES.flatMap((s) => [
       ...range(9).map((k) =>
@@ -1270,7 +1314,7 @@ function spireHall(pal: Palette): Parts {
       ),
     ]),
     // Tier 3, roof garden and corner kiosks.
-    P(chamferBox(-1.83, 1.83, 3.96, 4.9, -9.0, -6.2), wall, { aoUnder: 4.9 }),
+    P(eaveWall(-1.83, 1.83, 3.96, 4.9, -9.0, -6.2), wall, { aoUnder: 4.9 }),
     P(chamferBox(-1.9, 1.9, 4.9, 5.0, -9.07, -6.13), trim),
     ...SIDES.flatMap((s) => [
       ...grid(range(9), [4.2, 4.62], (k, y) =>
@@ -1287,7 +1331,7 @@ function spireHall(pal: Palette): Parts {
       P(cone(0.26, 4, 5.42, 5.6, kx, kz, true), trim),
     ]).flat(),
     // Tier 4 with tall arched openings.
-    P(chamferBox(-0.81, 0.81, 5.0, 6.2, -8.41, -6.79), wall, { aoUnder: 6.2 }),
+    P(eaveWall(-0.81, 0.81, 5.0, 6.2, -8.41, -6.79), wall, { aoUnder: 6.2 }),
     ...(
       [
         ["+z", -6.79, 0],
@@ -1361,9 +1405,9 @@ function clockTower(pal: Palette): Parts {
   ] as const;
   return [
     P(hipRoof, roof),
-    P(chamferBox(-0.85, 0.85, 0.3, 4.6, -6.5, -4.8), wall, { ao: true, aoUnder: 4.6 }),
+    P(eaveWall(-0.85, 0.85, 0.3, 4.6, -6.5, -4.8), wall, { ao: true, aoUnder: 4.6 }),
     P(chamferBox(-0.95, 0.95, 4.6, 4.72, -6.6, -4.7), trim),
-    P(chamferBox(-0.75, 0.75, 4.72, 5.9, -6.4, -4.9), wall),
+    P(eaveWall(-0.75, 0.75, 4.72, 5.9, -6.4, -4.9), wall, { aoUnder: 5.9 }),
     ...faces.flatMap(([face, plane, u]) => [
       P(disc(face, plane, u, v, 0.42, 16), pal.plaza, e),
       P(onFace(new RingGeometry(0.42, 0.5, 16), face, plane, u, v), accent),
@@ -1391,7 +1435,7 @@ function colonnade(pal: Palette): Parts {
   return [
     ...COLONNADE_COLUMNS.flatMap(({ x, z }) => [
       P(box(x - 0.13, x + 0.13, 0.04, 0.12, z - 0.13, z + 0.13), trim),
-      P(cyl(0.075, 0.088, 8, 0.12, 1.55, x, z), wall, { aoUnder: 1.55 }),
+      P(cyl(0.075, 0.088, 8, 0.12, 1.55, x, z), wall),
       P(box(x - 0.13, x + 0.13, 1.55, 1.65, z - 0.13, z + 0.13), trim),
     ]),
     ...SIDES.flatMap((s) => [
@@ -1568,7 +1612,7 @@ export function buildLibrary(pal: Palette, look: SiteLook) {
   const tall = [-11.85, -11.15, -10.45, -9.75];
   const parts: Parts = [
     P(chamferBox(-12.4, -8.8, 0, 0.25, -6.0, -0.6), c.trim, { ao: true }),
-    P(chamferBox(-12.2, -9.4, 0.25, 1.85, -5.8, -0.8), c.wall, { ao: true, aoUnder: 1.85 }),
+    P(eaveWall(-12.2, -9.4, 0.25, 1.85, -5.8, -0.8), c.wall, { ao: true, aoUnder: 1.85 }),
     ...[-5.2, -4.4, -3.6, -2.0, -1.2].flatMap((z) => [
       P(cyl(0.075, 0.085, 8, 0.25, 1.85, -9.05, z), c.wall),
       P(cyl(0.095, 0.095, 8, 1.66, 1.76, -9.05, z), c.accent),
@@ -1650,15 +1694,16 @@ export function buildWatchtower(pal: Palette, look: SiteLook) {
   const slot = { emissive: look === "lit" };
   return merge([
     P(chamferBox(8.8, 12.0, 0, 0.25, -6.0, -1.0), c.trim, ao),
-    P(chamferBox(9.0, 11.8, 0.25, 1.45, -3.8, -1.2), c.wall, { ...ao, aoUnder: 1.45 }),
+    // The lobby reaches one chamfer into the tower, so its bevels leave no groove at the joint.
+    P(eaveWall(9.0, 11.8, 0.25, 1.45, -3.8 - CHAMFER, -1.2), c.wall, { ...ao, aoUnder: 1.45 }),
     P(chamferBox(8.95, 11.85, 1.45, 1.53, -3.85, -1.15), c.trim),
-    P(chamferBox(9.6, 11.6, 0.25, 3.45, -5.8, -3.8), c.wall, { ...ao, aoUnder: 3.45 }),
+    P(eaveWall(9.6, 11.6, 0.25, 3.45, -5.8, -3.8), c.wall, { ...ao, aoUnder: 3.45 }),
     P(chamferBox(9.52, 11.68, 3.45, 3.57, -5.88, -3.72), c.trim),
-    P(chamferBox(9.8, 11.4, 3.57, 4.17, -5.6, -4.0), c.wall, { aoUnder: 4.17 }),
+    P(eaveWall(9.8, 11.4, 3.57, 4.17, -5.6, -4.0), c.wall, { aoUnder: 4.17 }),
     P(chamferBox(9.75, 11.45, 4.17, 4.25, -5.65, -3.95), c.trim),
-    P(chamferBox(10.05, 11.15, 4.25, 4.75, -5.35, -4.25), c.wall),
+    P(eaveWall(10.05, 11.15, 4.25, 4.75, -5.35, -4.25), c.wall, { aoUnder: 4.75 }),
     P(chamferBox(10.0, 11.2, 4.75, 4.82, -5.4, -4.2), c.trim),
-    P(chamferBox(10.3, 10.9, 4.82, 5.5, -5.1, -4.5), c.wall),
+    P(eaveWall(10.3, 10.9, 4.82, 5.5, -5.1, -4.5), c.wall, { aoUnder: 5.5 }),
     P(chamferBox(10.24, 10.96, 5.5, 5.58, -5.16, -4.44), c.trim),
     // The lamp slot under the cap, on all four sides (D13).
     ...(
@@ -1724,9 +1769,9 @@ export function buildMarket(pal: Palette, look: SiteLook) {
   const tilt = 0.3805;
   return merge([
     P(chamferBox(7.0, 11.0, 0, 0.2, 2.6, 5.2), c.trim, { ao: true }),
-    ...columns.map(({ x, z }) => P(cyl(0.08, 0.09, 8, 0.2, 1.75, x, z), c.wall, { aoUnder: 1.75 })),
+    ...columns.map(({ x, z }) => P(cyl(0.08, 0.09, 8, 0.2, 1.75, x, z), c.wall)),
     P(chamferBox(6.95, 11.05, 1.75, 1.95, 2.55, 5.25), c.trim),
-    P(chamferBox(7.6, 10.4, 1.95, 2.35, 3.05, 4.75), c.wall, { aoUnder: 2.35 }),
+    P(eaveWall(7.6, 10.4, 1.95, 2.35, 3.05, 4.75), c.wall, { aoUnder: 2.35 }),
     P(chamferBox(7.55, 10.45, 2.35, 2.42, 3.0, 4.8), c.trim),
     P(new PlaneGeometry(3.9, 0.646).rotateX(-PI / 2 + tilt).translate(9.0, 1.5, 5.55), c.roof),
     // North awning, the south one turned round (D15): seen from behind, the fair keeps its red.
