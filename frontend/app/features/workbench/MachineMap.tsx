@@ -403,8 +403,8 @@ const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
  * A toy or belt off the pressed step's path. 70% is the lowest 5% step at which
  * EVERY tone of a toy's outline holds 3:1 against the frame (WCAG 1.4.11), not just the idle ink:
  * a run leaves outlines green, red, amber and teal or blue, and those are paler once faded.
- * Contrast of the faded outline over the frame's white, town / vinuni (e2e "keeps a dimmed toy's
- * outline at 3:1" and "run-state outline ... after W1's recorded run", both themes):
+ * Contrast of the faded outline over the frame's white, town / campus theme (e2e "keeps a dimmed
+ * toy's outline at 3:1" and "run-state outline ... after W1's recorded run", both themes):
  *
  *   opacity   fg          success     warning     danger      brand       lowest
  *   55%       3.51 3.36   2.51 2.66   2.51 2.54   2.74 2.66   2.45 2.82   2.45
@@ -2060,45 +2060,47 @@ function Dress({
           : answer === "fail"
             ? "fill-danger-tint"
             : "fill-surface";
+      const tone = answer === "pass" ? "stroke-success" : "stroke-danger";
       return g(
         <>
           <polygon points={board} className={fill} />
           {answer !== null && (
             // The verdict sealed like the results stamp: a double frame, tilted a little, in the
-            // verdict's tone, round a tick or a cross. Drawing only, no words. The frames sit
-            // inside the board's face, which they leave as it was.
+            // verdict's tone, round a tick or a cross. Drawing only, no words. The seal is drawn
+            // flat about the board's centre, tilted 3 degrees in the board's own plane, and only
+            // then sheared into the face (`skewY` is the slope of `iso`'s x axis, 30 degrees), so
+            // it leans with the board and its frames stay inside the face's 31 by 30.
             <g data-verdict={answer}>
-              <g data-board-seal="" transform={`rotate(-3 ${mx} ${my})`}>
+              <g
+                data-board-seal=""
+                transform={`translate(${mx.toFixed(1)} ${my.toFixed(1)}) skewY(30) rotate(-3)`}
+              >
                 <rect
-                  x={mx - 11}
-                  y={my - 10}
+                  x="-11"
+                  y="-10"
                   width="22"
                   height="20"
                   fill="none"
-                  className={answer === "pass" ? "stroke-success" : "stroke-danger"}
+                  className={tone}
                   strokeWidth={INK.edge}
                 />
                 <rect
-                  x={mx - 9}
-                  y={my - 8}
+                  x="-9"
+                  y="-8"
                   width="18"
                   height="16"
                   fill="none"
-                  className={answer === "pass" ? "stroke-success" : "stroke-danger"}
+                  className={tone}
                   strokeWidth={INK.fine}
                 />
                 {answer === "pass" ? (
                   <path
-                    d={`M${mx - 7} ${my}l5 5l9 -10`}
-                    className="fill-none stroke-success"
+                    d="M-7 0l5 5l9 -10"
+                    className={`fill-none ${tone}`}
                     strokeWidth={INK.mark}
                   />
                 ) : (
-                  <path
-                    d={`M${mx - 6} ${my - 6}l12 12M${mx + 6} ${my - 6}l-12 12`}
-                    className="stroke-danger"
-                    strokeWidth={INK.mark}
-                  />
+                  <path d="M-6 -6l12 12M6 -6l-12 12" className={tone} strokeWidth={INK.mark} />
                 )}
               </g>
             </g>

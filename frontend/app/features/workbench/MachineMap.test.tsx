@@ -404,6 +404,51 @@ describe("the machine as a figure to play with", () => {
     expect(INK).toEqual({ outline: 2.4, edge: 1, fine: 1, cue: 1.6, mark: 2.5 });
   });
 
+  /** The points of a seal (rect corners, path ends) after its `translate skewY rotate` transform. */
+  const sealPoints = (seal: Element | null | undefined): [number, number][] => {
+    const m = /^translate\((-?[\d.]+) (-?[\d.]+)\) skewY\((-?[\d.]+)\) rotate\((-?[\d.]+)\)$/.exec(
+      seal?.getAttribute("transform") ?? "",
+    );
+    if (!m) return [];
+    const [tx, ty, skew, turn] = m.slice(1).map(Number) as [number, number, number, number];
+    const place = (x: number, y: number): [number, number] => {
+      const a = (turn * Math.PI) / 180;
+      const rx = x * Math.cos(a) - y * Math.sin(a);
+      const ry = x * Math.sin(a) + y * Math.cos(a);
+      return [tx + rx, ty + ry + rx * Math.tan((skew * Math.PI) / 180)];
+    };
+    const out: [number, number][] = [];
+    for (const rect of seal?.querySelectorAll("rect") ?? []) {
+      const [x, y, w, h] = ["x", "y", "width", "height"].map((n) => Number(rect.getAttribute(n)));
+      for (const [dx, dy] of [
+        [0, 0],
+        [w, 0],
+        [w, h],
+        [0, h],
+      ] as const)
+        out.push(place((x ?? 0) + (dx ?? 0), (y ?? 0) + (dy ?? 0)));
+    }
+    for (const path of seal?.querySelectorAll("path") ?? []) {
+      let at: [number, number] = [0, 0];
+      for (const [, cmd, a, b] of (path.getAttribute("d") ?? "").matchAll(
+        /([Ml])(-?[\d.]+)[ ,](-?[\d.]+)/g,
+      )) {
+        const next: [number, number] = [Number(a), Number(b)];
+        at = cmd === "M" ? next : [at[0] + next[0], at[1] + next[1]];
+        out.push(place(at[0], at[1]));
+      }
+    }
+    return out;
+  };
+  /** Inside a convex quad (corner list in drawing order), edges included. */
+  const insideBoard = (p: [number, number], quad: number[][]): boolean => {
+    const signs = quad.map(([ax = 0, ay = 0], i) => {
+      const [bx = 0, by = 0] = quad[(i + 1) % quad.length] ?? [];
+      return Math.sign((bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax));
+    });
+    return signs.every((s) => s >= 0) || signs.every((s) => s <= 0);
+  };
+
   it("seals the answer board like a stamp, without words", () => {
     const board = () => {
       const polygon = tile("output")?.querySelector('g[aria-hidden="true"] > polygon:first-child');
@@ -427,6 +472,7 @@ describe("the machine as a figure to play with", () => {
         board: board(),
         rects: [...(seal?.children ?? [])].filter((c) => c.tagName === "rect"),
         transform: seal?.getAttribute("transform"),
+        points: sealPoints(seal),
         texts: seal?.querySelectorAll("text").length,
         glyph: seal?.querySelector("path")?.getAttribute("d"),
         tone: verdict?.querySelector("path")?.getAttribute("class"),
@@ -461,7 +507,13 @@ describe("the machine as a figure to play with", () => {
       expect(seal.board).toBe(empty);
       // Two concentric frames, then the tick or the cross, in the verdict's tone; no words.
       expect(seal.rects).toHaveLength(2);
-      expect(seal.transform).toMatch(/^rotate\(-3 /);
+      // Tilted in the board's own plane, then sheared into its face, so it leans with the board.
+      expect(seal.transform).toMatch(/^translate\(-?[\d.]+ -?[\d.]+\) skewY\(30\) rotate\(-3\)$/);
+      // Every corner of both frames and every end of the mark, as the board shows it, is inside
+      // the board's face (a drawn 1.7 px outside it before the shear).
+      expect(seal.points.length).toBeGreaterThan(10);
+      for (const point of seal.points)
+        expect(insideBoard(point, corners), String(point)).toBe(true);
       expect(seal.texts).toBe(0);
       expect(seal.tone).toContain(tone);
       expect(seal.glyph).toBeTruthy();
