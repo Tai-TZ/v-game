@@ -575,22 +575,42 @@ test.describe("the projector at 375 px (R10)", () => {
     });
   }
 
-  // Graphics upgrade 4.3: at 175 % the three stars and "3/3 sao" must not push the page sideways.
-  for (const stream of ["starter", "reference"] as const) {
-    test(`keeps the ${stream} run's score on one screen width`, async ({ page }) => {
-      await mockWorkbenchApi(page, { events: () => w1Stream(stream) });
-      await page.goto(`${W1}?chieu=1`);
-      await page.getByRole("button", { name: "Mở ca" }).click();
-      await page.getByRole("button", { name: "Mở kết quả" }).click();
-      await expect(page.getByText(/^\d\/3 sao$/)).toBeVisible();
-      // At rest: a stamp lands from 1.15x, and its overshoot may reach past the edge for 180 ms.
-      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
-      expect(await sideways(page)).toBeLessThanOrEqual(0);
-      for (const star of await page.locator("[data-star]").all()) {
-        const box = await star.boundingBox();
-        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= 375).toBe(true);
-      }
-    });
+  // Graphics upgrade 4.3: at 175 % the three stars and "3/3 sao" must not push the page sideways,
+  // and every star must sit inside the band it is drawn on (at 320 px too).
+  for (const width of [375, 320]) {
+    for (const stream of ["starter", "reference"] as const) {
+      test(`keeps the ${stream} run's stars inside the band at ${width} px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 812 });
+        await mockWorkbenchApi(page, { events: () => w1Stream(stream) });
+        await page.goto(`${W1}?chieu=1`);
+        await page.getByRole("button", { name: "Mở ca" }).click();
+        await page.getByRole("button", { name: "Mở kết quả" }).click();
+        await expect(page.getByText(/^\d\/3 sao$/)).toBeVisible();
+        // At rest: a stamp lands from 1.15x, and its overshoot may reach past the edge for 180 ms.
+        await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+        // R10 is 375 px. At 320 the case tiles' label chips overflow on their own (not the stars'
+        // doing), so there only the band is held to the screen.
+        if (width === 375) expect(await sideways(page)).toBeLessThanOrEqual(0);
+        const band = await page.locator("[data-results-band]").boundingBox();
+        expect(band).not.toBeNull();
+        expect(band?.x ?? -1).toBeGreaterThanOrEqual(0);
+        expect((band?.x ?? 0) + (band?.width ?? 0)).toBeLessThanOrEqual(width);
+        const stars = await page.locator("[data-star]").all();
+        expect(stars).toHaveLength(3);
+        for (const star of stars) {
+          const box = await star.boundingBox();
+          expect(box).not.toBeNull();
+          expect(box?.x ?? -1).toBeGreaterThanOrEqual(band?.x ?? 0);
+          expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+            (band?.x ?? 0) + (band?.width ?? 0),
+          );
+          expect(box?.y ?? -1).toBeGreaterThanOrEqual(band?.y ?? 0);
+          expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+            (band?.y ?? 0) + (band?.height ?? 0),
+          );
+        }
+      });
+    }
   }
 });
 
@@ -651,4 +671,56 @@ for (const theme of THEMES) {
       }
     });
   }
+}
+
+// Graphics upgrade 4.3: a star not earned is a dashed outline that reads as a star (the dashes run
+// per edge, so the points stay solid) and holds 3:1 against the band under it (WCAG 1.4.11).
+for (const theme of THEMES) {
+  test(`draws an unearned star dashed and at 3:1 on the band, theme ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.addInitScript((id) => window.localStorage.setItem("vg-theme", id), theme);
+    await mockWorkbenchApi(page, { events: () => w1Stream("starter") });
+    await page.goto(`${W1}?chieu=1`);
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await page.getByRole("button", { name: "Mở kết quả" }).click();
+    const empty = page.locator('[data-star="empty"]');
+    await expect(empty).toHaveCount(3);
+    const seen = await empty.evaluateAll((stars) => {
+      const rgba = (css: string) => {
+        const ctx = document.createElement("canvas").getContext("2d");
+        if (!ctx) throw new Error("no canvas");
+        ctx.fillStyle = css;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r = 0, g = 0, b = 0, a = 0] = ctx.getImageData(0, 0, 1, 1).data;
+        return [r, g, b, a / 255] as const;
+      };
+      return stars.map((star) => {
+        const css = getComputedStyle(star);
+        const bandEl = star.closest("[data-results-band]");
+        if (!bandEl) throw new Error("a star outside the band");
+        const band = getComputedStyle(bandEl);
+        return {
+          dash: css.strokeDasharray,
+          offset: css.strokeDashoffset,
+          join: css.strokeLinejoin,
+          pathLength: star.querySelector("path")?.getAttribute("pathLength"),
+          ink: rgba(css.stroke),
+          back: rgba(band.backgroundColor),
+        };
+      });
+    });
+    for (const star of seen) {
+      expect(star.dash).not.toMatch(/^(none)?$/);
+      expect(star.pathLength).toBe("100");
+      expect(star.join).toBe("round");
+      expect(star.back[3], "an opaque band behind the star").toBe(1);
+      expect(star.ink[3], "an opaque outline").toBe(1);
+      expect(
+        contrast(
+          [star.ink[0], star.ink[1], star.ink[2]],
+          [star.back[0], star.back[1], star.back[2]],
+        ),
+      ).toBeGreaterThanOrEqual(3);
+    }
+  });
 }

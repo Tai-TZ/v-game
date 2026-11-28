@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { buttonClass } from "~/components/ui/button";
 import { CheckIcon, ChevronDownIcon, ClockIcon, CrossIcon, StarIcon } from "~/components/ui/icons";
-import { Stamp } from "~/components/ui/Stamp";
+import { LAND_DELAY, Stamp } from "~/components/ui/Stamp";
 import { ProjectorLink } from "~/features/projector/ProjectorLink";
 
 import { domain, nodeIds, sameJson, type Env } from "./bench";
@@ -79,13 +79,6 @@ interface ResultsProps {
   /** N16: opening a failing case's trace is a free look toward the next hint. */
   onLook?: () => void;
 }
-
-/** Each earned star lands a beat after the one before it (Stamp's delays, in stars). */
-const STAR_DELAY = [
-  "[animation-delay:0ms]",
-  "[animation-delay:60ms]",
-  "[animation-delay:120ms]",
-] as const;
 
 /** Sao 3 evidence per forbidden label, in the words of `stars_vi` ("{n} câu …"). */
 const LABEL_EVIDENCE: Readonly<Record<string, string>> = {
@@ -184,6 +177,9 @@ export function Results({
   const skipped = unfinished(run).length;
   const calls = llmCalls(run);
   const served = fallbackAnswers(run);
+  // X7: a fallback costs about 0,9k more output tokens on an L3 run (spec §7), so when one
+  // answered, a token figure is not a measure of the player's bench alone.
+  const tokenNote = served.fallback > 0 ? ["hiệu chỉnh trên model chính"] : [];
   const spread = outTokenSpread(run);
   const conditions = [
     {
@@ -202,11 +198,9 @@ export function Results({
     },
     {
       ok: score.s2,
-      // X7: a fallback costs about 0,9k more output tokens on an L3 run (spec §7), so when one
-      // answered, this token figure is not a measure of the player's bench alone.
       evidence: [
         `${fmt(score.tokens)}/${fmt(score.budget)} token (${TOKENS_VI.usage})`,
-        ...(served.fallback > 0 ? ["hiệu chỉnh trên model chính"] : []),
+        ...tokenNote,
       ].join(" · "),
       bar: true,
     },
@@ -237,7 +231,10 @@ export function Results({
           {runGraph && !sameJson(runGraph, graph) && ` · ${RECORDED_VI.notYours}`}
         </p>
       )}
-      <div data-results-band="" className="mt-4 rounded-md bg-subtle p-4">
+      <div
+        data-results-band=""
+        className="mt-4 max-w-prose rounded-md bg-subtle p-4 chieu:max-sm:p-2"
+      >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span aria-hidden="true" className="flex gap-1">
             {([0, 1, 2] as const).map((index) =>
@@ -245,13 +242,13 @@ export function Results({
                 <StarIcon
                   key={index}
                   data-star="earned"
-                  className={`size-10 shrink-0 fill-accent stroke-accent motion-safe:animate-stamp chieu:size-14 ${STAR_DELAY[index]}`}
+                  className={`size-10 shrink-0 fill-accent stroke-accent motion-safe:animate-stamp chieu:size-14 chieu:max-sm:size-10 ${LAND_DELAY[index]}`}
                 />
               ) : (
                 <StarIcon
                   key={index}
                   data-star="empty"
-                  className="size-10 shrink-0 fill-none stroke-line-strong [stroke-dasharray:3_2] chieu:size-14"
+                  className="size-10 shrink-0 fill-none stroke-fg-muted [stroke-dasharray:7_3] [stroke-dashoffset:3.5] [stroke-linejoin:round] chieu:size-14 chieu:max-sm:size-10"
                 />
               ),
             )}
@@ -259,7 +256,7 @@ export function Results({
           <p className="text-2xl font-bold">{score.stars}/3 sao</p>
         </div>
         <p className="mt-2 text-sm text-fg-muted tabular-nums">
-          Tổng {fmt(score.tokens)} token ({TOKENS_VI.usage})
+          {[`Tổng ${fmt(score.tokens)} token (${TOKENS_VI.usage})`, ...tokenNote].join(" · ")}
         </p>
       </div>
 
@@ -372,7 +369,7 @@ export function Results({
                   key={group.flag}
                   className="rounded-md border border-l-[3px] border-line border-l-brand bg-surface p-3"
                 >
-                  <p className="font-semibold">{rich(group.message_vi)}</p>
+                  <p>{rich(group.message_vi)}</p>
                   {showSlot && target.why && <p className="mt-1 text-sm">{target.why}</p>}
                   {rest.length > 0 && (
                     <p className="mt-1 text-sm">

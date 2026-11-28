@@ -6,11 +6,15 @@ const TONE = {
   muted: "text-fg-muted border-line-strong",
 } as const;
 
-const DELAY = {
-  0: "[animation-delay:0ms]",
-  1: "[animation-delay:60ms]",
-  2: "[animation-delay:120ms]",
-} as const;
+/**
+ * One beat later per step: a stamp's `delay`, and the nth earned star's. Literal strings, so
+ * Tailwind's scanner sees every class.
+ */
+export const LAND_DELAY = [
+  "[animation-delay:0ms]",
+  "[animation-delay:60ms]",
+  "[animation-delay:120ms]",
+] as const;
 
 /**
  * A verdict pressed onto the page like an ink stamp (graphics upgrade 4.3): mono capitals in a
@@ -29,7 +33,7 @@ export function Stamp({
   return (
     <span
       data-stamp={tone}
-      className={`inline-block -rotate-3 border-4 border-double px-2 py-0.5 font-mono text-sm font-semibold uppercase motion-safe:animate-stamp chieu:text-2xl ${TONE[tone]} ${DELAY[delay]}`}
+      className={`inline-block -rotate-3 border-4 border-double px-2 py-0.5 font-mono text-sm font-semibold uppercase motion-safe:animate-stamp chieu:text-2xl ${TONE[tone]} ${LAND_DELAY[delay]}`}
     >
       {children}
     </span>

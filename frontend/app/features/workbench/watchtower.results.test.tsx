@@ -167,6 +167,8 @@ describe("the band and the rule of the results (graphics upgrade 4.2.4)", () => 
     expect(band.className).toContain("bg-subtle");
     expect(band.className).toContain("rounded-md");
     expect(band.className).toContain("p-4");
+    // As wide as the rest of the results, not the section's whole width.
+    expect(band.className).toContain("max-w-prose");
     // The stars and the total token line live in it; no button, no link.
     expect(band.querySelectorAll("[data-star]")).toHaveLength(3);
     expect(within(band).getByText(/Tổng .* token/)).not.toBeNull();
@@ -189,14 +191,29 @@ describe("the band and the rule of the results (graphics upgrade 4.2.4)", () => 
   });
 
   it("rules every diagnosis card in one tone", () => {
-    show(run(two, "bỏ qua"));
+    show(
+      run(
+        [
+          {
+            case: "wt-w1-t01",
+            flag: "hitl.bypassed",
+            message_vi: "Câu #9 chạy thẳng, thiếu *Chuông duyệt*.",
+          },
+          { case: "wt-w1-t04", flag: "guard.blocked_benign", message_vi: "Lưới chặn nhầm." },
+        ],
+        "bỏ qua",
+      ),
+    );
     const cards = [...document.querySelectorAll("ul[aria-labelledby='wb-diagnosis-title'] > li")];
     expect(cards).toHaveLength(2);
+    expect(cards[0]?.firstElementChild?.querySelector("strong")?.textContent).toBe("Chuông duyệt");
     for (const card of cards) {
       const classes = card.getAttribute("class") ?? "";
       expect(classes).toContain("border-l-[3px]");
       expect(classes).toContain("border-l-brand");
-      expect(card.firstElementChild?.getAttribute("class") ?? "").toContain("font-semibold");
+      // The message is body weight: a card has no heading, and a bold paragraph would mute the
+      // toy names in `<strong>` (e2e "sets a toy's name bolder than the card's message").
+      expect(card.firstElementChild?.getAttribute("class") ?? "").not.toMatch(/font-(semi)?bold/);
     }
     // One tone for all: no card carries a danger or warning rule.
     for (const card of cards) {
@@ -220,8 +237,16 @@ describe("the stars and their stamps (graphics upgrade 4.3)", () => {
     expect(stars("earned")).toHaveLength(0);
     expect(stars("empty")).toHaveLength(3);
     for (const star of stars("empty")) {
-      expect(star.getAttribute("class")).toContain("[stroke-dasharray:3_2]");
-      expect(star.getAttribute("class")).toContain("fill-none");
+      const classes = star.getAttribute("class") ?? "";
+      // Dashed per edge, not along the whole path: the path is 100 long (ten edges of about
+      // 10), `7 3` shifted by 3.5 puts each gap mid-edge, and the points stay solid.
+      expect(star.querySelector("path")?.getAttribute("pathLength")).toBe("100");
+      expect(classes).toContain("[stroke-dasharray:7_3]");
+      expect(classes).toContain("[stroke-dashoffset:3.5]");
+      expect(classes).toContain("[stroke-linejoin:round]");
+      expect(classes).toContain("fill-none");
+      expect(classes).toContain("stroke-fg-muted");
+      expect(classes).not.toContain("stroke-line-strong");
     }
     cleanup();
 

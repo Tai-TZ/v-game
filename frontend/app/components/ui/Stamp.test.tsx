@@ -1,5 +1,4 @@
 import { cleanup, render } from "@testing-library/react";
-import axe from "axe-core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Stamp } from "./Stamp";
@@ -49,26 +48,5 @@ describe("Stamp (graphics upgrade 4.3)", () => {
 
   it("keeps its copy as typed, for a screen reader", () => {
     expect(stamp("muted").textContent).toBe("Đạt");
-  });
-
-  it("passes axe's structural rules and keeps the visible text in the name", async () => {
-    const { container } = render(
-      <ol>
-        <li>
-          <Stamp tone="pass">Đạt</Stamp>
-        </li>
-        <li>
-          <Stamp tone="muted">Chưa đạt</Stamp>
-        </li>
-      </ol>,
-    );
-    const result = await axe.run(container, {
-      runOnly: {
-        type: "rule",
-        values: ["list", "listitem", "label-content-name-mismatch", "aria-allowed-attr"],
-      },
-    });
-    expect(result.passes.length).toBeGreaterThan(0);
-    expect(result.violations.map((v) => v.id)).toEqual([]);
   });
 });

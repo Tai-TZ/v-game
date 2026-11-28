@@ -297,6 +297,18 @@ describe("a run some fallback model answered", () => {
     expect(s2?.textContent).toContain("hiệu chỉnh trên model chính");
   });
 
+  it("carries the same caveat on the band's total, and only then", () => {
+    // The band is the line a teacher reads first; its token total must not drop the caveat.
+    show(withFallback(2));
+    const band = document.querySelector("[data-results-band]");
+    expect(band?.textContent).toMatch(/Tổng .* token \(.*\) · hiệu chỉnh trên model chính$/);
+    cleanup();
+    show(withFallback(0));
+    const plain = document.querySelector("[data-results-band]");
+    expect(plain?.textContent).toMatch(/Tổng .* token/);
+    expect(plain?.textContent).not.toContain("model chính");
+  });
+
   it("stays quiet when the primary answered every case", () => {
     show(withFallback(0));
     expect(document.querySelector("[data-fallback]")).toBeNull();

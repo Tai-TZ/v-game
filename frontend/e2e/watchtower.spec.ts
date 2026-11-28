@@ -154,6 +154,24 @@ test.describe("watchtower W1", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("sets a toy's name bolder than the card's message", async ({ page }) => {
+    await mockWorkbenchApi(page, { events: () => stream("starter") });
+    await page.goto(W1);
+    await page.getByRole("button", { name: "Mở ca" }).click();
+    await page.getByRole("button", { name: "Bỏ qua, xem chẩn đoán" }).click();
+    const message = page
+      .locator("ul[aria-labelledby='wb-diagnosis-title'] > li > p:first-child")
+      .filter({ has: page.locator("strong") })
+      .first();
+    await expect(message).toBeVisible();
+    const weights = await message.evaluate((el) => ({
+      message: Number(getComputedStyle(el).fontWeight),
+      toy: Number(getComputedStyle(el.querySelector("strong") as Element).fontWeight),
+    }));
+    expect(weights.message).toBe(400);
+    expect(weights.toy).toBeGreaterThan(weights.message);
+  });
+
   test("stamps each earned star once, and not with reduced motion (graphics upgrade 4.3)", async ({
     page,
   }) => {

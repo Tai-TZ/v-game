@@ -59,7 +59,11 @@ export function CrossIcon({ className = ICON }: { className?: string }) {
   );
 }
 
-/** Star; colour comes from the caller's `fill-*` / `stroke-*` classes. */
+/**
+ * Star; colour comes from the caller's `fill-*` / `stroke-*` classes. The path is 100 long
+ * (`pathLength`), its ten edges about 10 each, so a caller can dash it per edge: `7 3` with a
+ * dash offset of 3.5 puts every gap mid-edge and leaves each point and corner solid.
+ */
 export function StarIcon({
   className = ICON,
   "data-star": star,
@@ -75,7 +79,10 @@ export function StarIcon({
       strokeWidth="1.5"
       data-star={star}
     >
-      <path d="m10 2.5 2.3 4.8 5.2.7-3.8 3.6.9 5.2L10 14.3l-4.6 2.5.9-5.2-3.8-3.6 5.2-.7Z" />
+      <path
+        pathLength="100"
+        d="m10 2.5 2.3 4.8 5.2.7-3.8 3.6.9 5.2L10 14.3l-4.6 2.5.9-5.2-3.8-3.6 5.2-.7Z"
+      />
     </svg>
   );
 }
