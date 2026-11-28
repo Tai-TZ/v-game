@@ -268,6 +268,22 @@ for (const viewport of [
   }
 }
 
+test("draws the machine's outlines at 3 on the projector (R2)", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await mockWorkbenchApi(page);
+  const outline = () => page.locator("[data-machine-figure] [data-outline]").first();
+  const width = () => outline().evaluate((el) => getComputedStyle(el).strokeWidth);
+
+  // The back row sees a heavier silhouette than the desk does: 3 against the ink's 2.4.
+  await page.goto(W1);
+  await expect(outline()).toBeVisible();
+  expect(await width()).toBe("2.4px");
+  await page.goto(`${W1}?chieu=1`);
+  await expect(page.locator("html")).toHaveClass(/\bchieu\b/);
+  await expect(outline()).toBeVisible();
+  expect(await width()).toBe("3px");
+});
+
 test("covers W1's recorded run, ledger and answer board too, while the server wakes (R4, R6)", async ({
   page,
 }) => {

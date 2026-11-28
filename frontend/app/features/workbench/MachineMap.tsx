@@ -446,7 +446,7 @@ function Box({
   stroke?: string;
   /** See-through: the faces turn to glass so what the toy holds shows inside it. */
   glass?: boolean;
-  /** The heavy silhouette over the faces' thin edges. */
+  /** The heavy silhouette over the faces' thin edges; 3 rather than 2.4 on the projector. */
   outline?: boolean;
   /** A dash pattern for the silhouette: a state told by its line, not its colour alone. */
   dash?: string | undefined;
@@ -506,7 +506,7 @@ function Box({
         <polygon
           data-outline=""
           fill="none"
-          className={`${stroke}`}
+          className={`${stroke} chieu:[stroke-width:3]`}
           strokeWidth={INK.outline}
           strokeLinejoin="round"
           {...(dash ? { strokeDasharray: dash } : {})}
