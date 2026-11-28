@@ -259,7 +259,8 @@ for (const viewport of [
       expect(await px(page, "#wb-results")).toBeGreaterThanOrEqual(40);
       // Graphics upgrade 4.3: the verdict stamps are read from the back row too.
       await expect(page.locator("[data-stamp]").first()).toBeVisible();
-      expect(await px(page, "[data-stamp]")).toBeGreaterThanOrEqual(24);
+      // chieu:text-2xl: 24 x 1.75 = 42 px, the stamp bigger than the 24.5 px text beside it.
+      expect(await px(page, "[data-stamp]")).toBeGreaterThanOrEqual(40);
       await expect(page.getByText("Xem vết chạy").first()).toBeHidden();
       expect(await seriousViolations(page)).toEqual([]);
       expect(await sideways(page)).toBeLessThanOrEqual(0);
@@ -571,6 +572,24 @@ test.describe("the projector at 375 px (R10)", () => {
       // The way back on one line: one 44-unit control, 77 px at the projector's 175 %.
       const back = header.getByRole("link").first();
       expect((await back.boundingBox())?.height ?? 0).toBeLessThanOrEqual(78);
+    });
+  }
+
+  // Graphics upgrade 4.3: at 175 % the three stars and "3/3 sao" must not push the page sideways.
+  for (const stream of ["starter", "reference"] as const) {
+    test(`keeps the ${stream} run's score on one screen width`, async ({ page }) => {
+      await mockWorkbenchApi(page, { events: () => w1Stream(stream) });
+      await page.goto(`${W1}?chieu=1`);
+      await page.getByRole("button", { name: "Mở ca" }).click();
+      await page.getByRole("button", { name: "Mở kết quả" }).click();
+      await expect(page.getByText(/^\d\/3 sao$/)).toBeVisible();
+      // At rest: a stamp lands from 1.15x, and its overshoot may reach past the edge for 180 ms.
+      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      expect(await sideways(page)).toBeLessThanOrEqual(0);
+      for (const star of await page.locator("[data-star]").all()) {
+        const box = await star.boundingBox();
+        expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= 375).toBe(true);
+      }
     });
   }
 });

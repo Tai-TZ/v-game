@@ -80,7 +80,6 @@ interface ResultsProps {
   onLook?: () => void;
 }
 
-/** Sao 3 evidence per forbidden label, in the words of `stars_vi` ("{n} câu …"). */
 /** Each earned star lands a beat after the one before it (Stamp's delays, in stars). */
 const STAR_DELAY = [
   "[animation-delay:0ms]",
@@ -88,6 +87,7 @@ const STAR_DELAY = [
   "[animation-delay:120ms]",
 ] as const;
 
+/** Sao 3 evidence per forbidden label, in the words of `stars_vi` ("{n} câu …"). */
 const LABEL_EVIDENCE: Readonly<Record<string, string>> = {
   stale_doc: "mang văn bản hết hiệu lực vào thùng",
   cite_unknown: "trích nguồn không có trong thùng",
@@ -237,7 +237,7 @@ export function Results({
           {runGraph && !sameJson(runGraph, graph) && ` · ${RECORDED_VI.notYours}`}
         </p>
       )}
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span aria-hidden="true" className="flex gap-1">
           {([0, 1, 2] as const).map((index) =>
             index < score.stars ? (
