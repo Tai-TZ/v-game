@@ -1291,6 +1291,8 @@ function Toy({
   // A guard that stopped a case wrongly still holds a passed state (it ran), but it is not a pass:
   // it shakes and cuts the belts. Its mark is the failed one, and its label says why.
   const wrongStop = fault && state === "passed";
+  // It is drawn as it reads: the failed ink and dash, not the green of the state it ran in.
+  const drawn: BlockState = wrongStop ? "error" : state;
   return (
     <g
       {...common}
@@ -1315,9 +1317,9 @@ function Toy({
             d={FOOT}
             h={h}
             top={lit ? "fill-brand-tint" : "fill-surface"}
-            stroke={TONE[state]}
+            stroke={TONE[drawn]}
             glass={seeThrough}
-            dash={DASH[state]}
+            dash={DASH[drawn]}
           />
           {seeThrough && <Inside env={env} bench={bench} type={type} x={x} y={y} h={h} />}
           <Dress
@@ -1333,7 +1335,7 @@ function Toy({
             stopped={stopped}
           />
           {locked && <Lock at={iso(x, y + FOOT, h)} />}
-          <StateMark state={wrongStop ? "error" : state} at={iso(x + FOOT, y + FOOT, h)} />
+          <StateMark state={drawn} at={iso(x + FOOT, y + FOOT, h)} />
         </g>
       </g>
     </g>

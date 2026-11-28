@@ -10,7 +10,7 @@ import {
   type Bench,
   type Env,
 } from "./bench";
-import { beatLine, columns, INK, MachineMap, TONE } from "./MachineMap";
+import { beatLine, columns, DASH, INK, MachineMap, TONE } from "./MachineMap";
 import type { BenchRunView } from "./BenchView";
 import type { BlockState } from "./run";
 import type { BlockType, EventType } from "./schema";
@@ -663,6 +663,17 @@ describe("the machine as a figure to play with", () => {
       view: { run, followed, gold: null },
     } as const;
     const markOf = () => tile("pattern_guard")?.querySelector("[data-tile-mark]");
+    // The silhouette and the faces' thin edges all carry the one tone: the three faces' own
+    // edges, or on a dashed silhouette the inner edges drawn in their place.
+    const inkOf = () => {
+      const outline = tile("pattern_guard")?.querySelector("[data-outline]");
+      const parts = [...(outline?.parentElement?.children ?? [])].filter(
+        (el) => el === outline || el.hasAttribute("data-face-edges") || el.tagName === "polygon",
+      );
+      return parts
+        .filter((el) => el.getAttribute("stroke") !== "none")
+        .map((el) => el.getAttribute("class") ?? "");
+    };
     const { rerender } = render(<MachineMap {...props} answer="pass" />);
     expect(document.querySelectorAll("[data-gauge-stop]")).toHaveLength(1);
     expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
@@ -670,6 +681,8 @@ describe("the machine as a figure to play with", () => {
     // A right stop is a pass, and says so.
     expect(markOf()?.getAttribute("data-tile-mark")).toBe("pass");
     expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt");
+    expect(inkOf()).toHaveLength(4);
+    for (const cls of inkOf()) expect(cls).toContain(TONE.passed);
 
     // The same stop on a case that should have been served: the guard is at fault.
     rerender(<MachineMap {...props} answer="fail" />);
@@ -680,6 +693,17 @@ describe("the machine as a figure to play with", () => {
     expect(markOf()?.getAttribute("data-tile-mark")).toBe("fail");
     expect(markOf()?.getAttribute("class")).toContain(TONE.error);
     expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt, chặn nhầm");
+    // The toy reads as failed everywhere: its silhouette and face edges are red, not the green of
+    // the state it ran in (which `data-tile-state` still reports), and long-dashed as an error is.
+    expect(tile("pattern_guard")?.getAttribute("data-tile-state")).toBe("passed");
+    expect(inkOf()).toHaveLength(2);
+    for (const cls of inkOf()) {
+      expect(cls).toContain(TONE.error);
+      expect(cls).not.toContain(TONE.passed);
+    }
+    expect(
+      tile("pattern_guard")?.querySelector("[data-outline]")?.getAttribute("stroke-dasharray"),
+    ).toBe(DASH.error);
     const keys = columns(w1).map((col) => col.join("+"));
     for (const belt of document.querySelectorAll("[data-pipe-after]")) {
       const index = keys.indexOf(belt.getAttribute("data-pipe-after") ?? "");
