@@ -10,11 +10,11 @@ import {
   type Bench,
   type Env,
 } from "./bench";
-import { beatLine, MachineMap } from "./MachineMap";
+import { beatLine, columns, INK, MachineMap, TONE } from "./MachineMap";
 import type { BenchRunView } from "./BenchView";
 import type { BlockState } from "./run";
 import type { BlockType, EventType } from "./schema";
-import { frame, readText, replay, testEnv } from "./test-fixtures";
+import { frame, parseSse, readText, replay, testEnv } from "./test-fixtures";
 
 afterEach(cleanup);
 
@@ -160,6 +160,59 @@ describe("the machine map at the head of the bench", () => {
     });
     expect(tile("vector_search")?.getAttribute("data-tile-state")).toBe("passed");
     expect(tile("llm")?.getAttribute("data-tile-state")).toBe("error");
+  });
+
+  it("shows each toy's state by shape, not colour alone", () => {
+    const cases: readonly {
+      type: BlockType;
+      state: BlockState;
+      mark: "pass" | "fail" | null;
+      shape: string | null;
+      dash: string | null;
+    }[] = [
+      { type: "input", state: "passed", mark: "pass", shape: "circle", dash: null },
+      { type: "llm", state: "error", mark: "fail", shape: "rect", dash: "6 4" },
+      { type: "output", state: "stale", mark: null, shape: null, dash: "2 3" },
+      { type: "chunker", state: "running", mark: null, shape: null, dash: null },
+      { type: "corpus", state: "idle", mark: null, shape: null, dash: null },
+    ];
+    draw(l1, setAttached(starter(l1), "vector_search", true), {
+      states: Object.fromEntries(cases.map((c) => [c.type, c.state])),
+    });
+    for (const { type, state, mark, shape, dash } of cases) {
+      const toy = tile(type);
+      const marks = toy?.querySelectorAll("[data-tile-mark]") ?? [];
+      expect(marks.length, `${state} mark count`).toBe(mark ? 1 : 0);
+      if (mark && shape) {
+        const badge = marks[0];
+        expect(badge?.getAttribute("data-tile-mark")).toBe(mark);
+        expect(badge?.querySelectorAll(shape).length, `${state} badge shape`).toBe(1);
+        expect(badge?.getAttribute("class")).toContain(TONE[state]);
+        expect(badge?.getAttribute("stroke-width")).toBe(String(INK.mark));
+      }
+      const outline = toy?.querySelector("[data-outline]");
+      expect(outline?.getAttribute("stroke-dasharray"), `${state} dash`).toBe(dash);
+      expect(outline?.getAttribute("class")).toContain(TONE[state]);
+      // Only the silhouette is dashed: nothing thin is solid under it, so a dashed state's faces
+      // draw no edge of their own and the three that meet inside are drawn apart, thin and solid.
+      const faces = [...(outline?.parentElement?.querySelectorAll("polygon") ?? [])].filter(
+        (face) => face !== outline,
+      );
+      expect(faces.length, `${state} faces`).toBe(3);
+      const inner = outline?.parentElement?.querySelectorAll("[data-face-edges]") ?? [];
+      expect(inner.length, `${state} inner edges`).toBe(dash ? 1 : 0);
+      for (const face of faces) {
+        expect(face.hasAttribute("stroke-dasharray")).toBe(false);
+        expect(face.getAttribute("stroke") === "none", `${state} face edge`).toBe(Boolean(dash));
+      }
+      if (dash) {
+        const edge = inner[0];
+        expect(edge?.getAttribute("stroke-width")).toBe(String(INK.edge));
+        expect(edge?.getAttribute("class")).toContain(TONE[state]);
+        expect(edge?.hasAttribute("stroke-dasharray")).toBe(false);
+        expect((edge?.getAttribute("d") ?? "").match(/M/g)?.length).toBe(3);
+      }
+    }
   });
 
   it("cannot be pressed while the bench is locked for a run", () => {
@@ -325,11 +378,42 @@ describe("the machine as a figure to play with", () => {
     expect(document.querySelectorAll("[data-glass]").length).toBe(6);
   });
 
+  it("draws each toy with a heavy silhouette over thin face edges", () => {
+    draw(l1, setAttached(starter(l1), "vector_search", true));
+    for (const seeThrough of [false, true]) {
+      if (seeThrough) fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
+      const toys = [...document.querySelectorAll('[data-tile="on"]')];
+      expect(toys.length).toBe(7);
+      for (const toy of toys) {
+        const outlines = toy.querySelectorAll("[data-outline]");
+        expect(outlines.length).toBe(1);
+        const outline = outlines[0];
+        expect(outline?.getAttribute("stroke-width")).toBe(String(INK.outline));
+        expect(outline?.getAttribute("fill")).toBe("none");
+        const faces = [...(outline?.parentElement?.querySelectorAll("polygon") ?? [])].filter(
+          (face) => face !== outline,
+        );
+        expect(faces.length).toBe(3);
+        for (const face of faces) {
+          expect(face.getAttribute("stroke-width")).toBe(String(INK.edge));
+          // The glass keeps its fill: the outline is a line, not a pane over the toy's insides.
+          if (seeThrough) expect(face.getAttribute("class")).toContain("[fill-opacity:0.28]");
+        }
+      }
+    }
+    expect(INK).toEqual({ outline: 2.4, edge: 1, fine: 1, cue: 1.6, mark: 2.5 });
+  });
+
   it("cuts the sheet inside the blade into as many pieces as it has cuts, plus one", () => {
     draw(l2, setParam(l2, starter(l2), "chunker", "chunk_size", 256));
     fireEvent.click(screen.getByRole("button", { name: "Nhìn xuyên" }));
     const cuts = tile("chunker")?.querySelectorAll("[data-gauge-cut]").length ?? 0;
     expect(tile("chunker")?.querySelectorAll("[data-piece]").length).toBe(cuts + 1);
+    // A cut carries the reading, so it is a cue line, not a hairline.
+    expect(cuts).toBeGreaterThan(0);
+    for (const cut of tile("chunker")?.querySelectorAll("[data-gauge-cut]") ?? []) {
+      expect(cut.getAttribute("stroke-width")).toBe(String(INK.cue));
+    }
   });
 
   it("lights as many stars inside the dome as passages it pulls", () => {
@@ -351,10 +435,214 @@ describe("the machine as a figure to play with", () => {
     fireEvent.click(beatButton("search"));
     const slip = document.querySelector("[data-slip]");
     expect(slip?.getAttribute("data-at")).toBe("search");
+    expect(slip?.querySelector("polygon")?.getAttribute("stroke-width")).toBe(String(INK.cue));
     const before = slip?.getAttribute("style");
     fireEvent.click(beatButton("llm"));
     expect(document.querySelector("[data-slip]")?.getAttribute("data-at")).toBe("llm");
     expect(document.querySelector("[data-slip]")?.getAttribute("style")).not.toBe(before);
+  });
+
+  it("dims everything but the pressed step's part", () => {
+    draw(l1, starter(l1));
+    expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
+
+    fireEvent.click(beatButton("llm"));
+    const tiles = [...document.querySelectorAll("[data-tile]")];
+    expect(tiles.length).toBeGreaterThan(1);
+    const [lit, rest] = [
+      tiles.filter((t) => t.getAttribute("data-tile-type") === "llm"),
+      tiles.filter((t) => t.getAttribute("data-tile-type") !== "llm"),
+    ];
+    expect(lit).toHaveLength(1);
+    expect(lit[0]?.hasAttribute("data-dimmed")).toBe(false);
+    for (const other of rest) {
+      expect(other.hasAttribute("data-dimmed")).toBe(true);
+      // Faded over an opaque backing, so the belt behind the toy cannot show through it.
+      expect(other.querySelectorAll("[data-backing]")).toHaveLength(1);
+      expect(other.querySelector("[data-backing] + [class*='opacity-']")).not.toBeNull();
+    }
+    expect(lit[0]?.querySelector("[data-backing]")).toBeNull();
+    // The belt into the pressed toy stays; the rest of the belts step back.
+    const into = document.querySelector('[data-pipe-after="context_packer"]');
+    expect(into?.hasAttribute("data-dimmed")).toBe(false);
+    const belts = [...document.querySelectorAll("[data-pipe-after]")].filter((b) => b !== into);
+    expect(belts.length).toBeGreaterThan(0);
+    for (const belt of belts) expect(belt.hasAttribute("data-dimmed")).toBe(true);
+    // The slip and the bubble stay full.
+    expect(document.querySelector("[data-slip]")?.closest("[data-dimmed]")).toBeNull();
+    expect(document.querySelector("[data-beat-bubble]")?.closest("[data-dimmed]")).toBeNull();
+
+    fireEvent.click(beatButton("llm"));
+    expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
+  });
+
+  it("keeps the branch toy and its belt full when a branch step is pressed", () => {
+    const w1 = testEnv("direct-injection");
+    draw(w1, starter(w1));
+    fireEvent.click(beatButton("tool_refund"));
+    expect(tile("tool_refund")?.hasAttribute("data-dimmed")).toBe(false);
+    expect(
+      document.querySelector('[data-pipe-branch="tool_refund"]')?.hasAttribute("data-dimmed"),
+    ).toBe(false);
+    expect(
+      document.querySelector('[data-pipe-branch="human_approval"]')?.hasAttribute("data-dimmed"),
+    ).toBe(true);
+    expect(tile("human_approval")?.hasAttribute("data-dimmed")).toBe(true);
+    expect(tile("action_llm")?.hasAttribute("data-dimmed")).toBe(true);
+    expect(document.querySelector("[data-slip]")?.closest("[data-dimmed]")).toBeNull();
+    for (const belt of document.querySelectorAll("[data-pipe-after]")) {
+      expect(belt.hasAttribute("data-dimmed")).toBe(true);
+    }
+    fireEvent.click(beatButton("tool_refund"));
+    expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
+  });
+
+  it("marks the faulted toy and the belt after it", () => {
+    const keys = columns(l1).map((col) => col.join("+"));
+    const at = keys.indexOf("chunker");
+    const { rerender } = render(
+      <MachineMap
+        env={l1}
+        bench={starter(l1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{ chunker: "error" }}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    const faults = [...document.querySelectorAll("[data-fault]")];
+    expect(faults).toHaveLength(1);
+    expect(faults[0]).toBe(tile("chunker"));
+    expect(faults[0]?.getAttribute("class")?.split(/\s+/)).toContain("motion-safe:animate-shake");
+    const belts = [...document.querySelectorAll("[data-pipe-after]")];
+    expect(belts).toHaveLength(keys.length - 1);
+    for (const belt of belts) {
+      const index = keys.indexOf(belt.getAttribute("data-pipe-after") ?? "");
+      expect(belt.hasAttribute("data-pipe-fault"), `belt after ${keys[index]}`).toBe(index >= at);
+    }
+    const cut = document.querySelector("[data-pipe-fault]");
+    expect(cut?.getAttribute("class")).toContain("stroke-danger");
+    expect(cut?.getAttribute("class")).toContain("stroke-dasharray");
+
+    rerender(
+      <MachineMap
+        env={l1}
+        bench={starter(l1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{ chunker: "idle" }}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-pipe-fault]")).toHaveLength(0);
+  });
+
+  it("carries a desk fault down the tool branch too, and a branch fault only past itself", () => {
+    const w1 = testEnv("direct-injection");
+    const branchBelts = () =>
+      [...document.querySelectorAll("[data-pipe-branch]")].map((b) =>
+        b.hasAttribute("data-pipe-fault"),
+      );
+    const props = {
+      env: w1,
+      bench: setAttached(starter(w1), "human_approval", true),
+      onChange: () => undefined,
+      disabled: false,
+      highlight: null,
+      answer: null,
+    } as const;
+    const { rerender } = render(<MachineMap {...props} states={{ action_llm: "error" }} />);
+    expect(branchBelts()).toEqual([true, true]);
+    rerender(<MachineMap {...props} states={{ human_approval: "error" }} />);
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(1);
+    // The first branch belt runs into the faulted bell; only the belt past it is cut.
+    expect(branchBelts()).toEqual([false, true]);
+    for (const belt of document.querySelectorAll("[data-pipe-after]")) {
+      expect(belt.hasAttribute("data-pipe-fault")).toBe(false);
+    }
+    // The last toy of the branch has nothing past it; neither has the output, off the branch.
+    rerender(<MachineMap {...props} states={{ tool_refund: "error" }} />);
+    expect(branchBelts()).toEqual([false, false]);
+    rerender(<MachineMap {...props} states={{ output: "error" }} />);
+    expect(branchBelts()).toEqual([false, false]);
+  });
+
+  it("faults a guard only when its stop was wrong", () => {
+    const w1 = testEnv("direct-injection");
+    const run = replay(parseSse(readText("e2e", "data", "run-w1-reference.sse")));
+    // wt-w1-t03 is a trap the net (Lưới cụm từ) rightly stops.
+    const followed = run?.cases.find((c) => c.id === "wt-w1-t03");
+    if (!run || !followed) throw new Error("the recorded W1 run does not replay");
+    const props = {
+      env: w1,
+      bench: setAttached(starter(w1), "pattern_guard", true),
+      onChange: () => undefined,
+      disabled: false,
+      highlight: null,
+      states: { pattern_guard: "passed" },
+      view: { run, followed, gold: null },
+    } as const;
+    const markOf = () => tile("pattern_guard")?.querySelector("[data-tile-mark]");
+    const { rerender } = render(<MachineMap {...props} answer="pass" />);
+    expect(document.querySelectorAll("[data-gauge-stop]")).toHaveLength(1);
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
+    expect(document.querySelectorAll("[data-pipe-fault]")).toHaveLength(0);
+    // A right stop is a pass, and says so.
+    expect(markOf()?.getAttribute("data-tile-mark")).toBe("pass");
+    expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt");
+
+    // The same stop on a case that should have been served: the guard is at fault.
+    rerender(<MachineMap {...props} answer="fail" />);
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(1);
+    expect(tile("pattern_guard")?.hasAttribute("data-fault")).toBe(true);
+    // It shakes and cuts the belts, so it must not wear a tick or say "đạt": a crossed square,
+    // in the danger tone, and a label that says the stop was wrong.
+    expect(markOf()?.getAttribute("data-tile-mark")).toBe("fail");
+    expect(markOf()?.getAttribute("class")).toContain(TONE.error);
+    expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt, chặn nhầm");
+    const keys = columns(w1).map((col) => col.join("+"));
+    for (const belt of document.querySelectorAll("[data-pipe-after]")) {
+      const index = keys.indexOf(belt.getAttribute("data-pipe-after") ?? "");
+      expect(belt.hasAttribute("data-pipe-fault")).toBe(index >= keys.indexOf("pattern_guard"));
+    }
+    // An unanswered board is no verdict.
+    rerender(<MachineMap {...props} answer={null} />);
+    expect(document.querySelectorAll("[data-fault]")).toHaveLength(0);
+    expect(markOf()?.getAttribute("data-tile-mark")).toBe("pass");
+    expect(tile("pattern_guard")?.getAttribute("aria-label")).toBe("Lưới cụm từ: Đạt");
+  });
+
+  it("dims nothing when the pressed beat is gone from the level", () => {
+    const w1 = testEnv("direct-injection");
+    const { rerender } = render(
+      <MachineMap
+        env={w1}
+        bench={starter(w1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{}}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    fireEvent.click(beatButton("tool_refund"));
+    expect(document.querySelectorAll("[data-dimmed]").length).toBeGreaterThan(0);
+    rerender(
+      <MachineMap
+        env={l1}
+        bench={starter(l1)}
+        onChange={() => undefined}
+        disabled={false}
+        states={{}}
+        highlight={null}
+        answer={null}
+      />,
+    );
+    expect(document.querySelectorAll("[data-tile]").length).toBeGreaterThan(1);
+    expect(document.querySelectorAll("[data-dimmed]")).toHaveLength(0);
   });
 
   it("narrates the beat in a bubble over the machine", () => {

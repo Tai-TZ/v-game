@@ -331,6 +331,11 @@ type P = readonly [number, number];
 const iso = (x: number, y: number, z: number): P => [(x - y) * C * S, (x + y) * 0.5 * S - z * S];
 const pts = (list: readonly P[]) =>
   list.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(" ");
+/** Lines from one point out to several, as one path. */
+const edges = (from: P, to: readonly P[]) =>
+  to
+    .map(([a, b]) => `M${from[0].toFixed(1)},${from[1].toFixed(1)}L${a.toFixed(1)},${b.toFixed(1)}`)
+    .join("");
 const quad = (x: number, y: number, w: number, d: number, z: number) =>
   pts([iso(x, y, z), iso(x + w, y, z), iso(x + w, y + d, z), iso(x, y + d, z)]);
 
@@ -394,7 +399,54 @@ const rowOf = (index: number, at: number) => (index + at) % 2;
 /** The front toy of a pair, whose tag hangs below. */
 const frontOf = (col: Column, at: number) => col.length > 1 && at === 1;
 
-/** Three faces of a box: the top in its own token, the two sides darker by a fixed rule. */
+/**
+ * A toy or belt off the pressed step's path. 70% is the lowest 5% step at which
+ * EVERY tone of a toy's outline holds 3:1 against the frame (WCAG 1.4.11), not just the idle ink:
+ * a run leaves outlines green, red, amber and teal or blue, and those are paler once faded.
+ * Contrast of the faded outline over the frame's white, town / campus theme (e2e "keeps a dimmed toy's
+ * outline at 3:1" and "run-state outline ... after W1's recorded run", both themes):
+ *
+ *   opacity   fg          success     warning     danger      brand       lowest
+ *   55%       3.51 3.36   2.51 2.66   2.51 2.54   2.74 2.66   2.45 2.82   2.45
+ *   60%       4.06 3.86   2.77 2.95   2.77 2.80   3.04 2.93   2.70 3.15   2.70
+ *   65%       4.73 4.47   3.06 3.29   3.07 3.11   3.37 3.23   2.98 3.54   2.98
+ *   70%       5.54 5.20   3.39 3.68   3.40 3.45   3.73 3.55   3.30 3.99   3.30
+ *
+ * (66% would just clear, at 3.04; 70% is a Tailwind step and keeps a margin for rounding.)
+ * STEPPED is its resting twin, so the fade is a transition both ways. A dimmed toy is faded over
+ * an opaque backing in the frame's own colour (`backing` in `Toy`): a bare group opacity would
+ * let the belt behind it show through the box.
+ */
+const STEPPED = "transition-opacity duration-150 motion-reduce:transition-none";
+const DIMMED = `opacity-70 ${STEPPED}`;
+/** A faulted toy knocks once; not at all with reduced motion, where the class never applies. */
+const SHAKE = "motion-safe:animate-shake";
+/** A belt cut short: no fill, a dashed red line. After an empty search socket, or a faulted toy. */
+const CUT = "fill-none stroke-danger [stroke-dasharray:4_3]";
+
+/**
+ * The ink weights of a technical drawing: a heavy outline round the whole toy, the base and the
+ * belts, thin edges between faces, on dressings and on leaders, and a middle weight for a line
+ * that carries information (a blade's cut, the question slip), which a hairline would lose.
+ * One unit is one px.
+ */
+export const INK = { outline: 2.4, edge: 1, fine: 1, cue: 1.6, mark: 2.5 } as const;
+
+/** The six corners of a box's silhouette: its top and its two near sides, as `iso` draws them. */
+const hexagon = (x: number, y: number, z: number, w: number, d: number, t: number) => [
+  iso(x, y, t),
+  iso(x + w, y, t),
+  iso(x + w, y, z),
+  iso(x + w, y + d, z),
+  iso(x, y + d, z),
+  iso(x, y + d, t),
+];
+
+/**
+ * Three faces of a box: the top in its own token, the two sides darker by a fixed rule. The faces
+ * share thin edges; one heavy hexagon round the three is the toy's silhouette. A small dressing
+ * on a toy has no silhouette of its own (`outline={false}`).
+ */
 function Box({
   x,
   y,
@@ -405,6 +457,8 @@ function Box({
   top = "fill-surface",
   stroke = "stroke-fg",
   glass = false,
+  outline = true,
+  dash,
 }: {
   x: number;
   y: number;
@@ -416,13 +470,25 @@ function Box({
   stroke?: string;
   /** See-through: the faces turn to glass so what the toy holds shows inside it. */
   glass?: boolean;
+  /** The heavy silhouette over the faces' thin edges; 3 rather than 2.4 on the projector. */
+  outline?: boolean;
+  /** A dash pattern for the silhouette: a state told by its line, not its colour alone. */
+  dash?: string | undefined;
 }) {
   const t = z + h;
   const pane = glass ? "[fill-opacity:0.28]" : "";
+  // A dashed silhouette must not lie on a thin solid line (the faces' own outer edges): that reads
+  // as heavy dashes on a hairline. So the faces draw no edge, and the three that meet inside the
+  // box are drawn on their own, below.
+  const dashed = Boolean(dash) && outline;
+  const faceInk = dashed ? "" : stroke;
+  const faceEdge = dashed ? { stroke: "none" } : {};
   return (
-    <g strokeWidth="1.6" strokeLinejoin="round" {...(glass ? { "data-glass": "" } : {})}>
+    <g strokeLinejoin="round" {...(glass ? { "data-glass": "" } : {})}>
       <polygon
-        className={`fill-line ${pane} ${stroke}`}
+        className={`fill-line ${pane} ${faceInk}`}
+        strokeWidth={INK.edge}
+        {...faceEdge}
         points={pts([
           iso(x + w, y, z),
           iso(x + w, y + d, z),
@@ -431,7 +497,9 @@ function Box({
         ])}
       />
       <polygon
-        className={`fill-subtle ${pane} ${stroke}`}
+        className={`fill-subtle ${pane} ${faceInk}`}
+        strokeWidth={INK.edge}
+        {...faceEdge}
         points={pts([
           iso(x, y + d, z),
           iso(x + w, y + d, z),
@@ -439,12 +507,41 @@ function Box({
           iso(x, y + d, t),
         ])}
       />
-      <polygon className={`${top} ${pane} ${stroke}`} points={quad(x, y, w, d, t)} />
+      <polygon
+        className={`${top} ${pane} ${faceInk}`}
+        strokeWidth={INK.edge}
+        {...faceEdge}
+        points={quad(x, y, w, d, t)}
+      />
+      {dashed && (
+        <path
+          data-face-edges=""
+          fill="none"
+          className={stroke}
+          strokeWidth={INK.edge}
+          d={edges(iso(x + w, y + d, t), [
+            iso(x + w, y, t),
+            iso(x, y + d, t),
+            iso(x + w, y + d, z),
+          ])}
+        />
+      )}
+      {outline && (
+        <polygon
+          data-outline=""
+          fill="none"
+          className={`${stroke} chieu:[stroke-width:3]`}
+          strokeWidth={INK.outline}
+          strokeLinejoin="round"
+          {...(dash ? { strokeDasharray: dash } : {})}
+          points={pts(hexagon(x, y, z, w, d, t))}
+        />
+      )}
     </g>
   );
 }
 
-const TONE: Readonly<Record<BlockState, string>> = {
+export const TONE: Readonly<Record<BlockState, string>> = {
   idle: "stroke-fg",
   stale: "stroke-warning",
   queued: "stroke-fg",
@@ -452,6 +549,12 @@ const TONE: Readonly<Record<BlockState, string>> = {
   passed: "stroke-success",
   error: "stroke-danger",
 };
+
+/**
+ * The silhouette's dash by state, so error and stale read without colour: error is long-dashed,
+ * stale short-dotted. Every other state is a solid line.
+ */
+export const DASH: Partial<Record<BlockState, string>> = { error: "6 4", stale: "2 3" };
 
 /** How far a socket and its callout reach either side of its centre, in drawing units. */
 const SOCKET_REACH = 56;
@@ -567,6 +670,24 @@ export function MachineMap({
   const active = new Set<BlockType>(
     forkIndex !== -1 ? fork.slice(forkIndex, forkIndex + 1) : (cols[beatIndex] ?? []),
   );
+  // While a beat is pressed, every toy and belt off its path steps back (§4.1.3). The path is the
+  // active column's toy, the belt into it (the branch belt for a branch toy), the slip, the bubble.
+  // A beat that matches no column or fork (a stale id from another level) dims nothing.
+  const focused = beatIndex !== -1 || forkIndex !== -1;
+  const beltInto = (key: string) => {
+    if (!focused) return false;
+    return forkIndex === -1 && cols[beatIndex - 1]?.join("+") === key;
+  };
+  // A toy is faulted when its state is error, or it holds the bar of the guard that stopped the
+  // followed case wrongly (the case's verdict is a fail). A guard that rightly stops an attack is
+  // doing its job: no shake, no red belt. Every belt past a fault runs red, until the states
+  // change; the tool branch hangs off the desk, so it is past every toy up to and including the
+  // desk, and a branch toy only cuts the belts after itself.
+  const faulted = (type: BlockType) =>
+    attached(type) && (states[type] === "error" || (stopped === type && answer === "fail"));
+  const faultCol = cols.findIndex((col) => col.some(faulted));
+  const faultFork = fork.findIndex(faulted);
+  const pastDesk = faultCol !== -1 && faultCol <= Math.max(deskIndex, 0);
   // The question slip rides the belt and stops just before the toy of the beat; on the branch
   // it is the slip the desk wrote, riding down to the bell and the refund desk.
   const slipAt =
@@ -741,7 +862,7 @@ export function MachineMap({
               </filter>
             </defs>
 
-            <g aria-hidden="true" strokeWidth="1.6" strokeLinejoin="round">
+            <g aria-hidden="true" strokeWidth={INK.outline} strokeLinejoin="round">
               {/* A flat shadow, offset, under the slab (no blur: art bible §1.3). */}
               <polygon
                 className="fill-brand-tint"
@@ -821,16 +942,24 @@ export function MachineMap({
               {fork.map((type, k) => {
                 const gated = fork.includes("human_approval") && attached("human_approval");
                 const from = k === 0 ? desk : forkCentre(k - 1);
+                const dim = focused && forkIndex !== k;
+                const cut = pastDesk || (faultFork !== -1 && k > faultFork);
                 return (
                   <polygon
                     key={type}
                     aria-hidden="true"
                     data-pipe-branch={type}
                     data-pipe={gated ? "gated" : "unguarded"}
-                    className={
-                      gated ? "fill-line-strong stroke-fg" : "fill-danger-tint stroke-danger"
-                    }
-                    strokeWidth="1.4"
+                    {...(cut ? { "data-pipe-fault": "" } : {})}
+                    {...(dim ? { "data-dimmed": "" } : {})}
+                    className={`${
+                      cut
+                        ? CUT
+                        : gated
+                          ? "fill-line-strong stroke-fg"
+                          : "fill-danger-tint stroke-danger"
+                    } ${dim ? DIMMED : STEPPED}`}
+                    strokeWidth={INK.outline}
                     points={pts([
                       along(from, BELT, 0, 0),
                       along(from, BELT, FORK / U, 0),
@@ -844,6 +973,8 @@ export function MachineMap({
                 const key = col.join("+");
                 const broken = col.every(isSearch) && !col.some(attached);
                 const from = centre(index);
+                const dim = focused && !beltInto(key);
+                const cut = faultCol !== -1 && index >= faultCol;
                 return (
                   <g key={key} data-column={key}>
                     {/* The belt to the next toy, cut after an empty search socket. */}
@@ -852,12 +983,12 @@ export function MachineMap({
                         aria-hidden="true"
                         data-pipe-after={key}
                         data-pipe={broken ? "broken" : "flow"}
-                        className={
-                          broken
-                            ? "fill-none stroke-danger [stroke-dasharray:4_3]"
-                            : "fill-line-strong stroke-fg"
-                        }
-                        strokeWidth="1.4"
+                        {...(cut ? { "data-pipe-fault": "" } : {})}
+                        {...(dim ? { "data-dimmed": "" } : {})}
+                        className={`${
+                          broken || cut ? CUT : "fill-line-strong stroke-fg"
+                        } ${dim ? DIMMED : STEPPED}`}
+                        strokeWidth={INK.outline}
                         points={pts([
                           along(from, 0, BELT, 0),
                           along(from, STEP / U, BELT, 0),
@@ -879,7 +1010,9 @@ export function MachineMap({
                           on={attached(type)}
                           disabled={disabled}
                           state={states[type] ?? "idle"}
+                          fault={faulted(type)}
                           lit={highlight === type || active.has(type)}
+                          dimmed={focused && !active.has(type)}
                           answer={type === "output" ? answer : null}
                           seeThrough={seeThrough}
                           packed={packed}
@@ -906,7 +1039,9 @@ export function MachineMap({
                       on={attached(type)}
                       disabled={disabled}
                       state={states[type] ?? "idle"}
+                      fault={faulted(type)}
                       lit={highlight === type || active.has(type)}
+                      dimmed={focused && !active.has(type)}
                       answer={null}
                       seeThrough={seeThrough}
                       packed={packed}
@@ -981,7 +1116,7 @@ export function MachineMap({
               >
                 <polygon
                   className="fill-surface stroke-fg"
-                  strokeWidth="1.4"
+                  strokeWidth={INK.cue}
                   points={pts([
                     iso(-0.3, -0.3, 0.05),
                     iso(0.3, -0.3, 0.05),
@@ -1062,7 +1197,9 @@ function Toy({
   on,
   disabled,
   state,
+  fault,
   lit,
+  dimmed,
   answer,
   seeThrough,
   packed,
@@ -1079,7 +1216,10 @@ function Toy({
   on: boolean;
   disabled: boolean;
   state: BlockState;
+  /** The toy is at fault: it knocks once, and its belts after it run red. */
+  fault: boolean;
   lit: boolean;
+  dimmed: boolean;
   answer: "pass" | "fail" | null;
   seeThrough: boolean;
   packed: number;
@@ -1098,6 +1238,7 @@ function Toy({
     tabIndex: disabled ? -1 : 0,
     "aria-disabled": disabled,
     "data-tile-type": type,
+    ...(dimmed ? { "data-dimmed": "" } : {}),
     onClick: () => {
       if (!disabled) act();
     },
@@ -1110,6 +1251,12 @@ function Toy({
   } as const;
 
   const h = HEIGHT[type];
+  const fade = dimmed ? DIMMED : STEPPED;
+  /** What a dimmed toy is faded over: the card's colour, under its drawing, so no belt shows. */
+  const backing = (points: string) =>
+    dimmed && (
+      <polygon aria-hidden="true" data-backing="" className="fill-surface" points={points} />
+    );
   const focusRing = (
     <polygon
       aria-hidden="true"
@@ -1123,59 +1270,103 @@ function Toy({
     const [cx, cy] = iso(x + FOOT / 2, y + FOOT / 2, 0);
     return (
       <g {...common} data-tile="empty" aria-label={`Gắn ${toy}`}>
-        <polygon
-          points={footprint}
-          className="fill-surface stroke-danger [stroke-dasharray:4_3]"
-          strokeWidth="1.5"
-        />
-        <path
-          d={`M${cx - 6} ${cy}h12M${cx} ${cy - 6}v12`}
-          className="stroke-danger"
-          strokeWidth="2"
-        />
+        {backing(footprint)}
+        <g className={fade}>
+          <polygon
+            points={footprint}
+            className="fill-surface stroke-danger [stroke-dasharray:4_3]"
+            strokeWidth="1.5"
+          />
+          <path
+            d={`M${cx - 6} ${cy}h12M${cx} ${cy - 6}v12`}
+            className="stroke-danger"
+            strokeWidth="2"
+          />
+        </g>
         {focusRing}
       </g>
     );
   }
 
+  // A guard that stopped a case wrongly still holds a passed state (it ran), but it is not a pass:
+  // it shakes and cuts the belts. Its mark is the failed one, and its label says why.
+  const wrongStop = fault && state === "passed";
   return (
     <g
       {...common}
       data-tile="on"
       data-tile-state={state}
+      {...(fault ? { "data-fault": "" } : {})}
+      className={fault ? `${common.className} ${SHAKE}` : common.className}
       {...(locked ? { "data-locked": "" } : {})}
-      aria-label={`${toy}: ${BLOCK_STATE_VI[state]}${locked ? ", khóa ở màn này" : ""}`}
+      aria-label={`${toy}: ${BLOCK_STATE_VI[state]}${wrongStop ? ", chặn nhầm" : ""}${locked ? ", khóa ở màn này" : ""}`}
     >
       {focusRing}
       {/* The active toy lifts once and settles; nothing moves on its own. */}
       <g
         className={`transition-transform duration-200 motion-reduce:transition-none ${lit ? "-translate-y-1.5" : ""}`}
       >
-        <Box
-          x={x}
-          y={y}
-          w={FOOT}
-          d={FOOT}
-          h={h}
-          top={lit ? "fill-brand-tint" : "fill-surface"}
-          stroke={TONE[state]}
-          glass={seeThrough}
-        />
-        {seeThrough && <Inside env={env} bench={bench} type={type} x={x} y={y} h={h} />}
-        <Dress
-          env={env}
-          bench={bench}
-          type={type}
-          x={x}
-          y={y}
-          h={h}
-          answer={answer}
-          packed={packed}
-          entries={entries}
-          stopped={stopped}
-        />
-        {locked && <Lock at={iso(x, y + FOOT, h)} />}
+        {backing(pts(hexagon(x, y, 0, FOOT, FOOT, h)))}
+        <g className={fade}>
+          <Box
+            x={x}
+            y={y}
+            w={FOOT}
+            d={FOOT}
+            h={h}
+            top={lit ? "fill-brand-tint" : "fill-surface"}
+            stroke={TONE[state]}
+            glass={seeThrough}
+            dash={DASH[state]}
+          />
+          {seeThrough && <Inside env={env} bench={bench} type={type} x={x} y={y} h={h} />}
+          <Dress
+            env={env}
+            bench={bench}
+            type={type}
+            x={x}
+            y={y}
+            h={h}
+            answer={answer}
+            packed={packed}
+            entries={entries}
+            stopped={stopped}
+          />
+          {locked && <Lock at={iso(x, y + FOOT, h)} />}
+          <StateMark state={wrongStop ? "error" : state} at={iso(x + FOOT, y + FOOT, h)} />
+        </g>
       </g>
+    </g>
+  );
+}
+
+/**
+ * A badge at a toy's top-front corner for the two states that end a run: a ticked circle for
+ * passed, a crossed square for error. Drawn last, so it sits over the toy and lifts with it.
+ */
+function StateMark({ state, at: [x, y] }: { state: BlockState; at: P }) {
+  if (state !== "passed" && state !== "error") return null;
+  const pass = state === "passed";
+  return (
+    <g
+      data-tile-mark={pass ? "pass" : "fail"}
+      aria-hidden="true"
+      className={`fill-surface ${TONE[state]}`}
+      strokeWidth={INK.mark}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {pass ? (
+        <>
+          <circle cx={x} cy={y} r="6" />
+          <path d={`M${x - 3} ${y}l2 2.5l4 -5`} fill="none" />
+        </>
+      ) : (
+        <>
+          <rect x={x - 5.5} y={y - 5.5} width="11" height="11" />
+          <path d={`M${x - 2.5} ${y - 2.5}l5 5m0 -5l-5 5`} fill="none" />
+        </>
+      )}
     </g>
   );
 }
@@ -1263,7 +1454,7 @@ function Callout({
     const end = fx - 14;
     return (
       <g aria-hidden="true" data-callout={type} className={className} onClick={onPress}>
-        <line x1={fx} y1={fy} x2={end} y2={fy} className="stroke-fg" strokeWidth="1" />
+        <line x1={fx} y1={fy} x2={end} y2={fy} className="stroke-fg" strokeWidth={INK.fine} />
         <rect
           x={end - w}
           y={top}
@@ -1271,7 +1462,7 @@ function Callout({
           height={TAG}
           rx="4"
           className="fill-surface stroke-fg"
-          strokeWidth="1.2"
+          strokeWidth={INK.edge}
         />
         <text
           x={end - w / 2}
@@ -1292,7 +1483,7 @@ function Callout({
         x2={fx}
         y2={below ? top : top + TAG}
         className="stroke-fg"
-        strokeWidth="1"
+        strokeWidth={INK.fine}
       />
       <rect
         x={fx - w / 2}
@@ -1301,7 +1492,7 @@ function Callout({
         height={TAG}
         rx="4"
         className="fill-surface stroke-fg"
-        strokeWidth="1.2"
+        strokeWidth={INK.edge}
       />
       <text
         x={fx}
@@ -1341,7 +1532,7 @@ function Inside({
     <g
       aria-hidden="true"
       data-internal={type}
-      strokeWidth="1"
+      strokeWidth={INK.fine}
       strokeLinejoin="round"
       className="stroke-fg"
     >
@@ -1516,7 +1707,7 @@ function Inside({
 
 function Lock({ at: [x, y] }: { at: P }) {
   return (
-    <g aria-hidden="true" className="fill-surface stroke-fg-muted" strokeWidth="1.2">
+    <g aria-hidden="true" className="fill-surface stroke-fg-muted" strokeWidth={INK.edge}>
       <rect x={x + 3} y={y - 4} width="8" height="7" rx="1" />
       <path d={`M${x + 5} ${y - 4}v-2a2 2 0 0 1 4 0v2`} className="fill-none" />
     </g>
@@ -1567,7 +1758,7 @@ function Dress({
   const params = slotParams(env, bench, type);
   const [tx, ty] = iso(x + FOOT / 2, y + FOOT / 2, h);
   const g = (children: ReactNode) => (
-    <g aria-hidden="true" strokeWidth="1.2" strokeLinejoin="round" className="stroke-fg">
+    <g aria-hidden="true" strokeWidth={INK.edge} strokeLinejoin="round" className="stroke-fg">
       {children}
     </g>
   );
@@ -1595,6 +1786,7 @@ function Dress({
             d={0.7}
             h={doc.includes("2019") ? 0.6 : 0.9}
             top={doc.includes("2019") ? "fill-warning-tint" : "fill-brand-tint"}
+            outline={false}
           />
         )),
       );
@@ -1617,11 +1809,20 @@ function Dress({
                 x2={bx}
                 y2={by}
                 className="stroke-danger"
-                strokeWidth="1.6"
+                strokeWidth={INK.cue}
               />
             );
           })}
-          <Box x={x + 1.5} y={y + 0.2} z={h} w={0.08} d={1.2} h={0.55} top="fill-line-strong" />
+          <Box
+            x={x + 1.5}
+            y={y + 0.2}
+            z={h}
+            w={0.08}
+            d={1.2}
+            h={0.55}
+            top="fill-line-strong"
+            outline={false}
+          />
         </>,
       );
     }
@@ -1699,7 +1900,16 @@ function Dress({
           ))}
           {params.cite_ids === true && (
             <g data-gauge-stamp="">
-              <Box x={x + 1.1} y={y - 0.1} z={h} w={0.35} d={0.35} h={0.3} top="fill-brand" />
+              <Box
+                x={x + 1.1}
+                y={y - 0.1}
+                z={h}
+                w={0.35}
+                d={0.35}
+                h={0.3}
+                top="fill-brand"
+                outline={false}
+              />
             </g>
           )}
         </>,
@@ -1856,7 +2066,7 @@ function Dress({
               data-verdict="pass"
               d={`M${mx - 7} ${my}l5 5l9 -10`}
               className="fill-none stroke-success"
-              strokeWidth="2.5"
+              strokeWidth={INK.mark}
             />
           )}
           {answer === "fail" && (
@@ -1864,7 +2074,7 @@ function Dress({
               data-verdict="fail"
               d={`M${mx - 6} ${my - 6}l12 12M${mx + 6} ${my - 6}l-12 12`}
               className="stroke-danger"
-              strokeWidth="2.5"
+              strokeWidth={INK.mark}
             />
           )}
           {answer === null && (
